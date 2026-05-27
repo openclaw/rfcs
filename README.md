@@ -82,9 +82,9 @@ template currently uses these metadata keys:
 The expected top-level sections are:
 
 - `Summary`
+- `Motivation`
 - `Goals`
 - `Non-Goals`
-- `Motivation`
 - `Proposal`
 - `Rationale`
 - `Unresolved questions`
@@ -98,9 +98,9 @@ The expected top-level sections are:
 - Keep assets specific to one RFC in that RFC's own `<id>/` directory rather
   than creating a shared global asset folder.
 - Keep `Summary` to one paragraph.
+- Use `Motivation` to explain why the change is necessary.
 - Use `Goals` to define what success looks like for the proposal.
 - Use `Non-Goals` to define what is intentionally out of scope.
-- Use `Motivation` to explain why the change is necessary.
 - Use `Proposal` to describe what is changing.
 - Use `Rationale` to compare alternatives and explain the tradeoffs in the
   chosen design.

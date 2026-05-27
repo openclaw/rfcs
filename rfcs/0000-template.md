@@ -17,6 +17,10 @@ rfc_pr: <pull request URL or TBD>
 
 One paragraph explanation of the feature.
 
+## Motivation
+
+Why this is necessary.
+
 ## Goals
 
 What success looks like for this proposal.
@@ -24,10 +28,6 @@ What success looks like for this proposal.
 ## Non-Goals
 
 What this proposal intentionally does not address.
-
-## Motivation
-
-Why this is necessary.
 
 ## Proposal
 
