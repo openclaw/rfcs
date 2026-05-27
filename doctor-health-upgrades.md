@@ -255,23 +255,65 @@ structured `detect` only.
 
 ## Example Migration
 
-The shell completion Doctor rule is a good first example. It can keep its
-existing positional contribution and legacy repair behavior while declaring a
-structured core health id:
+The shell completion Doctor rule is a good first example because it shows both
+the current bridge shape and the target contribution-owned shape.
+
+### Merged bridge shape
+
+The first merged shell-completion migration registered
+`core/doctor/shell-completion` as a structured health check and kept real repair
+on the existing positional Doctor path. In simplified form, that looked like
+this:
+
+```ts
+const SHELL_COMPLETION_CHECK_ID = "core/doctor/shell-completion";
+
+registerHealthCheck({
+  id: SHELL_COMPLETION_CHECK_ID,
+  kind: "core",
+  description: "Shell completion profile and cache are ready.",
+  async run(ctx, scope) {
+    const { runShellCompletionHealth } = await import(
+      "../commands/doctor-completion.js"
+    );
+    return runShellCompletionHealth(ctx, scope);
+  },
+});
+```
+
+The Doctor contribution still owned the user's normal `doctor --fix`
+experience, and the structured check supplied lint/dry-run data for
+`core/doctor/shell-completion`. The bridge also had to keep that check out of
+broad structured repair so it did not run twice or move out of its positional
+Doctor slot.
+
+That was a safe first step, but it is not the desired final pattern for core
+Doctor rules.
+
+### Target contribution-owned shape
+
+The target shape is for the existing Doctor contribution to declare the
+structured health beside the legacy real repair path:
 
 ```ts
 createDoctorHealthContribution({
   id: "doctor:shell-completion",
   label: "Shell completion",
-  healthCheckIds: ["core/doctor/shell-completion"],
-  run: runShellCompletionHealth,
+  healthChecks: {
+    id: "core/doctor/shell-completion",
+    description: "Shell completion profile and cache are ready.",
+    async run(ctx, scope) {
+      return runShellCompletionHealth(ctx, scope);
+    },
+  },
+  run: runLegacyShellCompletionDoctorRepair,
 })
 ```
 
-After that change, `doctor --lint` can report
-`core/doctor/shell-completion` through the ordered core contribution path,
-while `doctor --fix` still runs the existing shell-completion repair behavior
-in its original Doctor slot.
+In this shape, `doctor --lint` reports `core/doctor/shell-completion` through
+the ordered core contribution path, while `doctor --fix` can continue to use the
+legacy repair path until the rule intentionally moves fully behind structured
+health.
 
 This is the intended migration shape for most early Doctor upgrades: add
 structured findings first, keep the real repair path stable, and grow dry-run
