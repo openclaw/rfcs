@@ -66,6 +66,42 @@ The final health gate remains `doctor --lint`. Policy-specific authoring and
 audit workflows can run `openclaw policy check`, but policy findings should also
 flow into doctor so operators have one shared lint signal.
 
+## Current Problems
+
+### Policy can drift toward parallel configuration
+
+As policy grows, there is pressure to mirror every OpenClaw setting in
+`policy.jsonc`. That would make policy harder to review, harder to keep current,
+and ambiguous about which file actually controls runtime behavior.
+
+Policy 1.0 should stay focused on conformance questions that can be answered
+from observed OpenClaw configuration and workspace declarations.
+
+### Evidence quality varies by surface
+
+Some posture is directly observable from config, such as configured channels,
+provider ids, MCP server ids, and Gateway bind posture. Other posture depends on
+runtime-specific details or secret material that policy should not inspect.
+
+A policy field without attributable evidence should fail as unobservable for
+that target instead of becoming a best-effort pass.
+
+### Baselines and scoped policy need shared comparison rules
+
+Enterprise baselines and per-agent or per-channel overlays both need to answer
+whether one policy is equal or stricter than another. If each check implements
+that comparison separately, scoped overlays and baseline comparison will drift.
+
+Strictness metadata should be owned with the policy schema so baseline compare,
+scoped overlay validation, and future repair previews use the same rules.
+
+### Runtime enforcement is easy to overclaim
+
+Policy findings can identify nonconforming config, but they are not runtime
+authorization decisions by themselves. Any future enforcement must name the
+runtime hook, evidence, and tests that prove the same contract at the point of
+use.
+
 ## Proposed Contract
 
 ### Policy is authored, not inferred
