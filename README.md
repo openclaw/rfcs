@@ -1,6 +1,6 @@
-![OpenClaw RFCs banner](docs/assets/readme-banner.jpg)
-
 # OpenClaw RFCs
+
+![OpenClaw RFCs banner](docs/assets/readme-banner.jpg)
 
 This repository stores design proposals and longer-form technical decisions for
 OpenClaw.
