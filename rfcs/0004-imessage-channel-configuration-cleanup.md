@@ -1,4 +1,13 @@
-# iMessage Channel Configuration Cleanup
+---
+title: iMessage Channel Configuration Cleanup
+authors:
+  - omarshahine
+created: 2026-05-27
+last_updated: 2026-05-29
+rfc_pr: TBD
+---
+
+# Proposal: iMessage Channel Configuration Cleanup
 
 ## Summary
 
@@ -6,30 +15,13 @@ Simplify the iMessage channel configuration surface by moving expected reliabili
 behavior into defaults, preserving true safety and operations controls, and
 hiding or deprecating knobs that expose implementation details.
 
+## Motivation
+
 The current iMessage config surface mixes user-facing policy, bridge operations,
 generic channel behavior, and legacy compatibility fields. This makes setup
 harder than it needs to be: users must discover opt-in settings for behavior
 they reasonably expect, while advanced fields appear equally important in docs
 and schema output.
-
-## Goals
-
-- Make common iMessage behavior work with less configuration.
-- Keep explicit controls for privacy, security, and deployment variance.
-- Keep shipped configs compatible unless there is a deliberate migration path.
-- Reduce docs and setup emphasis on low-level transport and generic channel
-  internals.
-- Clarify which options are basic setup, advanced operations, compatibility, or
-  planned deprecation.
-
-## Non-Goals
-
-- Removing multi-account iMessage support.
-- Removing group allowlists, pairing, or config-write authorization.
-- Changing the iMessage bridge dependency or replacing `imsg`.
-- Removing generic channel config support from other channels.
-
-## Current Problems
 
 ### Expected behavior is opt-in
 
@@ -64,9 +56,28 @@ not imply they are core iMessage concepts.
 runtime consumer has been identified. If there is no generic consumer, it should
 be removed or deprecated.
 
-## Proposed Classification
+## Goals
 
-### Basic setup
+- Make common iMessage behavior work with less configuration.
+- Keep explicit controls for privacy, security, and deployment variance.
+- Keep shipped configs compatible unless there is a deliberate migration path.
+- Reduce docs and setup emphasis on low-level transport and generic channel
+  internals.
+- Clarify which options are basic setup, advanced operations, compatibility, or
+  planned deprecation.
+
+## Non-Goals
+
+- Removing multi-account iMessage support.
+- Removing group allowlists, pairing, or config-write authorization.
+- Changing the iMessage bridge dependency or replacing `imsg`.
+- Removing generic channel config support from other channels.
+
+## Proposal
+
+### Field classification
+
+#### Basic setup
 
 These fields remain visible in basic setup and examples:
 
@@ -85,7 +96,7 @@ These fields remain visible in basic setup and examples:
 - `defaultAccount`: selects the default account when multiple accounts exist.
 - `name`: display label for account lists.
 
-### Default or collapse
+#### Default or collapse
 
 These should stop being prominent opt-in settings:
 
@@ -101,7 +112,7 @@ These should stop being prominent opt-in settings:
 - `remoteAttachmentRoots`: default to `attachmentRoots` and keep as an advanced
   override only when remote and local paths differ.
 
-### Keep advanced
+#### Keep advanced
 
 These options should remain user-configurable but move out of basic setup docs:
 
@@ -114,7 +125,7 @@ These options should remain user-configurable but move out of basic setup docs:
 - `groups.*.tools`: group-specific tool authority policy.
 - `groups.*.toolsBySender`: sender-specific group tool authority policy.
 
-### Keep compatible, hide from iMessage docs
+#### Keep compatible, hide from iMessage docs
 
 These fields should remain schema-compatible, but documentation should frame
 them as shared channel/session behavior or omit them from iMessage setup:
@@ -127,7 +138,7 @@ them as shared channel/session behavior or omit them from iMessage setup:
 - `dms`: generic per-DM overrides.
 - `blockStreaming`: generic reply pipeline override.
 
-### Deprecate or migrate
+#### Deprecate or migrate
 
 These fields should get a compatibility plan:
 
@@ -142,7 +153,7 @@ These fields should get a compatibility plan:
   prompt/config sprawl. Keep only if cross-channel group prompt policy is an
   intentional product surface.
 
-### Keep as explicit safety or authority boundaries
+#### Keep as explicit safety or authority boundaries
 
 These options should not be removed as part of cleanup:
 
@@ -151,7 +162,7 @@ These options should not be removed as part of cleanup:
 - `groups.*.tools`: controls tool authority in group conversations.
 - `groups.*.toolsBySender`: controls sender-specific tool authority.
 
-## Migration Plan
+### Migration plan
 
 1. Split documentation into basic setup and advanced configuration.
 2. Remove nonessential fields from basic examples, especially
@@ -168,7 +179,7 @@ These options should not be removed as part of cleanup:
 5. Add doctor migrations for any removed or renamed shipped config keys.
 6. Stage risky default changes behind one release of warnings when needed.
 
-## Compatibility Notes
+### Compatibility notes
 
 Changing config defaults is upgrade-sensitive. Any behavior change must preserve
 existing explicit config values:
@@ -181,7 +192,45 @@ existing explicit config values:
 - Existing `actions.*` fields should continue to parse until a doctor migration
   or deprecation window removes them.
 
-## Open Questions
+### Success criteria
+
+- New iMessage setup requires fewer config lines.
+- Safety boundaries remain explicit and tested.
+- Advanced operators can still configure remote Mac, timeouts, read receipts,
+  reaction visibility, and group tool policy.
+- Basic docs no longer present internal transport knobs as normal setup.
+- Deprecated fields have a migration or doctor path before removal.
+
+## Rationale
+
+The core design choice is to **classify and default** rather than aggressively
+remove. Most of the friction comes not from too many capabilities, but from
+presenting policy, operations, generic channel behavior, and legacy fields as if
+they were all equally part of iMessage setup. Reclassifying fields and choosing
+sensible defaults addresses the friction while keeping the configuration
+expressive for advanced operators.
+
+Alternatives considered:
+
+- **Remove the low-value fields outright.** Rejected as the default path because
+  shipped configs and remote-Mac deployments depend on several of these knobs.
+  Removal without a migration window would break upgrades. Deprecation with a
+  doctor migration achieves the same end-state more safely.
+- **Leave the surface as-is and only fix documentation.** Rejected because the
+  schema itself, not just the docs, presents opt-in settings for behavior users
+  reasonably expect (`includeAttachments`, `coalesceSameSenderDms`,
+  `catchup.enabled`). Docs-only changes would not reduce required setup lines.
+- **Flip risky defaults immediately in one release.** Rejected as the universal
+  approach because attachment ingestion and catchup replay change observable
+  behavior. The proposal allows a staged rollout behind one release of doctor
+  warnings where compatibility risk is high, while still permitting immediate
+  defaulting for low-risk knobs.
+
+The main trade-off is added migration machinery (doctor migrations, staged
+warnings, classification metadata) in exchange for a smaller, clearer setup
+surface and preserved backward compatibility.
+
+## Unresolved questions
 
 - Should iMessage attachment ingestion become default-on in one release, or
   after one release of doctor warnings?
@@ -193,12 +242,3 @@ existing explicit config values:
   to an agent/routing-owned surface?
 - Should `defaultTo` remain for CLI workflows, or be replaced by explicit target
   and last-route behavior?
-
-## Success Criteria
-
-- New iMessage setup requires fewer config lines.
-- Safety boundaries remain explicit and tested.
-- Advanced operators can still configure remote Mac, timeouts, read receipts,
-  reaction visibility, and group tool policy.
-- Basic docs no longer present internal transport knobs as normal setup.
-- Deprecated fields have a migration or doctor path before removal.
