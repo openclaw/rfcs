@@ -4,7 +4,7 @@ authors:
   - omarshahine
 created: 2026-05-30
 last_updated: 2026-05-30
-rfc_pr: TBD
+rfc_pr: https://github.com/openclaw/rfcs/pull/4
 ---
 
 # Proposal: Approval Prompt Markdown Contract
