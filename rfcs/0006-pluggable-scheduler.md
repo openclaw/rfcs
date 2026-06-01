@@ -4,7 +4,7 @@ authors:
   - amittell
 created: 2026-05-31
 last_updated: 2026-05-31
-rfc_pr: TBD
+rfc_pr: https://github.com/openclaw/rfcs/pull/5
 ---
 
 # Proposal: Pluggable Scheduler Seam in Gateway
