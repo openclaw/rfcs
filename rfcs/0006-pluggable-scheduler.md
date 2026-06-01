@@ -3,7 +3,7 @@ title: Pluggable Scheduler Seam in Gateway
 authors:
   - amittell
 created: 2026-05-31
-last_updated: 2026-05-31
+last_updated: 2026-06-01
 rfc_pr: https://github.com/openclaw/rfcs/pull/5
 ---
 
@@ -86,9 +86,12 @@ gateway disables its in-process cron at startup and routes all
 `gateway scheduledJobs.*` calls to the plugin. If no scheduler plugin is
 registered, the built-in cron stays on.
 
-Operators can fall back to built-in cron at any time by uninstalling or
-disabling the scheduler plugin; the gateway resumes ownership without a
-restart.
+Fallback is also a startup decision in v1. If a scheduler plugin owns
+scheduled jobs, uninstalling or disabling that plugin, or otherwise changing
+scheduler ownership, requires a gateway restart before the built-in cron
+resumes ownership. This keeps the first revision aligned with startup-time
+discovery and avoids promising a hot scheduler handoff before the runtime has
+a live ownership-transfer contract.
 
 ### Runtime contract (`scheduler-host-runtime.ts`)
 
