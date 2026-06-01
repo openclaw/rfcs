@@ -3,7 +3,7 @@ title: Feeds for Curated Skills and Plugins
 authors:
   - giodl73-repo
 created: 2026-05-28
-last_updated: 2026-05-31
+last_updated: 2026-06-01
 rfc_pr: TBD
 ---
 
@@ -11,15 +11,16 @@ rfc_pr: TBD
 
 ## Summary
 
-Add a generic OpenClaw feeds extension for curated skill and plugin catalog
-documents. Feeds are configured sources that OpenClaw can validate, inspect,
-search, use for explicit installs, check against Policy conformance rules, and
-compare against installed skill/plugin inventory for update notices.
+Define a portable feed contract for curated skill and plugin catalog documents,
+then add OpenClaw client support for consuming those feeds. Feeds are configured
+sources that OpenClaw can validate, inspect, search, use for explicit installs,
+check against Policy conformance rules, and compare against installed inventory
+for update notices.
 
 The design is deliberately file and URL based at the client boundary. ClawHub can
-publish standard root feeds, enterprises can publish their own feeds, and OpenClaw
-clients do not need to download or index the entire public catalog unless they
-choose a feed that represents it.
+publish standard root feeds, enterprises or tenant admin systems can publish their
+own feeds, and OpenClaw clients do not need to download or index the entire public
+catalog unless they choose a feed that represents it.
 
 ## Motivation
 
@@ -50,6 +51,8 @@ Feeds should also support governance workflows:
 - Let OpenClaw configure feed sources under the bundled `feeds` extension.
 - Validate feed source config through Doctor and plugin schema validation.
 - Add read-only CLI discovery for configured feeds.
+- Allow native `skills search` and `plugins search` to opt into configured feeds
+  by flag or by explicit config.
 - Allow explicit install from a selected feed entry through existing OpenClaw
   install commands.
 - Add optional approved-only warn/enforce behavior for feed-backed installs.
@@ -57,7 +60,10 @@ Feeds should also support governance workflows:
   posture.
 - Add authoring and subscriber commands for validating, hashing, building,
   diffing, and checking updates from feed artifacts.
-- Let ClawHub publish root feeds while keeping enterprise feed hosting possible outside ClawHub.
+- Let ClawHub publish root feeds while keeping enterprise feed hosting possible
+  outside ClawHub.
+- Keep package publishing separate from feed publication: source systems own
+  package upload, while feeds describe curated catalog metadata.
 
 ## Non-Goals
 
@@ -67,6 +73,8 @@ Feeds should also support governance workflows:
 - Intercepting every non-feed install command.
 - Requiring clients to download or index the full public catalog.
 - Treating feed membership as proof that code is safe.
+- Defining how packages are uploaded to ClawHub, MOS3, npm, or internal
+  registries.
 
 ## Proposal
 
@@ -214,6 +222,108 @@ can learn that installed skills or plugins have newer approved versions in
 configured feeds. The initial subscriber commands report candidates only; they
 do not auto-update.
 
+## Enterprise feed consumption flow
+
+The same client contract works when a feed is created outside ClawHub. For
+example, an internal catalog service, tenant admin tool, or CI job can emit a
+`company-approved.json` feed using the schema above and host it at an HTTPS URL
+or a local `file://` path.
+
+The publisher side can use the feeds CLI to keep that artifact reviewable:
+
+```bash
+openclaw feeds build --inventory ./inventory.json --out ./company-approved.json --id company-approved
+openclaw feeds validate ./company-approved.json --json
+openclaw feeds hash ./company-approved.json
+openclaw feeds diff --previous ./previous-company-approved.json --current ./company-approved.json --json
+```
+
+The subscriber side configures the published artifact as a feed source and can
+make native skills/plugins search use that source by default:
+
+```jsonc
+{
+  "plugins": {
+    "entries": {
+      "feeds": {
+        "enabled": true,
+        "config": {
+          "sources": [
+            {
+              "id": "company-approved",
+              "url": "https://catalog.example.com/openclaw/company-approved.json",
+              "trust": "pinned",
+              "integrity": "sha256:..."
+            }
+          ],
+          "search": {
+            "default": true,
+            "sources": ["company-approved"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Users can then stay on familiar OpenClaw commands while searching the configured
+enterprise feed:
+
+```bash
+openclaw skills search excel
+openclaw plugins search calendar
+openclaw feeds install calendar-helper --source company-approved --type plugin --dry-run
+openclaw feeds install calendar-helper --source company-approved --type plugin
+```
+
+Operators can verify that a workspace is configured for the approved feed and
+check subscriber update state without requiring a marketplace service:
+
+```bash
+openclaw policy check
+openclaw feeds updates --installed ./installed.json --approved-only --json
+openclaw feeds notices --installed ./installed.json --approved-only --json
+```
+
+OpenClaw does not need to know whether the feed was produced by ClawHub, a
+static file publisher, a tenant catalog, or CI. The interoperability point is
+the feed document plus optional pinned integrity.
+
+## Producer and consumer roles
+
+The final design separates package supply, feed production, and OpenClaw
+consumption:
+
+| Role | Examples | Responsibility |
+|---|---|---|
+| Package producer | Skill/plugin authors, internal platform teams | Publish package artifacts and source metadata to a source system. |
+| Source supplier | ClawHub, MOS3, npm, internal registries, static inventory files | Expose package metadata and artifact coordinates. |
+| Feed producer | ClawHub root feeds, enterprise catalog tools, tenant admin systems, CI jobs | Emit deterministic feed documents using the shared feed schema. |
+| Feed curator | Platform, compliance, tenant admins | Decide which entries are approved, denied, pinned, deprecated, or visible. |
+| Feed consumer | OpenClaw clients | Verify configured feed sources, search entries, hand off installs, and report approved updates. |
+
+This is why the RFC does not require every enterprise to run a marketplace or
+ClawHub fork. A tool such as an internal catalog service can consume ClawHub or
+other source metadata, materialize an approved tenant feed, and let OpenClaw use
+that feed through the same config and commands.
+
+## ClawHub root feeds
+
+ClawHub can improve the public producer story by publishing first-party root
+feeds that already use the OpenClaw feed schema. The initial lanes are:
+
+| Feed | Intended contents |
+|---|---|
+| `all` | Public feedable skills and plugins. |
+| `official` | Entries carrying ClawHub official ownership/channel metadata. |
+| `community` | Public community entries that are not official. |
+| `reviewed` | Entries with the best currently available review posture, such as clean scans or non-suspicious/non-deprecated skill metadata. |
+
+These lanes are convenience roots, not hard-coded client trust. Enterprises can
+consume them directly, layer their own curation on top, or ignore them and
+publish their own compatible feeds from another source system.
+
 ## PR plan
 
 The implementation is split into five OpenClaw client PRs plus one ClawHub
@@ -236,7 +346,9 @@ producer PR:
 5. [openclaw/openclaw#88732](https://github.com/openclaw/openclaw/pull/88732) -
    **Native search defaults**: opt-in config and Policy hooks so native
    `openclaw skills search` and `openclaw plugins search` can search configured
-   feeds by default or by selected source ids.
+   feeds by flag, by default, or by selected source ids. This preserves the
+   familiar CLI surface while letting managed environments redirect discovery
+   to approved feeds.
 6. [openclaw/clawhub#2460](https://github.com/openclaw/clawhub/pull/2460) -
    **ClawHub root feed lanes**: public `all`, `official`, `community`, and
    `reviewed` feed documents that use the same feed schema and deterministic
@@ -245,7 +357,9 @@ producer PR:
 This split keeps the client contract usable with any file or URL feed while also
 letting ClawHub expose first-party root feeds for common discovery paths. The
 enterprise path is to publish a feed using the same schema, configure it as an
-OpenClaw feed source, and optionally require it through Policy conformance.
+OpenClaw feed source, optionally make native search use it, and optionally require
+it through Policy conformance. Source-management helper commands can be layered
+on later, but the core contract remains ordinary config plus feed documents.
 
 ## Rationale
 
@@ -259,7 +373,8 @@ Keeping the client contract independent of ClawHub avoids a hard cross-service
 dependency. OpenClaw can support useful enterprise catalog workflows with any
 hosted or local feed artifact. ClawHub root feeds improve the default public
 producer story by emitting the same documents that enterprise publishers can
-emit themselves.
+emit themselves, and external catalog tools can build smaller feeds from those
+roots without changing OpenClaw.
 
 The explicit install model keeps user intent clear. Feed presence alone should
 not mutate a workspace. Feed install enforcement applies only to the explicit
@@ -279,7 +394,10 @@ The initial feeds extension is opt-in. Workspaces without
 
 Feed config uses normal plugin config validation. Unknown feed config keys are
 rejected by the plugin schema. Feed source ids are local stable identifiers; they
-do not need to match a remote service id.
+do not need to match a remote service id. The feed document itself uses `id`
+for its stable feed identity; CLI and Policy evidence may expose that value as a
+`feedId` field when it needs to distinguish the feed document from the
+configured source id.
 
 Pinned feed sources must declare `sha256:<64 hex>` integrity. Integrity is
 checked before entries from a pinned source are trusted. Unsigned sources remain
@@ -289,7 +407,8 @@ unsigned posture.
 
 Policy feed checks are active only when the policy file declares feed rules.
 This avoids changing policy attestation hashes for workspaces that have no feed
-policy posture.
+policy posture. Policy evaluates configured source posture and native-search
+posture; it should not fetch feed documents or make package safety claims.
 
 ## Security considerations
 
