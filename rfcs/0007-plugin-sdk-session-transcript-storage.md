@@ -191,6 +191,12 @@ operations before plugin use cases are clear.
 If a public cleanup API becomes necessary, it should be proposed as an additive follow-up with its
 own compatibility and permission model.
 
+The current Path 3 PR stack contains several draft branches that export
+`cleanupSessionLifecycleArtifacts` through `openclaw/plugin-sdk/session-store-runtime`. This RFC
+treats that export as an implementation finding, not as an accepted SDK design. Before any branch
+that contains that export leaves draft, maintainers should either remove the export from the public
+SDK barrel or explicitly accept and document it as a public destructive lifecycle API.
+
 ### Verification requirements
 
 Every PR that changes plugin SDK session/transcript surfaces should include:
@@ -207,6 +213,55 @@ Every PR that changes plugin SDK session/transcript surfaces should include:
 The compatibility proof should be explicit in the PR description. For deprecated adapters, tests
 should prove that the adapter routes through the canonical accessor rather than reintroducing a
 parallel runtime storage path.
+
+### Current tracked compatibility matrix
+
+This matrix was generated from the Path 3 tracker issue on 2026-06-04. It covers every tracked PR
+that touches plugin SDK source files, generated SDK API baselines, or public SDK-facing event
+contracts. "Non-breaking" means existing imports and runtime call shapes are intended to continue
+working; it does not mean the new API is automatically approved as the right long-term SDK surface.
+
+| PR | SDK surface | Public change | Compatibility assessment | Required before undraft/merge |
+| --- | --- | --- | --- | --- |
+| [#88840](https://github.com/openclaw/openclaw/pull/88840) | `session-store-runtime`; API baseline | Introduced the initial accessor export stack, including lifecycle cleanup exports. | Superseded by [#90463](https://github.com/openclaw/openclaw/pull/90463). Do not merge as-is. | Keep closed/superseded; ensure later PRs own any surviving exports. |
+| [#89121](https://github.com/openclaw/openclaw/pull/89121) | `session-store-runtime`; API baseline | Transcript reader slice inherits the lifecycle cleanup export. | Additive at the type level, but the cleanup export needs the lifecycle API decision above. | Remove cleanup export or document/approve it; refresh API baseline proof after rebase. |
+| [#89122](https://github.com/openclaw/openclaw/pull/89122) | `session-store-runtime`; API baseline | Cron, infra, and command consumers inherit the lifecycle cleanup export. | Same as [#89121](https://github.com/openclaw/openclaw/pull/89121): additive but not yet accepted as public SDK design. | Remove cleanup export or document/approve it; refresh API baseline proof after rebase. |
+| [#89123](https://github.com/openclaw/openclaw/pull/89123) | `session-store-runtime`; API baseline | Transcript writer slice inherits the lifecycle cleanup export. | Same lifecycle export concern; writer behavior otherwise routes through the accessor. | Resolve lifecycle export ownership; rerun SDK baseline and focused writer proof. |
+| [#89124](https://github.com/openclaw/openclaw/pull/89124) | `session-store-runtime`; API baseline | Auto-reply and agent slice inherits the lifecycle cleanup export. | Same lifecycle export concern; no intended external call-shape break. | Resolve lifecycle export ownership; rerun SDK baseline and focused auto-reply proof. |
+| [#89129](https://github.com/openclaw/openclaw/pull/89129) | `config-runtime`, `session-store-runtime`; API baseline | Adds entry-level session helpers and aliases such as `getSessionEntry`, `listSessionEntries`, and `readSessionUpdatedAt`. | Non-breaking additive helpers. Existing whole-store and file-shaped helpers remain available. | Confirm aliases are still needed after [#89203](https://github.com/openclaw/openclaw/pull/89203)/[#89204](https://github.com/openclaw/openclaw/pull/89204) settle; rerun API check. |
+| [#89178](https://github.com/openclaw/openclaw/pull/89178) | API baseline only | SQLite foundation changes SDK baseline through the stacked migration context, with no direct public SDK source file in the PR. | No independent public SDK contract change identified from tracked files. | Treat baseline drift as a review signal; require fresh `plugin-sdk:api:check` before undraft. |
+| [#89201](https://github.com/openclaw/openclaw/pull/89201) | API baseline only; transcript runtime contract | Adds internal transcript identity/state contract used by later SDK/API work. | No direct public SDK API change identified, but later transcript SDK APIs depend on it. | Keep public SDK changes in the owning transcript SDK PRs; refresh API baseline proof. |
+| [#89203](https://github.com/openclaw/openclaw/pull/89203) | `config-runtime`, `session-store-runtime`; API docs/tests/baseline | Adds narrow session-entry helpers and routes public runtime helpers through the accessor while keeping deprecated whole-store compatibility helpers. | Non-breaking additive API plus deprecated compatibility adapters. This is the main SDK bridge for legacy session-store callers. | Verify deprecated whole-store helpers still typecheck and route through the accessor; keep deprecation comments/docs. |
+| [#89204](https://github.com/openclaw/openclaw/pull/89204) | `config-runtime`, `session-store-runtime`; tests/baseline | Adds or refines entry-level helpers including `getSessionEntry`, `listSessionEntries`, `patchSessionEntry`, `upsertSessionEntry`, and `updateSessionStoreEntry`. | Non-breaking additive entry API. Existing imports remain. | Reconcile overlap with [#89203](https://github.com/openclaw/openclaw/pull/89203); keep one coherent helper set and API baseline proof. |
+| [#89261](https://github.com/openclaw/openclaw/pull/89261) | New `session-transcript-runtime` subpath; `session-transcript-hit`; package/docs/scripts/tests/baseline | Adds transcript identity/read APIs and memory-hit identity helpers. | Non-breaking additive subpath and helpers. It intentionally moves new callers away from file-path identity without removing old hit parsing. | Confirm new subpath export metadata, docs, and API baseline are current after rebase. |
+| [#89262](https://github.com/openclaw/openclaw/pull/89262) | `session-transcript-runtime`; package/docs/tests/baseline | Adds transcript target/writer APIs: resolve target, append by identity, publish update by identity, and write-lock by target. | Non-breaking additive writer API. Optional `sessionFile` remains as a file-backed active-artifact binding hint. | Verify old file-backed writer flows and new identity writer flows in the same proof set. |
+| [#89348](https://github.com/openclaw/openclaw/pull/89348) | `memory-core-host-engine-storage`; memory host SDK types/helpers/tests/baseline | Adds `MemorySessionSyncTarget` and `MemorySyncParams.sessions`, while retaining deprecated `sessionFiles`. | Non-breaking if `sessionFiles` remains accepted through the deprecation window. This is the public bridge for `MemorySearchManager.sync`. | Keep canonical-path tests for deprecated `sessionFiles`; document `sessions` as preferred. |
+| [#89518](https://github.com/openclaw/openclaw/pull/89518) | API baseline only; bundled plugin users of transcript APIs | Migrates bundled plugin transcript mirrors onto scoped transcript APIs. | No new public SDK source identified; validates that additive transcript APIs are usable by OpenClaw-owned plugins. | Keep baseline check and bundled plugin proof current after rebasing onto transcript API owners. |
+| [#89519](https://github.com/openclaw/openclaw/pull/89519) | `session-store-runtime`; API baseline | Adds or inherits `cleanupSessionLifecycleArtifacts` lifecycle cleanup export. | Additive but not yet accepted as a public SDK design. Destructive cleanup should stay internal unless explicitly approved. | Resolve lifecycle API decision before undraft; remove from SDK exports if it remains internal. |
+| [#89904](https://github.com/openclaw/openclaw/pull/89904) | `config-runtime`, `session-store-runtime`; docs/tests/baseline | Routes bundled SDK/runtime session helpers through the accessor; keeps deprecated whole-store/file-shaped compatibility. Also carries lifecycle cleanup export. | Session helper compatibility is non-breaking; lifecycle export remains unresolved. | Keep old SDK helpers working; resolve cleanup export before undraft. |
+| [#89911](https://github.com/openclaw/openclaw/pull/89911) | `session-transcript-runtime`, `session-transcript-hit`, `text-chunking`, package/docs/scripts/tests/baseline | Adds a public phase-aware text extraction helper and uses transcript target lookup APIs in bundled consumers. | Non-breaking additive helper. Existing transcript command/session-file compatibility remains. | Confirm `text-chunking` belongs in the plugin SDK and is documented as stable enough for external use. |
+| [#89912](https://github.com/openclaw/openclaw/pull/89912) | `SessionTranscriptUpdate` event contract; API baseline | Adds structured transcript update identity/target fields, deprecates `sessionFile`, and makes `sessionFile` optional. | Runtime-compatible when emitters keep providing `sessionFile` during the deprecation window. Potentially source-breaking for TypeScript listeners that treat `update.sessionFile` as always present. | Decide whether to keep `sessionFile: string` required until removal, or accept/document the type-level break with a migration note. |
+| [#90438](https://github.com/openclaw/openclaw/pull/90438) | `session-store-runtime`; API baseline | SQLite embedded-run adapter branch carries the lifecycle cleanup export. | Additive but subject to the same cleanup API decision. | Resolve cleanup export ownership; rerun API baseline after stacking on accepted owner branches. |
+| [#90463](https://github.com/openclaw/openclaw/pull/90463) | API baseline; new accessor package surface | Combines the 3.1a accessor seam with a first gateway consumer and ratchet. | No direct plugin SDK source change in the PR after removing misplaced exports; baseline changes should be reviewed as package-surface drift. | Keep `plugin-sdk:api:check` green and ratchet scope narrow. |
+
+Audited tracker PRs with no identified public plugin SDK API change: [#89120](https://github.com/openclaw/openclaw/pull/89120)
+is superseded by [#90463](https://github.com/openclaw/openclaw/pull/90463); [#89360](https://github.com/openclaw/openclaw/pull/89360)
+is QMD/internal memory artifact identity mapping; [#89581](https://github.com/openclaw/openclaw/pull/89581)
+is an internal transcript reader migration; [#90437](https://github.com/openclaw/openclaw/pull/90437)
+is a SQLite adapter implementation; and [#90439](https://github.com/openclaw/openclaw/pull/90439)
+is an internal embedded-run session target seam that depends on the transcript target APIs but does
+not itself add public SDK surface.
+
+Two compatibility gaps remain open after this audit:
+
+1. The lifecycle cleanup export appears in multiple stacked PRs. It is additive, but destructive
+   cleanup is a poor accidental SDK surface. The stack should either remove that export from public
+   SDK barrels or explicitly document and approve it.
+2. `SessionTranscriptUpdate.sessionFile` becoming optional is runtime-compatible only if the
+   deprecation adapter continues to populate it for old subscribers. It can still be a TypeScript
+   source break for external listeners. The safest compatibility position is to keep `sessionFile`
+   required until a later removal RFC, while marking it deprecated and adding the structured target
+   fields now.
 
 ### Deprecation plan
 
