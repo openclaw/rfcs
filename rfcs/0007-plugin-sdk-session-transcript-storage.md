@@ -14,13 +14,16 @@ rfc_pr: TBD
 OpenClaw session and transcript state is moving from JSON session-store files and JSONL
 transcript files to SQLite. This RFC proposes the plugin SDK compatibility strategy for that
 migration: add storage-neutral session and transcript APIs, move OpenClaw-owned callers to those
-APIs incrementally, keep shipped file-shaped SDK APIs as compatibility adapters during a
-deprecation window, and prove each SDK-affecting slice with API baseline checks and targeted
-backward-compatibility tests.
+APIs incrementally, keep shipped file-shaped SDK APIs available during a pre-SQLite deprecation
+window, and prove each SDK-affecting slice with API baseline checks, targeted compatibility tests,
+documentation, and plugin-inspector deprecation reporting.
 
-The core migration can then replace the storage implementation behind the new APIs without
-requiring external plugins to stop compiling or immediately rewrite existing `sessionFile` and
-whole-store call sites.
+The SQLite flip is the compatibility boundary for file-shaped SDK APIs. External plugins should
+have a documented migration window before that flip, with deprecations visible in TypeScript,
+OpenClaw docs, `openclaw plugins inspect`, and the external plugin inspector. The goal is to keep
+legacy plugins compiling during the window while making the removal point explicit rather than
+pretending `sessionFile` and mutable whole-store APIs remain valid after runtime state is no longer
+file-backed.
 
 ## Motivation
 
@@ -47,22 +50,24 @@ before the SQLite migration reaches those surfaces.
 
 ## Goals
 
-- Keep plugin SDK changes backward-compatible for the SQLite migration.
+- Keep plugin SDK changes backward-compatible during the pre-SQLite migration window.
 - Add storage-neutral APIs for session entries, transcript identity, transcript reads/writes, and
   memory transcript sync.
-- Preserve existing SDK imports and call shapes as compatibility adapters during a documented
-  deprecation window.
+- Preserve existing SDK imports and call shapes during a documented deprecation window before
+  SQLite becomes canonical.
 - Move OpenClaw-owned callers, including bundled plugins, to the new APIs as soon as the relevant
   API exists.
 - Make each SDK-affecting migration slice prove both API compatibility and runtime behavior.
+- Make every deprecated SDK surface visible in TypeScript comments, docs, and plugin-inspector
+  output before the SQLite flip.
 - Avoid making SQLite, JSON files, or transient migration mechanics part of the long-term plugin
   SDK contract.
 
 ## Non-Goals
 
 - This RFC does not define the SQLite schema.
-- This RFC does not remove existing plugin SDK exports.
-- This RFC does not require external plugin authors to migrate before the storage flip.
+- This RFC does not remove existing plugin SDK exports before the deprecation window begins.
+- This RFC does not guarantee that file-shaped SDK APIs continue to work after the SQLite flip.
 - This RFC does not preserve file-backed runtime fallback after migration. Legacy files should be
   migrated by the designated migration owner before steady-state runtime starts.
 - This RFC does not make private cleanup or lifecycle hooks public unless an external plugin use
@@ -81,12 +86,16 @@ Plugin SDK changes for the session/transcript migration should follow these rule
 4. File-shaped public inputs remain accepted through a deprecation window when there is a shipped
    compatibility contract.
 5. New internal and bundled-plugin code uses the storage-neutral APIs, not the deprecated adapters.
-6. Deprecated adapters call the canonical accessor implementation; they do not become a second
-   runtime storage path.
+6. Deprecated adapters may call the canonical accessor during the file-backed window, but they do
+   not become a second runtime storage path after SQLite is canonical.
+7. Every deprecated SDK surface has a named replacement, a removal milestone, and plugin-inspector
+   visibility.
 
 The key distinction is external compatibility versus internal architecture. External SDK consumers
-get a bridge; OpenClaw-owned callers should move to the canonical API in the same migration slice
-that introduces or needs it.
+get a pre-SQLite migration window; OpenClaw-owned callers should move to the canonical API in the
+same migration slice that introduces or needs it. The migration window is a compatibility promise,
+not a commitment to synthesize JSON session files or `sessionFile` identity after SQLite owns the
+runtime state.
 
 ### Session entry access
 
@@ -100,10 +109,10 @@ Representative operations:
 - patch one entry;
 - replace or upsert one entry.
 
-The existing mutable whole-store export should remain available as a deprecated compatibility
-adapter. It should continue returning the legacy shape during the deprecation window, but new
-OpenClaw-owned code should not use it. Where a caller only needs one session, it should use the
-narrow entry API rather than loading and mutating the full store.
+The existing mutable whole-store export should remain available only during the pre-SQLite
+deprecation window. It should continue returning the legacy shape while the runtime is still
+file-backed, but new OpenClaw-owned code should not use it. Where a caller only needs one session,
+it should use the narrow entry API rather than loading and mutating the full store.
 
 ### Transcript identity and target APIs
 
@@ -148,9 +157,12 @@ The event should include a structured target containing:
 - `sessionId`;
 - `targetKind`, distinguishing the current runtime session from an active file-backed artifact.
 
-For compatibility, `sessionFile` should remain optional and deprecated. Existing listeners that
-only accept the old string form or read `update.sessionFile` should continue to work during the
-deprecation window. New emitters and subscribers should publish and prefer the structured target.
+For compatibility, `sessionFile` should remain present and deprecated while file-backed transcript
+updates are still emitted. Existing listeners that only accept the old string form or read
+`update.sessionFile` should continue to work during the deprecation window. New emitters and
+subscribers should publish and prefer the structured target. Making `sessionFile` optional before
+the removal boundary is a potential TypeScript source break and should be avoided unless a slice
+explicitly accepts and documents that break.
 
 ### Memory transcript sync
 
@@ -167,9 +179,9 @@ type MemorySessionSyncTarget = {
 
 `MemorySearchManager.sync` should accept those targets through a `sessions` parameter. Existing
 `sessionFiles` inputs should remain accepted as deprecated compatibility inputs during the
-deprecation window, limited to canonical OpenClaw transcript files. OpenClaw-owned callers should
-switch to `sessions` so targeted sync does not require a JSONL path once transcripts live in
-SQLite.
+pre-SQLite deprecation window, limited to canonical OpenClaw transcript files. OpenClaw-owned
+callers should switch to `sessions` so targeted sync does not require a JSONL path once transcripts
+live in SQLite. This RFC does not require `sessionFiles` to work after the SQLite flip.
 
 ### Transcript search hit compatibility
 
@@ -203,16 +215,52 @@ Every PR that changes plugin SDK session/transcript surfaces should include:
 
 - plugin SDK API baseline generation and `plugin-sdk:api:check`;
 - subpath export checks;
-- focused tests showing old call shapes still work;
+- focused tests showing old call shapes still work during the file-backed window;
 - focused tests showing new identity-based call shapes work;
+- docs updates for new replacement APIs and deprecated legacy APIs;
+- `openclaw plugins inspect` and external plugin-inspector proof for any newly deprecated SDK
+  surface they can detect;
 - bundled plugin or extension tests for any migrated OpenClaw-owned callers;
 - a disposable SQLite-flip validation where the slice has a SQLite implementation;
 - a ratchet or boundary check when a subsystem has been migrated off direct JSON session-store
   access.
 
 The compatibility proof should be explicit in the PR description. For deprecated adapters, tests
-should prove that the adapter routes through the canonical accessor rather than reintroducing a
-parallel runtime storage path.
+should prove that the adapter still works during the file-backed window and does not get used by
+OpenClaw-owned callers that have a replacement API.
+
+### Documentation and inspector requirements
+
+The deprecation window only works if plugin authors can discover it without reading the Path 3 PR
+stack. Each deprecated SDK surface must therefore be represented in four places:
+
+1. TypeScript API comments: add `@deprecated` with the replacement API and removal milestone.
+2. Plugin SDK docs: update the relevant runtime guide, subpath reference, and migration guide.
+3. Runtime inspection: make `openclaw plugins inspect --runtime` and its JSON report include a
+   compatibility notice when a plugin uses a deprecated session/transcript SDK surface.
+4. External inspection: update the plugin-inspector advisory rules so package authors see the same
+   deprecation before installing or submitting a plugin.
+
+The notice should name the deprecated import, function, option, or event field; explain that it is
+supported only through the pre-SQLite deprecation window; name the replacement API; and identify the
+planned removal boundary as the SQLite storage flip.
+
+The first deprecated surfaces that need coverage are:
+
+- mutable whole-store helpers such as `loadSessionStore`, `saveSessionStore`,
+  `updateSessionStore`, and `updateSessionStoreEntry`;
+- file-path helpers such as `resolveSessionFilePath`, `resolveSessionTranscriptPathInDir`,
+  `resolveAndPersistSessionFile`, and `readLatestAssistantTextFromSessionTranscript`;
+- transcript append/update APIs that take or emit `transcriptPath` or `sessionFile`;
+- `SessionTranscriptUpdate.sessionFile` as a consumed identity field;
+- embedded-agent and memory-sync parameters such as `runEmbeddedAgent({ sessionFile })` and
+  `MemorySearchManager.sync({ sessionFiles })`;
+- transcript search-hit helpers that expose JSONL/QMD filename identity.
+
+The inspector does not need to understand arbitrary plugin runtime behavior before this RFC can
+land, but it does need to flag importable SDK surfaces and obvious option/field names that plugin
+authors can act on. Deeper usage analysis can be added incrementally as each 3.1b slice adds a
+replacement.
 
 ### Current tracked compatibility matrix
 
@@ -231,16 +279,16 @@ working; it does not mean the new API is automatically approved as the right lon
 | [#89129](https://github.com/openclaw/openclaw/pull/89129) | `config-runtime`, `session-store-runtime`; API baseline | Adds entry-level session helpers and aliases such as `getSessionEntry`, `listSessionEntries`, and `readSessionUpdatedAt`. | Non-breaking additive helpers. Existing whole-store and file-shaped helpers remain available. | Confirm aliases are still needed after [#89203](https://github.com/openclaw/openclaw/pull/89203)/[#89204](https://github.com/openclaw/openclaw/pull/89204) settle; rerun API check. |
 | [#89178](https://github.com/openclaw/openclaw/pull/89178) | API baseline only | SQLite foundation changes SDK baseline through the stacked migration context, with no direct public SDK source file in the PR. | No independent public SDK contract change identified from tracked files. | Treat baseline drift as a review signal; require fresh `plugin-sdk:api:check` before undraft. |
 | [#89201](https://github.com/openclaw/openclaw/pull/89201) | API baseline only; transcript runtime contract | Adds internal transcript identity/state contract used by later SDK/API work. | No direct public SDK API change identified, but later transcript SDK APIs depend on it. | Keep public SDK changes in the owning transcript SDK PRs; refresh API baseline proof. |
-| [#89203](https://github.com/openclaw/openclaw/pull/89203) | `config-runtime`, `session-store-runtime`; API docs/tests/baseline | Adds narrow session-entry helpers and routes public runtime helpers through the accessor while keeping deprecated whole-store compatibility helpers. | Non-breaking additive API plus deprecated compatibility adapters. This is the main SDK bridge for legacy session-store callers. | Verify deprecated whole-store helpers still typecheck and route through the accessor; keep deprecation comments/docs. |
+| [#89203](https://github.com/openclaw/openclaw/pull/89203) | `config-runtime`, `session-store-runtime`; API docs/tests/baseline | Adds narrow session-entry helpers and routes public runtime helpers through the accessor while keeping deprecated whole-store compatibility helpers during the file-backed window. | Non-breaking additive API plus a pre-SQLite deprecation bridge for legacy session-store callers. It should not promise whole-store helpers after the SQLite flip. | Verify deprecated whole-store helpers still typecheck during the window; add docs and inspector notices that identify the new entry helpers as replacements. |
 | [#89204](https://github.com/openclaw/openclaw/pull/89204) | `config-runtime`, `session-store-runtime`; tests/baseline | Adds or refines entry-level helpers including `getSessionEntry`, `listSessionEntries`, `patchSessionEntry`, `upsertSessionEntry`, and `updateSessionStoreEntry`. | Non-breaking additive entry API. Existing imports remain. | Reconcile overlap with [#89203](https://github.com/openclaw/openclaw/pull/89203); keep one coherent helper set and API baseline proof. |
 | [#89261](https://github.com/openclaw/openclaw/pull/89261) | New `session-transcript-runtime` subpath; `session-transcript-hit`; package/docs/scripts/tests/baseline | Adds transcript identity/read APIs and memory-hit identity helpers. | Non-breaking additive subpath and helpers. It intentionally moves new callers away from file-path identity without removing old hit parsing. | Confirm new subpath export metadata, docs, and API baseline are current after rebase. |
 | [#89262](https://github.com/openclaw/openclaw/pull/89262) | `session-transcript-runtime`; package/docs/tests/baseline | Adds transcript target/writer APIs: resolve target, append by identity, publish update by identity, and write-lock by target. | Non-breaking additive writer API. Optional `sessionFile` remains as a file-backed active-artifact binding hint. | Verify old file-backed writer flows and new identity writer flows in the same proof set. |
-| [#89348](https://github.com/openclaw/openclaw/pull/89348) | `memory-core-host-engine-storage`; memory host SDK types/helpers/tests/baseline | Adds `MemorySessionSyncTarget` and `MemorySyncParams.sessions`, while retaining deprecated `sessionFiles`. | Non-breaking if `sessionFiles` remains accepted through the deprecation window. This is the public bridge for `MemorySearchManager.sync`. | Keep canonical-path tests for deprecated `sessionFiles`; document `sessions` as preferred. |
+| [#89348](https://github.com/openclaw/openclaw/pull/89348) | `memory-core-host-engine-storage`; memory host SDK types/helpers/tests/baseline | Adds `MemorySessionSyncTarget` and `MemorySyncParams.sessions`, while retaining deprecated `sessionFiles` during the file-backed window. | Non-breaking if `sessionFiles` remains accepted through the pre-SQLite deprecation window. This is the public bridge for `MemorySearchManager.sync`, not a post-flip compatibility guarantee. | Keep canonical-path tests for deprecated `sessionFiles`; document and inspect `sessions` as the required replacement before SQLite. |
 | [#89518](https://github.com/openclaw/openclaw/pull/89518) | API baseline only; bundled plugin users of transcript APIs | Migrates bundled plugin transcript mirrors onto scoped transcript APIs. | No new public SDK source identified; validates that additive transcript APIs are usable by OpenClaw-owned plugins. | Keep baseline check and bundled plugin proof current after rebasing onto transcript API owners. |
 | [#89519](https://github.com/openclaw/openclaw/pull/89519) | `session-store-runtime`; API baseline | Adds or inherits `cleanupSessionLifecycleArtifacts` lifecycle cleanup export. | Additive but not yet accepted as a public SDK design. Destructive cleanup should stay internal unless explicitly approved. | Resolve lifecycle API decision before undraft; remove from SDK exports if it remains internal. |
-| [#89904](https://github.com/openclaw/openclaw/pull/89904) | `config-runtime`, `session-store-runtime`; docs/tests/baseline | Routes bundled SDK/runtime session helpers through the accessor; keeps deprecated whole-store/file-shaped compatibility. Also carries lifecycle cleanup export. | Session helper compatibility is non-breaking; lifecycle export remains unresolved. | Keep old SDK helpers working; resolve cleanup export before undraft. |
+| [#89904](https://github.com/openclaw/openclaw/pull/89904) | `config-runtime`, `session-store-runtime`; docs/tests/baseline | Routes bundled SDK/runtime session helpers through the accessor; keeps deprecated whole-store/file-shaped compatibility during the file-backed window. Also carries lifecycle cleanup export. | Session helper compatibility is non-breaking during the deprecation window; lifecycle export remains unresolved. | Keep old SDK helpers working only as pre-SQLite compatibility; resolve cleanup export and add docs/inspector deprecation coverage before undraft. |
 | [#89911](https://github.com/openclaw/openclaw/pull/89911) | `session-transcript-runtime`, `session-transcript-hit`, `text-chunking`, package/docs/scripts/tests/baseline | Adds a public phase-aware text extraction helper and uses transcript target lookup APIs in bundled consumers. | Non-breaking additive helper. Existing transcript command/session-file compatibility remains. | Confirm `text-chunking` belongs in the plugin SDK and is documented as stable enough for external use. |
-| [#89912](https://github.com/openclaw/openclaw/pull/89912) | `SessionTranscriptUpdate` event contract; API baseline | Adds structured transcript update identity/target fields, deprecates `sessionFile`, and makes `sessionFile` optional. | Runtime-compatible when emitters keep providing `sessionFile` during the deprecation window. Potentially source-breaking for TypeScript listeners that treat `update.sessionFile` as always present. | Decide whether to keep `sessionFile: string` required until removal, or accept/document the type-level break with a migration note. |
+| [#89912](https://github.com/openclaw/openclaw/pull/89912) | `SessionTranscriptUpdate` event contract; API baseline | Adds structured transcript update identity/target fields and deprecates `sessionFile`. | Non-breaking only if `sessionFile` remains present during the pre-SQLite deprecation window. Making it optional before removal is a likely TypeScript source break for external listeners. | Keep `sessionFile: string` required until the SQLite removal boundary, mark it deprecated, and add docs/inspector coverage for subscribers that still key on it. |
 | [#90438](https://github.com/openclaw/openclaw/pull/90438) | `session-store-runtime`; API baseline | SQLite embedded-run adapter branch carries the lifecycle cleanup export. | Additive but subject to the same cleanup API decision. | Resolve cleanup export ownership; rerun API baseline after stacking on accepted owner branches. |
 | [#90463](https://github.com/openclaw/openclaw/pull/90463) | API baseline; new accessor package surface | Combines the 3.1a accessor seam with a first gateway consumer and ratchet. | No direct plugin SDK source change in the PR after removing misplaced exports; baseline changes should be reviewed as package-surface drift. | Keep `plugin-sdk:api:check` green and ratchet scope narrow. |
 
@@ -256,36 +304,71 @@ Two compatibility gaps remain open after this audit:
 
 1. The lifecycle cleanup export appears in multiple stacked PRs. It is additive, but destructive
    cleanup is a poor accidental SDK surface. The stack should either remove that export from public
-   SDK barrels or explicitly document and approve it.
-2. `SessionTranscriptUpdate.sessionFile` becoming optional is runtime-compatible only if the
-   deprecation adapter continues to populate it for old subscribers. It can still be a TypeScript
-   source break for external listeners. The safest compatibility position is to keep `sessionFile`
-   required until a later removal RFC, while marking it deprecated and adding the structured target
+   SDK barrels or explicitly document and approve an owner-scoped lifecycle API with docs and
+   inspector coverage.
+2. `SessionTranscriptUpdate.sessionFile` becoming optional is runtime-compatible only if every
+   emitter still populates it for old subscribers. It can still be a TypeScript source break for
+   external listeners. The safest compatibility position is to keep `sessionFile` required during
+   the pre-SQLite deprecation window, while marking it deprecated and adding the structured target
    fields now.
+
+### Impact on current 3.1b slices
+
+The deprecation-window decision does not invalidate the existing 3.1b migration slices. They still
+serve the core purpose of introducing replacement APIs and moving OpenClaw-owned callers onto those
+APIs before SQLite becomes canonical. It does change the acceptance criteria for SDK-affecting
+slices:
+
+- PRs that introduce replacement APIs must also update docs and plugin-inspector deprecation
+  reporting for the legacy surface they replace.
+- PRs that keep old SDK helpers working should describe that compatibility as pre-SQLite
+  deprecation-window support, not as post-flip JSON/session-file emulation.
+- PRs that migrate bundled or internal callers should not leave those callers on deprecated APIs
+  just because external plugins still have the migration window.
+- SQLite adapter PRs do not need to preserve legacy file-shaped SDK APIs after the flip unless a
+  separate compatibility decision explicitly requires it.
+- Disposable SQLite-flip validation branches should route any legacy-SDK failure back to either the
+  replacement API owner or the deprecation/removal plan; they should not add disposable-only JSON
+  fallback behavior.
+
+Concretely, the already-open 3.1b PRs need the following follow-up:
+
+- Session-entry compatibility PRs should keep whole-store helpers available only during the
+  file-backed window and add inspector/docs deprecations that point to entry helpers.
+- Transcript identity and target/writer PRs remain the canonical replacement for `sessionFile` and
+  `transcriptPath` call patterns, and their docs should say so directly.
+- Memory sync identity should treat `sessionFiles` as pre-SQLite deprecated compatibility and
+  `sessions` as the required future API.
+- Transcript update identity should keep `sessionFile` required and deprecated during the window,
+  while adding structured target identity for new subscribers.
+- Lifecycle cleanup should be resolved as an explicit owner-scoped SDK capability if external
+  plugins need it; otherwise the accidental raw cleanup export should be removed from public SDK
+  barrels before those branches leave draft.
 
 ### Deprecation plan
 
-The initial SQLite migration should not remove shipped plugin SDK APIs. Deprecation should happen
-in stages:
+The initial 3.1b migration should not remove shipped plugin SDK APIs. Deprecation should happen in
+stages before SQLite becomes the canonical runtime store:
 
 1. Add the replacement API.
 2. Move OpenClaw-owned callers to the replacement.
-3. Mark the old API or field deprecated in TypeScript and documentation.
-4. Keep the old API working through the SQLite flip by adapting it to the canonical backend.
-5. After external usage has had a migration window, propose removal in a separate RFC or release
-   plan.
+3. Mark the old API or field deprecated in TypeScript comments, docs, and plugin-inspector output.
+4. Keep the old API working while the runtime is still file-backed.
+5. Remove the old file-shaped API at the SQLite storage flip, or in an explicitly named release
+   boundary tied to that flip.
 
 The migration window length is intentionally left open in this RFC.
 
 ## Rationale
 
-This plan keeps the storage migration incremental without making external plugins absorb the
-internal sequencing. The core runtime can stop treating JSON paths as identity, while SDK consumers
-get additive replacements and a compatibility bridge.
+This plan keeps the storage migration incremental without making external plugins absorb every
+internal sequencing detail. The core runtime can stop treating JSON paths as identity, while SDK
+consumers get additive replacements, visible deprecation notices, and a bounded migration window.
 
 A big-bang SDK break would reduce adapter code, but it would force external plugin authors to
-coordinate with an internal storage migration. That is unnecessary: the old API shapes can be
-implemented as adapters over the new accessor until a later removal decision.
+coordinate with an internal storage migration immediately. That is unnecessary while the runtime is
+still file-backed. It is also unnecessary to preserve file-shaped APIs after SQLite owns the store:
+the honest compatibility boundary is a pre-flip deprecation window with inspector support.
 
 A permanent dual-store runtime would also preserve compatibility, but it would make the migration
 harder to reason about. The compatibility layer should live at the public SDK edge. The runtime
@@ -301,8 +384,8 @@ should not copy.
 - What exact SDK subpath and export names should the transcript identity APIs use?
 - How long should the deprecation window last for `sessionFile`, `sessionFiles`, and mutable
   whole-store helpers?
-- Should deprecated whole-store helpers remain fully mutable adapters, or should some operations
-  become read-only after the SQLite migration?
+- Should removed JavaScript entry points fail with explicit runtime errors at the SQLite boundary,
+  or should they be removed from the package exports entirely?
 - Should transcript update events expose both a structured `target` object and mirrored top-level
   `agentId`/`sessionKey`/`sessionId` fields long term?
 - Do any external plugins need public session cleanup or transcript deletion APIs, or can those
