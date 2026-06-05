@@ -2,6 +2,7 @@
 title: Gmail Pub/Sub Pull Delivery
 authors:
   - joshp123
+  - joshp123's clanker
 created: 2026-06-05
 last_updated: 2026-06-05
 rfc_pr: https://github.com/openclaw/rfcs/pull/8
@@ -53,7 +54,7 @@ History API step.
 
 ## Goals
 
-- Make no-inbound Gmail notification delivery a first-party OpenClaw path.
+- Make the Gmail Pub/Sub pull model a first-party OpenClaw path.
 - Keep `gog` as the Gmail watch runtime rather than switching OpenClaw to a
   separate Gmail CLI bridge.
 - Add a transport-neutral Gmail notification processing path in `gog` that both
@@ -71,9 +72,12 @@ History API step.
 
 ## Non-Goals
 
-- Removing the current Pub/Sub push path in the same change.
+- Deprecating or removing the current inbound-webhook Pub/Sub push path in the
+  same change.
 - Making shared-token Pub/Sub push a recommended production path.
-- Replacing `gog` with `gws` or another Gmail watcher runtime.
+- Replacing `gog` with `gws` or another Gmail watcher runtime. Earlier pull-model
+  proposals did that by adding a second Gmail bridge; this RFC deliberately keeps
+  one Gmail watcher runtime and fixes the maintained `gog` path instead.
 - Having OpenClaw create or mutate cloud infrastructure during normal gateway
   startup.
 - Embedding Google credentials, hook tokens, or OAuth secrets in OpenClaw config
@@ -213,12 +217,13 @@ publishing into the same delivery stream.
 ### First-party Pub/Sub client contract
 
 The pull implementation should use Google's maintained Go Pub/Sub client
-library, `cloud.google.com/go/pubsub/v2`, at the high-level subscriber API. As
-of the docs checked on 2026-06-05, the current public package shown by Google is
-v2.6.0 and the simple Go subscriber path is `Subscriber.Receive`. The
-implementation should not hand-roll long polling, StreamingPull, ack-deadline
-extension, flow control, or retry loops against raw REST unless a specific
-client-library bug forces that choice.
+library, `cloud.google.com/go/pubsub/v2`, at the high-level subscriber API. This
+is the simplest first-party prior art for a Go worker. As of the docs checked on
+2026-06-05, the current public package shown by Google is v2.6.0 and the simple
+Go subscriber path is `Subscriber.Receive`. The implementation should not
+hand-roll long polling, StreamingPull, ack-deadline extension, flow control, or
+retry loops against raw REST unless a specific client-library bug forces that
+choice.
 
 The default implementation should use `Subscriber.Receive`, because the
 official client already owns the hard Pub/Sub mechanics:
@@ -230,7 +235,8 @@ official client already owns the hard Pub/Sub mechanics:
 - exposing `Ack` and `Nack` decisions at the message boundary.
 
 The implementation should still use the published Pub/Sub API shape in tests and
-adapters. For Go, that means the generated Pub/Sub proto surface
+adapters rather than inventing a local envelope. For Go, that means the
+generated Pub/Sub proto surface
 `google.pubsub.v1.PubsubMessage`, exposed by the client as `pubsubpb.PubsubMessage`
 for low-level tests and by the high-level client as `pubsub.Message` for normal
 receive handling. The REST shape is also documented as `PubsubMessage`. A
@@ -418,9 +424,9 @@ configuration. If OpenClaw later normalizes old Gmail config into a
 tests proving existing push deployments keep working.
 
 Push documentation should remain available after pull becomes the recommended
-path. It should move under explicit compatibility or public-ingress guidance
-rather than disappear, because users with existing public HTTPS deployments still
-need setup, renewal, auth, and troubleshooting docs.
+path. It should move under explicit Pub/Sub push compatibility guidance rather
+than disappear, because users with existing public HTTPS deployments still need
+setup, renewal, auth, and troubleshooting docs.
 
 ### Credentials and secrets
 
@@ -501,11 +507,11 @@ change. Each slice adds one product capability and has its own proof gate.
 | --- | --- | --- | --- |
 | 0 | `openclaw/rfcs` | Accepted direction: pull is the target production path, push remains compatibility, and `gog` remains the Gmail runtime. | RFC review accepts the product boundary and rollout plan. |
 | 1 | `gog` | `gog gmail settings watch pull`, the `gog gmail watch pull` compatibility alias, official Go Pub/Sub client dependency, pull subscriber loop, and a shared Gmail notification processor reused by push and pull. | `gog` unit/fake-subscriber tests prove decode, account guardrails, ack/nack, stale history, hook failure, rate-limit behavior, and unchanged push behavior. |
-| 2 | OpenClaw | Explicit Gmail `delivery.mode`, config validation, watcher spawn support for pull, setup opt-in for pull, and docs for pull-vs-push. Existing push setup stays unchanged, including current push `pushToken`, `serve`, and `tailscale` config. | OpenClaw tests and Crabbox/Testbox proof show pull mode starts, restarts, renews, stops, and delivers one hook payload without public ingress; push-mode tests prove existing setup still renders `gog gmail watch serve`. |
+| 2 | OpenClaw | Explicit Gmail `delivery.mode`, config validation, watcher spawn support for pull, setup opt-in for pull, and docs for pull-vs-push. Existing push setup stays unchanged, including current push `pushToken`, `serve`, and `tailscale` config. | OpenClaw tests and Crabbox/Testbox proof show pull mode starts, restarts, renews, stops, and delivers one hook payload through Pub/Sub pull; push-mode tests prove existing setup still renders `gog gmail watch serve`. |
 | 3 | nix-openclaw-tools | A released `gog` binary with pull support is packaged and exposed as the normal `gogcli` package. | Package smoke proves `gog gmail settings watch pull --help`, `gog gmail watch pull --help`, and the existing watch commands are present in the packaged binary. |
 | 4 | nix-openclaw | A high-level Gmail watch module option renders the same OpenClaw Gmail config, adds `gog` to the runtime path, wires secret-backed env, and rejects conflicting raw Gmail hook ownership. | Nix/module eval tests prove rendered config has pull delivery, no push endpoint, no literal secrets, and no conflicting raw hook config. |
-| 5 | First real deployment | The operator's cloud config creates or verifies the pull subscription and gives the local `gog` worker permission to read only that subscription; the user's OpenClaw config enables the high-level Gmail watch integration. | A real mailbox change reaches OpenClaw through pull delivery without public ingress, and rollback to the existing push path is documented. |
-| 6 | Make pull the default for new setup | A follow-up OpenClaw PR changes new `openclaw webhooks gmail setup` runs to choose pull unless the user explicitly asks for push. Push docs move under compatibility or public-ingress guidance. | Maintainers have live proof over a few weeks, documented rollback to push, and no unresolved compatibility findings. |
+| 5 | First real deployment | The operator's cloud config creates or verifies the pull subscription and gives the local `gog` worker permission to read only that subscription; the user's OpenClaw config enables the high-level Gmail watch integration. | A real mailbox change reaches OpenClaw through Pub/Sub pull delivery, and rollback to the existing push path is documented. |
+| 6 | Make pull the default for new setup | A follow-up OpenClaw PR changes new `openclaw webhooks gmail setup` runs to choose pull unless the user explicitly asks for push. Push docs move under explicit Pub/Sub push compatibility guidance. | Maintainers have live proof over a few weeks, documented rollback to push, and no unresolved compatibility findings. |
 
 No implementation PR should cross product boundaries just to look complete. In
 particular, the first `gog` PR should not patch OpenClaw defaults, the first
@@ -577,12 +583,13 @@ current Pub/Sub client behavior and Gmail notification shape:
 
 ## Rationale
 
-Pull delivery is the best default because it removes the public ingress problem
-instead of trying to secure it with more setup. Google-signed push is a valid
-production option for users who intentionally operate public HTTPS endpoints,
-but it still requires an inbound endpoint, proxying, path behavior, and endpoint
-ownership. Shared-token push is simpler to test, but it exposes a bearer secret
-at the HTTP boundary and should not be the recommended production path.
+Pull delivery is the best default because it uses Pub/Sub as a queue consumed by
+the local worker, instead of requiring the user to operate a public inbound
+webhook. Google-signed push is a valid production option for users who
+intentionally operate public HTTPS endpoints, but it still requires inbound
+endpoint ownership, proxying, path behavior, and push-subscription setup.
+Shared-token push is simpler to test, but it exposes a bearer secret at the HTTP
+boundary and should not be the recommended production path.
 
 Keeping `gog` as the runtime is also intentional. Existing OpenClaw docs and
 source already treat `gog gmail watch serve` as the supported Gmail watcher
@@ -592,13 +599,16 @@ existing owner boundary: `gog` owns Gmail and Pub/Sub runtime behavior,
 OpenClaw owns gateway hook dispatch and watcher supervision, and packagers own
 declarative wiring.
 
-A previous OpenClaw PR attempted a no-inbound path through a `gws` bridge:
+A previous OpenClaw PR attempted the Pub/Sub pull product outcome through a
+`gws` bridge:
 
 - https://github.com/openclaw/openclaw/pull/35506
 
-That PR demonstrates that the no-inbound shape is useful, but it is not the
-right first-party architecture for this RFC because it introduces a second Gmail
-watch runtime instead of improving the maintained `gog` path.
+That PR demonstrates that the pull-model product outcome is useful, but it is
+not the right first-party architecture for this RFC because it introduces a
+second Gmail watch runtime. This RFC chooses the opposite boundary: keep `gog` as
+the Gmail watcher, add Pub/Sub pull delivery there, and let OpenClaw supervise
+that same runtime.
 
 Maintainer discussion around these related items supports keeping `gog` as the
 supported path until a product-level change is proposed and implemented:
