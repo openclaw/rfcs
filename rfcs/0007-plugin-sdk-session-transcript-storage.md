@@ -196,21 +196,25 @@ continue to parse existing file-shaped artifacts during the deprecation window.
 ### Cleanup and lifecycle APIs
 
 Session lifecycle cleanup, transcript deletion, and scoped artifact cleanup should stay internal
-except for the minimum owner-scoped capability needed by the dreaming workflow. The migration needs
-storage-neutral cleanup internally, but a broad public cleanup helper would increase the SDK
-compatibility burden and expose destructive operations beyond the known plugin use case.
+except for the lifecycle-artifact cleanup capability already needed by the memory-core dreaming
+plugin. Dreaming is implemented as a plugin SDK consumer, and its narrative runner needs to reclaim
+stale subagent session rows and orphaned transcript artifacts that ordinary `subagent.deleteSession`
+can fail to remove. The SDK should therefore expose this lifecycle cleanup capability, but it should
+not grow into a broader deletion or arbitrary cleanup API.
 
-The accepted public shape should be no wider than "let this plugin clean up the sessions/artifacts
-it owns." It should not expose raw store paths, transcript filename prefixes, marker-based deletion,
-or mutable whole-store access. The SDK contract should name the ownership and permission rule rather
-than the current file-backed cleanup mechanics.
+The accepted public shape is the current session lifecycle artifact cleanup capability: remove
+session rows whose session-key segment matches a lifecycle-owned prefix, archive stale or orphaned
+transcript artifacts that carry the lifecycle marker, preserve fresh/live artifacts, and report the
+number of removed rows and archived artifacts. SQLite implementations may change how this is
+performed internally, but the SDK contract should stay scoped to lifecycle-owned cleanup rather than
+mutable whole-store access.
 
 The current Path 3 PR stack contains several draft branches that export
 `cleanupSessionLifecycleArtifacts` through `openclaw/plugin-sdk/session-store-runtime`. This RFC
-treats that export as an implementation finding, not as an accepted SDK design. Before any branch
-that contains that export leaves draft, maintainers should remove the raw export from public SDK
-barrels and, only if dreaming still needs SDK access, replace it with the narrow owner-scoped
-capability described above.
+treats that export as the required dreaming support, not as permission to add more cleanup surface.
+Before any branch that contains that export leaves draft, maintainers should document it as a narrow
+lifecycle cleanup API, keep it covered by plugin SDK API checks, and avoid adding broader session
+deletion or transcript cleanup exports.
 
 ### Verification requirements
 
@@ -275,10 +279,10 @@ working; it does not mean the new API is automatically approved as the right lon
 | PR | SDK surface | Public change | Compatibility assessment | Required before undraft/merge |
 | --- | --- | --- | --- | --- |
 | [#88840](https://github.com/openclaw/openclaw/pull/88840) | `session-store-runtime`; API baseline | Introduced the initial accessor export stack, including lifecycle cleanup exports. | Superseded by [#90463](https://github.com/openclaw/openclaw/pull/90463). Do not merge as-is. | Keep closed/superseded; ensure later PRs own any surviving exports. |
-| [#89121](https://github.com/openclaw/openclaw/pull/89121) | `session-store-runtime`; API baseline | Transcript reader slice inherits the lifecycle cleanup export. | Additive at the type level, but the raw cleanup export is not accepted as public SDK design. | Remove raw cleanup export; refresh API baseline proof after rebase. |
-| [#89122](https://github.com/openclaw/openclaw/pull/89122) | `session-store-runtime`; API baseline | Cron, infra, and command consumers inherit the lifecycle cleanup export. | Same as [#89121](https://github.com/openclaw/openclaw/pull/89121): additive but not accepted as public SDK design. | Remove raw cleanup export; refresh API baseline proof after rebase. |
-| [#89123](https://github.com/openclaw/openclaw/pull/89123) | `session-store-runtime`; API baseline | Transcript writer slice inherits the lifecycle cleanup export. | Same raw cleanup export concern; writer behavior otherwise routes through the accessor. | Remove raw cleanup export; rerun SDK baseline and focused writer proof. |
-| [#89124](https://github.com/openclaw/openclaw/pull/89124) | `session-store-runtime`; API baseline | Auto-reply and agent slice inherits the lifecycle cleanup export. | Same raw cleanup export concern; no intended external call-shape break. | Remove raw cleanup export; rerun SDK baseline and focused auto-reply proof. |
+| [#89121](https://github.com/openclaw/openclaw/pull/89121) | `session-store-runtime`; API baseline | Transcript reader slice inherits the lifecycle cleanup export. | Additive at the type level. The export is accepted only as the narrow lifecycle-artifact cleanup needed by dreaming. | Document the cleanup export; refresh API baseline proof after rebase. |
+| [#89122](https://github.com/openclaw/openclaw/pull/89122) | `session-store-runtime`; API baseline | Cron, infra, and command consumers inherit the lifecycle cleanup export. | Same as [#89121](https://github.com/openclaw/openclaw/pull/89121): additive and limited to lifecycle-artifact cleanup. | Document the cleanup export; refresh API baseline proof after rebase. |
+| [#89123](https://github.com/openclaw/openclaw/pull/89123) | `session-store-runtime`; API baseline | Transcript writer slice inherits the lifecycle cleanup export. | Same lifecycle cleanup scope; writer behavior otherwise routes through the accessor. | Document the cleanup export; rerun SDK baseline and focused writer proof. |
+| [#89124](https://github.com/openclaw/openclaw/pull/89124) | `session-store-runtime`; API baseline | Auto-reply and agent slice inherits the lifecycle cleanup export. | Same lifecycle cleanup scope; no intended external call-shape break. | Document the cleanup export; rerun SDK baseline and focused auto-reply proof. |
 | [#89129](https://github.com/openclaw/openclaw/pull/89129) | `config-runtime`, `session-store-runtime`; API baseline | Adds entry-level session helpers and aliases such as `getSessionEntry`, `listSessionEntries`, and `readSessionUpdatedAt`. | Non-breaking additive helpers. Existing whole-store and file-shaped helpers remain available. | Confirm aliases are still needed after [#89203](https://github.com/openclaw/openclaw/pull/89203)/[#89204](https://github.com/openclaw/openclaw/pull/89204) settle; rerun API check. |
 | [#89178](https://github.com/openclaw/openclaw/pull/89178) | API baseline only | SQLite foundation changes SDK baseline through the stacked migration context, with no direct public SDK source file in the PR. | No independent public SDK contract change identified from tracked files. | Treat baseline drift as a review signal; require fresh `plugin-sdk:api:check` before undraft. |
 | [#89201](https://github.com/openclaw/openclaw/pull/89201) | API baseline only; transcript runtime contract | Adds internal transcript identity/state contract used by later SDK/API work. | No direct public SDK API change identified, but later transcript SDK APIs depend on it. | Keep public SDK changes in the owning transcript SDK PRs; refresh API baseline proof. |
@@ -288,11 +292,11 @@ working; it does not mean the new API is automatically approved as the right lon
 | [#89262](https://github.com/openclaw/openclaw/pull/89262) | `session-transcript-runtime`; package/docs/tests/baseline | Adds transcript target/writer APIs: resolve target, append by identity, publish update by identity, and write-lock by target. | Non-breaking additive writer API. Optional `sessionFile` remains as a file-backed active-artifact binding hint. | Verify old file-backed writer flows and new identity writer flows in the same proof set. |
 | [#89348](https://github.com/openclaw/openclaw/pull/89348) | `memory-core-host-engine-storage`; memory host SDK types/helpers/tests/baseline | Adds `MemorySessionSyncTarget` and `MemorySyncParams.sessions`, while retaining deprecated `sessionFiles` during the file-backed window. | Non-breaking if `sessionFiles` remains accepted through the pre-SQLite deprecation window. This is the public bridge for `MemorySearchManager.sync`, not a post-flip compatibility guarantee. | Keep canonical-path tests for deprecated `sessionFiles`; document and inspect `sessions` as the required replacement before SQLite. |
 | [#89518](https://github.com/openclaw/openclaw/pull/89518) | API baseline only; bundled plugin users of transcript APIs | Migrates bundled plugin transcript mirrors onto scoped transcript APIs. | No new public SDK source identified; validates that additive transcript APIs are usable by OpenClaw-owned plugins. | Keep baseline check and bundled plugin proof current after rebasing onto transcript API owners. |
-| [#89519](https://github.com/openclaw/openclaw/pull/89519) | `session-store-runtime`; API baseline | Adds or inherits `cleanupSessionLifecycleArtifacts` lifecycle cleanup export. | Additive but not accepted as the public SDK design. Dreaming should get only a narrow owner-scoped capability if it needs SDK access. | Remove raw cleanup export; replace only with the minimum owner-scoped dreaming capability if still required. |
+| [#89519](https://github.com/openclaw/openclaw/pull/89519) | `session-store-runtime`; API baseline | Adds or inherits `cleanupSessionLifecycleArtifacts` lifecycle cleanup export. | Additive and accepted as the narrow public SDK capability needed by memory-core dreaming. It should not expand into general cleanup/deletion. | Document the export, prove the dreaming scrub behavior, and keep API baseline proof current. |
 | [#89904](https://github.com/openclaw/openclaw/pull/89904) | `config-runtime`, `session-store-runtime`; docs/tests/baseline | Routes bundled SDK/runtime session helpers through the accessor; keeps deprecated whole-store/file-shaped compatibility during the file-backed window. Also carries lifecycle cleanup export. | Session helper compatibility is non-breaking during the deprecation window; lifecycle export remains unresolved. | Keep old SDK helpers working only as pre-SQLite compatibility; resolve cleanup export and add docs/inspector deprecation coverage before undraft. |
 | [#89911](https://github.com/openclaw/openclaw/pull/89911) | `session-transcript-runtime`, `session-transcript-hit`, `text-chunking`, package/docs/scripts/tests/baseline | Adds a public phase-aware text extraction helper and uses transcript target lookup APIs in bundled consumers. | Non-breaking additive helper. Existing transcript command/session-file compatibility remains. | Confirm `text-chunking` belongs in the plugin SDK and is documented as stable enough for external use. |
 | [#89912](https://github.com/openclaw/openclaw/pull/89912) | `SessionTranscriptUpdate` event contract; API baseline | Adds structured transcript update identity/target fields and deprecates `sessionFile`. | Non-breaking only if `sessionFile` remains present during the pre-SQLite deprecation window. Making it optional before removal is a likely TypeScript source break for external listeners. | Keep `sessionFile: string` required until the SQLite removal boundary, mark it deprecated, and add docs/inspector coverage for subscribers that still key on it. |
-| [#90438](https://github.com/openclaw/openclaw/pull/90438) | `session-store-runtime`; API baseline | SQLite embedded-run adapter branch carries the lifecycle cleanup export. | Additive but subject to the same raw cleanup export removal. | Remove raw cleanup export or stack on the accepted narrow owner-scoped capability; rerun API baseline. |
+| [#90438](https://github.com/openclaw/openclaw/pull/90438) | `session-store-runtime`; API baseline | SQLite embedded-run adapter branch carries the lifecycle cleanup export. | Additive and subject to the same narrow lifecycle cleanup contract. | Implement the same lifecycle-artifact cleanup semantics behind SQLite; rerun API baseline. |
 | [#90463](https://github.com/openclaw/openclaw/pull/90463) | API baseline; new accessor package surface | Combines the 3.1a accessor seam with a first gateway consumer and ratchet. | No direct plugin SDK source change in the PR after removing misplaced exports; baseline changes should be reviewed as package-surface drift. | Keep `plugin-sdk:api:check` green and ratchet scope narrow. |
 
 Audited tracker PRs with no identified public plugin SDK API change: [#89120](https://github.com/openclaw/openclaw/pull/89120)
@@ -305,10 +309,9 @@ not itself add public SDK surface.
 
 Two compatibility gaps remain open after this audit:
 
-1. The lifecycle cleanup export appears in multiple stacked PRs. It is additive, but destructive
-   cleanup is a poor accidental SDK surface. The stack should remove the raw export from public SDK
-   barrels. If dreaming still needs SDK access, add only the minimum owner-scoped lifecycle
-   capability with docs and inspector coverage.
+1. The lifecycle cleanup export appears in multiple stacked PRs. It is additive and needed by the
+   memory-core dreaming plugin. The stack should keep the export, document it as a narrow
+   lifecycle-artifact cleanup API, and avoid adding broader cleanup/deletion SDK surface.
 2. `SessionTranscriptUpdate.sessionFile` becoming optional is runtime-compatible only if every
    emitter still populates it for old subscribers. It can still be a TypeScript source break for
    external listeners. The safest compatibility position is to keep `sessionFile` required during
@@ -344,9 +347,9 @@ Concretely, the already-open 3.1b PRs need the following follow-up:
   `sessions` as the required future API.
 - Transcript update identity should keep `sessionFile` required and deprecated during the window,
   while adding structured target identity for new subscribers.
-- Lifecycle cleanup should be resolved by removing the accidental raw cleanup export. If dreaming
-  still needs SDK access, add only the minimum owner-scoped cleanup capability before those
-  branches leave draft.
+- Lifecycle cleanup should remain limited to `cleanupSessionLifecycleArtifacts`, because current
+  dreaming code needs that lifecycle-artifact scrub through the plugin SDK. Do not add broader
+  cleanup/deletion APIs around it.
 
 ### Deprecation plan
 
@@ -391,5 +394,5 @@ should not copy.
   or should they be removed from the package exports entirely?
 - Should transcript update events expose both a structured `target` object and mirrored top-level
   `agentId`/`sessionKey`/`sessionId` fields long term?
-- What exact owner-scoped cleanup API does dreaming need, and can it avoid exposing raw store paths
-  or file-backed deletion mechanics?
+- How should the SQLite implementation preserve `cleanupSessionLifecycleArtifacts` semantics without
+  exposing additional cleanup/deletion SDK surface?
