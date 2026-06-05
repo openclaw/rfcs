@@ -341,6 +341,13 @@ The proposed deprecation window is one week between the release that ships the r
 the SQLite storage flip. During that week, docs and plugin-inspector warnings should identify the
 replacement API for every deprecated surface.
 
+At the SQLite flip, deprecated file-shaped SDK APIs should be removed from TypeScript exports,
+generated API baselines, and package exports. The SDK should not keep post-flip throwing stubs only
+to make stale JavaScript imports resolve: that would keep the removed surface importable and blur the
+compatibility boundary. Plugin authors should get compatibility before the flip through working
+deprecated APIs, `@deprecated` comments, docs, and plugin-inspector warnings; after the flip, stale
+imports should fail naturally because the exports are gone.
+
 ## Rationale
 
 This plan keeps the storage migration incremental without making external plugins absorb every
