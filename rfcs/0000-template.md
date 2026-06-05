@@ -4,7 +4,9 @@ authors:
   - <Name>
 created: <YYYY-MM-DD>
 last_updated: <YYYY-MM-DD>
-rfc_pr: <pull request URL or TBD>
+status: draft
+issue:
+rfc_pr: <pull request URL>
 ---
 
 # Proposal: <Title>
@@ -12,6 +14,13 @@ rfc_pr: <pull request URL or TBD>
 > Copy this file to `<id>-<short-name>.md`. Place supporting diagrams and other
 > assets under a sibling folder named `<id>/`, then reference them with relative
 > paths such as `![](<id>/architecture-overview.png)`.
+>
+> New RFCs start as PRs and should remain unmerged while `status: draft`.
+> Create a discussion thread in `maintainer-discussion`.
+> Leave `issue` blank until the RFC is accepted. When accepted, create the
+> implementation GitHub issue, set `status: accepted`, fill in `issue` with the
+> issue URL, and merge the RFC. Once implementation is complete, update
+> `status: completed`.
 
 ## Summary
 

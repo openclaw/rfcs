@@ -72,6 +72,24 @@ The template keeps a compact RFC shape while borrowing the core proposal habits
 from Go and Rust: short summary, explicit motivation, concrete proposal text,
 rationale for the chosen approach, and clear unresolved questions.
 
+## RFC Lifecycle
+
+New RFCs start as pull requests and should not be merged to `main` while still
+in `draft` status.
+
+Each new RFC also needs a discussion thread in
+[`maintainer-discussion`](https://discord.com/channels/1456350064065904867/1466324351862177815).
+
+The expected flow is:
+
+1. Open the RFC as a PR with `status: draft`.
+2. Leave `issue` blank until the RFC is accepted.
+3. Create a discussion thread in `maintainer-discussion`.
+4. If the RFC is accepted, create a GitHub issue for implementation, update the
+   RFC to `status: accepted`, set `issue` to the GitHub issue URL, and then
+   merge the RFC.
+5. Once implementation is complete, update the RFC status to `completed`.
+
 RFC metadata should live in YAML frontmatter at the top of each RFC. The
 template currently uses these metadata keys:
 
@@ -79,7 +97,15 @@ template currently uses these metadata keys:
 - `authors`
 - `created`
 - `last_updated`
+- `status`
+- `issue`
 - `rfc_pr`
+
+For new RFCs:
+
+- `status` starts as `draft`
+- `issue` starts blank
+- `rfc_pr` should point to the RFC pull request
 
 The expected top-level sections are:
 
