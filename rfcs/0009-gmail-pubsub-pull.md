@@ -6,6 +6,8 @@ authors:
 created: 2026-06-05
 last_updated: 2026-06-05
 rfc_pr: https://github.com/openclaw/rfcs/pull/8
+status: draft
+issue:
 ---
 
 # Proposal: Gmail Pub/Sub Pull Delivery
