@@ -319,6 +319,75 @@ subscription on the same topic or run an explicit migration that changes the
 existing subscription from push to pull. It should not silently compete with an
 active push subscription or assume the topic itself is a consumable queue.
 
+### Current implementation delta
+
+The current `gog` and OpenClaw code already support much of the Gmail watch
+runtime, but only for Pub/Sub push. The implementation PRs should treat this as
+an extraction and delivery-mode change, not as a new integration from scratch.
+
+Current `gog` behavior:
+
+- `gog` has `start`, `status`, `renew`, `stop`, and `serve` Gmail watch
+  commands, but no pull command.
+- The canonical generated command docs use `gog gmail settings watch ...`.
+  OpenClaw also relies on the hidden compatibility surface
+  `gog gmail watch ...`.
+- `serve` already supports shared-token auth and Pub/Sub OIDC verification for
+  push delivery.
+- The push server already parses Pub/Sub push envelopes, decodes the Gmail
+  `emailAddress` plus `historyId` payload, checks account mismatch, detects
+  duplicate Pub/Sub message ids, handles stale history, calls Gmail
+  `history.list`, fetches messages, applies excluded labels, records delivery
+  state, handles rate-limit circuit state, and sends the OpenClaw hook payload.
+- `gog` currently depends on `google.golang.org/api` for Google API clients, but
+  not on `cloud.google.com/go/pubsub/v2`.
+
+Therefore the `gog` slice should:
+
+- add `gog gmail settings watch pull` and keep the OpenClaw-facing
+  `gog gmail watch pull` alias available;
+- add the official Go Pub/Sub client dependency;
+- add a supervised pull subscriber loop around `Subscriber.Receive`;
+- extract the current HTTP push processing path into a shared notification
+  processor that accepts a decoded Gmail notification plus Pub/Sub metadata;
+- keep current push tests green while adding fake-subscriber tests for pull ack
+  and retry decisions;
+- regenerate generated command docs.
+
+Current OpenClaw behavior:
+
+- `hooks.gmail` is push-shaped. It has `pushToken`, `serve`, and `tailscale`
+  fields, but no delivery mode and no Pub/Sub subscriber credential/source
+  fields.
+- `resolveGmailHookRuntimeConfig` currently requires `pushToken`; that is
+  correct for push but wrong for pull.
+- OpenClaw builds `gog gmail watch start` for Gmail watch registration and
+  `gog gmail watch serve` for the long-running push receiver. It has no pull
+  spawn path yet.
+- The gateway already stops, restarts, and respawns the Gmail watcher, and
+  `hooks.gmail` config reloads already trigger a watcher restart. Pull should
+  reuse that lifecycle instead of inventing a second supervisor.
+- Current OpenClaw docs describe push setup, Tailscale exposure, and local
+  `gog` serve behavior. Some CLI docs use the shorthand `gog watch serve`; the
+  implementation and generated `gog` docs use `gog gmail watch serve` or
+  `gog gmail settings watch serve`.
+- The current OpenClaw wrapper only renders shared-token push into `gog serve`.
+  `gog` itself supports OIDC push verification, but first-party OpenClaw setup
+  does not currently expose that as the recommended production path.
+
+Therefore the OpenClaw slice should:
+
+- add an explicit Gmail delivery mode while preserving existing push config;
+- make `pushToken`, `serve`, and `tailscale` required only for push delivery;
+- make pull delivery require a subscription and Pub/Sub subscriber credential
+  source instead of a push endpoint;
+- build and supervise `gog gmail watch pull` in pull mode using the existing
+  watcher lifecycle;
+- keep `gog gmail watch start`/renewal behavior shared by push and pull;
+- update schema, help, labels, docs, setup, reload, and watcher tests;
+- normalize OpenClaw docs so command references consistently name the actual
+  `gog gmail watch ...` or `gog gmail settings watch ...` surface.
+
 ### Setup behavior
 
 `openclaw webhooks gmail setup` should gain pull mode before it becomes the
@@ -431,9 +500,9 @@ change. Each slice adds one product capability and has its own proof gate.
 | Slice | Product or repo | What gets added | Proof gate |
 | --- | --- | --- | --- |
 | 0 | `openclaw/rfcs` | Accepted direction: pull is the target production path, push remains compatibility, and `gog` remains the Gmail runtime. | RFC review accepts the product boundary and rollout plan. |
-| 1 | `gog` | `gog gmail watch pull`, official Go Pub/Sub client dependency, pull subscriber loop, and a shared Gmail notification processor reused by push and pull. | `gog` unit/fake-subscriber tests prove decode, account guardrails, ack/nack, stale history, hook failure, and rate-limit behavior. |
-| 2 | OpenClaw | Explicit Gmail `delivery.mode`, config validation, watcher spawn support for pull, setup opt-in for pull, and docs for pull-vs-push. Existing push setup stays unchanged. | OpenClaw tests and Crabbox/Testbox proof show pull mode starts, restarts, renews, stops, and delivers one hook payload without public ingress. |
-| 3 | nix-openclaw-tools | A released `gog` binary with pull support is packaged and exposed as the normal `gogcli` package. | Package smoke proves `gog gmail watch pull --help` and the existing watch commands are present in the packaged binary. |
+| 1 | `gog` | `gog gmail settings watch pull`, the `gog gmail watch pull` compatibility alias, official Go Pub/Sub client dependency, pull subscriber loop, and a shared Gmail notification processor reused by push and pull. | `gog` unit/fake-subscriber tests prove decode, account guardrails, ack/nack, stale history, hook failure, rate-limit behavior, and unchanged push behavior. |
+| 2 | OpenClaw | Explicit Gmail `delivery.mode`, config validation, watcher spawn support for pull, setup opt-in for pull, and docs for pull-vs-push. Existing push setup stays unchanged, including current push `pushToken`, `serve`, and `tailscale` config. | OpenClaw tests and Crabbox/Testbox proof show pull mode starts, restarts, renews, stops, and delivers one hook payload without public ingress; push-mode tests prove existing setup still renders `gog gmail watch serve`. |
+| 3 | nix-openclaw-tools | A released `gog` binary with pull support is packaged and exposed as the normal `gogcli` package. | Package smoke proves `gog gmail settings watch pull --help`, `gog gmail watch pull --help`, and the existing watch commands are present in the packaged binary. |
 | 4 | nix-openclaw | A high-level Gmail watch module option renders the same OpenClaw Gmail config, adds `gog` to the runtime path, wires secret-backed env, and rejects conflicting raw Gmail hook ownership. | Nix/module eval tests prove rendered config has pull delivery, no push endpoint, no literal secrets, and no conflicting raw hook config. |
 | 5 | First real deployment | The operator's cloud config creates or verifies the pull subscription and gives the local `gog` worker permission to read only that subscription; the user's OpenClaw config enables the high-level Gmail watch integration. | A real mailbox change reaches OpenClaw through pull delivery without public ingress, and rollback to the existing push path is documented. |
 | 6 | Make pull the default for new setup | A follow-up OpenClaw PR changes new `openclaw webhooks gmail setup` runs to choose pull unless the user explicitly asks for push. Push docs move under compatibility or public-ingress guidance. | Maintainers have live proof over a few weeks, documented rollback to push, and no unresolved compatibility findings. |
@@ -466,9 +535,12 @@ mutation:
   and retryable outcome.
 - `gog gmail watch start --dry-run --json` proof that watch registration
   requests are still formed correctly.
-- OpenClaw config tests for pull-vs-push schema validation.
+- OpenClaw config tests for pull-vs-push schema validation, including proof that
+  pull mode does not require `pushToken` and push mode still does.
 - OpenClaw watcher tests proving the pull command is spawned with the expected
   args and restarted/stopped with the gateway lifecycle.
+- OpenClaw push compatibility tests proving existing `gog gmail watch serve`
+  spawning, Tailscale path handling, and reload restart behavior remain intact.
 - OpenClaw setup tests proving pull mode creates or verifies a subscription
   without `push_config`.
 - Documentation examples that do not require Tailscale Funnel or public HTTP
