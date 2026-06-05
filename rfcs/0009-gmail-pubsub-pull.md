@@ -170,11 +170,17 @@ gog gmail watch pull \
   --hook-token "$OPENCLAW_HOOK_TOKEN"
 ```
 
-This is consistent with the existing `gog gmail watch` command family. Today
-`gog gmail watch serve` runs an HTTP server for Pub/Sub push delivery. The new
-`pull` command is the sibling long-running consumer for Pub/Sub pull delivery.
-The existing `start`, `status`, `renew`, and `stop` commands remain the watch
-registration lifecycle.
+This is a transport sibling, not a new lifecycle verb. The current `gog`
+command family has `start`, `status`, `renew`, `stop`, and `serve`: `start`,
+`renew`, and `stop` register or unregister Gmail's watch with the Gmail API,
+while `serve` is the long-running Pub/Sub push receiver. The new `pull` command
+should sit next to `serve` as the long-running Pub/Sub pull receiver.
+
+`gog` currently exposes this family in two ways: the canonical generated docs use
+`gog gmail settings watch ...`, and OpenClaw already invokes the hidden
+compatibility surface `gog gmail watch ...`. Implementation should keep those
+surfaces aligned. If `pull` is added under `settings watch`, the OpenClaw-facing
+`gmail watch pull` alias should exist too.
 
 The command should reuse the existing Gmail watch state and hook delivery
 behavior where possible. The main implementation work in `gog` is to extract the
@@ -207,10 +213,12 @@ publishing into the same delivery stream.
 ### First-party Pub/Sub client contract
 
 The pull implementation should use Google's maintained Go Pub/Sub client
-library, currently `cloud.google.com/go/pubsub/v2`, at the high-level
-subscriber API. It should not hand-roll long polling, StreamingPull,
-ack-deadline extension, flow control, or retry loops against raw REST unless a
-specific client-library bug forces that choice.
+library, `cloud.google.com/go/pubsub/v2`, at the high-level subscriber API. As
+of the docs checked on 2026-06-05, the current public package shown by Google is
+v2.6.0 and the simple Go subscriber path is `Subscriber.Receive`. The
+implementation should not hand-roll long polling, StreamingPull, ack-deadline
+extension, flow control, or retry loops against raw REST unless a specific
+client-library bug forces that choice.
 
 The default implementation should use `Subscriber.Receive`, because the
 official client already owns the hard Pub/Sub mechanics:
@@ -222,9 +230,13 @@ official client already owns the hard Pub/Sub mechanics:
 - exposing `Ack` and `Nack` decisions at the message boundary.
 
 The implementation should still use the published Pub/Sub API shape in tests and
-adapters. A Pub/Sub message has a `data` field and metadata such as message id.
-For Gmail, `data` is the base64-encoded JSON notification documented by the
-Gmail API:
+adapters. For Go, that means the generated Pub/Sub proto surface
+`google.pubsub.v1.PubsubMessage`, exposed by the client as `pubsubpb.PubsubMessage`
+for low-level tests and by the high-level client as `pubsub.Message` for normal
+receive handling. The REST shape is also documented as `PubsubMessage`. A
+Pub/Sub message has a `data` field and metadata such as message id. For Gmail,
+`data` is not a proto message and not an email body; it is the base64url-encoded
+JSON notification documented by the Gmail API:
 
 ```json
 {
@@ -236,6 +248,22 @@ Gmail API:
 Tests should build fixtures from that documented Gmail payload and the official
 Pub/Sub message shape rather than from ad hoc strings copied out of one local
 run.
+
+### Why the worker still calls Gmail
+
+Pub/Sub is the queue, not the mailbox change log. Gmail publishes a small
+notification that says, in effect, "mailbox X advanced to history id Y." It does
+not publish the changed message ids, deleted message ids, labels, snippets, or
+message bodies. After the worker receives and decodes the Pub/Sub message, it
+must call Gmail `history.list` from the last stored history id to discover the
+actual mailbox changes. That is the same Gmail-side work the current push
+handler already performs after receiving an HTTP Pub/Sub push.
+
+So pull mode removes inbound HTTP delivery, but it does not replace Gmail
+history processing. The transport changes from "Google POSTs the Pub/Sub
+message to us" to "we receive the Pub/Sub message from Google"; the mailbox
+cursor, history fetch, stale-history recovery, and hook payload construction
+remain the same product behavior.
 
 ### Ack and retry policy
 
@@ -327,10 +355,15 @@ need setup, renewal, auth, and troubleshooting docs.
 
 ### Credentials and secrets
 
-Pull mode needs two credential families:
+Pull mode needs the same Gmail credential family that push mode already needs,
+plus one new Pub/Sub subscriber credential family:
 
-- Gmail credentials so `gog` can read Gmail history after a notification.
-- Pub/Sub subscriber credentials so `gog` can pull from the subscription.
+- Gmail credentials so `gog` can register or renew the Gmail watch and read
+  Gmail history after a notification. This is not new to pull; the existing push
+  handler also calls Gmail after receiving a Pub/Sub notification.
+- Pub/Sub subscriber credentials so `gog` can pull from the subscription. This is
+  new for pull because the local worker, not Google Pub/Sub push delivery, is now
+  the subscriber.
 
 The Gmail credential path should reuse whatever `gog` already uses for Gmail
 watch setup and history reads. The Pub/Sub credential path should use the
