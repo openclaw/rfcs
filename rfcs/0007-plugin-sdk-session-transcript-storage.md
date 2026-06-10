@@ -3,7 +3,7 @@ title: Plugin SDK Session and Transcript Storage Migration
 authors:
   - jalehman
 created: 2026-06-04
-last_updated: 2026-06-05
+last_updated: 2026-06-10
 status: draft
 issue: https://github.com/openclaw/openclaw/issues/88838
 rfc_pr: https://github.com/openclaw/rfcs/pull/7
@@ -198,6 +198,99 @@ compatibility.
 
 This lets new code treat transcript search hits as session identity, while old memory/QMD workflows
 continue to parse existing file-shaped artifacts during the deprecation window.
+
+### Transcript storage lifecycle
+
+The transcript migration changes where transcript data lives, so this RFC defines the full
+lifecycle rather than only the hot store. The design separates the canonical store from derived
+artifacts: SQLite owns runtime state, and JSONL files remain as archive artifacts that the
+runtime produces but never reads.
+
+#### Hot store
+
+Live transcript events are rows in the SQLite transcript store. The runtime session path —
+resume, append, compaction, checkpoints, live memory indexing — reads and writes only these
+rows. After the transcript storage flip there is no point where the runtime consults a
+transcript file to answer a session-path read.
+
+#### Retention boundary
+
+Transcript rows live exactly as long as a session entry references their session id. The
+existing session-entry maintenance events are the only retention triggers:
+
+- idle prune (`pruneAfterMs`, default 30 days);
+- entry cap (`maxEntries`, default 500);
+- disk-budget eviction;
+- explicit session delete, session reset, and agent deletion.
+
+When one of these removes the last live entry referencing a session id, maintenance exports
+that session's transcript rows to an archived JSONL artifact and then deletes the rows. This
+replaces the current file-move archive step at the same trigger points, preserving today's
+observable contract: a session evicted from the store leaves an archived transcript behind.
+
+Rules carried over from the current file-backed behavior:
+
+- A session id still referenced by another live entry is not exported or deleted.
+- Warn-only maintenance mode reports and does not export or delete.
+- Export covers every transcript artifact belonging to the session (topic variants and
+  compaction successor chains), matching what the file-move archives today.
+- Reset-archive retention (`resetArchiveRetention`, defaulting to the prune window) continues
+  to govern archived-artifact cleanup.
+
+This proposal adds no new retention configuration. Users who tuned `pruneAfterMs` or
+`maxEntries` have already expressed their retention preference; transcripts inherit it.
+
+Two behaviors are redefined for the SQLite backend:
+
+1. **Ordering.** The archive export must be durable before the rows are deleted. A crash
+   between export and delete leaves the rows in place, and the next maintenance sweep
+   re-exports idempotently. The reverse order is forbidden because it can lose data.
+2. **Disk budget.** Budget enforcement currently measures transcript file sizes. After the
+   flip it measures per-session transcript row bytes in the store, with the same eviction
+   policy.
+
+#### Archive artifacts
+
+Archived transcripts are JSONL files in the existing archive location and format. They are
+named product artifacts in the sense of the repository storage policy (export/backup), not
+runtime state:
+
+- the runtime session path never reads them; resuming a session whose entry was pruned starts
+  fresh, exactly as it does today;
+- memory/QMD indexing, dreaming, support workflows, and users continue to read them as files;
+- existing archived-transcript cleanup behavior (sweeps removing archives older than the
+  prune/reset-archive window) carries forward unchanged.
+
+Because the canonical store produces archives rather than reading them, this does not create a
+dual-read runtime or a fallback storage path.
+
+#### Storage flip and legacy import
+
+The retention design shrinks the transcript storage flip's doctor migration. At the flip:
+
+- transcripts referenced by a live session entry are imported into the SQLite store so resume
+  and compaction keep working;
+- legacy transcript files not referenced by any live entry are reclassified as archived
+  artifacts in place, not parsed into rows.
+
+The long tail of historical JSONL is already in the archive tier's format, so the importer
+only pays for the live working set.
+
+#### Dependency on identity-based memory sync
+
+Live transcripts index from the store and archived transcripts index from files, so memory
+sync can no longer be addressed by file path. The `MemorySessionSyncTarget` replacement for
+`sessionFiles` defined earlier in this RFC is therefore a prerequisite for the transcript
+storage flip, not an optional SDK cleanup: targeted sync must address transcripts by session
+identity and let the implementation resolve the storage tier.
+
+#### Lifecycle non-goals
+
+- No user-facing purge or retention configuration is added. Archived-artifact cleanup keeps
+  its current shipped semantics; a richer purge surface can be designed later if demand
+  appears.
+- No runtime fallback reads of archived artifacts, and no import path that rehydrates an
+  archived transcript back into the hot store.
 
 ### Cleanup and lifecycle APIs
 
