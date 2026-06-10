@@ -1,6 +1,6 @@
 # Example Stable/LTS Scorecard Checklist
 
-This is a complete example, not the final OpenClaw Stable/LTS taxonomy. It shows the level of detail the implementation fixture should contain: every checklist row has a category ID, a blocking rule, evidence requirements, and at least one example mapping to executable evidence. The real fixture can rename categories, split rows, or add surfaces, and `@kevinlin-openai` owns the authoritative requirement-to-test mapping. Whatever the final mapping contains, it should preserve the same property: no release-blocking checklist item exists without a machine-readable evidence mapping.
+This is a complete example, not the final OpenClaw Stable/LTS taxonomy. OpenClaw now has the maturity taxonomy snapshot in `taxonomy.yaml`, the executable overlay in `taxonomy-mappings.yaml`, and the score snapshot in `docs/maturity-scores.yaml`; this example shows the RFC 0007 mapping shape on top of that data. Every checklist row has a category ID, a blocking rule, evidence requirements, and at least one example mapping to executable evidence. The real mapping can rename categories, split rows, or add surfaces. Whatever the final mapping contains, it should preserve the same property: no release-blocking checklist item exists without a machine-readable evidence mapping.
 
 ## Example checklist
 
@@ -20,15 +20,15 @@ This is a complete example, not the final OpenClaw Stable/LTS taxonomy. It shows
 | providers.openrouter | Model providers | OpenRouter provider path | OpenRouter routing, model selection, tool support detection, and error handling work with live credentials. | yes | Live provider lane. |
 | providers.local | Model providers | Local provider path | Local provider setup, catalog, text turn, and failure diagnostics work without cloud credentials. | yes | Host e2e or Docker local-provider lane. |
 | channels.qa | Channels | Synthetic QA channel | The synthetic channel still covers portable channel contract behavior used by normal PR CI. | yes | Core QA Lab `qa-channel` lane. |
-| channels.telegram.mock | Channels | Telegram deterministic channel proof | Telegram adapter handles DM, group mention, thread/topic, approval button, media metadata, reconnect, and outbound transcript with local upstream shims. | yes | Multipass mock-channel lane. |
+| channels.telegram.mock | Channels | Telegram deterministic channel proof | Telegram adapter handles DM, group mention, thread/topic, approval button, media metadata, reconnect, and outbound transcript with local upstream shims. | yes | `openclaw/crabline` SDK-backed mock-channel lane. |
 | channels.telegram.live | Channels | Telegram live upstream proof | Telegram bot and user-driver flows work against live Telegram for every release that claims Telegram support. | yes | Live Telegram lane. |
-| channels.discord.mock | Channels | Discord deterministic channel proof | Discord adapter handles DM, guild mention, thread, native callback, reaction/action, media metadata, and outbound transcript with local upstream shims. | yes | Multipass mock-channel lane. |
+| channels.discord.mock | Channels | Discord deterministic channel proof | Discord adapter handles DM, guild mention, thread, native callback, reaction/action, media metadata, and outbound transcript with local upstream shims. | yes | `openclaw/crabline` SDK-backed mock-channel lane. |
 | channels.discord.live | Channels | Discord live upstream proof | Discord canary works against live Discord for every release that claims Discord support. | yes | Live Discord lane. |
-| channels.slack.mock | Channels | Slack deterministic channel proof | Slack adapter handles DM, channel thread, Socket Mode event, slash command, button approval, file attachment, and outbound transcript with local upstream shims. | yes | Multipass mock-channel lane. |
+| channels.slack.mock | Channels | Slack deterministic channel proof | Slack adapter handles DM, channel thread, Socket Mode event, slash command, button approval, file attachment, and outbound transcript with local upstream shims. | yes | `openclaw/crabline` SDK-backed mock-channel lane. |
 | channels.slack.live | Channels | Slack live upstream proof | Slack canary works against live Slack for every release that claims Slack support. | yes | Live Slack lane. |
-| channels.whatsapp.mock | Channels | WhatsApp deterministic channel proof | WhatsApp adapter handles DM, group activation, media/voice metadata, native reaction/approval, reconnect, and outbound transcript with local upstream shims. | yes | Multipass mock-channel lane. |
+| channels.whatsapp.mock | Channels | WhatsApp deterministic channel proof | WhatsApp adapter handles DM, group activation, media/voice metadata, native reaction/approval, reconnect, and outbound transcript with local upstream shims. | yes | `openclaw/crabline` SDK-backed mock-channel lane. |
 | channels.whatsapp.live | Channels | WhatsApp live upstream proof | WhatsApp canary works against live WhatsApp for every release that claims WhatsApp support. | yes | Live WhatsApp lane. |
-| channels.matrix.live | Channels | Matrix live release profile | Matrix transport, media, and E2EE profiles pass against the disposable Matrix release runner. | yes | Matrix QA release profile. |
+| channels.matrix.live | Channels | Matrix live release lane | Matrix transport, media, and E2EE lanes pass against the disposable Matrix release runner. | yes | Matrix QA release lane. |
 | memory.recall | Memory and sessions | Memory recall | User preference and session memory recall work through normal conversation flow and do not cross thread/channel boundaries. | yes | QA Lab memory scenarios. |
 | memory.failure | Memory and sessions | Memory failure behavior | Memory store failure produces visible fallback behavior without losing the active turn. | yes | QA Lab memory failure scenario. |
 | sessions.persistence | Memory and sessions | Session persistence | Session identity, transcript ordering, and resume state survive restart and package lanes. | yes | Runtime e2e plus package restart lane. |
@@ -56,52 +56,54 @@ This is a complete example, not the final OpenClaw Stable/LTS taxonomy. It shows
 
 ## Example mapping
 
-| Checklist ID | Coverage IDs | Example scenarios or lanes | Required tier | Required live proof | Freshness rule |
+`Required profiles` uses only the initial `smoke-ci` and `release` profiles. `none` means the row is advisory evidence outside the blocking profile set unless maintainers later promote it.
+
+| Checklist ID | Coverage IDs | Example scenarios or lanes | Required profiles | Required live proof | Freshness rule |
 | --- | --- | --- | --- | --- | --- |
-| runtime.gateway.startup | `runtime.gateway.startup`, `runtime.protocol.auth` | `pnpm test:e2e` Gateway shard; Docker gateway smoke; package acceptance workflow | core, release | package lane for release | target ref and release package |
-| runtime.gateway.restart | `runtime.gateway.restart`, `runtime.run.recovery` | `qa/scenarios/jsonl-replay/gateway-restart-recovery.jsonl`; `qa/scenarios/runtime/gateway-restart-inflight-run.md` | core, release | package lane for release | target ref and release package |
-| runtime.agent.turns | `runtime.agent.turn`, `runtime.streaming.final` | `qa/scenarios/channels/dm-chat-baseline.md`; `qa/scenarios/runtime/streaming-final-integrity.md` | core | no | target ref |
-| runtime.context.compaction | `runtime.context.compaction`, `runtime.replay.safe` | `qa/scenarios/runtime/compaction-retry-mutating-tool.md`; `qa/scenarios/runtime/long-context-progress-watchdog.md` | core, extended | no | target ref |
-| runtime.tools.core | `runtime.tools.core`, `runtime.tools.files`, `runtime.tools.exec` | `qa/scenarios/runtime/tools/fs-read.md`; `qa/scenarios/runtime/tools/fs-write.md`; `qa/scenarios/runtime/tools/exec.md`; `qa/scenarios/runtime/tools/apply-patch.md` | core | no | target ref |
-| runtime.tools.approval | `runtime.tools.approval`, `runtime.actions.approval` | `qa/scenarios/runtime/approval-turn-tool-followthrough.md`; `qa/scenarios/personal/approval-denial-stop.md` | core, release | live channel action for channel claims | target ref and release package |
-| runtime.observability.trace | `runtime.observability.otel`, `runtime.trace.visibility` | `qa/scenarios/runtime/otel-trace-smoke.md`; `qa/scenarios/runtime/qa-bus-tool-trace-visibility.md` | core, release | no | target ref |
+| runtime.gateway.startup | `runtime.gateway.startup`, `runtime.protocol.auth` | `pnpm test:e2e` Gateway shard; Docker gateway smoke; package acceptance workflow | smoke-ci, release | package lane for release | target ref and release package |
+| runtime.gateway.restart | `runtime.gateway.restart`, `runtime.run.recovery` | `qa/scenarios/jsonl-replay/gateway-restart-recovery.jsonl`; `qa/scenarios/runtime/gateway-restart-inflight-run.md` | smoke-ci, release | package lane for release | target ref and release package |
+| runtime.agent.turns | `runtime.agent.turn`, `runtime.streaming.final` | `qa/scenarios/channels/dm-chat-baseline.md`; `qa/scenarios/runtime/streaming-final-integrity.md` | smoke-ci | no | target ref |
+| runtime.context.compaction | `runtime.context.compaction`, `runtime.replay.safe` | `qa/scenarios/runtime/compaction-retry-mutating-tool.md`; `qa/scenarios/runtime/long-context-progress-watchdog.md` | smoke-ci, release | no | target ref |
+| runtime.tools.core | `runtime.tools.core`, `runtime.tools.files`, `runtime.tools.exec` | `qa/scenarios/runtime/tools/fs-read.md`; `qa/scenarios/runtime/tools/fs-write.md`; `qa/scenarios/runtime/tools/exec.md`; `qa/scenarios/runtime/tools/apply-patch.md` | smoke-ci | no | target ref |
+| runtime.tools.approval | `runtime.tools.approval`, `runtime.actions.approval` | `qa/scenarios/runtime/approval-turn-tool-followthrough.md`; `qa/scenarios/personal/approval-denial-stop.md` | smoke-ci, release | live channel action for channel claims | target ref and release package |
+| runtime.observability.trace | `runtime.observability.otel`, `runtime.trace.visibility` | `qa/scenarios/runtime/otel-trace-smoke.md`; `qa/scenarios/runtime/qa-bus-tool-trace-visibility.md` | smoke-ci, release | no | target ref |
 | runtime.performance.budget | `runtime.performance.rtt`, `runtime.performance.startup` | RTT harness summary; CLI/Gateway startup benchmark summary | release | live channel RTT for channel claims | release candidate |
 | providers.openai | `providers.openai.live`, `providers.openai.tools`, `providers.openai.web_search` | `qa/scenarios/models/openai-native-web-search-live.md`; OpenAI tools client e2e | release | yes | release candidate |
 | providers.anthropic | `providers.anthropic.live`, `providers.anthropic.long_context` | `qa/scenarios/models/anthropic-opus-api-key-smoke.md`; `qa/scenarios/models/anthropic-opus-setup-token-smoke.md` | release | yes | release candidate |
-| providers.google | `providers.google.live` | Live provider shard for Google profile | release | yes | release candidate |
-| providers.openrouter | `providers.openrouter.live`, `providers.routing.catalog` | Live provider shard for OpenRouter profile | release | yes | release candidate |
-| providers.local | `providers.local.live`, `providers.local.diagnostics` | Local-provider Docker or host e2e lane | extended, release | local runtime, no cloud | target ref and release package |
-| channels.qa | `channels.qa.baseline`, `channels.portable.contract` | `qa/scenarios/channels/channel-chat-baseline.md`; `qa/scenarios/channels/dm-chat-baseline.md` | core | no | target ref |
-| channels.telegram.mock | `channels.telegram.mock`, `channels.actions.approval`, `channels.media.metadata` | Multipass Telegram mock upstream lane | core | no | target ref |
+| providers.google | `providers.google.live` | Live provider shard for Google | release | yes | release candidate |
+| providers.openrouter | `providers.openrouter.live`, `providers.routing.catalog` | Live provider shard for OpenRouter | release | yes | release candidate |
+| providers.local | `providers.local.live`, `providers.local.diagnostics` | Local-provider Docker or host e2e lane | release | local runtime, no cloud | target ref and release package |
+| channels.qa | `channels.qa.baseline`, `channels.portable.contract` | `qa/scenarios/channels/channel-chat-baseline.md`; `qa/scenarios/channels/dm-chat-baseline.md` | smoke-ci | no | target ref |
+| channels.telegram.mock | `channels.telegram.mock`, `channels.actions.approval`, `channels.media.metadata` | `openclaw/crabline` Telegram mock upstream lane | smoke-ci | no | target ref |
 | channels.telegram.live | `channels.telegram.live`, `channels.telegram.user_driver` | Telegram live QA lane; Telegram user-driver Crabbox proof | release | yes | release candidate |
-| channels.discord.mock | `channels.discord.mock`, `channels.threading`, `channels.actions.native` | Multipass Discord mock upstream lane | core | no | target ref |
+| channels.discord.mock | `channels.discord.mock`, `channels.threading`, `channels.actions.native` | `openclaw/crabline` Discord mock upstream lane | smoke-ci | no | target ref |
 | channels.discord.live | `channels.discord.live` | Discord live QA lane | release | yes | release candidate |
-| channels.slack.mock | `channels.slack.mock`, `channels.threading`, `channels.file_attachment` | Multipass Slack mock upstream lane | core | no | target ref |
+| channels.slack.mock | `channels.slack.mock`, `channels.threading`, `channels.file_attachment` | `openclaw/crabline` Slack mock upstream lane | smoke-ci | no | target ref |
 | channels.slack.live | `channels.slack.live` | Slack live QA lane | release | yes | release candidate |
-| channels.whatsapp.mock | `channels.whatsapp.mock`, `channels.media.voice`, `channels.reconnect` | Multipass WhatsApp mock upstream lane | core | no | target ref |
+| channels.whatsapp.mock | `channels.whatsapp.mock`, `channels.media.voice`, `channels.reconnect` | `openclaw/crabline` WhatsApp mock upstream lane | smoke-ci | no | target ref |
 | channels.whatsapp.live | `channels.whatsapp.live` | WhatsApp live QA lane | release | yes | release candidate |
-| channels.matrix.live | `channels.matrix.live`, `channels.matrix.e2ee`, `channels.matrix.media` | Matrix QA transport/media/E2EE release profile | release | yes | release candidate |
-| memory.recall | `memory.recall`, `memory.thread_isolation` | `qa/scenarios/memory/memory-recall.md`; `qa/scenarios/memory/thread-memory-isolation.md`; `qa/scenarios/personal/memory-preference-recall.md` | core | no | target ref |
-| memory.failure | `memory.failure.fallback` | `qa/scenarios/memory/memory-failure-fallback.md` | core | no | target ref |
-| sessions.persistence | `sessions.persistence`, `sessions.resume` | `qa/scenarios/jsonl-replay/recovery-partial-session.jsonl`; runtime e2e shard | core, release | package lane for release | target ref and release package |
-| automation.cron | `automation.cron.lifecycle`, `automation.cron.dedupe` | `qa/scenarios/scheduling/cron-natural-fire-no-duplicate.md`; `qa/scenarios/scheduling/cron-single-run-no-duplicate.md`; `qa/scenarios/scheduling/cron-one-minute-ping.md` | core, release | live delivery for claimed live channels | target ref and release package |
-| automation.reminders | `automation.reminders`, `automation.heartbeat` | `qa/scenarios/personal/reminder-roundtrip.md`; `qa/scenarios/memory/commitments-heartbeat-target-none.md` | core | no | target ref |
-| automation.webhooks | `automation.webhooks.ingress`, `automation.hooks.dispatch` | Hook integration shard; future QA Lab webhook scenario | extended, release | live tunnel only if release claims hosted ingress | release candidate |
-| plugins.manifest | `plugins.manifest.contract`, `plugins.sdk.boundary` | Plugin inspection summary; plugin contract integration tests | core | no | target ref |
-| plugins.runtime | `plugins.runtime.user_flow`, `plugins.kitchen_sink.conformance` | `qa/scenarios/plugins/kitchen-sink-live-openai.md`; `qa/scenarios/plugins/mcp-plugin-tools-call.md`; `qa/scenarios/plugins/plugin-manifest-contract-health.md` | core, release | live provider only for provider plugin claims | target ref and release package |
-| plugins.external.compat | `plugins.external.compat.advisory` | Crabpot/plugin-inspector advisory summary | advisory | no | latest advisory run |
-| media.input | `media.input.image`, `media.input.attachment` | `qa/scenarios/media/image-understanding-attachment.md`; live media shard | core, release | live provider for release | release candidate |
-| media.output | `media.output.image`, `media.output.tts` | `qa/scenarios/media/image-generation-roundtrip.md`; `qa/scenarios/media/native-image-generation.md`; `qa/scenarios/runtime/tools/tts.md` | extended, release | live provider/channel where claimed | release candidate |
-| ui.control | `ui.control.gateway`, `ui.control.browser` | Control UI e2e shard; mobile viewport browser run | core, extended | no | target ref |
-| ui.tui | `ui.tui.pty`, `ui.tui.local_backend` | TUI fake-backend PTY lane; local-backend smoke where stable | core, extended | no | target ref |
-| cli.commands | `cli.commands.package`, `cli.doctor`, `cli.qa` | Package acceptance workflow; CLI startup and doctor smoke | core, release | no | target ref and release package |
+| channels.matrix.live | `channels.matrix.live`, `channels.matrix.e2ee`, `channels.matrix.media` | Matrix QA transport/media/E2EE release lane | release | yes | release candidate |
+| memory.recall | `memory.recall`, `memory.thread_isolation` | `qa/scenarios/memory/memory-recall.md`; `qa/scenarios/memory/thread-memory-isolation.md`; `qa/scenarios/personal/memory-preference-recall.md` | smoke-ci | no | target ref |
+| memory.failure | `memory.failure.fallback` | `qa/scenarios/memory/memory-failure-fallback.md` | smoke-ci | no | target ref |
+| sessions.persistence | `sessions.persistence`, `sessions.resume` | `qa/scenarios/jsonl-replay/recovery-partial-session.jsonl`; runtime e2e shard | smoke-ci, release | package lane for release | target ref and release package |
+| automation.cron | `automation.cron.lifecycle`, `automation.cron.dedupe` | `qa/scenarios/scheduling/cron-natural-fire-no-duplicate.md`; `qa/scenarios/scheduling/cron-single-run-no-duplicate.md`; `qa/scenarios/scheduling/cron-one-minute-ping.md` | smoke-ci, release | live delivery for claimed live channels | target ref and release package |
+| automation.reminders | `automation.reminders`, `automation.heartbeat` | `qa/scenarios/personal/reminder-roundtrip.md`; `qa/scenarios/memory/commitments-heartbeat-target-none.md` | smoke-ci | no | target ref |
+| automation.webhooks | `automation.webhooks.ingress`, `automation.hooks.dispatch` | Hook integration shard; future QA Lab webhook scenario | release | live tunnel only if release claims hosted ingress | release candidate |
+| plugins.manifest | `plugins.manifest.contract`, `plugins.sdk.boundary` | Plugin inspection summary; plugin contract integration tests | smoke-ci | no | target ref |
+| plugins.runtime | `plugins.runtime.user_flow`, `plugins.kitchen_sink.conformance` | `qa/scenarios/plugins/kitchen-sink-live-openai.md`; `qa/scenarios/plugins/mcp-plugin-tools-call.md`; `qa/scenarios/plugins/plugin-manifest-contract-health.md` | smoke-ci, release | live provider only for provider plugin claims | target ref and release package |
+| plugins.external.compat | `plugins.external.compat.advisory` | Crabpot/plugin-inspector advisory summary | none | no | latest advisory run |
+| media.input | `media.input.image`, `media.input.attachment` | `qa/scenarios/media/image-understanding-attachment.md`; live media shard | smoke-ci, release | live provider for release | release candidate |
+| media.output | `media.output.image`, `media.output.tts` | `qa/scenarios/media/image-generation-roundtrip.md`; `qa/scenarios/media/native-image-generation.md`; `qa/scenarios/runtime/tools/tts.md` | release | live provider/channel where claimed | release candidate |
+| ui.control | `ui.control.gateway`, `ui.control.browser` | Control UI e2e shard; mobile viewport browser run | smoke-ci, release | no | target ref |
+| ui.tui | `ui.tui.pty`, `ui.tui.local_backend` | TUI fake-backend PTY lane; local-backend smoke where stable | smoke-ci, release | no | target ref |
+| cli.commands | `cli.commands.package`, `cli.doctor`, `cli.qa` | Package acceptance workflow; CLI startup and doctor smoke | smoke-ci, release | no | target ref and release package |
 | install.npm | `install.npm.fresh`, `install.npm.update` | Package acceptance workflow; npm update smoke | release | package registry or release artifact | release candidate |
 | install.docker | `install.docker.package`, `install.docker.gateway` | Docker e2e lane; Docker package gateway smoke | release | package artifact | release candidate |
 | install.desktop | `install.desktop.macos`, `install.desktop.windows`, `install.desktop.linux` | Parallels macOS/Windows/Linux smoke; Crabbox/Testbox platform lanes | release | platform lane | release candidate |
 | upgrade.config | `upgrade.config.doctor`, `upgrade.state.migration` | `qa/scenarios/config/config-apply-restart-wakeup.md`; `qa/scenarios/runtime/auth-profile-doctor-migration-safety.md`; upgrade survivor lane | release | package upgrade lane | release candidate |
-| security.secrets | `security.secrets.redaction`, `security.artifacts.redaction` | `qa/scenarios/security/secret-redaction-tool-logs.md`; `qa/scenarios/personal/redaction-no-secret-leak.md`; secret scanning gate | core, release | no | target ref and release package |
-| security.network | `security.network.boundaries`, `security.media.ssrfsafe` | Security e2e/integration shard; media unsafe-source checks | core, release | no | target ref |
-| security.permissions | `security.permissions.actions`, `security.plugin_hooks.policy` | `qa/scenarios/personal/tool-safety-followthrough.md`; plugin hook health scenario | core, release | live channel action for channel claims | target ref and release package |
+| security.secrets | `security.secrets.redaction`, `security.artifacts.redaction` | `qa/scenarios/security/secret-redaction-tool-logs.md`; `qa/scenarios/personal/redaction-no-secret-leak.md`; secret scanning gate | smoke-ci, release | no | target ref and release package |
+| security.network | `security.network.boundaries`, `security.media.ssrfsafe` | Security e2e/integration shard; media unsafe-source checks | smoke-ci, release | no | target ref |
+| security.permissions | `security.permissions.actions`, `security.plugin_hooks.policy` | `qa/scenarios/personal/tool-safety-followthrough.md`; plugin hook health scenario | smoke-ci, release | live channel action for channel claims | target ref and release package |
 | docs.troubleshooting | `docs.troubleshooting.surface`, `docs.release.rerun` | Docs check; release checklist summary with rerun commands | release | no | release candidate |
 | release.artifacts | `release.artifacts.summary`, `release.artifacts.manifest` | Release workflow artifact upload step; scorecard report artifact | release | release workflow | release candidate |
 | release.waivers | `release.waiver.upstream`, `release.failure.classification` | Scorecard gate failure classification; maintainer waiver record | release | live upstream outage path | release candidate |
@@ -112,7 +114,7 @@ The scorecard gate can generate a compact report from the mapping above and the 
 
 | Checklist ID | Status | Evidence artifact | Detail |
 | --- | --- | --- | --- |
-| runtime.gateway.startup | pass | `.artifacts/qa-e2e/core/qa-suite-summary.json` | host e2e and package lane passed for target ref |
+| runtime.gateway.startup | pass | `.artifacts/qa-e2e/smoke-ci/qa-suite-summary.json` | host e2e and package lane passed for target ref |
 | channels.telegram.live | pass | `.artifacts/qa-e2e/telegram-20260607/telegram-qa-summary.json` | live Telegram bot and user-driver proof passed |
 | providers.google | fail | `.artifacts/qa-e2e/live-providers/qa-suite-summary.json` | live Google provider scenario failed with provider outage classification |
 | plugins.external.compat | advisory | `crabpot-summary.json` | advisory-only compatibility signal, not release-blocking |

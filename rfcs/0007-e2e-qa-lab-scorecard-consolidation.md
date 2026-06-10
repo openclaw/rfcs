@@ -17,15 +17,15 @@ OpenClaw already has the pieces for serious e2e coverage: Vitest e2e shards, QA 
 
 ## Motivation
 
-The maturity scorecard process in `openclaw/maintainers` defines product surfaces and category-level maturity. Its rendered scorecard says promotion toward Stable needs release gates, troubleshooting paths, repeated real-world proof, and scenario proof across expected environments. OpenClaw CI carries the executable taxonomy it gates on, then publishes release results as artifacts first and to `openclaw/releases` once that handoff is useful.
+The maturity scorecard process defines product surfaces and category-level maturity. Its rendered scorecard says promotion toward Stable needs release gates, troubleshooting paths, repeated real-world proof, and scenario proof across expected environments. OpenClaw now has a checked-in maturity taxonomy snapshot in `taxonomy.yaml` and a score snapshot in `docs/maturity-scores.yaml`. This RFC adds the executable layer on top of that taxonomy: `taxonomy-mappings.yaml`, coverage IDs, profile membership, evidence summaries, CI gates, and release artifacts.
 
 OpenClaw already has many valuable non-unit checks:
 
 - `pnpm test:e2e` runs Vitest e2e shards across `test/**/*.e2e.test.ts`, `src/**/*.e2e.test.ts`, `packages/**/*.e2e.test.ts`, selected Gateway integration tests, bundled-plugin e2e globs, and Control UI e2e tests.
 - `pnpm test:live` runs the live Vitest shard for source, test, and bundled-plugin live tests. It covers provider, agent runtime, gateway, media, plugin, and native/live integration paths that QA Lab does not own directly.
-- `qa/scenarios/**` contains YAML-backed user scenarios with coverage IDs, docs refs, code refs, config patches, runtime parity tiers, and executable `qa-flow` blocks.
-- `extensions/qa-lab` can start isolated QA Lab runs, a synthetic `qa-channel`, mock providers, live provider modes, runtime-pair parity, live transport lanes for Telegram, Discord, Slack, and WhatsApp, Mantis before/after live verification, and a Multipass runner.
-- `extensions/qa-matrix` is a dedicated live transport runner for Matrix. It provisions a disposable Tuwunel homeserver in Docker, runs the real Matrix plugin in a child Gateway, and has release-gate profiles for transport, media, and E2EE coverage.
+- `qa/scenarios/**` contains YAML-backed user scenarios with coverage IDs, docs refs, code refs, config patches, runtime parity metadata, and executable `qa-flow` blocks.
+- `extensions/qa-lab` can start isolated QA Lab runs, a synthetic `qa-channel`, mock providers, live provider modes, runtime-pair parity, live transport lanes for Telegram, Discord, Slack, and WhatsApp, Mantis before/after live verification, and local channel runs backed by the `openclaw/crabline` messaging SDK.
+- `extensions/qa-matrix` is a dedicated live transport runner for Matrix. It provisions a disposable Tuwunel homeserver in Docker, runs the real Matrix plugin in a child Gateway, and has release-gate lanes for transport, media, and E2EE coverage.
 - `scripts/e2e/**`, Docker lanes, Parallels lanes, and release scripts exercise install, package, upgrade, plugin, live model, MCP, cross-OS, and release journeys.
 - `test/scripts/**` covers script-level release tooling, Docker plans, package checks, perf/RTT helpers, live proof helpers, and CI guards. Some of those tests are product-flow candidates; many are still script/tooling tests.
 - PTY/TUI tests cover a fake-backend terminal loop and an opt-in local TUI smoke, but the scoped TUI guide explicitly says the fake-backend PTY lane does not prove Gateway transport, embedded backend runtime, providers, session persistence, or live streaming.
@@ -36,7 +36,7 @@ Today there is no single summary entry that says: this product surface was exerc
 ## Goals
 
 - Map scorecard surfaces to executable coverage IDs and publish run summaries that CI can enforce.
-- Provide a harness-neutral QA wrapper so CI can request evidence by surface and category instead of knowing whether the proof comes from Vitest e2e, QA Lab scenarios, live transport lanes, Docker, Multipass, or release scripts.
+- Provide a harness-neutral QA wrapper so CI can request evidence by surface and category instead of knowing whether the proof comes from Vitest e2e, QA Lab scenarios, live transport lanes, Docker, the `openclaw/crabline` channel SDK, or release scripts.
 - Keep normal PR CI deterministic and credential-free while still exercising realistic user flows.
 - Run release gates against real providers, real channel credentials, package installs, upgrade paths, and supported platforms.
 - Keep scenario behavior portable across model providers, channels, runner substrates, and live/mock upstreams.
@@ -55,25 +55,29 @@ Today there is no single summary entry that says: this product surface was exerc
 
 Add a scorecard-aware e2e evidence model in `openclaw/openclaw`. QA Lab does not have to run every check. Its summary format covers the checks that matter for release confidence: e2e shards, Docker lanes, live transport checks, release jobs, and scorecard reports.
 
-Each run writes a summary JSON artifact into its QA artifact directory: the directory passed with `--output-dir`, or the command default under `.artifacts/qa-e2e/<lane>-<timestamp>`. `qa suite` writes `qa-suite-summary.json`; Multipass copies that same summary back to the host artifact directory; live transport lanes write lane-specific summaries such as `telegram-qa-summary.json`, `discord-qa-summary.json`, `slack-qa-summary.json`, `whatsapp-qa-summary.json`, and `matrix-qa-summary.json`. Release CI uploads those files as workflow artifacts first, then can mirror or import the same summaries into `openclaw/releases` once the schema settles.
+Each run writes a summary JSON artifact into its QA artifact directory: the directory passed with `--output-dir`, or the command default under `.artifacts/qa-e2e/<lane>-<timestamp>`. `qa suite` writes `qa-suite-summary.json`; local `openclaw/crabline` channel runs write the same summary shape; live transport lanes write lane-specific summaries such as `telegram-qa-summary.json`, `discord-qa-summary.json`, `slack-qa-summary.json`, `whatsapp-qa-summary.json`, and `matrix-qa-summary.json`. Release CI uploads those files as workflow artifacts first, then can mirror or import the same summaries into `openclaw/releases` once the schema settles.
 
 Each summary includes one scenario entry per executable user-flow scenario with:
 
 - scenario id
 - coverage IDs
 - scorecard surface and category IDs
-- tier: `core`, `extended`, `release`, `soak`, or `manual`
-- model provider, model live mode, and provider fixture/profile, for example `provider: openai`, `model_live: false`, `provider_fixture: tool-call-streaming`
-- channel or surface, channel live mode, and runner substrate, for example `channel: telegram`, `channel_live: true`, `runner: crabbox`
+- profile: `smoke-ci` or `release`
+- model provider, model live mode, and provider fixture or auth mode, for example `provider: openai`, `model_live: false`, `provider_fixture: tool-call-streaming`
+- channel or surface, channel live mode, channel SDK/driver, and runner substrate, for example `channel: telegram`, `channel_live: false`, `channel_driver: crabline`, `runner: host`
 - OpenClaw ref, package spec, OS, Node version, runner, and artifact paths
 - pass/fail/blocked status plus failure reason
 - optional timing fields: p50/p95 when repeated, single-run RTT otherwise
 
-The existing QA scenario `coverage.primary` and `coverage.secondary` fields are the seed for this model. Start by extending `openclaw qa coverage` and the existing `qa-suite-summary.json` shape; then normalize live transport summaries to the same schema and join that output to the maturity taxonomy stored in `openclaw/openclaw`.
+Evidence summaries do not copy taxonomy provenance. `taxonomy-mappings.yaml` sits next to `taxonomy.yaml` and records the taxonomy source/version metadata, executable category IDs, profile membership, coverage IDs, docs refs, code refs, scenario refs, and release/advisory status used to join summary entries back to the maturity taxonomy.
 
-[0007/example-scorecard-checklist.md](0007/example-scorecard-checklist.md) shows a complete illustrative Stable/LTS checklist and evidence mapping. It is not the final taxonomy, but it shows the expected implementation shape: every release-blocking checklist item has a category ID, evidence requirement, and machine-readable mapping to one or more runnable lanes. The authoritative requirement-to-test mapping should be owned by `@kevinlin-openai` and land in `openclaw/openclaw`; this RFC's example remains a shape reference.
+The profile is a named selector layered onto the taxonomy mapping that maps scorecard surfaces and categories to runnable lanes. `smoke-ci` is the deterministic PR and merge-gate profile: model providers use mock fixtures, channels use synthetic or local SDK-backed upstreams, and no live external service is required. `release` is the full Stable/LTS profile: provider, channel, package, upgrade, and platform claims need live proof where the claim depends on a real upstream or release artifact. Focused local runs can still filter a profile down to one surface or category. CI should read that profile mapping from `taxonomy-mappings.yaml` rather than carrying a second list in workflow YAML. Non-blocking evidence can appear as advisory rows in reports, but it is not a separate test profile until maintainers explicitly promote it.
 
-Maturity test docs should also live in `openclaw/openclaw` alongside the taxonomy and runnable coverage IDs. `openclaw/maintainers` can keep policy and process notes, but OpenClaw CI should not depend on incubating maintainer docs to understand what a release-blocking requirement means, how it maps to code paths, or how to rerun/troubleshoot the proof.
+The existing QA scenario `coverage.primary` and `coverage.secondary` fields are the seed for this model. Start by extending `openclaw qa coverage` and the existing `qa-suite-summary.json` shape; then normalize live transport summaries to the same schema and join that output to `taxonomy.yaml` through `taxonomy-mappings.yaml`. The landed taxonomy is the product/maturity source of truth; RFC 0007's follow-up work should add executable mappings and profiles without creating a competing scorecard taxonomy.
+
+[0007/example-scorecard-checklist.md](0007/example-scorecard-checklist.md) shows a complete illustrative Stable/LTS checklist and evidence mapping. It is not the final taxonomy, but it shows the expected implementation shape: every release-blocking checklist item has a category ID, evidence requirement, and machine-readable mapping to one or more runnable lanes. The authoritative requirement-to-test mapping should land in `openclaw/openclaw` as checked-in mapping data; this RFC's example remains a shape reference.
+
+Maturity test docs should also live in `openclaw/openclaw` alongside `taxonomy.yaml`, `taxonomy-mappings.yaml`, and runnable coverage IDs. OpenClaw CI should not depend on external process notes to understand what a release-blocking requirement means, how it maps to code paths, or how to rerun/troubleshoot the proof.
 
 ### 2. Add a harness-neutral QA wrapper
 
@@ -81,57 +85,54 @@ Keep the harness-specific commands for local debugging and focused work, but add
 
 ```sh
 pnpm openclaw qa run \
+  --profile smoke-ci \
   --surface channels.telegram \
   --category channels.telegram.mock \
-  --tier core \
-  --provider openai \
-  --model-live false \
-  --channel telegram \
-  --channel-live false \
-  --runner multipass \
-  --output-dir .artifacts/qa-e2e/channels-telegram-core
+  --provider-mode mock-openai \
+  --transport telegram \
+  --output-dir .artifacts/qa-e2e/channels-telegram-smoke-ci
 ```
 
-The wrapper can dispatch to the right implementation: Vitest e2e shard, QA Lab scenario pack, live transport command, Matrix runner, Docker/package lane, Multipass lane, Control UI browser run, TUI lane, or release helper. The caller should not need to know that `runtime.gateway.startup` is currently a Vitest shard while `channels.telegram.mock` is a Multipass-backed QA Lab run.
+The wrapper can dispatch to the right implementation: Vitest e2e shard, QA Lab scenario pack, live transport command, Matrix runner, Docker/package lane, `openclaw/crabline` channel SDK lane, Control UI browser run, TUI lane, or release helper. The caller should not need to know that `runtime.gateway.startup` is currently a Vitest shard while `channels.telegram.mock` is an SDK-backed QA Lab run.
 
-The wrapper should still write the same summary artifacts described above. A category can map to multiple lanes, and the wrapper can either run all required lanes or fail early with a clear "missing runnable mapping" error.
+The wrapper should still write the same summary artifacts described above. A profile can map to many surface/category pairs, a category can map to multiple lanes, and the wrapper can either run all required lanes or fail early with a clear "missing runnable mapping" error. `--surface` and `--category` are filters over the selected profile, not a separate source of truth.
 
 ### 3. Split the suites by when they run
 
-#### Core e2e in normal CI
+#### `smoke-ci` profile in normal CI
 
-Core e2e runs on every PR or normal merge gate. It is deterministic and credential-free. It still needs to hit user paths, not only package checks or internal contracts.
+The `smoke-ci` profile runs on every PR or normal merge gate. It is deterministic and credential-free. It still needs to hit user paths, not only package checks or internal contracts.
 
 Required components:
 
 - Gateway e2e Vitest shard for protocol, auth, sessions, and core runtime.
 - Control UI e2e shard for browser/Gateway workflows with mocked Gateway and selective real WebSocket flows.
 - QA Lab scenario subset through `qa-channel` and mock model providers.
-- Runtime-pair parity for the standard tier, currently OpenClaw vs Codex where the scenario declares parity.
-- Multipass-backed messaging-channel core lane with mock AI responses. Run it on every PR, even while coverage is still thin, so regressions force the lane to mature instead of leaving channel e2e as occasional release-only work.
+- Runtime-pair parity for the standard profile, currently OpenClaw vs Codex where the scenario declares parity.
+- `openclaw/crabline`-backed messaging-channel smoke lane with mock AI responses. Run it on every PR, even while coverage is still thin, so regressions force the lane to mature instead of leaving channel e2e as occasional release-only work.
 - TUI fake-backend PTY lane plus an explicit local-backend smoke on the platforms where it is stable enough for CI.
 - Plugin fixture smoke for built-in plugins using plugin-inspector concepts and Kitchen Sink conformance mode, but without executing arbitrary external plugin code.
 
-The core lane needs an explicit configuration path. The current CLI spells deterministic OpenAI-compatible model fixtures as `--provider-mode mock-openai`; the proposed evidence schema records that as `provider: openai` and `model_live: false`.
+The `smoke-ci` profile needs an explicit configuration path. The current CLI spells deterministic OpenAI-compatible model fixtures as `--provider-mode mock-openai`; the proposed evidence schema records that as `provider: openai` and `model_live: false`.
 
 ```sh
-pnpm openclaw qa suite \
-  --tier core \
+pnpm openclaw qa run \
+  --profile smoke-ci \
   --provider-mode mock-openai \
   --transport qa-channel \
-  --output-dir .artifacts/qa-e2e/core
+  --output-dir .artifacts/qa-e2e/smoke-ci
 
-pnpm openclaw qa suite \
-  --tier core \
-  --runner multipass \
+pnpm openclaw qa run \
+  --profile smoke-ci \
+  --channel-driver crabline \
   --provider-mode mock-openai \
   --transport telegram \
-  --output-dir .artifacts/qa-e2e/core-multipass-telegram
+  --output-dir .artifacts/qa-e2e/smoke-ci-crabline-telegram
 ```
 
-#### Extended e2e outside the shortest PR path
+#### Broader release-track e2e
 
-Extended e2e runs on scheduled, maintainer-triggered, and changed-surface gates. It can spend more time on deterministic services and broader matrices:
+Some release-profile coverage can run before a release candidate on scheduled, maintainer-triggered, and changed-surface gates. These runs can spend more time on deterministic services and broader matrices without creating a third profile:
 
 - Docker install, package, plugin lifecycle, MCP, upgrade, and release-user journey lanes.
 - Kova-like release-shaped runtime scenarios when they test behavior that belongs in `openclaw/openclaw`.
@@ -154,7 +155,7 @@ Release CI fails closed for scorecard categories. For the first Stable/LTS gate,
 
 ### 4. Keep scenarios portable across providers, channels, and runners
 
-Make each high-level scenario portable across providers, channels, and runner substrates. The scenario describes the user behavior. The runner supplies the provider fixture or credentials, channel upstream, package source, and execution environment.
+Make each high-level scenario portable across providers, channels, channel drivers, and runner substrates. The scenario describes the user behavior. The selected driver supplies the channel upstream behavior, while the runner supplies the execution environment, provider fixture or credentials, and package source.
 
 Model provider dimensions:
 
@@ -169,38 +170,39 @@ Channel and surface dimensions:
 
 - `channel`: `qa-channel`, `telegram`, `discord`, `slack`, `whatsapp`, `matrix`, or another channel ID.
 - `channel_live`: `false` for synthetic channels or deterministic local upstream shims, and `true` for real upstream credentials.
+- `channel_driver`: `native`, `crabline`, or another channel driver. `crabline` means the `openclaw/crabline` messaging SDK.
 - `surface`: `gateway-rpc`, `control-ui`, `tui-pty`, `cli`, `docker-package`, `package-install`, or another non-channel surface.
-- `runner`: `host`, `multipass`, `docker`, `crabbox`, or a release workflow runner.
+- `runner`: `host`, `docker`, `crabbox`, or a release workflow runner.
 
 This keeps channel identity separate from liveness. A Telegram scenario can run as `channel: telegram, channel_live: false` in PR CI and as `channel: telegram, channel_live: true` in release CI. The same pattern applies to model providers with `provider: openai, model_live: false` versus `provider: openai, model_live: true`.
 
 Suggested env/flag contract:
 
 ```text
-OPENCLAW_E2E_TIER=core|extended|release|soak
+OPENCLAW_QA_PROFILE=smoke-ci|release
 OPENCLAW_QA_PROVIDER=openai|anthropic|google|openrouter|local|...
 OPENCLAW_QA_MODEL_LIVE=0|1
 OPENCLAW_QA_PROVIDER_FIXTURE=openai-tools-streaming|timeout|rate-limit|...
 OPENCLAW_QA_CHANNEL=qa-channel|telegram|discord|slack|whatsapp|matrix|...
 OPENCLAW_QA_CHANNEL_LIVE=0|1
+OPENCLAW_QA_CHANNEL_DRIVER=native|crabline|...
 OPENCLAW_QA_SURFACE=gateway-rpc|control-ui|tui-pty|cli|docker-package|...
-OPENCLAW_QA_RUNNER=host|multipass|docker|crabbox
+OPENCLAW_QA_RUNNER=host|docker|crabbox
 OPENCLAW_QA_SCORECARD=1
 ```
 
 Prefer CLI flags for local runs. CI can pass env vars through reusable workflows.
 
-### 5. Use Multipass for channel behavior that needs a VM
+### 5. Use `openclaw/crabline` for deterministic channel behavior
 
-The current QA Lab Multipass runner already creates a VM, syncs the repo, installs packages, builds, and runs `pnpm openclaw qa suite` with a selected provider mode, runtime pair, and scenario IDs. Use it for channel behavior where host-only tests miss packaging, process, network, or Linux runtime problems.
+The Crabline work in this RFC refers to the `openclaw/crabline` messaging SDK. It should provide deterministic local upstream shims for channel behavior so OpenClaw can test Telegram, Discord, Slack, WhatsApp, and similar transports without real service credentials in normal CI.
 
 Add a channel conformance runner with this shape:
 
 ```text
-qa suite --runner multipass --transport telegram --tier core --output-dir .artifacts/qa-e2e/core-multipass-telegram
-  starts Ubuntu LTS VM
+qa suite --channel-driver crabline --runner host --transport telegram --profile smoke-ci --output-dir .artifacts/qa-e2e/smoke-ci-crabline-telegram
   uses a deterministic provider fixture so channel failures are not mixed with live model-provider failures
-  starts the selected channel's mock upstream service
+  starts the selected channel's local Crabline upstream shim
   starts OpenClaw Gateway with selected channel plugin enabled
   injects inbound DM/group/thread/media/action events
   waits for Gateway/agent/channel reply
@@ -243,7 +245,7 @@ Use YAML-driven QA Lab scenarios when the behavior is a product workflow:
 - "cron reminder arrives once"
 - "media input is staged, summarized, and reply media is sent"
 
-The existing `qa/scenarios/channels/group-visible-reply-tool.md` is the right shape: it has coverage IDs, docs/code refs, a config patch, and a flow that asserts both mock-provider tool planning and visible outbound transcript state. The plan is to expand that pattern across scorecard surfaces and let the runner choose mock, live, host, Multipass, Docker, or Crabbox substrate.
+The existing `qa/scenarios/channels/group-visible-reply-tool.md` is the right shape: it has coverage IDs, docs/code refs, a config patch, and a flow that asserts both mock-provider tool planning and visible outbound transcript state. The plan is to expand that pattern across scorecard surfaces and let the wrapper choose mock, live, host, Docker, Crabbox, or `openclaw/crabline` channel-driver paths.
 
 ### 7. Turn plugin contract coverage into user-flow coverage
 
@@ -311,16 +313,18 @@ The dependency-oriented PR plan lives in [0007/implementation-plan.md](0007/impl
 This keeps the repo boundaries straightforward:
 
 - Core product behavior and executable test harnesses stay in `openclaw/openclaw`.
-- Scorecard policy can stay in `openclaw/maintainers`; the executable taxonomy, maturity test docs, and CI-owned requirement metadata live in `openclaw/openclaw`.
+- Scorecard policy, executable taxonomy, maturity test docs, and CI-owned requirement metadata live in `openclaw/openclaw`.
 - The design decision stays in `openclaw/rfcs`.
 - Timing history and dashboards stay in `openclaw/openclaw-rtt`.
 - Durable release evidence can stay in `openclaw/releases` after CI artifacts establish the schema.
 - Broad external plugin compatibility stays in `openclaw/crabpot`.
 - Remote execution capacity stays in `openclaw/crabbox`.
 
-Normal CI stays affordable. Mock services and channel shims catch many regressions without credentials, and Multipass keeps channel packaging/runtime coverage from drifting. Live release lanes still cover upstream API and real-account behavior before users get a release.
+Normal CI stays affordable. Mock services and `openclaw/crabline` channel shims catch many regressions without credentials. Live release lanes still cover upstream API and real-account behavior before users get a release.
 
 Without this consolidation, the likely path is more isolated Docker scripts, live workflows, and script tests. Those checks can be useful, but the maturity scorecard still has to infer whether the product surface was actually covered.
+
+The machine-readable summaries are necessary for CI, but they should not become the only maintainer interface. A fast-follow report should start from scorecard categories, show blocking/missing/stale/advisory status, link to artifacts and rerun commands, and keep raw scenario rows behind the main view. Otherwise the system risks producing large reports that technically contain the answer but are hard to review.
 
 ## Unresolved questions
 

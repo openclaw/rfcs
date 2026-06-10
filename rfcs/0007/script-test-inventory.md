@@ -43,7 +43,7 @@ These tests protect scripts and release tooling. Keep them under `test/scripts` 
 
 The likely removal list is conditional on the conversions above landing first:
 
-- Remove QA smoke scripts after `openclaw qa suite --tier core` covers the same behavior with summary evidence.
-- Remove telemetry smoke scripts after telemetry scenarios run through the normal QA Lab tier and emit scorecard evidence.
+- Remove QA smoke scripts after `openclaw qa suite --profile smoke-ci` covers the same behavior with summary evidence.
+- Remove telemetry smoke scripts after telemetry scenarios run through the normal QA Lab profile and emit scorecard evidence.
 - Remove assertion-only Docker and release helpers after the Docker/release e2e lanes emit native scenario evidence and the assertions move beside the scenario runner.
 - Remove old RTT-specific script tests only if their importer and historical data remain covered in `openclaw-rtt`; keep OpenClaw runtime measurement tests in `openclaw/openclaw`.
