@@ -3,9 +3,9 @@ title: E2E and QA Lab scorecard consolidation
 authors:
   - Dallin Romney
 created: 2026-06-07
-last_updated: 2026-06-07
-status: draft
-issue:
+last_updated: 2026-06-10
+status: accepted
+issue: https://github.com/openclaw/openclaw/issues/91883
 rfc_pr: https://github.com/openclaw/rfcs/pull/10
 ---
 

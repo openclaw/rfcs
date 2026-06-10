@@ -11,9 +11,10 @@ rfc_pr: <pull request URL>
 
 # Proposal: <Title>
 
-> Copy this file to `<id>-<short-name>.md`. Place supporting diagrams and other
-> assets under a sibling folder named `<id>/`, then reference them with relative
-> paths such as `![](<id>/architecture-overview.png)`.
+> Copy this file to `<id>-<short-name>.md`. Place supporting diagrams, examples,
+> inventories, implementation plans, or other sidecar material under a sibling
+> folder named `<id>/`, then reference them with relative paths such as
+> `![](<id>/architecture-overview.png)` or `[Implementation plan](<id>/implementation-plan.md)`.
 >
 > New RFCs start as PRs and should remain unmerged while `status: draft`.
 > Create a discussion thread in `maintainer-discussion`.
