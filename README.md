@@ -31,21 +31,18 @@ supporting assets are needed:
     ├── <id>-<short-name>.md
     └── <id>/
         ├── architecture-overview.png
-        ├── implementation-plan.md
         └── other-assets...
 ```
 
 The Markdown file is the RFC. The sibling `<id>/` directory inside `rfcs/` is
-optional and is used for referenced supporting material that would make the RFC
-body harder to review inline. This can include diagrams, screenshots, example
-checklists, inventories, implementation plans, or other sidecar artifacts.
+optional and is used only for assets referenced by that RFC.
 
 ## Naming
 
 - `rfcs/0000-template.md` is the starter template for new RFCs.
 - New RFCs should be named `<id>-<short-name>.md`.
-- When an RFC has supporting assets or sidecar material, store them under a
-  sibling folder inside `rfcs/` named exactly `<id>/`.
+- When an RFC has supporting assets, store them under a sibling folder inside
+  `rfcs/` named exactly `<id>/`.
 
 Example:
 
