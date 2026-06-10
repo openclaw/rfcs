@@ -3,10 +3,10 @@ title: Analyst-skill seams on a pipeline-shaped session substrate
 authors:
   - David Steeves <davesteeves@gmail.com>
 created: 2026-06-08
-last_updated: 2026-06-08
+last_updated: 2026-06-10
 status: draft
 issue:
-rfc_pr: TBD
+rfc_pr: https://github.com/openclaw/rfcs/pull/11
 ---
 
 # Proposal: Analyst-skill seams on a pipeline-shaped session substrate
@@ -14,25 +14,18 @@ rfc_pr: TBD
 ## Summary
 
 OpenClaw's session and transcript surface is the place where policy will, in
-practice, either hold or fail. Today the substrate has no named moments where
-policy can run on flowing data, and no structural separation between the code
-that produces data and the code that evaluates it. This RFC proposes both:
-shape the substrate as a three-stage data pipeline — `raw`, `processed`,
-`curated` — so that stage boundaries become explicit *seams* where designated
-**analyst skills** can read, classify, transform, or hold payloads; and
-reserve the substrate, the analyst registry, and the Policy artifacts to the
-Gateway control plane so that agent-plane code cannot quietly rewrite the
-supervisor that supervises it.
-
-The pipeline is a contract about *shape*, not *backend*. A local SQLite file,
-an embedded log, an object store, or a remote managed queue can each back any
-stage; the contract names where evaluation happens and who is allowed to
-register it.
-
-Analyst skills run in the existing skill runtime — no new isolation primitive
-— and emit verdicts (`pass`, `transform`, `block`, `escalate`) shaped as
-redacted evidence in the form RFC 0003 already defines. Trust in the surface
-improves as the analyst inventory matures; the substrate stays stable.
+practice, either hold or fail, yet today it has no named moments where policy
+can run on flowing data and no structural separation between the code that
+produces data and the code that evaluates it. This RFC proposes both: shape
+the substrate as a three-stage data pipeline — `raw`, `processed`, `curated`
+— so that stage boundaries become explicit *seams* where designated **analyst
+skills** (running in the existing skill runtime, emitting verdicts as the
+redacted evidence RFC 0003 already defines) can read, classify, transform, or
+hold payloads; and reserve the substrate, the analyst registry, and the
+Policy artifacts to the Gateway control plane so that agent-plane code cannot
+quietly rewrite the supervisor that supervises it. The pipeline is a contract
+about *shape*, not *backend* — a local SQLite file, an embedded log, an
+object store, or a remote managed queue can each back any stage.
 
 ## Motivation
 
