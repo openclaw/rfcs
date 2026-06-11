@@ -4,6 +4,8 @@ authors:
   - giodl73-repo
 created: 2026-05-27
 last_updated: 2026-05-28
+status: accepted
+issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/1
 ---
 

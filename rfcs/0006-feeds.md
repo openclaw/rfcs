@@ -4,6 +4,8 @@ authors:
   - giodl73-repo
 created: 2026-05-28
 last_updated: 2026-06-01
+status: accepted
+issue:
 rfc_pr: TBD
 ---
 
