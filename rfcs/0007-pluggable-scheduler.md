@@ -3,7 +3,7 @@ title: Pluggable Scheduler Seam in Gateway
 authors:
   - amittell
 created: 2026-05-31
-last_updated: 2026-06-09
+last_updated: 2026-06-12
 rfc_pr: https://github.com/openclaw/rfcs/pull/5
 status: draft
 issue:
@@ -65,7 +65,10 @@ hook, run-log, and transcript surfaces.
 - Defining a new persistence format for run state in core; the seam is
   contract-only, the plugin owns its store.
 - Migrating existing cron config into a scheduler plugin automatically. That
-  belongs in `openclaw doctor` follow-up work, not this seam.
+  belongs in `openclaw doctor` follow-up work, not this seam. The same goes
+  for operators who run external schedulers via direct HTTP today: the
+  expected path is a doctor finding that suggests installing the scheduler
+  plugin, with details in a follow-up RFC.
 - Bringing `openclaw-scheduler` into the core monorepo or as a bundled plugin;
   this RFC is about the seam, not any specific implementation.
 
@@ -172,7 +175,9 @@ discovery contract is a single manifest field and a single `owns` token.
 This is intentionally narrower than what the existing cron does internally:
 the seam covers scheduled jobs, not heartbeats. Heartbeats stay in core
 because no external scheduler should be required for the gateway to consider
-itself healthy.
+itself healthy. This is decided for v1: if a future host needs heartbeats
+with job-grade durability, that would be a new `owns` token in a follow-up
+RFC, not a widening of this seam.
 
 ### Alternatives considered
 
@@ -203,13 +208,6 @@ carry the reference implementation as a follow-up PR against `openclaw/openclaw`
 - Should `cancelScheduledJob` be required, or optional with a fallback to
   unregistering the spec on next startup? Optional is simpler but
   inconsistent with `registerScheduledJob` returning a live handle.
-- Heartbeats stay in core. Is there a future seam where a scheduler plugin
-  also wants to own heartbeat scheduling (for hosts where heartbeats need
-  the same durability as jobs), or should that always be in-process?
-- What is the migration path for existing operators who run external
-  schedulers via direct HTTP today? Probably an `openclaw doctor` finding
-  that suggests installing the scheduler plugin, but the details belong in
-  a follow-up RFC, not this one.
 - The runtime contract includes `listScheduledJobs`. Should docs/tools consume
   that runtime method directly, or should they stay behind the existing
   `cron.list`/`cron.status` gateway surface so scheduler storage remains fully
