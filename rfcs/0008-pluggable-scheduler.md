@@ -140,7 +140,7 @@ for built-in cron, and (3) mirror or link agent-job transcripts when the plugin
 run produces gateway-visible agent turns. The plugin does not have to integrate
 with each consumer individually.
 
-A diagram of the discovery flow will be added under `rfcs/0007/` in a follow-up
+A diagram of the discovery flow will be added under `rfcs/0008/` in a follow-up
 revision once the seam shape is settled. In short: when the scheduler plugin
 manifest declares `owns: "scheduled-jobs"`, the gateway swaps its built-in cron
 registration for a forwarder to the plugin runtime, and ingests run lifecycle
