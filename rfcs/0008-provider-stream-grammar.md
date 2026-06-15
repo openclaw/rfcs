@@ -24,7 +24,7 @@ at presentation**. Integrating a new channel (GUI, TUI, Discord, anything) means
 following this output contract and overlaying channel UX — nothing more.
 
 The full normative specification, evidence files (per-family wire captures), a
-conformance harness (35 passing tests), and two red-team passes live in a
+conformance harness (37 tests across 28 golden captures), and two red-team passes live in a
 companion repository:
 <https://github.com/Marvinthebored/openclaw-provider-stream-spec>. This RFC is
 the design narrative; the spec is the contract. It extends the agent event I/O
@@ -149,8 +149,8 @@ path-independence rules.
 
 ### Conformance (§8)
 
-The companion repo ships an executable harness (35 passing tests) plus golden
-captures from live APIs for each wire family, so adapters and channels can be
+The companion repo ships an executable harness (37 tests, 28 golden captures)
+from live APIs for each wire family, so adapters and channels can be
 validated against the contract rather than against each other.
 
 ### Reference implementation
@@ -194,9 +194,11 @@ elimination of an entire bug class and the drop in new-channel integration cost.
 ## Unresolved questions
 
 - **Base-contract coordination.** The four [AMENDS BASE] points (§3.2, §3.3,
-  §5.1, §7.3) must land in `agent-event-io-contract.md` itself, not only here —
-  an implementer of the base contract alone would still build a thinking-dropping
-  gateway. Sequencing with #92216 is open.
+  §5.1, §7.3) are now folded into the vendored
+  [`0008/agent-event-io-contract.md`](0008/agent-event-io-contract.md) (marked
+  inline as *RFC 0008 amendment*), so an implementer of the base alone no longer
+  builds a thinking-dropping gateway. Open: upstreaming the amended contract back
+  into the maintained docs tree, sequenced with #92216.
 - **deepseek reasoning/text boundary.** deepseek (no clean reasoning-end signal)
   can fold its final answer into the thinking block under the current adapter; a
   boundary fix is in progress in the core branch and is not yet complete.
