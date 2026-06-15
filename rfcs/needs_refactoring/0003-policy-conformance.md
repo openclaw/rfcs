@@ -3,8 +3,8 @@ title: Policy Conformance 1.0
 authors:
   - giodl73-repo
 created: 2026-05-27
-last_updated: 2026-05-28
-rfc_pr: https://github.com/openclaw/rfcs/pull/2
+last_updated: 2026-06-15
+rfc_pr: https://github.com/openclaw/rfcs/pull/6
 ---
 
 # Proposal: Policy Conformance 1.0
@@ -17,13 +17,13 @@ Define OpenClaw policy as a configuration conformance and audit-evidence layer o
 
 Policy 1.0 should help operators answer a narrow question: does this workspace configuration conform to the approved policy file? It should not become a second configuration language, a secrets-management system, or a broad runtime enforcement layer.
 
-The Policy plugin contributes conformance checks to OpenClaw. Policy rules live in `policy.jsonc`; plugin settings live under `plugins.entries.policy.config`. The current policy surface covers configured channels, MCP server ids, model provider ids and selected model refs, private-network SSRF posture, ingress and channel access posture, Gateway exposure posture, agent workspace posture, global and per-agent tool posture, governed tool metadata declarations, sandbox runtime posture, config secret provider and SecretRef provenance, config auth profile metadata, and policy-to-policy baseline comparison.
+The Policy plugin contributes conformance checks to OpenClaw. Policy rules live in `policy.jsonc`; plugin settings live under `plugins.entries.policy.config`. The current policy surface covers configured channels, MCP server ids, model provider ids and selected model refs, private-network SSRF posture, ingress and channel access posture, Gateway exposure posture, agent workspace posture, global and per-agent tool posture, governed tool metadata declarations, sandbox runtime posture, config secret provider and SecretRef provenance, config auth profile metadata, exec approval artifact posture, and policy-to-policy baseline comparison.
 
 The final health gate remains `doctor --lint`. Policy-specific authoring and audit workflows can run `openclaw policy check`, but policy findings should also flow into Doctor so operators have one shared lint signal.
 
 As policy grows, there is pressure to mirror every OpenClaw setting in `policy.jsonc`. That would make policy harder to review, harder to keep current, and ambiguous about which file actually controls runtime behavior. Policy 1.0 should stay focused on conformance questions that can be answered from observed OpenClaw configuration and workspace declarations.
 
-Evidence quality varies by surface. Some posture is directly observable from config, such as configured channels, provider ids, MCP server ids, and Gateway bind posture. Other posture depends on runtime-specific details or secret material that policy should not inspect. A policy field without attributable evidence should fail as unobservable for that target instead of becoming a best-effort pass.
+Evidence quality varies by surface. Some posture is directly observable from config, such as configured channels, provider ids, MCP server ids, and Gateway bind posture. Some posture is stored in named product artifacts. Those artifacts can be policy evidence only when they have a stable product schema, contain reviewable posture rather than secret material, are read by an explicit opt-in policy section, and can be redacted to stable evidence fields. `exec-approvals.json` is the first concrete example because it stores default and per-agent exec approval posture plus reviewed allowlist patterns. This RFC does not grant blanket coverage for every file under the OpenClaw state directory. Other posture depends on runtime-specific details, credential liveness, filesystem integrity, arbitrary file contents, logs, or secret material that policy should not inspect. A policy field without attributable evidence should fail as unobservable for that target instead of becoming a best-effort pass.
 
 Enterprise baselines and per-agent or per-channel overlays both need to answer whether one policy is equal or stricter than another. If each check implements that comparison separately, scoped overlays and baseline comparison will drift. Strictness metadata should be owned with the policy schema so baseline compare, scoped overlay validation, and future repair previews use the same rules.
 
@@ -44,7 +44,7 @@ Policy findings can identify nonconforming config, but they are not runtime auth
 
 - Replacing OpenClaw configuration.
 - Claiming there are no secrets in config or taking ownership of secret-value management.
-- Inspecting per-agent credential stores or secret material.
+- Inspecting per-agent credential stores, secret material, or runtime approval decisions.
 - Enforcing every policy requirement at runtime.
 - Mirroring every plugin, channel, provider, or agent setting.
 - Treating unobservable runtime state as passing evidence.
@@ -64,7 +64,7 @@ Policy supports top-level rules for broad workspace posture and named `scopes.<s
 
 | Selector | Supported sections | Purpose |
 | --- | --- | --- |
-| `agentIds` | `tools`, `agents.workspace`, `sandbox` | Apply stricter agent, tool, or sandbox posture to one or more runtime agents. |
+| `agentIds` | `tools`, `agents.workspace`, `sandbox`, `execApprovals` | Apply stricter agent, tool, sandbox, or exec approval posture to one or more runtime agents. |
 | `channelIds` | `ingress.channels` | Apply stricter channel ingress posture to one or more configured channels. |
 
 Unsupported selector and section combinations should be rejected instead of ignored. A scope without an enforceable selector should be invalid. The same target can appear in multiple scopes. That allows operators to compose policy by purpose, such as "release agents" and "restricted shell agents." If two applicable scopes touch the same field, the duplicate field must be equal or more restrictive according to shared policy metadata. Weaker duplicate claims should fail during policy compilation before check evaluation begins.
@@ -80,13 +80,104 @@ Policy should keep comparison semantics in schema-owned metadata rather than cus
 
 The checked policy can be stricter than the baseline. A broad top-level checked rule can satisfy a scoped baseline rule when it is equally or more restrictive for the selected target.
 
-The seed conformance areas are channels, MCP, models, private network posture, ingress, Gateway exposure, agents, tools, sandbox posture, secrets, and auth profiles. These checks are intentionally config-level. Policy can report that a denied provider, channel, MCP server, or private-network posture is configured. It does not prove that no external system can ever reach the same service.
+The seed conformance areas are channels, MCP, models, private network posture, ingress, Gateway exposure, agents, tools, sandbox posture, exec approvals, secrets, and auth profiles. These checks are intentionally conformance-level. Policy can report that a denied provider, channel, MCP server, private-network posture, or exec approval posture is configured. It does not prove that no external system can ever reach the same service, and it does not make runtime approval decisions.
 
 Ingress policy covers direct-message session scope and channel group admission posture. Channel-scoped ingress should use `channelIds` because channel posture is attributable. Session DM scope remains global while the evidence is not channel-attributable. Gateway exposure policy covers bind posture, auth posture, Control UI posture, remote Gateway posture, and HTTP endpoint posture. These checks should stay close to operator-facing exposure questions rather than becoming a copy of every Gateway config field.
 
-Agent workspace policy and tool posture policy cover configured workspace access, tool profile, filesystem posture, exec posture, elevated mode, additive tool grants, and deny lists. These are config conformance checks, not runtime operator approval checks. Sandbox policy covers sandbox mode, backend, and observable container/browser posture. Container posture fields should be allowed only where OpenClaw can observe them for the selected target. Operators can use scopes to apply different sandbox requirements to different agent groups.
+Agent workspace policy and tool posture policy cover configured workspace access, tool profile, filesystem posture, exec posture, elevated mode, additive tool grants, and deny lists. These are config conformance checks, not runtime operator approval checks. Exec approval policy can separately cover the named `exec-approvals.json` artifact for required file presence, default and per-agent security posture, and reviewed allowlist patterns. Sandbox policy covers sandbox mode, backend, and observable container/browser posture. Container posture fields should be allowed only where OpenClaw can observe them for the selected target. Operators can use scopes to apply different sandbox requirements to different agent groups.
 
-Policy can require managed secret provider declarations, deny insecure provider sources, and require auth profile metadata in OpenClaw config. It should not read raw secret values or claim to regulate all secret lifecycle concerns. Secrets management, credential storage, rotation, and runtime credential access remain owned by their existing OpenClaw systems and future dedicated work.
+The `execApprovals` policy section is an explicit opt-in to read the active named `exec-approvals.json` product artifact. A configured exec approvals posture rule requires valid attributable artifact evidence. Missing artifacts must report `policy/exec-approvals-missing`; unreadable or schema-invalid artifacts must report `policy/exec-approvals-invalid`; absent evidence must not be replaced with inferred runtime defaults. `requireFile: false` by itself is a no-op and does not require or read the artifact. Any other configured `execApprovals` rule, including scoped `defaults`, scoped `agents`, or `allowlist.expected` rules, requires the valid redacted artifact evidence needed to evaluate that rule.
+
+The exec approvals evidence model is posture-only. Policy may retain default security mode, per-agent effective security mode, and reviewed allowlist pattern identifiers. It must omit socket paths, socket tokens, command text, resolved paths, timestamps, approval-session details, and any other data that is not needed to evaluate the configured posture rule. Evidence references should use stable `oc://exec-approvals.json/...` paths so findings can link a policy requirement to the redacted artifact record without exposing the raw artifact.
+
+For example, a policy can require the approvals artifact, deny permissive approval defaults, and allow selected agents to use only reviewed exec approval allowlists:
+
+```jsonc
+{
+  "execApprovals": {
+    "requireFile": true,
+    "defaults": {
+      // Security modes: "deny", "allowlist", or "full".
+      // This default permits only the locked-down deny posture.
+      "allowSecurity": ["deny"]
+    }
+  },
+  "scopes": {
+    "restricted-shell": {
+      "agentIds": ["family-agent", "groups-agent"],
+      "execApprovals": {
+        "agents": {
+          // Selected agents may use reviewed allowlist posture, but not "full".
+          "allowSecurity": ["allowlist"],
+          "allowlist": {
+            "expected": ["travel-hub", "calendar-cli", "/bin/date"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The collected evidence is redacted posture, not the raw artifact. For example, this artifact includes socket credentials and command text:
+
+```json
+{
+  "socket": { "path": "/tmp/openclaw.sock", "token": "secret-token" },
+  "defaults": { "security": "full" },
+  "agents": {
+    "sebby": {
+      "security": "full",
+      "allowlist": [{ "pattern": "deploy", "commandText": "deploy --prod" }]
+    }
+  }
+}
+```
+
+Policy evidence should retain only attributable posture records:
+
+```json
+[
+  {
+    "kind": "defaults",
+    "source": "oc://exec-approvals.json/defaults",
+    "security": "full"
+  },
+  {
+    "kind": "agent",
+    "source": "oc://exec-approvals.json/agents/sebby",
+    "agentId": "sebby",
+    "security": "full"
+  },
+  {
+    "kind": "allowlist",
+    "source": "oc://exec-approvals.json/agents/sebby/allowlist/#0",
+    "agentId": "sebby",
+    "pattern": "deploy"
+  }
+]
+```
+
+A finding then links the policy requirement to the redacted evidence reference:
+
+```json
+{
+  "checkId": "policy/exec-approvals-agent-security-unapproved",
+  "ocPath": "oc://exec-approvals.json/agents/sebby",
+  "requirement": "oc://policy.jsonc/execApprovals/agents/allowSecurity",
+  "message": "exec approvals agent 'sebby' uses unapproved security mode 'full'."
+}
+```
+
+Policy can require managed secret provider declarations, deny insecure provider sources, require auth profile metadata in OpenClaw config, and attest redacted posture from named non-secret product artifacts. It should not read raw secret values or claim to regulate all secret lifecycle concerns. Secrets management, credential storage, rotation, and runtime credential access remain owned by their existing OpenClaw systems and future dedicated work.
+
+The policy evidence roadmap should stay focused on posture that can be expressed as authored policy and supported by attributable, redacted evidence:
+
+- P1 covers the highest-value policy evidence gaps. `execApprovals` should read `exec-approvals.json` through the explicit policy section described above and report required file presence, invalid artifact shape, default security posture, per-agent effective security posture, and exact reviewed allowlist patterns. Sandbox policy should also gain a mode allowlist so a policy can assert that selected agents must remain `off` when the approved isolation model is exec allowlists plus tool denies rather than sandboxing.
+- P2 covers additional config-backed policy rules where OpenClaw already has stable evidence: elevated default posture, agent-to-agent enablement and allowlists, trusted safe-bin directories, and plugin allow/deny policy. These should use existing allowlist, denylist, exact-list, or required-boolean strictness metadata rather than bespoke comparison logic.
+- P3 remains explicit and low priority. Routing bindings may be policy evidence if the rule is framed as static routing posture. Cron recurring-job counts should not become policy evidence unless a future proposal defines a stable, low-noise cron posture artifact rather than treating dynamic job count as compliance state.
+
+Future evidence files should meet the same bar as `exec-approvals.json`: stable product schema, explicit policy opt-in, posture-oriented fields, deterministic redaction, stable `oc://` evidence references, and focused tests for invalid, missing, and drift states. Policy should not inspect credential stores, raw secret material, arbitrary wrapper file contents, filesystem layout integrity, transient runtime decisions, or logs. Those surfaces should remain with Doctor, command-specific self-tests, credential/status commands, or log monitoring.
 
 Each policy section should document the `policy.jsonc` syntax, the observed OpenClaw state, the reason an operator would set the field, whether the check is global or supports selectors, whether missing or unobservable evidence is a finding, and whether the rule participates in baseline comparison and scoped strictness. The CLI docs should continue to show:
 
@@ -105,6 +196,7 @@ The rollout plan is:
 4. Update `docs/cli/policy.md` as the canonical user-facing policy reference.
 5. Add strictness metadata for every policy field that participates in compare or scoped overlay validation.
 6. Add maintainer-only drift checks that flag new config areas or changed config semantics that policy may need to consider.
+7. Track future policy evidence work as separate implementation issues: P1 for exec approvals plus sandbox mode allowlists, P2 for config-backed coverage, and separate non-policy work for Doctor, command self-tests, credential/status commands, or log monitoring.
 
 ## Rationale
 
@@ -114,7 +206,9 @@ The alternative of mirroring every config field into policy would make policy co
 
 Policy rules are operator and audit contracts once shipped. Renaming a field, changing a finding id, or changing strictness semantics can break downstream baselines and attestation workflows. When a policy field must change, prefer accepting the old field during a deprecation window, reporting a clear Doctor or policy finding, documenting the migration in the CLI policy reference, and preserving attestation behavior where possible.
 
-## Unresolved questions
+## Follow-up questions
+
+The exec approvals artifact contract is resolved for this RFC: configured `execApprovals` posture rules require valid attributable artifact evidence, and missing or invalid artifacts produce explicit findings instead of inferred runtime defaults. The remaining questions are follow-up design choices for Policy after 1.0 rather than blockers for the exec approvals evidence contract:
 
 - Should `policy compare` remain the final command name, or should OpenClaw expose an alias such as `policy conform` for baseline workflows?
 - Which additional selectors are worth adding after `agentIds` and `channelIds`?
