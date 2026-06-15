@@ -28,8 +28,9 @@ conformance harness (35 passing tests), and two red-team passes live in a
 companion repository:
 <https://github.com/Marvinthebored/openclaw-provider-stream-spec>. This RFC is
 the design narrative; the spec is the contract. It extends the agent event I/O
-contract (`docs/channels/agent-event-io-contract.md`, ragesaq, #92216) and marks
-its four explicit amendments as **[AMENDS BASE]**.
+contract — vendored into this RFC at [`0008/agent-event-io-contract.md`](0008/agent-event-io-contract.md)
+from openclaw/openclaw #92216 by ragesaq — and marks its four explicit amendments
+as **[AMENDS BASE]**.
 
 ## Motivation
 
