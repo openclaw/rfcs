@@ -41,7 +41,7 @@ For example, a context engine can adjust recall depth or compaction behavior bas
 - Provide a typed `ContextEngineRuntimeSettings` payload for selected context-engine lifecycle hooks.
 - Let context engines observe the selected context engine and runtime facts for the current lifecycle invocation.
 - Keep the payload optional and additive so existing context engines can ignore it.
-- Make unknown or unavailable runtime facts explicit through nullable fields.
+- Make unknown or unavailable runtime facts explicit through nullable fields, not omitted fields.
 - Use host-curated diagnostic codes rather than raw provider or exception text.
 - Support end-to-end behavior proof through a configured context engine that consumes the payload OpenClaw produces.
 - Keep the merge path narrow: one optional payload, one schema version, no metadata negotiation, no UI, and no product-specific behavior.
@@ -78,8 +78,8 @@ export type ContextEngineRuntimeSettings = {
   runtime: {
     host: "openclaw";
     mode: ContextEngineRuntimeMode;
-    harnessId?: string | null;
-    runtimeId?: string | null;
+    harnessId: string | null;
+    runtimeId: string | null;
   };
   contextEngineSelection: {
     selectedId: string | null;
@@ -87,24 +87,32 @@ export type ContextEngineRuntimeSettings = {
   };
   executionHost: {
     id: string | null;
-    label?: string | null;
+    label: string | null;
   };
   model: {
-    requested?: string | null;
-    resolved?: string | null;
-    provider?: string | null;
-    family?: string | null;
+    requested: string | null;
+    resolved: string | null;
+    provider: string | null;
+    family: string | null;
   };
   limits: {
-    promptTokenBudget?: number | null;
-    maxOutputTokens?: number | null;
+    promptTokenBudget: number | null;
+    maxOutputTokens: number | null;
   };
   diagnostics: {
-    fallbackReason?: ContextEngineRuntimeReasonCode | null;
-    degradedReason?: ContextEngineRuntimeReasonCode | null;
+    fallbackReason: ContextEngineRuntimeReasonCode | null;
+    degradedReason: ContextEngineRuntimeReasonCode | null;
   };
 };
 ```
+
+This shape is the canonical public contract for the linked implementation work.
+The implementation must expose `contextEngineSelection`, `executionHost`,
+`limits.promptTokenBudget`, and closed diagnostic reason codes before merge.
+Earlier implementation names such as `contextEngine.hostId`,
+`contextEngine.hostLabel`, `contextEngine.capabilities`,
+`model.fallbackActive`, `limits.tokenBudget`, and free-string diagnostic
+reasons are not part of this RFC's v1 contract.
 
 ### Delivery Contract
 
@@ -162,9 +170,12 @@ The following hooks are out of scope for v1: `ingest`, `ingestBatch`, `prepareSu
 For schema version 1:
 
 - `schemaVersion` is required.
-- Every other field may be absent or `null` when unavailable.
-- New fields added to schema version 1 must be optional or nullable.
-- Removing a field or tightening an optional/nullable field into a required field requires a new schema version.
+- When `runtimeSettings` is present, the listed top-level envelopes and listed v1 fields are required.
+- Unknown or unavailable values in listed nullable fields are represented as `null`, not by omitting the field.
+- `contextEngineSelection.source` uses `"unknown"` when the producer cannot determine the selection source.
+- `runtime.mode` is host-owned runtime state and is never `"unknown"`; when neither fallback nor degraded state applies, the producer uses `"normal"`.
+- New fields added to schema version 1 must be optional, and consumers must ignore unknown optional keys.
+- Removing a listed v1 field, changing a nullable field to non-nullable, changing a nullable unknown representation, or changing a closed enum's meaning requires a new schema version.
 
 This RFC does not require v1 implementations to define a strict-validator retry mechanism. That can be considered separately if needed for legacy engines that fail on unknown optional keys.
 
