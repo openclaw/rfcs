@@ -4,7 +4,7 @@ authors:
   - jalehman
 created: 2026-06-04
 last_updated: 2026-06-10
-status: draft
+status: approved
 issue: https://github.com/openclaw/openclaw/issues/88838
 rfc_pr: https://github.com/openclaw/rfcs/pull/7
 ---
