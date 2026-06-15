@@ -6,7 +6,7 @@ created: 2026-06-15
 last_updated: 2026-06-15
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/17
 ---
 
 # Proposal: Gateway-Independent OpenClaw Core
