@@ -147,8 +147,8 @@ The following hooks are out of scope for v1: `ingest`, `ingestBatch`, `prepareSu
 | `model.family` | `string` | Yes | Model family when known. |
 | `limits.promptTokenBudget` | `number` | Yes | Prompt token budget for this invocation when known. |
 | `limits.maxOutputTokens` | `number` | Yes | Maximum output token setting when known. |
-| `diagnostics.fallbackReason` | closed reason code | Yes | Host-curated fallback reason. Never raw provider or exception text. |
-| `diagnostics.degradedReason` | closed reason code | Yes | Host-curated degraded reason. Never raw provider or exception text. |
+| `diagnostics.fallbackReason` | `ContextEngineRuntimeReasonCode` | Yes | Host-curated fallback reason. Never raw provider or exception text. |
+| `diagnostics.degradedReason` | `ContextEngineRuntimeReasonCode` | Yes | Host-curated degraded reason. Never raw provider or exception text. |
 
 ### Invariants
 
@@ -166,6 +166,7 @@ The following hooks are out of scope for v1: `ingest`, `ingestBatch`, `prepareSu
 ### Compatibility
 
 `runtimeSettings` is optional. Existing engines that do not read it continue to compile and run unchanged.
+The optionality boundary is the `runtimeSettings` object itself; when OpenClaw provides it, the object is a complete schema-versioned v1 envelope.
 
 For schema version 1:
 
