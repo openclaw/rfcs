@@ -3,9 +3,9 @@ title: Context Engine Runtime Settings
 authors:
   - ragesaq
 created: 2026-06-15
-last_updated: 2026-06-15
-status: draft
-issue:
+last_updated: 2026-06-16
+status: accepted
+issue: https://github.com/openclaw/openclaw/issues/93728
 rfc_pr: https://github.com/openclaw/rfcs/pull/14
 ---
 
