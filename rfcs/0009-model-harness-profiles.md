@@ -166,7 +166,8 @@ uses the full profile.
 
 ### Registry and manifest format
 
-Profiles and bindings live in a schema-validated built-in registry:
+Profiles and bindings live in a schema-validated registry. The in-process
+contract is a materialized registry:
 
 ```ts
 type ModelHarnessProfileRegistry = {
@@ -196,25 +197,82 @@ type ModelProfileBinding = {
 };
 ```
 
-The initial implementation may represent this as JSON-compatible files or a
-typed source module validated against the same schema. The contract is
-declarative and JSON-compatible, similar in spirit to model manifests, but it
-is not a request-time config file.
+The initial implementation may represent the built-in registry as
+JSON-compatible files or a typed source module validated against the same
+schema. The contract is declarative and JSON-compatible, similar in spirit to
+model manifests, but it is not a request-time config file.
+
+Profile artifacts should use a Kubernetes Resource Model style authoring shape
+so OpenClaw can reuse established base/overlay vocabulary instead of inventing
+a new layering language:
+
+```yaml
+apiVersion: profiles.openclaw.ai/v1alpha1
+kind: ModelProfile
+metadata:
+  namespace: openclaw
+  name: anthropic-agent-v1
+spec:
+  policy:
+    toolExposure: standard-v1
+    toolSearchDefault: inherit
+    promptRecipe: standard-v1
+    reasoningDefault: inherit
+    contextPosture: standard
+```
+
+Derived profiles may be authored as Kustomize-style overlays:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../anthropic-agent-v1
+patches:
+  - target:
+      group: profiles.openclaw.ai
+      version: v1alpha1
+      kind: ModelProfile
+      name: anthropic-agent-v1
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: claude-opus-4-7-agent-v1
+      - op: replace
+        path: /spec/policy/reasoningDefault
+        value: off
+```
+
+OpenClaw does not need to expose all of Kustomize as product surface. The
+supported profile-pack subset should be limited to deterministic resource
+hydration and patches required to materialize `ModelProfile` and
+`ModelProfileBinding` resources. Generators, executable plugins, arbitrary
+transformers, and request-time remote fetches are out of scope. An installer may
+resolve registry artifact references to local immutable content before
+hydration; runtime resolution consumes only the validated materialized snapshot.
+
+This gives profiles Docker-like base-image ergonomics without making profile
+manifests imperative. A profile author can publish an Anthropic base profile,
+then publish Claude, enterprise, or unreleased-model overlays that override only
+the fields they need. The materialized output is still one schema-validated
+registry snapshot with explicit provenance.
 
 The built-in registry loads and validates once during process startup. The
 process retains an immutable snapshot; an agent run receives a resolved policy
 snapshot, not a mutable registry pointer. Invalid built-ins fail development or
 build validation rather than falling back at request time.
 
-Future installed packs require explicit owner-controlled installation, schema
-validation, version/provenance attribution, and restart or explicit reload.
-They must never be fetched during a model request.
+Future installed packs may be hosted by ClawHub, a public artifact registry, a
+private enterprise registry, or an intranet mirror. They require explicit
+owner-controlled installation, schema validation, version/provenance
+attribution, digest pinning or equivalent immutable identity, and restart or
+explicit reload. They must never be fetched during a model request.
 
-Profiles support exactly one `extends` parent. The inheritance chain is linear
-and materialized base-to-leaf. The registry rejects cycles, unknown parents,
-ambiguous bindings, unknown prompt recipes, and invalid settings. Arrays and
-maps must use field-specific replacement/merge semantics; generic deep merge is
-not allowed.
+Profile layering is resolved before runtime selection. The hydrated resource
+graph must materialize to unambiguous profile resources; the registry rejects
+cycles, unknown bases, ambiguous bindings, unknown prompt recipes, and invalid
+settings. Arrays and maps must use field-specific replacement/merge semantics;
+generic deep merge is not allowed.
 
 ### Selection order
 
@@ -266,8 +324,9 @@ capacity-derived behavioral baselines:
 | `openclaw/full-agent-v1` | none | fallback; Medium/Large | general harness baseline |
 | `openclaw/lean-agent-v1` | `full-agent-v1` | trusted Tiny/Small; legacy config | exact Lean migration |
 | `openclaw/gpt-5-agent-v1` | `full-agent-v1` | current GPT-5 family behavior | prompt recipe and personality setting |
-| `openclaw/claude-opus-4-7-agent-v1` | `full-agent-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
-| `openclaw/claude-4-6-agent-v1` | `full-agent-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
+| `openclaw/anthropic-agent-v1` | `full-agent-v1` | shared Anthropic/Claude behavior | base profile for Claude-family overrides |
+| `openclaw/claude-opus-4-7-agent-v1` | `anthropic-agent-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
+| `openclaw/claude-4-6-agent-v1` | `anthropic-agent-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
 
 The exact model aliases and family identities remain in canonical model/provider
 catalogs. Registry bindings refer to normalized identity; profiles are not a
@@ -356,7 +415,7 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
 {
   "schemaVersion": 1,
   "id": "openclaw/claude-opus-4-7-agent-v1",
-  "extends": "openclaw/full-agent-v1",
+  "extends": "openclaw/anthropic-agent-v1",
   "policy": {
     "reasoningDefault": "off"
   }
@@ -367,7 +426,7 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
 {
   "schemaVersion": 1,
   "id": "openclaw/claude-4-6-agent-v1",
-  "extends": "openclaw/full-agent-v1",
+  "extends": "openclaw/anthropic-agent-v1",
   "policy": {
     "reasoningDefault": "adaptive"
   }
@@ -663,8 +722,8 @@ serving boundary before any ClawHub or community registry is trusted.
 8. Move Lean logic and doctor-migrate legacy Lean config.
 9. Add `gpt-5-agent-v1`, migrate personality config, and replace direct prompt
    overlay resolution.
-10. Add exact Claude/Opus profiles and move only existing thinking-default
-    selection branches.
+10. Add `anthropic-agent-v1` plus exact Claude/Opus derived profiles, and move
+    only existing thinking-default selection branches.
 11. Add profile inspection and documentation.
 12. Remove retired runtime config reads and helper/re-export paths.
 13. Add reviewed artifact/family bindings only with canonical identity,
@@ -700,12 +759,20 @@ stable publisher identifiers. Profiles for the same model may be official,
 publisher-authored, OpenClaw-reviewed, or community-authored, but their
 provenance must be visible to operators.
 
+The same artifact model should support enterprise and pre-release workflows.
+An organization should be able to host private profile packs in an enterprise
+registry or intranet mirror while it optimizes an unreleased model, then later
+promote the same profile chain, or a reviewed derivative, to a public ClawHub
+profile when the model is released.
+
 The ClawHub registry should support:
 
 - deterministic lookup by canonical model identity and exact artifact identity,
   not fuzzy model names;
 - profile provenance, owner, version, review status, download/install counts,
   benchmark evidence, and rollback metadata;
+- public, private, and intranet-hosted profile artifacts with immutable
+  versions or digests;
 - publisher and community submission flows with schema validation before a
   profile can be installed;
 - benchmark-informed profile recommendations for high-value open-weight models;
@@ -736,6 +803,9 @@ Registry and resolver:
 
 - reject duplicate ids, unknown parents, cycles, unknown bindings, ambiguous
   bindings, unknown recipes, and invalid settings;
+- materialize KRM/Kustomize-style profile packs into stable registry snapshots;
+- reject unsupported generators, executable plugins, arbitrary transformers,
+  request-time remote fetches, and ambiguous overlay outputs;
 - table-test every capacity boundary;
 - prove unknown/untrusted capacity selects `full-agent-v1`;
 - prove exact artifact beats model, family, and capacity;
@@ -841,6 +911,27 @@ A startup-loaded built-in registry is small, deterministic, and easy to test.
 It establishes the schema and resolution contract before introducing the
 security, provenance, reload, and compatibility burden of an installed remote
 registry ecosystem.
+
+### KRM-style profile artifacts
+
+Model profile artifacts should use Kubernetes Resource Model conventions for
+authoring because that ecosystem already has a clear language for
+`apiVersion`, `kind`, `metadata`, resources, bases, overlays, and patches. This
+keeps profile layering familiar to operators without turning profiles into a
+Dockerfile-like imperative language.
+
+OpenClaw should reuse the Kustomize base/overlay shape only as a constrained
+profile-pack authoring and materialization format. The runtime still consumes a
+fully resolved profile snapshot. This avoids reinventing inheritance syntax
+while preserving OpenClaw-specific safety rules: no executable generators, no
+unbounded transformers, no request-time remote fetches, and no raw prompt or
+provider payload injection from remote artifacts.
+
+The artifact model also fits enterprise distribution. A profile pack can be
+public on ClawHub, private in a provider's pre-release registry, or mirrored on
+an intranet. In all cases, OpenClaw resolves and validates the dependency chain
+before use, records the resolved profile ancestry, and applies driver
+capability gates after materialization.
 
 ## Unresolved Questions
 
