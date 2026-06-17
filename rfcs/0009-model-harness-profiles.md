@@ -6,7 +6,7 @@ created: 2026-06-17
 last_updated: 2026-06-17
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/18
 ---
 
 # Proposal: Model Harness Profiles
