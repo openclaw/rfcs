@@ -1,6 +1,7 @@
 ---
 title: Model Harness Profiles
 authors:
+  - osolmaz
   - vincentkoc
 created: 2026-06-17
 last_updated: 2026-06-17
@@ -639,51 +640,92 @@ provider/model discovery in each hot path.
 
 ### Rollout
 
-#### Phase 0: Design and ownership
+#### Phase 1: OpenClaw-owned profile platform
 
-- Accept this RFC.
-- Open an implementation issue with owners across agent runtime, config/doctor,
-  OpenAI, Anthropic, Codex, and local serving.
-- Freeze initial profile ids and capacity boundaries.
-- Confirm that `lean-agent-v1` is an exact migration rather than an
-  opportunity to expand its tool deny list.
+Phase one covers the complete OpenClaw-owned implementation path. It establishes
+the local schema, resolver, built-in registry, migration path, and managed-local
+serving boundary before any ClawHub or community registry is trusted.
 
-#### Phase 1: Profiles work and current behavior is preserved
-
-1. Add identity/capacity types, registry schema, built-in registry, resolver,
+1. Accept this RFC.
+2. Open an implementation issue with owners across agent runtime, config/doctor,
+   OpenAI, Anthropic, Codex, and local serving.
+3. Freeze initial profile ids and capacity boundaries.
+4. Confirm that `lean-agent-v1` is an exact migration rather than an
+   opportunity to expand its tool deny list.
+5. Add identity/capacity types, registry schema, built-in registry, resolver,
    binding validation, and diagnostics.
-2. Add `full-agent-v1` and `lean-agent-v1`.
-3. Thread the resolved profile through run planning, tools, and prompt
+6. Add `full-agent-v1` and `lean-agent-v1`.
+7. Thread the resolved profile through run planning, tools, and prompt
    composition.
-4. Move Lean logic and doctor-migrate legacy Lean config.
-5. Add `gpt-5-agent-v1`, migrate personality config, and replace direct prompt
+8. Move Lean logic and doctor-migrate legacy Lean config.
+9. Add `gpt-5-agent-v1`, migrate personality config, and replace direct prompt
    overlay resolution.
-6. Add exact Claude/Opus profiles and move only existing thinking-default
-   selection branches.
-7. Add profile inspection and documentation.
-8. Remove retired runtime config reads and helper/re-export paths.
+10. Add exact Claude/Opus profiles and move only existing thinking-default
+    selection branches.
+11. Add profile inspection and documentation.
+12. Remove retired runtime config reads and helper/re-export paths.
+13. Add reviewed artifact/family bindings only with canonical identity,
+    driver/engine conditions, benchmark evidence, rationale, and
+    removal/rollback criteria. Start with a small number of high-value
+    families. Do not bulk import model-card claims as operational policy.
+14. Add a separate Serving Preset resolver for OpenClaw-managed local services.
+    It validates engine/version/artifact compatibility, exposes applied
+    settings to the operator, and is where KV cache tuning may be added.
+15. Consider signed/reviewed installed profile packs only after built-ins have
+    proven stable. They remain startup or explicit-reload metadata, never
+    request-time remote configuration.
 
 Phase one is complete only when profiles exist, wiring is in use, current
-behavior is covered by tests, and legacy config has a doctor migration.
+behavior is covered by tests, legacy config has a doctor migration, family
+bindings and Serving Presets have owner-reviewed evidence, and any installed
+pack mechanism has explicit provenance and reload semantics.
 
-#### Phase 2: Specific local model families
+#### Phase 2: ClawHub model profile registry
 
-Add reviewed artifact/family bindings only with canonical identity,
-driver/engine conditions, benchmark evidence, rationale, and removal/rollback
-criteria. Start with a small number of high-value families. Do not bulk import
-model-card claims as operational policy.
+Phase two turns the profile system into a ClawHub-backed distribution and
+discovery surface for open-weight models. This is the community and publisher
+registry layer proposed for moving beyond `localModelLean`; it must build on
+the phase-one schema, resolver, provenance, and safety boundaries rather than
+replacing them.
 
-#### Phase 3: Managed local Serving Presets
+ClawHub should allow Hugging Face model publishers, artifact publishers, and
+community maintainers to submit model profiles that target specific model
+families, revisions, artifacts, or quantized files. Hugging Face identity should
+be treated as a primary source for open-model ownership and artifact identity
+where possible, including exact `hf://` model URIs, revisions, file paths, and
+stable publisher identifiers. Profiles for the same model may be official,
+publisher-authored, OpenClaw-reviewed, or community-authored, but their
+provenance must be visible to operators.
 
-Add a separate resolver for OpenClaw-managed local services. It validates
-engine/version/artifact compatibility, exposes applied settings to the
-operator, and is where KV cache tuning may be added.
+The ClawHub registry should support:
 
-#### Phase 4: Installed registry packs
+- deterministic lookup by canonical model identity and exact artifact identity,
+  not fuzzy model names;
+- profile provenance, owner, version, review status, download/install counts,
+  benchmark evidence, and rollback metadata;
+- publisher and community submission flows with schema validation before a
+  profile can be installed;
+- benchmark-informed profile recommendations for high-value open-weight models;
+- AI-assisted profile generation only as a proposal step, with reviewed output
+  before distribution;
+- profile discovery from a ClawHub UI that can search Hugging Face models,
+  list available artifacts or quantizations, and show matching profiles;
+- explicit user installation, startup loading, and visible diagnostics in
+  OpenClaw.
 
-Only after built-ins have proven stable, consider signed/reviewed installed
-profile packs. They remain startup or explicit-reload metadata, never
-request-time remote configuration.
+ClawHub profiles must not be fetched or evaluated during a model request. A
+downloaded profile pack still uses the phase-one installed-pack contract:
+schema validation, version/provenance attribution, restart or explicit reload,
+and driver capability gates. Remote content must not inject raw prompt text,
+credentials, provider payload fragments, cache controls, server flags, or
+unreviewed code. If ClawHub eventually references prompt behavior, it should
+select reviewed named prompt recipes rather than carrying arbitrary prompt
+bodies.
+
+Phase two is complete only when ClawHub can publish, discover, install, verify,
+and inspect model profiles for at least a small set of benchmarked open-weight
+families without weakening the built-in registry guarantees or hosted-provider
+boundaries.
 
 ### Verification requirements
 
