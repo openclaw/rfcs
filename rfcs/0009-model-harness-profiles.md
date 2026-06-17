@@ -19,7 +19,7 @@ versioned Model Profile system. A Model Profile is a bounded, portable
 description of how the OpenClaw agent harness should behave for a resolved
 model: tool exposure, Tool Search defaults, named system-prompt recipes, and
 supported reasoning defaults. It is separate from model identity, provider
-drivers, and managed-local serving presets. Phase one preserves the five
+drivers, and managed-local serving presets. Phase one preserves four
 requested model-capacity classes as metadata, ships two capacity-derived
 behavioral baselines, migrates existing Lean/GPT-5/Claude model-specific
 behavior onto profiles, and leaves KV cache and engine tuning outside profiles.
@@ -57,7 +57,7 @@ hosted providers a consistent way to opt into portable model-family policy.
 - Preserve current Lean behavior exactly during migration.
 - Centralize existing GPT-5 personality and Claude/Opus thinking-default
   behavior under the profile resolution system.
-- Keep five capacity classes available as model metadata and diagnostics.
+- Keep four capacity classes available as model metadata and diagnostics.
 - Ship a conservative phase-one fallback: lean behavior for trusted models up
   to 20B parameters and full behavior otherwise.
 - Make model identity, harness policy, driver behavior, and local serving
@@ -113,7 +113,7 @@ A driver answers: "Can OpenClaw use this endpoint, and how?" A profile answers:
 Profile selection consumes a prepared identity object:
 
 ```ts
-type ModelCapacityClass = "tiny" | "xsmall" | "small" | "medium" | "large";
+type ModelCapacityClass = "tiny" | "small" | "medium" | "large";
 
 type ResolvedModelIdentity = {
   providerId: string;
@@ -137,10 +137,13 @@ The requested capacity classes use total parameter count:
 | Class | Total parameters |
 | --- | --- |
 | `tiny` | `<= 1B` |
-| `xsmall` | `> 1B` and `<= 5B` |
-| `small` | `> 5B` and `<= 20B` |
+| `small` | `> 1B` and `<= 20B` |
 | `medium` | `> 20B` and `<= 50B` |
 | `large` | `> 50B` |
+
+This deliberately omits an `xsmall` class for phase-one simplicity. If later
+benchmarking shows that the `small` range is too broad, OpenClaw may split it
+into `small` and `xsmall` in a future schema version.
 
 For mixture-of-experts models, phase one classifies by total parameters.
 Future metadata may record active parameters, but active parameters must not
@@ -255,13 +258,13 @@ invent a provider payload.
 
 ### Initial profiles
 
-Phase one deliberately keeps five capacity classes but ships two
+Phase one deliberately keeps four capacity classes but ships two
 capacity-derived behavioral baselines:
 
 | Profile | Parent | Binding intent | Purpose |
 | --- | --- | --- | --- |
 | `openclaw/full-agent-v1` | none | fallback; Medium/Large | general harness baseline |
-| `openclaw/lean-agent-v1` | `full-agent-v1` | trusted Tiny/XSmall/Small; legacy config | exact Lean migration |
+| `openclaw/lean-agent-v1` | `full-agent-v1` | trusted Tiny/Small; legacy config | exact Lean migration |
 | `openclaw/gpt-5-agent-v1` | `full-agent-v1` | current GPT-5 family behavior | prompt recipe and personality setting |
 | `openclaw/claude-opus-4-7-agent-v1` | `full-agent-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
 | `openclaw/claude-4-6-agent-v1` | `full-agent-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
@@ -794,10 +797,12 @@ portable harness policy system. Calling a driver a profile would hide its
 protocol and payload responsibilities. The split makes ownership clear and
 prevents a local performance setting from reaching a public provider.
 
-### Five capacity classes, two phase-one baselines
+### Four capacity classes, two phase-one baselines
 
-The five requested classes are useful for reporting, bindings, and later
-benchmarking. They do not yet justify five different prompt/tool configurations.
+The four requested classes are useful for reporting, bindings, and later
+benchmarking. They do not yet justify four different prompt/tool configurations.
+An `xsmall` class is intentionally omitted for now to keep phase one simple; it
+can be added later if evidence shows the `small` range needs to be split.
 
 Two initial behavior baselines have a concrete purpose:
 
