@@ -17,7 +17,7 @@ Define an opt-in `snapshot` plugin for OpenClaw-owned SQLite state. The plugin p
 
 SQLite remains the hot local runtime database. The plugin does not replace SQLite, introduce a second required database backend, or make cloud storage mandatory. It gives managed and production operators a clearer answer to a narrower problem: how OpenClaw state becomes a portable, restorable artifact when a process, container, or host needs to be replaced.
 
-The plugin can expose its own commands and also extend the existing `openclaw backup` command surface.
+The plugin can expose its own commands and also extend the existing `openclaw backup` command surface. The snapshot provider contract should apply to any OpenClaw-owned SQLite database, and the plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
 
 ## Motivation
 
@@ -42,12 +42,14 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 - Make snapshot behavior opt-in through a plugin extension.
 - Produce consistent SQLite snapshots that handle WAL state correctly.
 - Make restore and verification first-class behaviors, not incidental backup side effects.
+- Define a reusable SQLite snapshot provider contract for OpenClaw-owned SQLite databases.
 - Allow the plugin to add commands under `openclaw snapshot` and extend `openclaw backup`.
 - Keep default local OpenClaw behavior unchanged when the plugin is not installed or enabled.
 - Avoid hot writes over network filesystems as a durability or concurrency strategy.
 - Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
 - Leave cloud artifact storage, retention, scheduling, and failover orchestration to optional providers or later RFCs.
 - Keep the design compatible with existing global state, per-agent state, and dedicated store boundaries.
+- Leave room for core to adopt the same primitives later if snapshot and restore become required OpenClaw behavior.
 
 ## Non-Goals
 
@@ -68,6 +70,8 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 Add an opt-in `snapshot` plugin that owns SQLite-safe snapshot and restore workflows for OpenClaw state.
 
 The plugin should be installable and removable like other OpenClaw plugins. When it is absent, default OpenClaw keeps its current local SQLite behavior and existing backup commands.
+
+The plugin is the first proposed consumer of the snapshot provider contract, not the only possible consumer. Over time, the same contract can be used by core backup/restore commands, doctor checks, managed startup hydration, or other OpenClaw features that need a consistent SQLite restore point.
 
 The plugin can add a direct command surface:
 
@@ -174,6 +178,8 @@ An OpenClaw-owned SQLite database is snapshot-safe when it can be captured, veri
 
 The unit of snapshotting is an existing OpenClaw-owned SQLite database, such as shared state, per-agent state, or a dedicated owner store. This RFC does not rename or redesign those logical units; it defines snapshot behavior that can apply to each unit.
 
+The provider contract should therefore take a database reference rather than assume one hard-coded database path. Core can decide which SQLite databases are eligible, and the plugin or provider can apply the same snapshot semantics to each eligible database.
+
 A snapshot must:
 
 - handle `.sqlite`, `-wal`, and `-shm` state correctly
@@ -267,6 +273,8 @@ The exact storage location for this metadata is implementation-defined, but the 
 
 The implementation can start as a SQLite-specific snapshot provider rather than a database abstraction layer.
 
+The provider contract should be reusable by any OpenClaw feature that needs to capture or restore an OpenClaw-owned SQLite database. The `snapshot` plugin is the first proposed packaging and CLI surface, but the contract should not depend on plugin-only state.
+
 A minimal shape is:
 
 ```ts
@@ -290,6 +298,8 @@ type RemoteSnapshotProvider = SqliteSnapshotProvider & {
 ```
 
 This keeps SQLite runtime access local while making state artifacts portable. A local snapshot provider can be the reference implementation. Cloud/object-store providers can come later without changing the default local runtime.
+
+If the design proves broadly useful, core can adopt the same contract for built-in backup restore, startup hydration, or state migration workflows without requiring the `snapshot` plugin command surface to become mandatory.
 
 ### First milestone
 
@@ -319,6 +329,8 @@ Treating remote storage as artifact storage avoids the common failure mode where
 Making the feature opt-in keeps the default OpenClaw runtime simple. Local and development users should not need object storage, a lease service, or a managed scheduler to keep using SQLite.
 
 Keeping core responsible for SQLite-safe primitives is important because safe snapshots and restores need access to database paths, WAL behavior, schema versions, and integrity checks. Provider-owned artifact storage keeps cloud credentials, retention policy, and managed failover out of the default core runtime.
+
+The provider contract gives OpenClaw a path from plugin experimentation to core adoption. The first implementation can live as an opt-in plugin while the contract stays general enough for future core backup, restore, startup hydration, or migration workflows.
 
 Explicit writer ownership keeps horizontal service orchestration honest. A service can move work between hosts, but it must move ownership and restore state deliberately rather than letting several instances write the same SQLite database through shared storage.
 
