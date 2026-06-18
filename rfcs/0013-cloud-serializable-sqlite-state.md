@@ -6,7 +6,7 @@ created: 2026-06-18
 last_updated: 2026-06-18
 status: draft
 issue:
-rfc_pr: TBD
+rfc_pr: https://github.com/openclaw/rfcs/pull/20
 ---
 
 # Proposal: Cloud-Serializable SQLite State
