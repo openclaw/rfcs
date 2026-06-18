@@ -17,7 +17,7 @@ Define an opt-in `snapshot` plugin for OpenClaw-owned SQLite state. The plugin p
 
 SQLite remains the hot local runtime database. The plugin does not replace SQLite, introduce a second required database backend, or make cloud storage mandatory. It gives managed and production operators a clearer answer to a narrower problem: how OpenClaw state becomes a portable, restorable artifact when a process, container, or host needs to be replaced.
 
-The plugin can expose its own commands and also extend the existing `openclaw backup` command surface. The snapshot provider contract should apply to any OpenClaw-owned SQLite database, and the plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
+The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The snapshot provider contract should apply to any OpenClaw-owned SQLite database, and the plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
 
 ## Motivation
 
@@ -43,7 +43,8 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 - Produce consistent SQLite snapshots that handle WAL state correctly.
 - Make restore and verification first-class behaviors, not incidental backup side effects.
 - Define a reusable SQLite snapshot provider contract for OpenClaw-owned SQLite databases.
-- Allow the plugin to add commands under `openclaw snapshot` and extend `openclaw backup`.
+- Allow the plugin to add commands under `openclaw snapshot`.
+- Leave `openclaw backup` integration as a possible later follow-up, not part of the initial proof stack.
 - Keep default local OpenClaw behavior unchanged when the plugin is not installed or enabled.
 - Avoid hot writes over network filesystems as a durability or concurrency strategy.
 - Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
@@ -62,6 +63,7 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 - This RFC does not define FTS/vector search portability.
 - This RFC does not require real-time multi-writer SQLite over shared storage.
 - This RFC does not define the final managed failover control plane.
+- This RFC does not change the existing `openclaw backup create` or `openclaw backup verify` behavior.
 
 ## Proposal
 
@@ -73,7 +75,21 @@ The plugin should be installable and removable like other OpenClaw plugins. When
 
 The plugin is the first proposed consumer of the snapshot provider contract, not the only possible consumer. Over time, the same contract can be used by core backup/restore commands, doctor checks, managed startup hydration, or other OpenClaw features that need a consistent SQLite restore point.
 
-The plugin can add a direct command surface:
+The plugin should follow the bundled extension pattern used by plugins such as `policy` and `oc-path`:
+
+```text
+extensions/snapshot/
+  package.json
+  openclaw.plugin.json
+  index.ts
+  src/
+    snapshot-provider.ts
+    sqlite-snapshot.ts
+    manifest.ts
+    local-repository.ts
+```
+
+The plugin adds a direct command surface:
 
 ```text
 openclaw snapshot create
@@ -83,7 +99,7 @@ openclaw snapshot list
 openclaw snapshot status
 ```
 
-It can also extend the existing backup surface so operators can use the name OpenClaw already has for this class of work:
+Later, if maintainers want one user-facing home for backup and restore workflows, the same provider contract can be wired under the existing backup command surface:
 
 ```text
 openclaw backup snapshot
@@ -91,7 +107,7 @@ openclaw backup restore
 openclaw backup status
 ```
 
-The intent is not to split the product vocabulary. `snapshot` is the plugin and capability name; `backup` remains the user-facing home for backup and restore workflows where that is more natural.
+That integration is intentionally not part of the initial implementation roadmap. The first proof should stay scoped to the `snapshot` plugin so it can demonstrate correctness without changing the existing backup command behavior.
 
 ### Responsibility split
 
@@ -111,11 +127,11 @@ The `snapshot` plugin should own:
 - local snapshot artifact creation
 - snapshot manifest creation and verification
 - restore workflow orchestration
-- optional integration with `openclaw backup`
 - provider hooks for storage backends
 
-Optional providers can own:
+Optional future integrations and providers can own:
 
+- integration with `openclaw backup`
 - local snapshot repositories
 - S3-compatible artifact storage
 - Azure Blob or other cloud artifact storage
@@ -143,7 +159,6 @@ flowchart LR
 
   subgraph Plugin[snapshot plugin]
     Cmd[openclaw snapshot]
-    Backup[openclaw backup extensions]
     Manifest[snapshot manifest]
     LocalRepo[(local snapshot repo)]
   end
@@ -159,7 +174,6 @@ flowchart LR
   Checkpoint --> Manifest
   Cmd --> Checkpoint
   Cmd --> Restore
-  Backup --> Cmd
   Manifest --> LocalRepo
   LocalRepo --> Restore
   LocalRepo --> Object
@@ -301,20 +315,54 @@ This keeps SQLite runtime access local while making state artifacts portable. A 
 
 If the design proves broadly useful, core can adopt the same contract for built-in backup restore, startup hydration, or state migration workflows without requiring the `snapshot` plugin command surface to become mandatory.
 
-### First milestone
+### Implementation roadmap
 
-The first implementation milestone should be intentionally small and opt-in:
+The initial implementation should be a short PR stack that proves correctness before expanding product surface.
 
-1. implement the `snapshot` plugin with a local snapshot repository
-2. choose one existing OpenClaw-owned SQLite database
-3. produce a consistent local snapshot artifact
-4. verify the snapshot manifest and SQLite integrity
-5. restore it into a fresh directory or host
-6. boot OpenClaw from restored state
-7. expose the workflow through `openclaw snapshot` and optionally `openclaw backup snapshot` / `openclaw backup restore`
-8. document that hot writes over network filesystems remain unsupported
+#### PR 1: provider proof
 
-Incremental deltas, object storage, leases, standby replicas, and automatic failover should follow after snapshot and restore are proven.
+Add the bundled `snapshot` plugin scaffold and a local SQLite snapshot provider.
+
+This PR should include:
+
+- `extensions/snapshot` plugin manifest, package metadata, and entrypoint
+- `SqliteSnapshotProvider` contract
+- local snapshot repository
+- snapshot manifest and content hash verification
+- SQLite-safe snapshot creation for one database reference
+- tests against a WAL-mode SQLite database
+- an internal restore in tests to prove the artifact is usable
+
+This PR does not need the full public restore CLI. It should prove that the provider can create and verify a correct SQLite snapshot artifact.
+
+#### PR 2: public snapshot CLI
+
+Expose the user-facing plugin commands:
+
+```text
+openclaw snapshot create
+openclaw snapshot verify
+openclaw snapshot restore
+```
+
+This PR should add target-directory safety checks, restore manifest validation, SQLite integrity checks after restore, and docs for the `snapshot` plugin command surface.
+
+#### PR 3: fresh-state boot proof
+
+Prove that a restored snapshot can hydrate a fresh OpenClaw state directory before runtime opens SQLite.
+
+This PR should demonstrate that OpenClaw can start from restored state in a fresh directory, host, or container-style environment. That proof is what makes the plugin a credible failover substrate rather than only an archive utility.
+
+#### Later work
+
+After the three initial PRs, follow-up RFCs or implementation PRs can consider:
+
+- `openclaw backup` integration
+- incremental deltas
+- object/blob storage providers
+- retention and scheduling
+- leases, promotion, fencing, and managed failover
+- external tool integrations such as Litestream or LiteFS
 
 ## Rationale
 
@@ -322,7 +370,7 @@ This approach targets the reliability problem directly. It does not require Open
 
 Calling the extension `snapshot` keeps the first deliverable concrete. It describes the artifact OpenClaw needs before higher-level reliability features can exist. It also avoids overpromising automatic failover before leases, promotion, and orchestration are designed.
 
-Keeping `backup` as an extended command surface respects the CLI that already exists. Users who think in backup and restore terms can stay under `openclaw backup`; operators who install the plugin can use `openclaw snapshot` when they need the more specific state-artifact workflow.
+Keeping the first implementation stack under `openclaw snapshot` keeps the proof small and plugin-scoped. Existing `openclaw backup create` and `openclaw backup verify` behavior can remain unchanged while the snapshot provider proves the harder SQLite correctness and restore semantics.
 
 Treating remote storage as artifact storage avoids the common failure mode where object storage or network filesystems are used as if they were local disk. SQLite remains local and authoritative while running. Reliability comes from verified snapshots, manifests, restore procedures, and later deltas.
 
@@ -338,7 +386,6 @@ The proposal also keeps logical storage boundaries out of scope. OpenClaw alread
 
 ## Unresolved questions
 
-- Should the plugin command be exactly `snapshot`, or should `snapshot` exist only as a backup subcommand?
 - Which existing SQLite database should be used for the first snapshot/restore proof?
 - Should the first checkpoint implementation use SQLite online backup, `VACUUM INTO`, WAL checkpointing, page capture, or a higher-level export format?
 - Should the reference provider be a local snapshot repository only, or should it include one object/blob storage provider?
