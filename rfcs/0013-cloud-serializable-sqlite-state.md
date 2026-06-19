@@ -38,7 +38,7 @@ The syncable file is created deliberately. OpenClaw should open the source datab
 
 For hosts that sync on filesystem changes, the sync trigger should be the completed artifact write, not arbitrary writes inside the live OpenClaw state directory. The artifact directory should contain completed database artifacts and manifests only. Live `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` files should not be created there, because a sync agent can observe and upload them as soon as they appear.
 
-Deltas do not remove this requirement. Ryan's underlying concern is that whole-file copies do not scale, but unmanaged file deltas over live SQLite make the correctness problem worse: a file-sync tool can observe DB pages, WAL frames, and sidecars at different moments without knowing SQLite ordering or checkpoint state. Deltas should be a later optimization from a verified snapshot cursor, not a replacement for the initial clean artifact boundary.
+Deltas do not remove this requirement. Ryan's underlying concern is that whole-file copies do not scale, but unmanaged file deltas over live SQLite make the correctness problem worse: a file-sync tool can observe DB pages, WAL frames, and sidecars at different moments without knowing SQLite ordering or checkpoint state. If high-frequency sync is needed, the simple follow-up should be ordered WAL-bundle artifacts anchored to a verified full snapshot.
 
 ## Goals
 
@@ -55,7 +55,7 @@ Deltas do not remove this requirement. Ryan's underlying concern is that whole-f
 - Leave `openclaw backup` integration as a possible later follow-up, not part of the initial proof stack.
 - Keep default local OpenClaw runtime behavior unchanged unless the snapshot command is invoked.
 - Avoid hot writes over network filesystems as a durability or concurrency strategy.
-- Treat deltas as a future SQLite-aware optimization after full snapshot artifacts are correct.
+- Treat WAL bundles as the first high-frequency optimization after full snapshot artifacts are correct.
 - Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
 - Leave cloud artifact storage, retention, scheduling, and failover orchestration to optional providers or later RFCs.
 - Let hosts such as Scout/Lobster own durable destination policy while OpenClaw owns the correctness of the local SQLite artifact operation.
@@ -265,45 +265,36 @@ The artifact model should support:
 - compact snapshot artifacts
 - ordered manifests
 - content hashes or equivalent integrity checks
-- optional incremental deltas after the first milestone
+- optional WAL bundles after the first milestones
 - resumable upload and download when a remote provider is configured
-- restore from the latest valid snapshot plus any required ordered deltas
+- restore from the latest valid snapshot plus any required ordered WAL bundles
 
-The delta mechanism can be WAL-frame based, page based, logical-change based, external-tool based, or backend-native. This RFC requires the contract, not one specific encoding.
+The follow-up high-frequency mechanism should start with WAL bundles, not a broad delta abstraction.
 
-Delta support must be anchored to a verified snapshot generation. The system should not treat arbitrary file-sync deltas from the live runtime directory as a restore stream. A valid delta design needs ordering, a base snapshot cursor, integrity checks, and replay rules that SQLite/OpenClaw can verify before opening the restored database.
+WAL bundles must be anchored to a verified snapshot generation. The system should not treat arbitrary file-sync deltas from the live runtime directory as a restore stream. A valid bundle design needs ordering, a base snapshot cursor, integrity checks, and replay rules that SQLite/OpenClaw can verify before opening the restored database.
 
-### Delta model
+### WAL bundle model
 
-Deltas are the answer to Ryan's scaling concern, but only after OpenClaw has a
-verified full snapshot contract. A delta is not "whatever changed on disk since
-the sync tool last ran." A valid delta is an OpenClaw-authored artifact that is
-created from a known base snapshot generation and replayed in manifest order.
+WAL bundles are the first proposed answer to Ryan's scaling concern, but only
+after OpenClaw has a verified full snapshot contract. A WAL bundle is not the
+live `*.sqlite-wal` file. It is an OpenClaw-authored artifact cut from a known
+SQLite state range, written to staging, verified, and then published into the
+sync-owned artifact directory.
 
-The first delta design should keep these invariants:
+The first WAL bundle design should keep these invariants:
 
-- every delta names its base snapshot generation or previous delta cursor
-- every delta has a monotonically ordered sequence number
-- every delta records the source database id, schema version, and page size or
+- every bundle names its base snapshot generation or previous bundle cursor
+- every bundle has a monotonically ordered sequence number
+- every bundle records the source database id, schema version, and page size or
   equivalent compatibility data
-- every delta records content hashes before upload and after download
-- restore applies deltas only after verifying the base snapshot
+- every bundle records content hashes before upload and after download
+- restore applies bundles only after verifying the base snapshot
 - restore rejects gaps, forks, duplicate sequence numbers, incompatible schema
   versions, and failed integrity checks
 - OpenClaw verifies the final restored database before runtime opens SQLite
 
-The encoding can be decided later. Plausible encodings include:
-
-- WAL-frame deltas, if OpenClaw can safely capture frame order and checkpoint
-  boundaries
-- page-level deltas, if OpenClaw can identify changed pages from a verified
-  base snapshot
-- logical deltas, if a future schema layer exposes stable logical changes
-- external-tool deltas, if an accepted provider such as Litestream or LiteFS can
-  satisfy the same manifest, ordering, and restore verification contract
-
 The milestone should be: full snapshot first, verified restore second, then
-ordered deltas from a snapshot cursor. File-sync deltas over the live runtime
+simple ordered WAL bundles from a snapshot cursor. File-sync deltas over the live runtime
 directory remain out of scope because they do not carry SQLite ordering,
 checkpoint, or replay semantics.
 
@@ -346,7 +337,7 @@ Failover becomes possible when OpenClaw has:
 2. a way to hydrate local disk before startup
 3. a way to confirm schema and integrity before runtime writes
 4. a clear owner for the database after restore
-5. optional deltas or upload scheduling to reduce the data-loss window
+5. optional WAL bundles or upload scheduling to reduce the data-loss window
 
 A later RFC can define leases, promotion, fencing, standby replicas, and managed orchestration. This RFC provides the snapshot and restore substrate those systems need.
 
@@ -472,32 +463,29 @@ This PR should demonstrate that OpenClaw can start from restored state in a fres
 
 This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
 
-#### PR 5: delta manifest contract
+#### PR 5: simple WAL bundle proof
 
-Add the manifest shape and verification rules for ordered deltas without
-requiring a production delta encoder yet.
+Add the smallest WAL-bundle proof that reduces full-snapshot frequency without
+blessing live-file deltas.
 
 This PR should include:
 
-- base snapshot generation and delta sequence fields
-- hash and byte-size fields for delta artifacts
+- base snapshot generation and bundle sequence fields
+- hash and byte-size fields for WAL bundle artifacts
+- staging then publish into the sync-owned artifact directory
 - restore validation for gaps, forks, duplicate sequence numbers, and wrong base
   snapshot generation
-- tests that prove invalid delta chains are rejected before database restore
-
-#### PR 6: reference delta encoder proof
-
-Add one narrow SQLite-aware delta encoder proof. The RFC does not require one
-encoding, but the first implementation should choose a small reference path and
-prove that restore works from:
+- tests that prove invalid bundle chains are rejected before database restore
+- proof that restore works from:
 
 ```text
-full snapshot + ordered deltas -> verified local SQLite database
+full snapshot + ordered WAL bundles -> verified local SQLite database
 ```
 
-The proof can use WAL-frame, page-level, logical, or external-tool-backed
-encoding, but it must satisfy the delta manifest contract and run SQLite
-integrity verification after replay.
+This PR should not add retention policy, object storage, failover, or multiple
+delta encodings. Compaction can be simple: replay the latest full snapshot plus
+bundles into a temp database, verify it, publish a new full snapshot, then leave
+pruning policy to later work.
 
 #### Later work
 
@@ -506,6 +494,7 @@ After the initial PRs, follow-up RFCs or implementation PRs can consider:
 - `openclaw backup` integration
 - object/blob storage providers
 - retention and scheduling
+- WAL bundle compaction and pruning policy
 - leases, promotion, fencing, and managed failover
 - external tool integrations such as Litestream or LiteFS
 
@@ -519,7 +508,7 @@ Calling the command `snapshot` keeps the first deliverable concrete. It describe
 
 Keeping the first implementation stack under `openclaw snapshot` keeps the proof small and command-scoped. Existing `openclaw backup create` and `openclaw backup verify` behavior can remain unchanged while the snapshot provider proves the harder SQLite correctness and restore semantics.
 
-Treating remote storage as artifact storage avoids the common failure mode where object storage or network filesystems are used as if they were local disk. SQLite remains local and authoritative while running. Reliability comes from verified snapshots, manifests, restore procedures, and later deltas.
+Treating remote storage as artifact storage avoids the common failure mode where object storage or network filesystems are used as if they were local disk. SQLite remains local and authoritative while running. Reliability comes from verified snapshots, manifests, restore procedures, and later WAL bundles.
 
 Making the feature opt-in keeps the default OpenClaw runtime simple. Local and development users should not need object storage, a lease service, or a managed scheduler to keep using SQLite.
 
@@ -538,7 +527,7 @@ The proposal also keeps storage ownership decisions out of scope. OpenClaw alrea
 - Which database-first unit should be used for the first named snapshot/restore proof: global control-plane state, one per-agent data-plane database, or both?
 - Should the first checkpoint implementation use SQLite online backup, `VACUUM INTO`, WAL checkpointing, page capture, or a higher-level export format?
 - Should the reference provider be a local snapshot repository only, or should it include one object/blob storage provider?
-- What is the acceptable data-loss window for managed deployments before deltas are implemented?
+- What is the acceptable data-loss window for managed deployments before WAL bundles are implemented?
 - Where should writer ownership metadata live before a database is opened?
 - Should restore verification run during startup, doctor, a managed-control-plane action, or all three?
 - What is the minimum host-facing API or command shape needed for Scout/Lobster-style platforms to request artifact materialization and pre-start hydration?
