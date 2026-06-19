@@ -411,9 +411,26 @@ If the design proves broadly useful, the same contract can support backup restor
 
 ### Implementation roadmap
 
-The initial implementation should be a short PR stack that proves correctness before expanding product surface.
+The implementation should be split into two phases.
 
-#### PR 1: core snapshot provider proof
+Phase 1 is the committed snapshot command work. It proves full verified
+snapshots, named OpenClaw database targets, and fresh-state restore. It should
+also collect the metrics that decide whether Phase 2 is worth doing:
+
+- snapshot artifact size by database role
+- snapshot duration
+- upload or sync bytes and time, when the host can report them
+- restore duration
+- snapshot frequency required to meet the desired recovery point objective
+- observed WAL growth between snapshots
+- runtime impact while snapshotting
+
+Phase 2 is gated. It should start only if Phase 1 data shows full snapshots are
+too large, too slow, or too infrequent for hosted deployments. Phase 2's planned
+shape is WAL bundles plus the minimum compaction proof needed to keep bundle
+chains bounded.
+
+#### Phase 1 / PR 1: core snapshot provider proof
 
 Add the shared SQLite snapshot provider and local artifact repository.
 
@@ -428,7 +445,7 @@ This PR should include:
 
 This PR does not need the full public restore CLI. It should prove that the provider can create and verify a correct SQLite snapshot artifact without publishing a premature provider API surface.
 
-#### PR 2: core snapshot CLI
+#### Phase 1 / PR 2: core snapshot CLI
 
 Expose the user-facing core commands:
 
@@ -442,7 +459,7 @@ This PR should add target-directory safety checks, restore manifest validation, 
 
 The CLI should accept an explicit database path for the proof path, but the intended product model is not "any random SQLite file forever." The command should be able to grow toward named OpenClaw database targets such as global state or a specific agent database once core exposes the eligible database registry cleanly.
 
-#### PR 3: named OpenClaw database targets
+#### Phase 1 / PR 3: named OpenClaw database targets
 
 Teach `openclaw snapshot` to address OpenClaw-owned databases by stable names
 instead of only accepting arbitrary paths.
@@ -455,7 +472,7 @@ This PR should include:
 - host-sync guidance that says live SQLite sidecars are ignored and completed
   artifacts are the sync input
 
-#### PR 4: fresh-state boot proof
+#### Phase 1 / PR 4: fresh-state boot proof and metrics
 
 Prove that a restored snapshot can hydrate a fresh OpenClaw state directory before runtime opens SQLite.
 
@@ -463,7 +480,15 @@ This PR should demonstrate that OpenClaw can start from restored state in a fres
 
 This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
 
-#### PR 5: simple WAL bundle proof
+This PR should record or report the Phase 1 metrics when available: snapshot
+size, snapshot duration, restore duration, WAL growth, and upload/sync bytes and
+time when the host supplies them. It should also document the greenlight
+criteria maintainers would use before starting Phase 2.
+
+#### Phase 2 / PR 5: simple WAL bundle proof
+
+Phase 2 is not automatically required by Phase 1. It needs a maintainer
+greenlight based on Phase 1 metrics.
 
 Add the smallest WAL-bundle proof that reduces full-snapshot frequency without
 blessing live-file deltas.
@@ -483,9 +508,9 @@ full snapshot + ordered WAL bundles -> verified local SQLite database
 ```
 
 This PR should not add retention policy, object storage, failover, or multiple
-delta encodings. Compaction can be simple: replay the latest full snapshot plus
-bundles into a temp database, verify it, publish a new full snapshot, then leave
-pruning policy to later work.
+delta encodings. It should include a simple compaction proof: replay the latest
+full snapshot plus bundles into a temp database, verify it, and publish a new
+full snapshot generation. Conservative pruning policy can remain later work.
 
 #### Later work
 
@@ -494,7 +519,7 @@ After the initial PRs, follow-up RFCs or implementation PRs can consider:
 - `openclaw backup` integration
 - object/blob storage providers
 - retention and scheduling
-- WAL bundle compaction and pruning policy
+- WAL bundle retention and pruning policy
 - leases, promotion, fencing, and managed failover
 - external tool integrations such as Litestream or LiteFS
 
@@ -509,6 +534,12 @@ Calling the command `snapshot` keeps the first deliverable concrete. It describe
 Keeping the first implementation stack under `openclaw snapshot` keeps the proof small and command-scoped. Existing `openclaw backup create` and `openclaw backup verify` behavior can remain unchanged while the snapshot provider proves the harder SQLite correctness and restore semantics.
 
 Treating remote storage as artifact storage avoids the common failure mode where object storage or network filesystems are used as if they were local disk. SQLite remains local and authoritative while running. Reliability comes from verified snapshots, manifests, restore procedures, and later WAL bundles.
+
+Phase 2 is deliberately gated. WAL bundles reduce sync cost and restore-point
+gaps only if Phase 1 metrics show full snapshots are insufficient. Keeping WAL
+bundles behind a greenlight avoids committing to replay and compaction
+complexity before OpenClaw knows database size, snapshot time, host sync cost,
+restore time, WAL growth, and recovery point needs.
 
 Making the feature opt-in keeps the default OpenClaw runtime simple. Local and development users should not need object storage, a lease service, or a managed scheduler to keep using SQLite.
 
@@ -527,7 +558,8 @@ The proposal also keeps storage ownership decisions out of scope. OpenClaw alrea
 - Which database-first unit should be used for the first named snapshot/restore proof: global control-plane state, one per-agent data-plane database, or both?
 - Should the first checkpoint implementation use SQLite online backup, `VACUUM INTO`, WAL checkpointing, page capture, or a higher-level export format?
 - Should the reference provider be a local snapshot repository only, or should it include one object/blob storage provider?
-- What is the acceptable data-loss window for managed deployments before WAL bundles are implemented?
+- Which Phase 1 metric thresholds should greenlight Phase 2 WAL bundles: artifact size, snapshot duration, sync bytes/time, restore duration, WAL growth, or required recovery point objective?
+- Should simple compaction land with the first WAL bundle proof or as the next Phase 2 PR?
 - Where should writer ownership metadata live before a database is opened?
 - Should restore verification run during startup, doctor, a managed-control-plane action, or all three?
 - What is the minimum host-facing API or command shape needed for Scout/Lobster-style platforms to request artifact materialization and pre-start hydration?
