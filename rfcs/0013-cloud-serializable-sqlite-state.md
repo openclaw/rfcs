@@ -238,18 +238,15 @@ The unit of snapshotting is an existing OpenClaw-owned SQLite database. The prim
 
 - the global control-plane database at `state/openclaw.sqlite`
 - one per-agent data-plane database at `agents/<agentId>/agent/openclaw-agent.sqlite`
-- a configured per-agent memory-search SQLite store, for example
-  `agents.defaults.memorySearch.store.path` with `{agentId}` substitution
+- memory-search tables owned by the per-agent database-first store
 - any future dedicated owner store that has explicit ownership, schema, and lifecycle metadata
 
 This RFC does not rename or redesign those logical units; openclaw/openclaw#94646 makes them concrete enough for snapshot to target. The RFC defines snapshot behavior that can apply to each eligible database.
 
 The memory-search target matters for hosted deployments such as Lobster because
-the host may place that SQLite database outside the default OpenClaw state tree,
-for example on local ephemeral disk at `/tmp/memory/{agentId}.sqlite`. The host
-should not need to hard-code that path or copy the live SQLite file family.
-Instead, OpenClaw should resolve the configured store path and materialize a
-safe snapshot artifact through the same core command:
+the host should not need to hard-code private SQLite paths or copy the live
+SQLite file family. OpenClaw should resolve the database-first owner path and
+materialize a safe snapshot artifact through the same core command:
 
 ```text
 openclaw snapshot create --target memory-search --agent main
@@ -476,8 +473,8 @@ openclaw snapshot restore
 ```
 - `--target global` for `state/openclaw.sqlite`
 - `--agent <agentId>` for `agents/<agentId>/agent/openclaw-agent.sqlite`
-- `--target memory-search --agent <agentId>` for a configured per-agent
-  memory-search SQLite store
+- `--target memory-search --agent <agentId>` for memory-search state in the
+  per-agent database-first store
 - manifest fields for database role, agent id, schema version, and source path
 - host-sync guidance that says live SQLite sidecars are ignored and completed
   artifacts are the sync input
