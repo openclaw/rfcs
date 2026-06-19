@@ -432,12 +432,13 @@ chains bounded.
 
 The current Phase 1 implementation stack is:
 
-| PR                                                                         | Purpose                              |
-| -------------------------------------------------------------------------- | ------------------------------------ |
-| [openclaw/openclaw#94694](https://github.com/openclaw/openclaw/pull/94694) | Core snapshot provider proof         |
-| [openclaw/openclaw#94717](https://github.com/openclaw/openclaw/pull/94717) | Core `openclaw snapshot` CLI         |
-| [openclaw/openclaw#94799](https://github.com/openclaw/openclaw/pull/94799) | Named OpenClaw database targets      |
-| [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Safe-sync artifact and restore proof |
+| PR                                                                         | Purpose                                       |
+| -------------------------------------------------------------------------- | --------------------------------------------- |
+| [openclaw/openclaw#94694](https://github.com/openclaw/openclaw/pull/94694) | Core snapshot provider proof                  |
+| [openclaw/openclaw#94717](https://github.com/openclaw/openclaw/pull/94717) | Core `openclaw snapshot` CLI                  |
+| [openclaw/openclaw#94799](https://github.com/openclaw/openclaw/pull/94799) | Named OpenClaw database targets               |
+| [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Safe-sync artifact and restore proof          |
+| [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967) | Snapshot stress harness for Phase 1 greenlight |
 
 #### Phase 1 / PR 1: core snapshot provider proof
 
@@ -507,7 +508,24 @@ criteria maintainers would use before starting Phase 2.
 
 Implementation: [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805).
 
-#### Phase 2 / PR 5: simple WAL bundle proof
+#### Phase 1 / PR 5: snapshot stress harness
+
+Add an opt-in harness that measures the Phase 1 behavior before maintainers
+decide whether Phase 2 is worth building.
+
+This PR should prove that snapshot artifacts still restore cleanly while a
+writer is committing transaction batches against the source database. It should
+cover both `--target global` and `--agent <id>`, report snapshot/restore p50/p95
+timings, snapshot bytes, WAL bytes after the run, writer rows, and restore
+verification counts.
+
+This PR should not make stress mandatory in normal CI. It is a local/release
+validation tool for maintainers and operators who need evidence before tuning
+snapshot frequency or greenlighting WAL bundles.
+
+Implementation: [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967).
+
+#### Phase 2 / PR 6: simple WAL bundle proof
 
 Phase 2 is not automatically required by Phase 1. It needs a maintainer
 greenlight based on Phase 1 metrics.
