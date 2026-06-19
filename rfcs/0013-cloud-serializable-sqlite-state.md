@@ -273,6 +273,40 @@ The delta mechanism can be WAL-frame based, page based, logical-change based, ex
 
 Delta support must be anchored to a verified snapshot generation. The system should not treat arbitrary file-sync deltas from the live runtime directory as a restore stream. A valid delta design needs ordering, a base snapshot cursor, integrity checks, and replay rules that SQLite/OpenClaw can verify before opening the restored database.
 
+### Delta model
+
+Deltas are the answer to Ryan's scaling concern, but only after OpenClaw has a
+verified full snapshot contract. A delta is not "whatever changed on disk since
+the sync tool last ran." A valid delta is an OpenClaw-authored artifact that is
+created from a known base snapshot generation and replayed in manifest order.
+
+The first delta design should keep these invariants:
+
+- every delta names its base snapshot generation or previous delta cursor
+- every delta has a monotonically ordered sequence number
+- every delta records the source database id, schema version, and page size or
+  equivalent compatibility data
+- every delta records content hashes before upload and after download
+- restore applies deltas only after verifying the base snapshot
+- restore rejects gaps, forks, duplicate sequence numbers, incompatible schema
+  versions, and failed integrity checks
+- OpenClaw verifies the final restored database before runtime opens SQLite
+
+The encoding can be decided later. Plausible encodings include:
+
+- WAL-frame deltas, if OpenClaw can safely capture frame order and checkpoint
+  boundaries
+- page-level deltas, if OpenClaw can identify changed pages from a verified
+  base snapshot
+- logical deltas, if a future schema layer exposes stable logical changes
+- external-tool deltas, if an accepted provider such as Litestream or LiteFS can
+  satisfy the same manifest, ordering, and restore verification contract
+
+The milestone should be: full snapshot first, verified restore second, then
+ordered deltas from a snapshot cursor. File-sync deltas over the live runtime
+directory remain out of scope because they do not carry SQLite ordering,
+checkpoint, or replay semantics.
+
 Artifacts should be suitable for host persistence. A hosting platform should be able to upload, retain, copy, and later download the artifact set without preserving process-local SQLite sidecars or relying on a mounted shared filesystem.
 
 The sync-owned artifact directory should not be the live SQLite runtime directory. If the host syncs on file save, OpenClaw should write completed artifacts into a separate artifact location after verification. That keeps the host from observing transient SQLite sidecars or partially materialized runtime state.
@@ -417,7 +451,20 @@ This PR should add target-directory safety checks, restore manifest validation, 
 
 The CLI should accept an explicit database path for the proof path, but the intended product model is not "any random SQLite file forever." The command should be able to grow toward named OpenClaw database targets such as global state or a specific agent database once core exposes the eligible database registry cleanly.
 
-#### PR 3: fresh-state boot proof
+#### PR 3: named OpenClaw database targets
+
+Teach `openclaw snapshot` to address OpenClaw-owned databases by stable names
+instead of only accepting arbitrary paths.
+
+This PR should include:
+
+- `--target global` for `state/openclaw.sqlite`
+- `--agent <agentId>` for `agents/<agentId>/agent/openclaw-agent.sqlite`
+- manifest fields for database role, agent id, schema version, and source path
+- host-sync guidance that says live SQLite sidecars are ignored and completed
+  artifacts are the sync input
+
+#### PR 4: fresh-state boot proof
 
 Prove that a restored snapshot can hydrate a fresh OpenClaw state directory before runtime opens SQLite.
 
@@ -425,12 +472,38 @@ This PR should demonstrate that OpenClaw can start from restored state in a fres
 
 This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
 
+#### PR 5: delta manifest contract
+
+Add the manifest shape and verification rules for ordered deltas without
+requiring a production delta encoder yet.
+
+This PR should include:
+
+- base snapshot generation and delta sequence fields
+- hash and byte-size fields for delta artifacts
+- restore validation for gaps, forks, duplicate sequence numbers, and wrong base
+  snapshot generation
+- tests that prove invalid delta chains are rejected before database restore
+
+#### PR 6: reference delta encoder proof
+
+Add one narrow SQLite-aware delta encoder proof. The RFC does not require one
+encoding, but the first implementation should choose a small reference path and
+prove that restore works from:
+
+```text
+full snapshot + ordered deltas -> verified local SQLite database
+```
+
+The proof can use WAL-frame, page-level, logical, or external-tool-backed
+encoding, but it must satisfy the delta manifest contract and run SQLite
+integrity verification after replay.
+
 #### Later work
 
-After the three initial PRs, follow-up RFCs or implementation PRs can consider:
+After the initial PRs, follow-up RFCs or implementation PRs can consider:
 
 - `openclaw backup` integration
-- incremental deltas
 - object/blob storage providers
 - retention and scheduling
 - leases, promotion, fencing, and managed failover
