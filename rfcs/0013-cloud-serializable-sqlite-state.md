@@ -434,19 +434,18 @@ The current Phase 1 implementation stack is:
 
 | PR                                                                         | Purpose                                       |
 | -------------------------------------------------------------------------- | --------------------------------------------- |
-| [openclaw/openclaw#94694](https://github.com/openclaw/openclaw/pull/94694) | Core snapshot provider proof                  |
-| [openclaw/openclaw#94717](https://github.com/openclaw/openclaw/pull/94717) | Core `openclaw snapshot` CLI                  |
-| [openclaw/openclaw#94799](https://github.com/openclaw/openclaw/pull/94799) | Named OpenClaw database targets               |
-| [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Safe-sync artifact and restore proof          |
+| [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Core snapshot command and safe-sync artifact  |
 | [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967) | Snapshot stress harness for Phase 1 greenlight |
 
-#### Phase 1 / PR 1: core snapshot provider proof
+Earlier provider, CLI, and named-target slices were collapsed into
+[openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) so
+the core feature can be reviewed as one product boundary.
 
-Add the shared SQLite snapshot provider and local artifact repository.
+#### Phase 1 / PR A: core snapshot command and safe-sync artifact
 
-Implementation: [openclaw/openclaw#94694](https://github.com/openclaw/openclaw/pull/94694).
-
-This PR should include:
+Add the shared SQLite snapshot provider, local artifact repository, public
+`openclaw snapshot` command surface, named database targets, and safe-sync
+artifact proof.
 
 - `SqliteSnapshotProvider` contract
 - local snapshot repository
@@ -454,50 +453,20 @@ This PR should include:
 - SQLite-safe snapshot creation for one database reference using shared core/package primitives where OpenClaw already owns the SQLite invariants
 - tests against a WAL-mode SQLite database
 - an internal restore in tests to prove the artifact is usable
-
-This PR does not need the full public restore CLI. It should prove that the provider can create and verify a correct SQLite snapshot artifact without publishing a premature provider API surface.
-
-#### Phase 1 / PR 2: core snapshot CLI
-
-Expose the user-facing core commands:
+- user-facing core commands:
 
 ```text
 openclaw snapshot create
 openclaw snapshot verify
 openclaw snapshot restore
 ```
-
-This PR should add target-directory safety checks, restore manifest validation, SQLite integrity checks after restore, and docs for the `openclaw snapshot` command surface.
-
-The CLI should accept an explicit database path for the proof path, but the intended product model is not "any random SQLite file forever." The command should be able to grow toward named OpenClaw database targets such as global state or a specific agent database once core exposes the eligible database registry cleanly.
-
-Implementation: [openclaw/openclaw#94717](https://github.com/openclaw/openclaw/pull/94717).
-
-#### Phase 1 / PR 3: named OpenClaw database targets
-
-Teach `openclaw snapshot` to address OpenClaw-owned databases by stable names
-instead of only accepting arbitrary paths.
-
-This PR should include:
-
 - `--target global` for `state/openclaw.sqlite`
 - `--agent <agentId>` for `agents/<agentId>/agent/openclaw-agent.sqlite`
 - manifest fields for database role, agent id, schema version, and source path
 - host-sync guidance that says live SQLite sidecars are ignored and completed
   artifacts are the sync input
-
-Implementation: [openclaw/openclaw#94799](https://github.com/openclaw/openclaw/pull/94799).
-
-#### Phase 1 / PR 4: safe-sync artifact and restore proof
-
-Prove that a completed snapshot artifact, not the live SQLite file family, is
-the host-sync boundary.
-
-This PR should demonstrate that OpenClaw can create a snapshot from a named
-database target, copy only the completed snapshot directory, restore from that
-copied artifact into a fresh local SQLite path, and verify the restored
-database. That proof is what makes the command a credible failover substrate
-rather than only an archive utility.
+- target-directory safety checks, restore manifest validation, SQLite integrity checks after restore, and docs for the `openclaw snapshot` command surface
+- proof that OpenClaw can create a snapshot from a named database target, copy only the completed snapshot directory, restore from that copied artifact into a fresh local SQLite path, and verify the restored database
 
 This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which files are safe to sync, which live SQLite sidecars should be ignored, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
 
@@ -508,7 +477,7 @@ criteria maintainers would use before starting Phase 2.
 
 Implementation: [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805).
 
-#### Phase 1 / PR 5: snapshot stress harness
+#### Phase 1 / PR B: snapshot stress harness
 
 Add an opt-in harness that measures the Phase 1 behavior before maintainers
 decide whether Phase 2 is worth building.
@@ -525,7 +494,7 @@ snapshot frequency or greenlighting WAL bundles.
 
 Implementation: [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967).
 
-#### Phase 2 / PR 6: simple WAL bundle proof
+#### Phase 2 / PR C: simple WAL bundle proof
 
 Phase 2 is not automatically required by Phase 1. It needs a maintainer
 greenlight based on Phase 1 metrics.
