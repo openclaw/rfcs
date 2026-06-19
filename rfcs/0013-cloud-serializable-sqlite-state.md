@@ -430,9 +430,20 @@ too large, too slow, or too infrequent for hosted deployments. Phase 2's planned
 shape is WAL bundles plus the minimum compaction proof needed to keep bundle
 chains bounded.
 
+The current Phase 1 implementation stack is:
+
+| PR                                                                         | Purpose                              |
+| -------------------------------------------------------------------------- | ------------------------------------ |
+| [openclaw/openclaw#94694](https://github.com/openclaw/openclaw/pull/94694) | Core snapshot provider proof         |
+| [openclaw/openclaw#94717](https://github.com/openclaw/openclaw/pull/94717) | Core `openclaw snapshot` CLI         |
+| [openclaw/openclaw#94799](https://github.com/openclaw/openclaw/pull/94799) | Named OpenClaw database targets      |
+| [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Safe-sync artifact and restore proof |
+
 #### Phase 1 / PR 1: core snapshot provider proof
 
 Add the shared SQLite snapshot provider and local artifact repository.
+
+Implementation: [openclaw/openclaw#94694](https://github.com/openclaw/openclaw/pull/94694).
 
 This PR should include:
 
@@ -459,6 +470,8 @@ This PR should add target-directory safety checks, restore manifest validation, 
 
 The CLI should accept an explicit database path for the proof path, but the intended product model is not "any random SQLite file forever." The command should be able to grow toward named OpenClaw database targets such as global state or a specific agent database once core exposes the eligible database registry cleanly.
 
+Implementation: [openclaw/openclaw#94717](https://github.com/openclaw/openclaw/pull/94717).
+
 #### Phase 1 / PR 3: named OpenClaw database targets
 
 Teach `openclaw snapshot` to address OpenClaw-owned databases by stable names
@@ -472,18 +485,27 @@ This PR should include:
 - host-sync guidance that says live SQLite sidecars are ignored and completed
   artifacts are the sync input
 
-#### Phase 1 / PR 4: fresh-state boot proof and metrics
+Implementation: [openclaw/openclaw#94799](https://github.com/openclaw/openclaw/pull/94799).
 
-Prove that a restored snapshot can hydrate a fresh OpenClaw state directory before runtime opens SQLite.
+#### Phase 1 / PR 4: safe-sync artifact and restore proof
 
-This PR should demonstrate that OpenClaw can start from restored state in a fresh directory, host, or container-style environment. That proof is what makes the command a credible failover substrate rather than only an archive utility.
+Prove that a completed snapshot artifact, not the live SQLite file family, is
+the host-sync boundary.
 
-This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
+This PR should demonstrate that OpenClaw can create a snapshot from a named
+database target, copy only the completed snapshot directory, restore from that
+copied artifact into a fresh local SQLite path, and verify the restored
+database. That proof is what makes the command a credible failover substrate
+rather than only an archive utility.
+
+This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which files are safe to sync, which live SQLite sidecars should be ignored, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
 
 This PR should record or report the Phase 1 metrics when available: snapshot
 size, snapshot duration, restore duration, WAL growth, and upload/sync bytes and
 time when the host supplies them. It should also document the greenlight
 criteria maintainers would use before starting Phase 2.
+
+Implementation: [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805).
 
 #### Phase 2 / PR 5: simple WAL bundle proof
 
