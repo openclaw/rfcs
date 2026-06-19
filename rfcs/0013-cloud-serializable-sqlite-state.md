@@ -3,7 +3,7 @@ title: SQLite State Snapshot Plugin
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-06-18
+last_updated: 2026-06-19
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -17,11 +17,11 @@ Define an opt-in `snapshot` plugin for OpenClaw-owned SQLite state. The plugin p
 
 SQLite remains the hot local runtime database. The plugin does not replace SQLite, introduce a second required database backend, or make cloud storage mandatory. It gives managed and production operators a clearer answer to a narrower problem: how OpenClaw state becomes a portable, restorable artifact when a process, container, or host needs to be replaced.
 
-The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The snapshot provider contract should apply to any OpenClaw-owned SQLite database, and the plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
+The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The snapshot provider contract should apply to the database-first layout OpenClaw has already landed: a global control-plane database plus per-agent data-plane databases, and any future dedicated owner store that follows the same ownership model. The plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
 
 ## Motivation
 
-OpenClaw is moving runtime state into SQLite-backed stores. That is a good local runtime shape, but operational reliability depends on more than having files on disk.
+OpenClaw is moving runtime state into SQLite-backed stores. The database-first SQLite alignment landed in openclaw/openclaw#94646 makes that shape more explicit: `state/openclaw.sqlite` is the global control-plane database, while `agents/<agentId>/agent/openclaw-agent.sqlite` is the per-agent data-plane database for agent-owned state such as memory indexes and auth/profile state. That is a good local runtime shape, but operational reliability depends on more than having files on disk.
 
 The pain points are concrete:
 
@@ -49,7 +49,7 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 - Avoid hot writes over network filesystems as a durability or concurrency strategy.
 - Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
 - Leave cloud artifact storage, retention, scheduling, and failover orchestration to optional providers or later RFCs.
-- Keep the design compatible with existing global state, per-agent state, and dedicated store boundaries.
+- Build on the existing database-first units: global control-plane SQLite, per-agent data-plane SQLite, and any dedicated owner store.
 - Leave room for core to adopt the same primitives later if snapshot and restore become required OpenClaw behavior.
 
 ## Non-Goals
@@ -84,7 +84,6 @@ extensions/snapshot/
   index.ts
   src/
     snapshot-provider.ts
-    sqlite-snapshot.ts
     manifest.ts
     local-repository.ts
 ```
@@ -190,7 +189,13 @@ The diagram is a responsibility split, not a default runtime requirement. Defaul
 
 An OpenClaw-owned SQLite database is snapshot-safe when it can be captured, verified, restored, and resumed on another host or directory without relying on a live shared filesystem.
 
-The unit of snapshotting is an existing OpenClaw-owned SQLite database, such as shared state, per-agent state, or a dedicated owner store. This RFC does not rename or redesign those logical units; it defines snapshot behavior that can apply to each unit.
+The unit of snapshotting is an existing OpenClaw-owned SQLite database. The primary units are:
+
+- the global control-plane database at `state/openclaw.sqlite`
+- one per-agent data-plane database at `agents/<agentId>/agent/openclaw-agent.sqlite`
+- any future dedicated owner store that has explicit ownership, schema, and lifecycle metadata
+
+This RFC does not rename or redesign those logical units; openclaw/openclaw#94646 makes them concrete enough for snapshot to target. The RFC defines snapshot behavior that can apply to each eligible database.
 
 The provider contract should therefore take a database reference rather than assume one hard-coded database path. Core can decide which SQLite databases are eligible, and the plugin or provider can apply the same snapshot semantics to each eligible database.
 
@@ -272,6 +277,8 @@ At minimum, snapshot metadata should include:
 
 - database id
 - database kind or owner
+- database role, such as global control-plane or per-agent data-plane
+- owning agent id when the snapshot is for a per-agent database
 - schema version
 - snapshot generation
 - checkpoint or WAL cursor when available
@@ -329,11 +336,11 @@ This PR should include:
 - `SqliteSnapshotProvider` contract
 - local snapshot repository
 - snapshot manifest and content hash verification
-- SQLite-safe snapshot creation for one database reference
+- SQLite-safe snapshot creation for one database reference using shared core/package primitives where OpenClaw already owns the SQLite invariants
 - tests against a WAL-mode SQLite database
 - an internal restore in tests to prove the artifact is usable
 
-This PR does not need the full public restore CLI. It should prove that the provider can create and verify a correct SQLite snapshot artifact.
+This PR does not need the full public restore CLI. It should prove that the provider can create and verify a correct SQLite snapshot artifact without publishing a premature provider API surface.
 
 #### PR 2: public snapshot CLI
 
@@ -346,6 +353,8 @@ openclaw snapshot restore
 ```
 
 This PR should add target-directory safety checks, restore manifest validation, SQLite integrity checks after restore, and docs for the `snapshot` plugin command surface.
+
+The CLI should accept an explicit database path for the proof path, but the intended product model is not "any random SQLite file forever." The command should be able to grow toward named OpenClaw database targets such as global state or a specific agent database once core exposes the eligible database registry cleanly.
 
 #### PR 3: fresh-state boot proof
 
@@ -368,6 +377,8 @@ After the three initial PRs, follow-up RFCs or implementation PRs can consider:
 
 This approach targets the reliability problem directly. It does not require OpenClaw to choose a second database backend before it has defined capture and restore semantics for the SQLite state it already owns.
 
+The database-first work in openclaw/openclaw#94646 improves this RFC because it gives snapshot a concrete target model. Snapshot does not have to invent logical database units. It can operate over the already-established global control-plane database and per-agent data-plane databases, then extend to dedicated owner stores only when those stores have comparable ownership and lifecycle metadata.
+
 Calling the extension `snapshot` keeps the first deliverable concrete. It describes the artifact OpenClaw needs before higher-level reliability features can exist. It also avoids overpromising automatic failover before leases, promotion, and orchestration are designed.
 
 Keeping the first implementation stack under `openclaw snapshot` keeps the proof small and plugin-scoped. Existing `openclaw backup create` and `openclaw backup verify` behavior can remain unchanged while the snapshot provider proves the harder SQLite correctness and restore semantics.
@@ -382,11 +393,11 @@ The provider contract gives OpenClaw a path from plugin experimentation to core 
 
 Explicit writer ownership keeps horizontal service orchestration honest. A service can move work between hosts, but it must move ownership and restore state deliberately rather than letting several instances write the same SQLite database through shared storage.
 
-The proposal also keeps logical storage boundaries out of scope. OpenClaw already has shared state, per-agent state, and owner-specific stores; this RFC defines how any of those databases can become restorable snapshot artifacts.
+The proposal also keeps storage ownership decisions out of scope. OpenClaw already has global control-plane state, per-agent data-plane state, and owner-specific stores; this RFC defines how those databases become restorable snapshot artifacts.
 
 ## Unresolved questions
 
-- Which existing SQLite database should be used for the first snapshot/restore proof?
+- Which database-first unit should be used for the first named snapshot/restore proof: global control-plane state, one per-agent data-plane database, or both?
 - Should the first checkpoint implementation use SQLite online backup, `VACUUM INTO`, WAL checkpointing, page capture, or a higher-level export format?
 - Should the reference provider be a local snapshot repository only, or should it include one object/blob storage provider?
 - What is the acceptable data-loss window for managed deployments before deltas are implemented?
