@@ -31,8 +31,8 @@ wrong long-term abstraction:
 
 - It makes locality stand in for agent-harness capability.
 - It is binary where current behavior already needs model-family rules.
-- GPT-5 personality prompt overlays and Claude/Opus thinking defaults live in
-  separate model-specific paths rather than one inspectable policy system.
+- GPT-5 response-style prompt overlays and Claude/Opus thinking defaults live
+  in separate model-specific paths rather than one inspectable policy system.
 - It cannot cleanly distinguish portable harness policy from local server
   configuration.
 - It encourages a future where a change intended to help local models can
@@ -55,7 +55,7 @@ hosted providers a consistent way to opt into portable model-family policy.
 
 - Replace `experimental.localModelLean` with versioned, testable model profiles.
 - Preserve current Lean behavior exactly during migration.
-- Centralize existing GPT-5 personality and Claude/Opus thinking-default
+- Centralize existing GPT-5 response-style and Claude/Opus thinking-default
   behavior under the profile resolution system.
 - Keep four capacity classes available as model metadata and diagnostics.
 - Ship a conservative phase-one fallback: lean behavior for trusted models up
@@ -100,8 +100,8 @@ model-reference authentication suffix called `profile`.
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Model identity | canonical model id, family, artifact/revision/digest, parameter count, capacity class | prompt policy, server flags |
-| Model Profile | portable harness policy: tools, Tool Search, named prompt recipe, reasoning default | HTTP payloads, auth, KV cache, server flags |
+| Model identity | canonical model id, family, artifact digest/kind, parameter count, model size class | prompt policy, server flags |
+| Model Profile | portable harness policy: tools, Tool Search, named prompt preset, reasoning mode | HTTP payloads, auth, KV cache, server flags |
 | Model Driver | provider protocol, auth, capabilities, payload transforms, streaming, native API settings | product harness policy |
 | Serving Preset | local managed-engine/artifact settings | hosted provider behavior, portable agent policy |
 
@@ -117,18 +117,15 @@ type ModelCapacityClass = "tiny" | "small" | "medium" | "large";
 
 type ResolvedModelIdentity = {
   providerId: string;
-  requestedModelId: string;
+  providerModelId: string;
   canonicalModelId: string | null;
-  modelFamily: string | null;
+  canonicalModelFamilyId: string | null;
   artifact: {
-    source: "registry" | "ollama" | "configured" | "unknown";
     digest: string | null;
-    revision: string | null;
-    format: "safetensors" | "gguf" | "ollama" | "api" | "unknown";
+    artifactKind: "safetensors" | "gguf" | "ollama" | "api" | "unknown";
   };
-  parameterCountB: number | null;
-  capacityClass: ModelCapacityClass | null;
-  metadataTrust: "verified" | "declared" | "unknown";
+  parameterCount: number | null;
+  modelSizeClass: ModelCapacityClass | null;
 };
 ```
 
@@ -189,9 +186,9 @@ type ModelProfileBinding = {
   selector: {
     providerId?: string;
     canonicalModelId?: string;
-    modelFamily?: string;
+    canonicalModelFamilyId?: string;
     artifactDigest?: string;
-    capacityClass?: ModelCapacityClass;
+    modelSizeClass?: ModelCapacityClass;
   };
   profile: string;
 };
@@ -215,11 +212,16 @@ metadata:
 spec:
   policy:
     toolExposure: standard-v1
-    toolSearchDefault: inherit
-    promptRecipe: standard-v1
-    reasoningDefault: inherit
+    toolSearchPolicy: inherit
+    promptPreset: standard-v1
+    reasoningMode: inherit
     contextPosture: standard
 ```
+
+The resource `spec` may also include `settings` with the same closed settings
+schema used by the materialized profile. For example, a GPT-5 profile artifact
+can declare the supported response-style setting without adding a generic
+config bag.
 
 Derived profiles may be authored as Kustomize-style overlays:
 
@@ -239,7 +241,7 @@ patches:
         path: /metadata/name
         value: claude-opus-4-7-agent-v1
       - op: replace
-        path: /spec/policy/reasoningDefault
+        path: /spec/policy/reasoningMode
         value: off
 ```
 
@@ -298,9 +300,9 @@ type ModelHarnessProfileSelectionSource =
 
 type ResolvedModelHarnessProfile = {
   profile: ModelHarnessProfile;
-  source: ModelHarnessProfileSelectionSource;
-  bindingId: string | null;
-  identity: ResolvedModelIdentity;
+  selectionSource: ModelHarnessProfileSelectionSource;
+  profileBindingId: string | null;
+  modelIdentity: ResolvedModelIdentity;
 };
 ```
 
@@ -323,7 +325,7 @@ capacity-derived behavioral baselines:
 | --- | --- | --- | --- |
 | `openclaw/full-agent-v1` | none | fallback; Medium/Large | general harness baseline |
 | `openclaw/lean-agent-v1` | `full-agent-v1` | trusted Tiny/Small; legacy config | exact Lean migration |
-| `openclaw/gpt-5-agent-v1` | `full-agent-v1` | current GPT-5 family behavior | prompt recipe and personality setting |
+| `openclaw/gpt-5-agent-v1` | `full-agent-v1` | current GPT-5 family behavior | prompt preset and response-style setting |
 | `openclaw/anthropic-agent-v1` | `full-agent-v1` | shared Anthropic/Claude behavior | base profile for Claude-family overrides |
 | `openclaw/claude-opus-4-7-agent-v1` | `anthropic-agent-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
 | `openclaw/claude-4-6-agent-v1` | `anthropic-agent-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
@@ -340,9 +342,9 @@ second model catalog.
   "id": "openclaw/full-agent-v1",
   "policy": {
     "toolExposure": "standard-v1",
-    "toolSearchDefault": "inherit",
-    "promptRecipe": "standard-v1",
-    "reasoningDefault": "inherit",
+    "toolSearchPolicy": "inherit",
+    "promptPreset": "standard-v1",
+    "reasoningModeDefault": "inherit",
     "contextPosture": "standard"
   }
 }
@@ -358,7 +360,7 @@ second model catalog.
   "extends": "openclaw/full-agent-v1",
   "policy": {
     "toolExposure": "lean-v1",
-    "toolSearchDefault": "lean-v1",
+    "toolSearchPolicy": "lean-v1",
     "contextPosture": "constrained"
   }
 }
@@ -380,16 +382,16 @@ direct, is useful as an implementation detail:
 
 ```ts
 type ToolExposurePolicy = {
-  mode: "standard-v1" | "lean-v1";
-  alwaysDirectToolIds: readonly string[];
+  preset: "standard-v1" | "lean-v1";
+  directToolIds: readonly string[];
 };
 ```
 
 It does not change phase-one Lean semantics without an explicit product
 decision.
 
-The GPT-5 profile owns the migrated personality setting and a code-owned named
-prompt recipe:
+The GPT-5 profile owns the migrated response-style setting and a code-owned
+named prompt preset:
 
 ```json
 {
@@ -397,12 +399,11 @@ prompt recipe:
   "id": "openclaw/gpt-5-agent-v1",
   "extends": "openclaw/full-agent-v1",
   "policy": {
-    "promptRecipe": "gpt-5-v1"
+    "promptPreset": "gpt-5-v1"
   },
   "settings": {
-    "personality": {
-      "type": "enum",
-      "values": ["friendly", "off"],
+    "responseStyle": {
+      "allowedValues": ["friendly", "off"],
       "default": "friendly"
     }
   }
@@ -417,7 +418,7 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
   "id": "openclaw/claude-opus-4-7-agent-v1",
   "extends": "openclaw/anthropic-agent-v1",
   "policy": {
-    "reasoningDefault": "off"
+    "reasoningModeDefault": "off"
   }
 }
 ```
@@ -428,7 +429,7 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
   "id": "openclaw/claude-4-6-agent-v1",
   "extends": "openclaw/anthropic-agent-v1",
   "policy": {
-    "reasoningDefault": "adaptive"
+    "reasoningMode": "adaptive"
   }
 }
 ```
@@ -444,9 +445,9 @@ The phase-one policy surface is closed:
 ```ts
 type ModelProfilePolicy = {
   toolExposure?: "standard-v1" | "lean-v1";
-  toolSearchDefault?: "inherit" | "lean-v1";
-  promptRecipe?: "standard-v1" | "gpt-5-v1";
-  reasoningDefault?: "inherit" | "off" | "adaptive";
+  toolSearchPolicy?: "inherit" | "lean-v1";
+  promptPreset?: "standard-v1" | "gpt-5-v1";
+  reasoningMode?: "inherit" | "off" | "adaptive";
   contextPosture?: "standard" | "constrained";
 };
 ```
@@ -454,9 +455,9 @@ type ModelProfilePolicy = {
 | Field | Owner | Consumer | Phase-one meaning |
 | --- | --- | --- | --- |
 | `toolExposure` | agent harness | tool preparation | standard or Lean filter |
-| `toolSearchDefault` | agent harness | embedded run planning | preserves undefined-only default semantics |
-| `promptRecipe` | core prompt composition | system-prompt builder | selects code-owned contribution |
-| `reasoningDefault` | resolver plus capability gate | current thinking-default callers | replaces model-id branching |
+| `toolSearchPolicy` | agent harness | embedded run planning | preserves undefined-only default semantics |
+| `promptPreset` | core prompt composition | system-prompt builder | selects code-owned contribution |
+| `reasoningMode` | resolver plus capability gate | current thinking-default callers | replaces model-id branching |
 | `contextPosture` | diagnostics/future policy | no hidden automatic rewrite | records compact/full intent |
 
 `contextPosture` is not a context-window override. It remains diagnostic until
@@ -468,13 +469,12 @@ server launch arguments, cache controls, or generic `extra` maps.
 
 ### System prompt composition
 
-Profiles select named prompt recipes. They do not contain arbitrary prompt text.
+Profiles select named prompt presets. They do not contain arbitrary prompt text.
 
 ```ts
-type PromptRecipeId = "standard-v1" | "gpt-5-v1";
+type PromptPresetId = "standard-v1" | "gpt-5-v1";
 
-type PromptRecipeContribution = {
-  id: string;
+type PromptPresetContribution = {
   text: string;
 };
 ```
@@ -514,11 +514,9 @@ capabilities:
 
 ```ts
 type ModelDriverCapabilities = {
-  supportsTools: boolean;
-  supportsToolSearch: boolean;
-  reasoningModes: readonly ("off" | "adaptive")[];
-  supportsNativePromptCaching: boolean;
-  managedServing: boolean;
+  supportsToolUse: boolean;
+  supportedReasoningModes: readonly ("off" | "adaptive")[];
+  supportsPromptCaching: boolean;
 };
 ```
 
@@ -555,14 +553,13 @@ A later **Serving Preset** layer owns managed local performance:
 type ServingPreset = {
   schemaVersion: 1;
   id: string;
-  engine: "vllm" | "sglang" | "llama-cpp" | "ollama";
-  engineVersionRange: string;
-  artifact: ArtifactSelector;
-  settings: {
-    contextWindow?: number;
-    kvCacheDtype?: string;
-    gpuMemoryUtilization?: number;
-    parallelism?: number;
+  servingRuntime: "vllm" | "sglang" | "llama-cpp" | "ollama";
+  servingRuntimeVersionRange: string;
+  artifactSelector: ArtifactSelector;
+  runtime: {
+    maxContextTokens?: number;
+    kvCacheDataType?: string;
+    maxGpuMemoryFraction?: number;
   };
 };
 ```
@@ -571,7 +568,7 @@ A Serving Preset may apply only when all of the following are true:
 
 1. OpenClaw manages the local service.
 2. The engine and version are recognized.
-3. The model artifact/revision/format is trusted.
+3. The model artifact digest and kind are trusted.
 4. A compatible preset exists.
 5. The selected preset and reason are visible to the operator.
 
@@ -586,14 +583,14 @@ Phase one adds one narrow selector at defaults and agent scope:
 
 ```json
 {
-  "agents": {
+  "agentProfiles": {
     "defaults": {
-      "modelProfile": "auto"
+      "modelProfileId": "auto"
     },
-    "list": [
+    "items": [
       {
         "id": "local-helper",
-        "modelProfile": "openclaw/lean-agent-v1"
+        "modelProfileId": "openclaw/lean-agent-v1"
       }
     ]
   }
@@ -608,11 +605,11 @@ Settings are namespaced to the selected profile's closed settings schema:
 
 ```json
 {
-  "agents": {
+  "agentProfiles": {
     "defaults": {
-      "modelProfile": "openclaw/gpt-5-agent-v1",
-      "modelProfileSettings": {
-        "personality": "off"
+      "modelProfileId": "openclaw/gpt-5-agent-v1",
+      "settings": {
+        "responseStyle": "off"
       }
     }
   }
@@ -644,11 +641,11 @@ shapes.
 
 | Legacy input | Canonical output | Notes |
 | --- | --- | --- |
-| default `experimental.localModelLean: true` | default `modelProfile: "openclaw/lean-agent-v1"` | preserves explicit Lean intent |
-| agent `experimental.localModelLean: true` | agent `modelProfile: "openclaw/lean-agent-v1"` | preserves stronger scope |
+| default `experimental.localModelLean: true` | default `modelProfileId: "openclaw/lean-agent-v1"` | preserves explicit Lean intent |
+| agent `experimental.localModelLean: true` | agent `modelProfileId: "openclaw/lean-agent-v1"` | preserves stronger scope |
 | legacy Lean `false` | remove legacy field | no explicit full profile needed |
-| GPT-5 overlay personality | GPT profile setting | preserves `friendly`/`off` |
-| OpenAI plugin personality fallback | GPT setting when no more-specific canonical value exists | preserves current precedence |
+| GPT-5 overlay personality | GPT response-style setting | preserves `friendly`/`off` |
+| OpenAI plugin personality fallback | GPT response-style setting when no more-specific canonical value exists | preserves current precedence |
 
 Doctor must validate rewritten config, be idempotent, avoid duplicating
 settings across scopes, remove legacy fields after success, and report
@@ -661,7 +658,7 @@ The following current code moves to the profile system:
 | `src/agents/local-model-lean.ts` | boolean resolution and compact tool policy | profile policy implementation; delete boolean resolver |
 | `src/agents/agent-tools.ts` | normal-tool filtering | consume resolved `toolExposure` |
 | `src/agents/embedded-agent-runner/run/attempt.ts` | Tool Search default and pre/post-search filtering | consume resolved profile at both boundaries |
-| `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | code-owned `gpt-5-v1` recipe plus profile setting |
+| `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | code-owned `gpt-5-v1` preset plus response-style setting |
 | `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve profile contribution before generic provider contribution |
 | `extensions/openai/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
 | `extensions/codex/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
@@ -720,8 +717,8 @@ serving boundary before any ClawHub or community registry is trusted.
 7. Thread the resolved profile through run planning, tools, and prompt
    composition.
 8. Move Lean logic and doctor-migrate legacy Lean config.
-9. Add `gpt-5-agent-v1`, migrate personality config, and replace direct prompt
-   overlay resolution.
+9. Add `gpt-5-agent-v1`, migrate response-style config, and replace direct
+   prompt overlay resolution.
 10. Add `anthropic-agent-v1` plus exact Claude/Opus derived profiles, and move
     only existing thinking-default selection branches.
 11. Add profile inspection and documentation.
@@ -935,8 +932,8 @@ capability gates after materialization.
 
 ## Unresolved Questions
 
-1. Should the public config field be `modelProfile` or `harnessProfile`?
-   This RFC recommends `modelProfile` publicly and `ModelHarnessProfile` in
+1. Should the public config field be `modelProfileId` or `harnessProfileId`?
+   This RFC recommends `modelProfileId` publicly and `ModelHarnessProfile` in
    implementation types.
 2. Should an explicit profile be selectable per run in phase one? The
    recommendation is defaults and agent scope only until a concrete run-level
