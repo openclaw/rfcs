@@ -19,7 +19,7 @@ SQLite remains the hot local runtime database. The plugin does not replace SQLit
 
 The central contract is a state-artifact boundary: OpenClaw turns live local SQLite state into verified artifacts, while a host such as Lobster/Aether decides where those artifacts live and when they are uploaded, retained, downloaded, or replayed.
 
-The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The snapshot provider contract should apply to the database-first layout OpenClaw has already landed: a global control-plane database plus per-agent data-plane databases, and any future dedicated owner store that follows the same ownership model. The plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
+The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The core OpenClaw responsibility is narrower and more fundamental: provide the SQLite-aware primitive that materializes a host-syncable database artifact and document that live SQLite sidecars must be ignored by host sync. The extension proves and packages the opt-in workflow around that primitive.
 
 ## Motivation
 
@@ -60,6 +60,8 @@ For hosts that sync on filesystem changes, the sync trigger should be the comple
 - Make restore and verification first-class behaviors, not incidental backup side effects.
 - Define a reusable SQLite snapshot provider contract for OpenClaw-owned SQLite databases.
 - Define the state-artifact boundary that lets hosted platforms persist OpenClaw state without understanding OpenClaw's internal SQLite file layout.
+- Make host-syncable SQLite artifact creation a core OpenClaw capability, even if the first user-facing commands live in the opt-in `snapshot` plugin.
+- Document host sync guidance: ignore live SQLite sidecars and sync completed snapshot artifacts/manifests instead.
 - Allow the plugin to add commands under `openclaw snapshot`.
 - Leave `openclaw backup` integration as a possible later follow-up, not part of the initial proof stack.
 - Keep default local OpenClaw behavior unchanged when the plugin is not installed or enabled.
@@ -76,6 +78,7 @@ For hosts that sync on filesystem changes, the sync trigger should be the comple
 - This RFC does not define a general database abstraction layer.
 - This RFC does not require OpenClaw to own the hosting platform's upload, retention, tenant routing, encryption, or object-storage policy.
 - This RFC does not make snapshots, cloud storage, or managed failover mandatory for local, self-hosted, or development OpenClaw installs.
+- This RFC does not require the `snapshot` plugin to be the only long-term consumer of the core SQLite artifact primitive.
 - This RFC does not require object-store credentials, a lease service, or a managed-service control plane in the default runtime.
 - This RFC does not replace the session/transcript migration plan tracked by openclaw/openclaw#88838.
 - This RFC does not define tenant isolation, row-level authorization, or a multi-tenant schema model.
@@ -129,19 +132,20 @@ That integration is intentionally not part of the initial implementation roadmap
 
 ### Responsibility split
 
-Core should expose or own the SQLite-safe primitives that require knowledge of OpenClaw state paths, WAL behavior, schema versions, and integrity checks.
+Core should own the SQLite-safe primitives and sync guidance that require knowledge of OpenClaw state paths, WAL behavior, schema versions, and integrity checks. This is core functionality because the host cannot safely infer those rules from the filesystem alone.
 
 Core should own:
 
 - eligible database discovery or registry for OpenClaw-owned SQLite databases
 - consistent SQLite checkpoint creation
 - materialization of a host-syncable database artifact from a live local SQLite database
+- guidance or generated ignore rules for host sync: ignore `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal`; do not use the live SQLite runtime directory as the sync-owned artifact directory
 - restore or hydrate before opening runtime state
 - restored database verification
 - lifecycle metadata shape
 - safety rules such as no hot writes over network filesystems
 
-The `snapshot` plugin should own:
+The `snapshot` plugin should own the opt-in workflow around the core primitive:
 
 - snapshot command UX
 - local snapshot artifact creation
