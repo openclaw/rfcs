@@ -98,7 +98,6 @@ The first named target shape can be:
 ```text
 openclaw snapshot create --target global
 openclaw snapshot create --agent main
-openclaw snapshot create --target memory-search --agent main
 openclaw snapshot verify <snapshot>
 openclaw snapshot restore <snapshot> --target <state-dir>
 ```
@@ -238,19 +237,22 @@ The unit of snapshotting is an existing OpenClaw-owned SQLite database. The prim
 
 - the global control-plane database at `state/openclaw.sqlite`
 - one per-agent data-plane database at `agents/<agentId>/agent/openclaw-agent.sqlite`
-- memory-search tables owned by the per-agent database-first store
 - any future dedicated owner store that has explicit ownership, schema, and lifecycle metadata
 
 This RFC does not rename or redesign those logical units; openclaw/openclaw#94646 makes them concrete enough for snapshot to target. The RFC defines snapshot behavior that can apply to each eligible database.
 
-The memory-search target matters for hosted deployments such as Lobster because
-the host should not need to hard-code private SQLite paths or copy the live
-SQLite file family. OpenClaw should resolve the database-first owner path and
-materialize a safe snapshot artifact through the same core command:
+Memory-search matters for hosted deployments such as Lobster because hosts
+should not need to hard-code private SQLite paths or copy the live SQLite file
+family. Today, memory-search state is owned by the per-agent database-first
+store, so Phase 1 can protect it through the per-agent database target:
 
 ```text
-openclaw snapshot create --target memory-search --agent main
+openclaw snapshot create --agent main
 ```
+
+A future memory-search-only target would need a separate design because it
+would either need a dedicated owner database or a true logical export. It should
+not be presented as memory-only while snapshotting the full per-agent database.
 
 The provider contract should therefore take a database reference rather than assume one hard-coded database path. Core can decide which SQLite databases are eligible and apply the same snapshot semantics to each eligible database.
 
@@ -473,8 +475,6 @@ openclaw snapshot restore
 ```
 - `--target global` for `state/openclaw.sqlite`
 - `--agent <agentId>` for `agents/<agentId>/agent/openclaw-agent.sqlite`
-- `--target memory-search --agent <agentId>` for memory-search state in the
-  per-agent database-first store
 - manifest fields for database role, agent id, schema version, and source path
 - host-sync guidance that says live SQLite sidecars are ignored and completed
   artifacts are the sync input
@@ -498,8 +498,8 @@ decide whether Phase 2 is worth building.
 This PR should prove that snapshot artifacts still restore cleanly while a
 writer is committing transaction batches against the source database. It should
 cover `--target global` and `--agent <id>` at minimum, and should be able to add
-dedicated targets such as `--target memory-search --agent <id>` as the core
-target registry grows. It should report snapshot/restore p50/p95 timings,
+future dedicated targets only after their owner database or logical export
+contract is explicit. It should report snapshot/restore p50/p95 timings,
 snapshot bytes, WAL bytes after the run, writer rows, and restore verification
 counts.
 
@@ -551,7 +551,7 @@ After the initial PRs, follow-up RFCs or implementation PRs can consider:
 
 This approach targets the reliability problem directly. It does not require OpenClaw to choose a second database backend before it has defined capture and restore semantics for the SQLite state it already owns.
 
-The database-first work in openclaw/openclaw#94646 improves this RFC because it gives snapshot a concrete target model. Snapshot does not have to invent logical database units. It can operate over the already-established global control-plane database and per-agent data-plane databases, then extend to dedicated owner stores such as memory-search when those stores have comparable ownership and lifecycle metadata.
+The database-first work in openclaw/openclaw#94646 improves this RFC because it gives snapshot a concrete target model. Snapshot does not have to invent logical database units. It can operate over the already-established global control-plane database and per-agent data-plane databases, then extend to dedicated owner stores only when those stores have comparable ownership and lifecycle metadata.
 
 Calling the command `snapshot` keeps the first deliverable concrete. It describes the artifact OpenClaw needs before higher-level reliability features can exist. It also avoids overpromising automatic failover before leases, promotion, and orchestration are designed.
 
