@@ -17,6 +17,8 @@ Define an opt-in `snapshot` plugin for OpenClaw-owned SQLite state. The plugin p
 
 SQLite remains the hot local runtime database. The plugin does not replace SQLite, introduce a second required database backend, or make cloud storage mandatory. It gives managed and production operators a clearer answer to a narrower problem: how OpenClaw state becomes a portable, restorable artifact when a process, container, or host needs to be replaced.
 
+The central contract is a state-artifact boundary: OpenClaw turns live local SQLite state into verified artifacts, while a host such as Lobster/Aether decides where those artifacts live and when they are uploaded, retained, downloaded, or replayed.
+
 The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The snapshot provider contract should apply to the database-first layout OpenClaw has already landed: a global control-plane database plus per-agent data-plane databases, and any future dedicated owner store that follows the same ownership model. The plugin can be the first consumer of primitives that core may later use directly if snapshot and restore become baseline behavior.
 
 ## Motivation
@@ -31,10 +33,13 @@ The pain points are concrete:
 - backup archives are only useful if restore is verified and repeatable
 - container or host replacement needs state hydration before OpenClaw opens the database
 - failover cannot be credible until OpenClaw has a known-good restore point
+- hosted OpenClaw platforms need a stable way to persist OpenClaw-owned state without reverse-engineering which files are authoritative, which SQLite sidecars are live-only, and which database units are safe to rehydrate
 
 The operational question is therefore not primarily "which database should OpenClaw use?" Greater minds can make the long-term database choice separately. This RFC focuses on the SQLite state OpenClaw already owns and asks for a practical extension point around it.
 
 The proposed answer is a `snapshot` plugin: an opt-in extension that turns local SQLite state into verified snapshot artifacts. Those artifacts can later support cloud uploads, retention policies, warm standby, and failover, but the first value is simpler: make state capture and restore correct.
+
+This also gives hosted OpenClaw deployments a cleaner integration point. The host should not need to copy `*.sqlite`, `*.sqlite-wal`, and `*.sqlite-shm` files directly or infer durability rules from ignore files. OpenClaw should provide the SQLite-aware translation into clean artifacts; the host should provide destination storage, schedule, retention, encryption policy, and container lifecycle integration.
 
 ## Goals
 
@@ -43,12 +48,14 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 - Produce consistent SQLite snapshots that handle WAL state correctly.
 - Make restore and verification first-class behaviors, not incidental backup side effects.
 - Define a reusable SQLite snapshot provider contract for OpenClaw-owned SQLite databases.
+- Define the state-artifact boundary that lets hosted platforms persist OpenClaw state without understanding OpenClaw's internal SQLite file layout.
 - Allow the plugin to add commands under `openclaw snapshot`.
 - Leave `openclaw backup` integration as a possible later follow-up, not part of the initial proof stack.
 - Keep default local OpenClaw behavior unchanged when the plugin is not installed or enabled.
 - Avoid hot writes over network filesystems as a durability or concurrency strategy.
 - Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
 - Leave cloud artifact storage, retention, scheduling, and failover orchestration to optional providers or later RFCs.
+- Let hosts such as Lobster/Aether own durable destination policy while OpenClaw owns the correctness of the local SQLite artifact operation.
 - Build on the existing database-first units: global control-plane SQLite, per-agent data-plane SQLite, and any dedicated owner store.
 - Leave room for core to adopt the same primitives later if snapshot and restore become required OpenClaw behavior.
 
@@ -56,6 +63,7 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 
 - This RFC does not choose PostgreSQL, libSQL, remote SQLite, object storage, or any other backend product.
 - This RFC does not define a general database abstraction layer.
+- This RFC does not require OpenClaw to own the hosting platform's upload, retention, tenant routing, encryption, or object-storage policy.
 - This RFC does not make snapshots, cloud storage, or managed failover mandatory for local, self-hosted, or development OpenClaw installs.
 - This RFC does not require object-store credentials, a lease service, or a managed-service control plane in the default runtime.
 - This RFC does not replace the session/transcript migration plan tracked by openclaw/openclaw#88838.
@@ -114,6 +122,7 @@ Core should expose or own the SQLite-safe primitives that require knowledge of O
 
 Core should own:
 
+- eligible database discovery or registry for OpenClaw-owned SQLite databases
 - consistent SQLite checkpoint creation
 - restore or hydrate before opening runtime state
 - restored database verification
@@ -134,10 +143,25 @@ Optional future integrations and providers can own:
 - local snapshot repositories
 - S3-compatible artifact storage
 - Azure Blob or other cloud artifact storage
+- ODSP, blob, git, durable-volume, or other host-specific persistence adapters
 - retention policy and upload scheduling
 - writer lease coordination
 - warm standby or managed failover orchestration
 - integration with external tools such as Litestream or LiteFS, if later accepted
+
+In other words, OpenClaw should own this translation:
+
+```text
+live OpenClaw SQLite database -> verified snapshot artifact + manifest
+```
+
+The hosting platform should own this policy:
+
+```text
+verified snapshot artifact + manifest -> durable destination and restore timing
+```
+
+That split keeps SQLite correctness in the codebase that owns the schema and file layout, while keeping cloud credentials, tenant routing, retention, and platform lifecycle outside the default OpenClaw runtime.
 
 ### Architecture
 
@@ -164,6 +188,7 @@ flowchart LR
 
   subgraph Providers[Optional providers]
     Object[(object/blob storage)]
+    Host[(host persistence layer)]
     Retention[retention schedule]
     Failover[standby / failover]
   end
@@ -176,7 +201,9 @@ flowchart LR
   Manifest --> LocalRepo
   LocalRepo --> Restore
   LocalRepo --> Object
+  LocalRepo --> Host
   Object --> Restore
+  Host --> Restore
   Restore --> Verify
   Verify --> DB
   Retention -. optional .-> LocalRepo
@@ -184,6 +211,8 @@ flowchart LR
 ```
 
 The diagram is a responsibility split, not a default runtime requirement. Default OpenClaw can run with only the runtime box. Operators opt into the plugin when they need verified snapshot and restore workflows.
+
+For hosted OpenClaw, the same split becomes the host integration contract. The host can ask OpenClaw to materialize a clean artifact before upload and can hydrate local disk from a verified artifact before OpenClaw opens SQLite. The host does not need to treat live SQLite sidecars as durable sync inputs.
 
 ### Snapshot semantics
 
@@ -224,6 +253,8 @@ The artifact model should support:
 - restore from the latest valid snapshot plus any required ordered deltas
 
 The delta mechanism can be WAL-frame based, page based, logical-change based, external-tool based, or backend-native. This RFC requires the contract, not one specific encoding.
+
+Artifacts should be suitable for host persistence. A hosting platform should be able to upload, retain, copy, and later download the artifact set without preserving process-local SQLite sidecars or relying on a mounted shared filesystem.
 
 ### Restore verification
 
@@ -362,6 +393,8 @@ Prove that a restored snapshot can hydrate a fresh OpenClaw state directory befo
 
 This PR should demonstrate that OpenClaw can start from restored state in a fresh directory, host, or container-style environment. That proof is what makes the plugin a credible failover substrate rather than only an archive utility.
 
+This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
+
 #### Later work
 
 After the three initial PRs, follow-up RFCs or implementation PRs can consider:
@@ -389,6 +422,8 @@ Making the feature opt-in keeps the default OpenClaw runtime simple. Local and d
 
 Keeping core responsible for SQLite-safe primitives is important because safe snapshots and restores need access to database paths, WAL behavior, schema versions, and integrity checks. Provider-owned artifact storage keeps cloud credentials, retention policy, and managed failover out of the default core runtime.
 
+Hosted deployments make that core responsibility more important, not less. A host can persist a directory, but OpenClaw should define which database artifacts are safe to persist. Without that boundary, every host integration has to rediscover SQLite sidecar rules and OpenClaw database ownership independently.
+
 The provider contract gives OpenClaw a path from plugin experimentation to core adoption. The first implementation can live as an opt-in plugin while the contract stays general enough for future core backup, restore, startup hydration, or migration workflows.
 
 Explicit writer ownership keeps horizontal service orchestration honest. A service can move work between hosts, but it must move ownership and restore state deliberately rather than letting several instances write the same SQLite database through shared storage.
@@ -403,5 +438,6 @@ The proposal also keeps storage ownership decisions out of scope. OpenClaw alrea
 - What is the acceptable data-loss window for managed deployments before deltas are implemented?
 - Where should writer ownership metadata live before a database is opened?
 - Should restore verification run during startup, doctor, a managed-control-plane action, or all three?
+- What is the minimum host-facing API or command shape needed for Lobster/Aether-style platforms to request artifact materialization and pre-start hydration without importing plugin-specific policy?
 - Which artifacts should be included with database restore for support/debug exports versus canonical runtime recovery?
 - Should external tools such as Litestream or LiteFS be provider integrations, deployment recommendations, or out of scope for OpenClaw-owned code?
