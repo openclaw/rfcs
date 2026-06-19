@@ -13,33 +13,19 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/20
 
 ## Summary
 
-Define an opt-in `snapshot` plugin for OpenClaw-owned SQLite state. The plugin produces SQLite-safe state snapshots that can be verified, restored, and used as the foundation for future failover.
+Define an opt-in `snapshot` plugin that gives file-syncing hosts a safe file to sync for OpenClaw-owned SQLite state.
 
-SQLite remains the hot local runtime database. The plugin does not replace SQLite, introduce a second required database backend, or make cloud storage mandatory. It gives managed and production operators a clearer answer to a narrower problem: how OpenClaw state becomes a portable, restorable artifact when a process, container, or host needs to be replaced.
+Hosted OpenClaw environments such as Scout/Lobster persist OpenClaw state by syncing files when they are saved. Live SQLite files are the wrong sync boundary: `state/openclaw.sqlite` or `agents/<agentId>/agent/openclaw-agent.sqlite` can be incomplete without their WAL, and `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` are process-local sidecars rather than durable artifacts.
 
-The central contract is a state-artifact boundary: OpenClaw turns live local SQLite state into verified artifacts, while a host such as Lobster/Aether decides where those artifacts live and when they are uploaded, retained, downloaded, or replayed.
+The `snapshot` extension provides the missing translation step. It asks SQLite to materialize a clean database artifact, verifies it, writes a manifest, and publishes the completed artifact set into a sync-owned location. That completed artifact write, not arbitrary live database churn, is what the host should sync.
 
-The plugin exposes its own `openclaw snapshot` command surface. It can leave room for later integration with `openclaw backup`, but the first implementation stack should stay plugin-scoped. The core OpenClaw responsibility is narrower and more fundamental: provide the SQLite-aware primitive that materializes a host-syncable database artifact and document that live SQLite sidecars must be ignored by host sync. The extension proves and packages the opt-in workflow around that primitive.
+SQLite remains the hot local runtime database. This RFC does not choose a replacement database, make cloud storage mandatory, or require managed failover. It defines a state-artifact boundary: OpenClaw owns the SQLite-aware artifact operation, while the host owns upload, retention, routing, encryption, and restore timing. Whether that boundary eventually belongs in core or remains extension-owned is an explicit design question; this RFC proves it first as a `snapshot` extension.
 
 ## Motivation
 
-OpenClaw is moving runtime state into SQLite-backed stores. The database-first SQLite alignment landed in openclaw/openclaw#94646 makes that shape more explicit: `state/openclaw.sqlite` is the global control-plane database, while `agents/<agentId>/agent/openclaw-agent.sqlite` is the per-agent data-plane database for agent-owned state such as memory indexes and auth/profile state. That is a good local runtime shape, but operational reliability depends on more than having files on disk.
+OpenClaw is moving runtime state into SQLite-backed stores. The database-first SQLite alignment landed in openclaw/openclaw#94646 makes that shape more explicit: `state/openclaw.sqlite` is the global control-plane database, while `agents/<agentId>/agent/openclaw-agent.sqlite` is the per-agent data-plane database. That is a good local runtime shape, but hosted reliability depends on more than having files on disk.
 
-The pain points are concrete:
-
-- copying a live SQLite database file can miss WAL state or capture a half-consistent database
-- whole-file copying gets expensive as state grows
-- network filesystems are not a safe concurrency strategy for hot SQLite writes
-- backup archives are only useful if restore is verified and repeatable
-- container or host replacement needs state hydration before OpenClaw opens the database
-- failover cannot be credible until OpenClaw has a known-good restore point
-- hosted OpenClaw platforms need a stable way to persist OpenClaw-owned state without reverse-engineering which files are authoritative, which SQLite sidecars are live-only, and which database units are safe to rehydrate
-
-The operational question is therefore not primarily "which database should OpenClaw use?" Greater minds can make the long-term database choice separately. This RFC focuses on the SQLite state OpenClaw already owns and asks for a practical extension point around it.
-
-The proposed answer is a `snapshot` plugin: an opt-in extension that turns local SQLite state into verified snapshot artifacts. Those artifacts can later support cloud uploads, retention policies, warm standby, and failover, but the first value is simpler: make state capture and restore correct.
-
-This also gives hosted OpenClaw deployments a cleaner integration point. The host should not need to copy `*.sqlite`, `*.sqlite-wal`, and `*.sqlite-shm` files directly or infer durability rules from ignore files. OpenClaw should provide the SQLite-aware translation into clean artifacts; the host should provide destination storage, schedule, retention, encryption policy, and container lifecycle integration.
+The host-sync problem is concrete. A host can watch files and sync them as they are saved, but it should not sync OpenClaw's live SQLite working set as the durability boundary.
 
 The unsafe sync inputs are specific:
 
@@ -52,23 +38,27 @@ The syncable file is created deliberately. OpenClaw should open the source datab
 
 For hosts that sync on filesystem changes, the sync trigger should be the completed artifact write, not arbitrary writes inside the live OpenClaw state directory. The artifact directory should contain completed database artifacts and manifests only. Live `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` files should not be created there, because a sync agent can observe and upload them as soon as they appear.
 
+Deltas do not remove this requirement. Ryan's underlying concern is that whole-file copies do not scale, but unmanaged file deltas over live SQLite make the correctness problem worse: a file-sync tool can observe DB pages, WAL frames, and sidecars at different moments without knowing SQLite ordering or checkpoint state. Deltas should be a later optimization from a verified snapshot cursor, not a replacement for the initial clean artifact boundary.
+
 ## Goals
 
 - Keep SQLite as the hot local runtime database for this proposal.
 - Make snapshot behavior opt-in through a plugin extension.
-- Produce consistent SQLite snapshots that handle WAL state correctly.
+- Produce a host-syncable SQLite artifact and manifest from live OpenClaw SQLite state.
+- Handle WAL state correctly without syncing live SQLite sidecars as durable artifacts.
 - Make restore and verification first-class behaviors, not incidental backup side effects.
 - Define a reusable SQLite snapshot provider contract for OpenClaw-owned SQLite databases.
 - Define the state-artifact boundary that lets hosted platforms persist OpenClaw state without understanding OpenClaw's internal SQLite file layout.
-- Make host-syncable SQLite artifact creation a core OpenClaw capability, even if the first user-facing commands live in the opt-in `snapshot` plugin.
+- Leave core-vs-extension ownership open while proving the mechanism first in the `snapshot` extension.
 - Document host sync guidance: ignore live SQLite sidecars and sync completed snapshot artifacts/manifests instead.
 - Allow the plugin to add commands under `openclaw snapshot`.
 - Leave `openclaw backup` integration as a possible later follow-up, not part of the initial proof stack.
 - Keep default local OpenClaw behavior unchanged when the plugin is not installed or enabled.
 - Avoid hot writes over network filesystems as a durability or concurrency strategy.
+- Treat deltas as a future SQLite-aware optimization after full snapshot artifacts are correct.
 - Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
 - Leave cloud artifact storage, retention, scheduling, and failover orchestration to optional providers or later RFCs.
-- Let hosts such as Lobster/Aether own durable destination policy while OpenClaw owns the correctness of the local SQLite artifact operation.
+- Let hosts such as Scout/Lobster own durable destination policy while OpenClaw owns the correctness of the local SQLite artifact operation.
 - Build on the existing database-first units: global control-plane SQLite, per-agent data-plane SQLite, and any dedicated owner store.
 - Leave room for core to adopt the same primitives later if snapshot and restore become required OpenClaw behavior.
 
@@ -132,9 +122,9 @@ That integration is intentionally not part of the initial implementation roadmap
 
 ### Responsibility split
 
-Core should own the SQLite-safe primitives and sync guidance that require knowledge of OpenClaw state paths, WAL behavior, schema versions, and integrity checks. This is core functionality because the host cannot safely infer those rules from the filesystem alone.
+OpenClaw must provide the SQLite-safe artifact contract because the host cannot safely infer it from the filesystem alone. The open design decision is packaging: the primitive may become core functionality, or the `snapshot` extension may remain the owner of the command and provider workflow while relying on a smaller core SQLite helper.
 
-Core should own:
+OpenClaw should provide:
 
 - eligible database discovery or registry for OpenClaw-owned SQLite databases
 - consistent SQLite checkpoint creation
@@ -148,7 +138,7 @@ Core should own:
 The `snapshot` plugin should own the opt-in workflow around the core primitive:
 
 - snapshot command UX
-- local snapshot artifact creation
+- local snapshot artifact creation and publication into a sync-owned artifact directory
 - snapshot manifest creation and verification
 - restore workflow orchestration
 - provider hooks for storage backends
@@ -243,7 +233,7 @@ flowchart LR
 
 The diagram is a responsibility split, not a default runtime requirement. Default OpenClaw can run with only the runtime box. Operators opt into the plugin when they need verified snapshot and restore workflows.
 
-For hosted OpenClaw, the same split becomes the host integration contract. The host can ask OpenClaw to materialize a clean artifact before upload and can hydrate local disk from a verified artifact before OpenClaw opens SQLite. The host does not need to treat live SQLite sidecars as durable sync inputs.
+For hosted OpenClaw, the same split becomes the host integration contract. The host can ask OpenClaw or the `snapshot` extension to materialize a clean artifact before upload and can hydrate local disk from a verified artifact before OpenClaw opens SQLite. The host does not need to treat live SQLite sidecars as durable sync inputs.
 
 ### Snapshot semantics
 
@@ -465,9 +455,9 @@ Treating remote storage as artifact storage avoids the common failure mode where
 
 Making the feature opt-in keeps the default OpenClaw runtime simple. Local and development users should not need object storage, a lease service, or a managed scheduler to keep using SQLite.
 
-Keeping core responsible for SQLite-safe primitives is important because safe snapshots and restores need access to database paths, WAL behavior, schema versions, and integrity checks. Provider-owned artifact storage keeps cloud credentials, retention policy, and managed failover out of the default core runtime.
+Keeping the SQLite-safe artifact contract inside OpenClaw is important because safe snapshots and restores need access to database paths, WAL behavior, schema versions, and integrity checks. Provider-owned artifact storage keeps cloud credentials, retention policy, and managed failover out of the default runtime.
 
-Hosted deployments make that core responsibility more important, not less. A host can persist a directory, but OpenClaw should define which database artifacts are safe to persist. Without that boundary, every host integration has to rediscover SQLite sidecar rules and OpenClaw database ownership independently.
+Hosted deployments make that responsibility more important, not less. A host can persist a directory, but OpenClaw should define which database artifacts are safe to persist. Without that boundary, every host integration has to rediscover SQLite sidecar rules and OpenClaw database ownership independently.
 
 The provider contract gives OpenClaw a path from plugin experimentation to core adoption. The first implementation can live as an opt-in plugin while the contract stays general enough for future core backup, restore, startup hydration, or migration workflows.
 
