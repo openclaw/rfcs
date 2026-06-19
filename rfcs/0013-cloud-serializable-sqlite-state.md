@@ -41,6 +41,17 @@ The proposed answer is a `snapshot` plugin: an opt-in extension that turns local
 
 This also gives hosted OpenClaw deployments a cleaner integration point. The host should not need to copy `*.sqlite`, `*.sqlite-wal`, and `*.sqlite-shm` files directly or infer durability rules from ignore files. OpenClaw should provide the SQLite-aware translation into clean artifacts; the host should provide destination storage, schedule, retention, encryption policy, and container lifecycle integration.
 
+The unsafe sync inputs are specific:
+
+- `state/openclaw.sqlite` can be stale by itself when committed writes still live in `state/openclaw.sqlite-wal`.
+- `agents/<agentId>/agent/openclaw-agent.sqlite` can be stale by itself when committed writes still live in `agents/<agentId>/agent/openclaw-agent.sqlite-wal`.
+- `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` are process-local SQLite sidecars, not durable host-sync artifacts.
+- Copying a directory while OpenClaw is writing can split one logical database state across files captured at different moments.
+
+The syncable file is created deliberately. OpenClaw should open the source database through SQLite, wait for any required busy timeout or writer barrier, materialize a clean database copy using SQLite online backup, `VACUUM INTO`, or an equivalent SQLite-aware checkpoint/copy mechanism, run integrity verification, and write a manifest that records the database identity, schema version, source path, hash, and restore metadata. The host syncs that artifact set, not the live SQLite files.
+
+For hosts that sync on filesystem changes, the sync trigger should be the completed artifact write, not arbitrary writes inside the live OpenClaw state directory. The artifact directory should contain completed database artifacts and manifests only. Live `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` files should not be created there, because a sync agent can observe and upload them as soon as they appear.
+
 ## Goals
 
 - Keep SQLite as the hot local runtime database for this proposal.
@@ -124,6 +135,7 @@ Core should own:
 
 - eligible database discovery or registry for OpenClaw-owned SQLite databases
 - consistent SQLite checkpoint creation
+- materialization of a host-syncable database artifact from a live local SQLite database
 - restore or hydrate before opening runtime state
 - restored database verification
 - lifecycle metadata shape
@@ -162,6 +174,21 @@ verified snapshot artifact + manifest -> durable destination and restore timing
 ```
 
 That split keeps SQLite correctness in the codebase that owns the schema and file layout, while keeping cloud credentials, tenant routing, retention, and platform lifecycle outside the default OpenClaw runtime.
+
+The host-facing flow should be explicit:
+
+```text
+before upload/sync:
+  1. host or operator asks OpenClaw to snapshot an eligible database
+  2. OpenClaw creates a clean database artifact in a staging location
+  3. OpenClaw verifies the artifact and writes the final artifact + manifest into the sync-owned artifact directory
+  4. host sync is triggered by the completed artifact/manifest write
+
+before startup after replacement:
+  1. host downloads/selects a verified artifact set
+  2. OpenClaw verifies and hydrates local database files
+  3. OpenClaw opens SQLite for runtime writes only after hydration succeeds
+```
 
 ### Architecture
 
@@ -239,6 +266,8 @@ A snapshot must:
 
 The implementation may use SQLite online backup APIs, `VACUUM INTO`, WAL checkpoints, page-level capture, or another implementation-specific mechanism. The observable contract is a consistent restore point.
 
+For the initial proof, `VACUUM INTO` is acceptable because it asks SQLite to produce a compact, consistent destination database. That is different from asking the host to copy a hot `.sqlite` file. It is also different from routinely vacuuming OpenClaw's runtime databases; the operation happens only when creating a snapshot artifact.
+
 ### Snapshot artifacts
 
 Snapshot storage should store durable artifacts, not a live database file used directly by the runtime.
@@ -255,6 +284,18 @@ The artifact model should support:
 The delta mechanism can be WAL-frame based, page based, logical-change based, external-tool based, or backend-native. This RFC requires the contract, not one specific encoding.
 
 Artifacts should be suitable for host persistence. A hosting platform should be able to upload, retain, copy, and later download the artifact set without preserving process-local SQLite sidecars or relying on a mounted shared filesystem.
+
+The sync-owned artifact directory should not be the live SQLite runtime directory. If the host syncs on file save, OpenClaw should write completed artifacts into a separate artifact location after verification. That keeps the host from observing transient SQLite sidecars or partially materialized runtime state.
+
+Artifacts should be created at explicit lifecycle moments:
+
+- on demand, when an operator or plugin command requests a snapshot
+- before a managed host uploads/syncs OpenClaw state
+- before container shutdown or ownership release when the platform can coordinate that moment
+- before migration or other state-changing maintenance when a rollback point is required
+- periodically, when a provider adds scheduling or retention policy
+
+Restore artifacts should be consumed before OpenClaw opens the target database for runtime writes. A host that downloads artifacts after OpenClaw has already opened SQLite risks racing the runtime and should be treated as outside this contract.
 
 ### Restore verification
 
