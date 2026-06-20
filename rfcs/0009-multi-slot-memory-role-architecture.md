@@ -17,6 +17,8 @@ Introduce purpose-specific memory role slots for OpenClaw plugins — `memory.re
 
 ## Motivation
 
+The [memory-plugin interop research pass](0009/memory-plugin-interop-research.md) validates this RFC as necessary architecture work, not optional extensibility: OpenClaw’s own documentation already describes memory as a composable ecosystem where builtin/QMD recall, Honcho user/session modeling, LanceDB recall/capture, Active Memory orchestration, dreaming/consolidation, and Memory Wiki compilation can coexist, but current `origin/main` collapses every `kind: "memory"` provider into one exclusive `plugins.slots.memory` owner, making those documented combinations impossible or dependent on brittle exceptions. This RFC closes that product/docs/runtime gap by replacing the single memory owner with explicit role slots — `memory.recall`, `memory.capture`, `memory.compaction`, `memory.dreaming`, and `memory.userModel` — while preserving legacy `memory` as a recall shorthand, so the documented memory-plugin interop story becomes actually representable in config and runtime behavior.
+
 OpenClaw currently has one effective memory plugin selector:
 
 ```jsonc
