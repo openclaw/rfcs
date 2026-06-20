@@ -14,24 +14,17 @@ rfc_pr:
 ## Summary
 
 Add Iroh as an optional OpenClaw Gateway transport so clients can discover and
-connect to a Gateway without requiring a VPN such as Tailscale. The first version
-should coexist with the existing Gateway connection options and use Iroh endpoint
-identity, address lookup, NAT traversal, and relay fallback while preserving
-OpenClaw's existing Gateway authorization model.
+connect to a Gateway without requiring a VPN such as Tailscale. The first version should coexist with the existing Gateway connection options and use Iroh endpoint identity, address lookup, NAT traversal, and relay fallback while preserving OpenClaw's existing Gateway authorization model.
 
 ## Motivation
 
 OpenClaw currently relies on existing reachable Gateway URLs, remote URLs,
-Tailscale Serve/Funnel, or LAN/custom bind addresses during pairing. Tailscale is
-a strong option for desktop and trusted-network workflows, but it is a high-friction
-dependency for mobile clients because users need to install and configure a VPN and, most importantly, keep it running to be able to reach the gateway from the phone. This might increase battery draw and greatly reduces friction for low-bandwith, high-latency networks
+Tailscale Serve/Funnel, or LAN/custom bind addresses during pairing. Tailscale is a strong option for desktop and trusted-network workflows, but it is a high-friction dependency for mobile clients because users need to install and configure a VPN and, most importantly, keep it running to be able to reach the gateway from the phone. This might increase battery draw and greatly reduces friction for low-bandwith or high-latency networks.
 
-One concrete example is mobile app testing (or production usage, too) against a local Gateway. A developer may have an OpenClaw Gateway bound to localhost only. To test from an iPhone,
-they would need to open the Gateway port and then either forward it through a VPN such as NetBird or expose it through a reverse proxy. That feels more complex and less secure than directly pairing the phone with the Gateway over an
-application-level Iroh connection.
+One concrete example is mobile app testing (or production usage, too) against a local Gateway. A user may have an OpenClaw Gateway bound to localhost only, especially when only using Telegram as a transport iwth message polling mode. To test from an iPhone, they would need to open the Gateway port and then either forward it through a VPN such as NetBird or expose it through a reverse proxy. That feels more complex and less secure than directly pairing the phone with the Gateway over an application-level Iroh connection.
 
 Iroh v1 provides a stable wire protocol and supported APIs for Rust, Python,
-Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and native mobile bindings for Swift and Kotlin. This makes it a plausible transport layer for OpenClaw clients that need to connect to a user-owned Gateway through NATs without asking users to set up a VPN. Also, this might be more performant than tunneling https trafic over a VPN, since it sets up on the transport protocol layer (QUIC) directly, including encrypting the connection 
+Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and native mobile bindings for Swift and Kotlin. This makes it a plausible transport layer for OpenClaw clients that need to connect to a user-owned Gateway through NATs without asking users to set up a VPN. Also, this might be more performant than tunneling https trafic over a VPN, since it sets up on the transport protocol layer (QUIC) directly, including encrypting the connection.
 
 ## Glossary
 
@@ -73,7 +66,7 @@ Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and nati
 
 ## Proposal
 
-Add an experimental Iroh Gateway transport behind explicit configuration:
+Add Iroh as an experimental Gateway bind target:
 
 ```jsonc
 {
@@ -81,81 +74,67 @@ Add an experimental Iroh Gateway transport behind explicit configuration:
     "bind": "iroh",
     "iroh": {
       "secretKeyPath": "~/.openclaw/iroh-gateway.key",
-      "endpoint": {
-        "relayMode": "default"
-      }
+      "endpoint": {}
     }
   }
 }
 ```
 
-`gateway.bind` should gain an `"iroh"` option because Iroh provides a Gateway
-entrypoint in the same broad family as the existing bind policies. Today
-`gateway.bind` describes how clients can reach the local Gateway: `"loopback"`
-for localhost-only, `"lan"` for local-network exposure, `"tailnet"` for a
-Tailscale address, and `"custom"` for an explicit host. `"iroh"` would mean the
-Gateway remains locally owned but publishes an Iroh endpoint for client
-connections.
+`gateway.bind: "iroh"` means the local Gateway publishes an Iroh endpoint as its
+client connection entrypoint. It belongs with the existing bind policies because
+`gateway.bind` already describes how clients reach the local Gateway:
+`"loopback"` for localhost-only, `"lan"` for local-network exposure,
+`"tailnet"` for a Tailscale address, and `"custom"` for an explicit host.
 
-The shape under `gateway.iroh.endpoint` should be a 1:1 representation of normal
-Iroh endpoint configuration wherever possible. OpenClaw should not invent
-product-level config names that map onto Iroh concepts. If OpenClaw needs
-additional values for Gateway lifecycle, persistence, or UI, those values should
-live next to `endpoint` under `gateway.iroh` and be merged with the Iroh endpoint
-config when constructing the endpoint.
+`gateway.iroh.endpoint` is the Iroh-owned endpoint configuration. Its shape should
+mirror normal Iroh configuration instead of translating through OpenClaw-specific
+names. An empty object uses Iroh's default endpoint behavior, including the
+default public relay and discovery infrastructure. If the RFC or implementation
+needs custom relay maps, relay presets, or other Iroh endpoint options, those
+fields should be exposed under `gateway.iroh.endpoint` using Iroh's native names.
+OpenClaw UI and help text can explain those native fields in product language.
 
-`gateway.iroh.endpoint.relayMode` is an example of this approach if that is the
-native Iroh configuration name. The first supported relay mode should represent
-Iroh's default public relay and address-discovery infrastructure. OpenClaw UI and
-help text should describe this as public relay infrastructure rather than hiding
-or renaming the native Iroh field in configuration. Future values may include a custom relay map for self-hosted or OpenClaw-operated
-relay deployments if those match Iroh's configuration surface.
+`gateway.iroh.secretKeyPath` is an OpenClaw-owned Gateway lifecycle field. The
+Gateway should create the secret key on first use and reuse it across restarts so
+it keeps a stable Iroh `EndpointId`. Other OpenClaw-owned fields, if needed,
+should live beside `endpoint` under `gateway.iroh` and be merged with the Iroh
+endpoint config when constructing the endpoint.
 
-`gateway.iroh.secretKeyPath` is an OpenClaw-specific value for persisted Gateway
-identity unless Iroh provides an equivalent config field. Its name follows the
-existing Gateway config style for filesystem-backed credentials such as
-`gateway.tls.certPath` and `gateway.tls.keyPath`. The Gateway should create this
-key on first use and reuse it so the Gateway keeps a stable Iroh `EndpointId`
-across restarts.
+When `gateway.bind` is `"iroh"`, Gateway startup should:
 
-When enabled, the Gateway should bind an Iroh endpoint with an OpenClaw-specific
-ALPN such as `openclaw-gateway-v1`. The Gateway should publish Iroh pairing data
-alongside the existing setup-code payload. The pairing payload may include:
+1. Load or create the persisted Iroh secret key.
+2. Construct an Iroh endpoint from `gateway.iroh.endpoint` plus OpenClaw-owned
+   runtime values such as the secret key and ALPN.
+3. Bring the endpoint online with an OpenClaw-specific ALPN such as
+   `openclaw-gateway-v1`.
+4. Publish Iroh pairing data alongside the existing setup-code payload.
 
-- the Gateway Iroh `EndpointId`
-- an `EndpointTicket` for QR/bootstrap pairing
-- relay mode metadata suitable for UI display
+The setup-code payload should include enough Iroh data for bootstrap pairing,
+such as the Gateway `EndpointId`, an `EndpointTicket`, and relay/discovery
+metadata suitable for UI display. Clients should use tickets for bootstrap
+pairing, then store the Gateway `EndpointId` for reconnects. This lets paired
+clients reconnect after network changes without requiring a new QR code or setup
+flow.
 
-Long-term reconnect should store the Gateway `EndpointId` and rely on Iroh
-address lookup. Tickets are useful for bootstrap pairing, but they may contain
-direct IP address information and can become stale.
+The initial release should be experimental and mobile-first. A browser-based
+frontend may also be part of the experiment if Iroh's WASM implementation can
+connect to the same Gateway endpoint with acceptable packaging, browser
+compatibility, and security constraints. Existing Tailscale, remote URL, LAN, and
+loopback Gateway paths should continue to work.
 
-The RFC process should decide between two transport designs before
-implementation:
+The RFC intentionally leaves the Gateway protocol mapping unresolved. The first
+implementation must choose between native Gateway protocol framing over Iroh QUIC
+bidirectional streams and an Iroh-to-localhost bridge inside the Gateway process.
+Native streams are the preferred long-term shape, while a localhost bridge may be
+a lower-risk spike if it preserves existing Gateway behavior.
 
-1. Native Gateway protocol over Iroh QUIC bidirectional streams.
-   - This is the preferred long-term design.
-   - It avoids exposing a local HTTP/WebSocket server through a bridge.
-   - It requires clients to implement an Iroh transport for the Gateway protocol.
-2. Iroh-to-localhost bridge inside the Gateway process.
-   - This may be faster to prototype.
-   - Incoming Iroh streams proxy to `127.0.0.1:<gatewayPort>`.
-   - It carries more proxy, WebSocket, and security complexity.
-
-The initial release should be experimental and optimized for mobile pairing and
-connectivity validation. A browser-based frontend may also be part of the
-experiment if Iroh's WASM implementation can connect to the same Gateway endpoint with acceptable packaging, browser compatibility, and security constraints. This would make the prototype easier for reviewers and contributors who are not set up to build the native OpenClaw app.
-
-Iroh support must be audited as public/remote Gateway exposure. The Gateway must
-not allow Iroh transport with unauthenticated Gateway mode. Pairing should keep
-using OpenClaw authorization, tokens, passwords, device records, or equivalent
-application-level controls. After pairing, OpenClaw should consider binding
-client records to Iroh peer `EndpointId`s or requiring a bootstrap token before a new peer is accepted.
-
-The Gateway should avoid logging full Iroh tickets because tickets may include
-direct IP addresses. Configuration audit warnings should explain that public
-relay mode uses public n0 infrastructure for relay and discovery fallback while
-traffic remains encrypted end-to-end by Iroh.
+Iroh support must be treated as public/remote Gateway exposure. The Gateway must
+not allow `gateway.bind: "iroh"` with unauthenticated Gateway mode. Pairing must
+continue to use OpenClaw authorization, tokens, passwords, device records, or an
+equivalent application-level control. After pairing, OpenClaw should consider
+binding client records to Iroh peer `EndpointId`s or requiring a bootstrap token
+before accepting a new peer. Logs and diagnostics should avoid full Iroh tickets
+because tickets may include direct IP addresses.
 
 ## Rationale
 
