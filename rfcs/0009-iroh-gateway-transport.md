@@ -61,7 +61,8 @@ directly.
   - avoids requiring users to depend on a single VPN provider or closed network
   - directly integrated into OpenClaw without requiring the user to set up extra
     infrastructure, such as VPNs
-- Let clients pair with a Gateway using an Iroh ticket or endpoint identity.
+- Let clients bootstrap pairing with a Gateway using an Iroh ticket, then use
+  the remembered Gateway endpoint identity for reconnects and address lookup.
 - Allow paired clients to reconnect after Gateway network changes without
   requiring a new QR code or setup flow.
 - Preserve OpenClaw Gateway authentication, authorization, and device-pairing
@@ -117,9 +118,15 @@ OpenClaw UI and help text can explain those native fields in product language.
 
 `gateway.iroh.secretKeyPath` is an OpenClaw-owned Gateway lifecycle field. The
 Gateway should create the secret key on first use and reuse it across restarts so
-it keeps a stable Iroh `EndpointId`. Other OpenClaw-owned fields, if needed,
-should live beside `endpoint` under `gateway.iroh` and be merged with the Iroh
-endpoint config when constructing the endpoint.
+it keeps a stable Iroh `EndpointId`. The default path should live under the
+OpenClaw state directory and use the same local-secret file hardening OpenClaw
+uses elsewhere: create parent directories with owner-only permissions, write the
+key atomically with owner-only file permissions, reject symlink-based key paths,
+and fail startup rather than silently regenerating or weakening a key when an
+existing key file is unreadable or has unsafe filesystem state. Other
+OpenClaw-owned fields, if needed, should live beside `endpoint` under
+`gateway.iroh` and be merged with the Iroh endpoint config when constructing the
+endpoint.
 
 When `gateway.bind` is `"iroh"`, Gateway startup should:
 
@@ -147,11 +154,13 @@ application-specific WASM wrapper rather than an official browser npm package.
 Existing Tailscale, remote URL, LAN, and loopback Gateway paths should continue
 to work.
 
-The RFC intentionally leaves the Gateway protocol mapping unresolved. The first
-implementation must choose between native Gateway protocol framing over Iroh QUIC
-bidirectional streams and an Iroh-to-localhost bridge inside the Gateway process.
-Native streams are the preferred long-term shape, while a localhost bridge may be
-a lower-risk spike if it preserves existing Gateway behavior.
+The RFC intentionally leaves the Gateway protocol mapping for maintainer review.
+The maintainers should decide whether the first implementation should use native
+Gateway protocol framing over Iroh QUIC bidirectional streams, or an
+Iroh-to-localhost bridge inside the Gateway process. Native streams are the
+preferred long-term architecture, while a localhost bridge may be the right
+lower-effort validation spike if it preserves existing Gateway behavior and is
+clearly documented as experimental.
 
 Iroh support must be treated as public/remote Gateway exposure. The Gateway must
 not allow `gateway.bind: "iroh"` with unauthenticated Gateway mode. Pairing must
@@ -189,8 +198,9 @@ relay and discovery infrastructure.
 
 Native Gateway protocol over Iroh streams is cleaner than a localhost bridge,
 but the bridge may be useful for a short spike. This RFC intentionally leaves the
-native-streams-versus-bridge decision unresolved so maintainers can decide it
-during review with more implementation evidence.
+native-streams-versus-bridge decision unresolved so maintainers can decide,
+during review, whether the project wants the lowest-effort experiment first or a
+more direct implementation of the desired long-term architecture.
 
 ## Future questions
 
