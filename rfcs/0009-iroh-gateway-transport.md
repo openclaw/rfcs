@@ -19,12 +19,28 @@ connect to a Gateway without requiring a VPN such as Tailscale. The first versio
 ## Motivation
 
 OpenClaw currently relies on existing reachable Gateway URLs, remote URLs,
-Tailscale Serve/Funnel, or LAN/custom bind addresses during pairing. Tailscale is a strong option for desktop and trusted-network workflows, but it is a high-friction dependency for mobile clients because users need to install and configure a VPN and, most importantly, keep it running to be able to reach the gateway from the phone. This might increase battery draw and greatly reduces friction for low-bandwith or high-latency networks.
+Tailscale Serve/Funnel, or LAN/custom bind addresses during pairing. Tailscale is
+a strong option for desktop and trusted-network workflows, but it is a
+high-friction dependency for mobile clients because users need to install and
+configure a VPN and, most importantly, keep it running to reach the Gateway from
+the phone. This may increase battery draw and add friction on low-bandwidth or
+high-latency networks.
 
-One concrete example is mobile app testing (or production usage, too) against a local Gateway. A user may have an OpenClaw Gateway bound to localhost only, especially when only using Telegram as a transport iwth message polling mode. To test from an iPhone, they would need to open the Gateway port and then either forward it through a VPN such as NetBird or expose it through a reverse proxy. That feels more complex and less secure than directly pairing the phone with the Gateway over an application-level Iroh connection.
+One concrete example is mobile app testing, or production usage, against a local
+Gateway. A user may have an OpenClaw Gateway bound to localhost only, especially
+when using Telegram as a polling transport. To test from an iPhone, they would
+need to open the Gateway port and then either forward it through a VPN such as
+NetBird or expose it through a reverse proxy. That feels more complex and less
+secure than directly pairing the phone with the Gateway over an application-level
+Iroh connection.
 
 Iroh v1 provides a stable wire protocol and supported APIs for Rust, Python,
-Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and native mobile bindings for Swift and Kotlin. This makes it a plausible transport layer for OpenClaw clients that need to connect to a user-owned Gateway through NATs without asking users to set up a VPN. Also, this might be more performant than tunneling https trafic over a VPN, since it sets up on the transport protocol layer (QUIC) directly, including encrypting the connection.
+Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and
+native mobile bindings for Swift and Kotlin. This makes it a plausible transport
+layer for OpenClaw clients that need to connect to a user-owned Gateway through
+NATs without asking users to set up a VPN. It may also avoid the overhead of
+routing Gateway traffic through a VPN by using encrypted QUIC connections
+directly.
 
 ## Glossary
 
@@ -122,8 +138,12 @@ flow.
 The initial release should be experimental and mobile-first. A browser-based
 frontend may also be part of the experiment if Iroh's WASM implementation can
 connect to the same Gateway endpoint with acceptable packaging, browser
-compatibility, and security constraints. Existing Tailscale, remote URL, LAN, and
-loopback Gateway paths should continue to work.
+compatibility, and security constraints. The browser path is not required for the
+first mobile-first experiment; if included, it must account for Iroh's current
+browser limitations, including relay-only browser traffic and the need for an
+application-specific WASM wrapper rather than an official browser npm package.
+Existing Tailscale, remote URL, LAN, and loopback Gateway paths should continue
+to work.
 
 The RFC intentionally leaves the Gateway protocol mapping unresolved. The first
 implementation must choose between native Gateway protocol framing over Iroh QUIC
@@ -150,7 +170,8 @@ Keeping Iroh optional reduces risk. Tailscale remains mature, user-controlled,
 and already integrated into OpenClaw's connection flow. Iroh introduces new
 operational questions around public relay dependency, address discovery,
 packaging native bindings, browser/WASM viability, and mobile client
-implementation. Treating it as an experimental transport lets OpenClaw learn from real pairing and reconnect flows without disrupting existing users.
+implementation. Treating it as an experimental transport lets OpenClaw learn from
+real pairing and reconnect flows without disrupting existing users.
 
 Modeling Iroh as `gateway.bind: "iroh"` fits the existing Gateway mental model
 better than adding a separate `gateway.iroh.enabled` or `gateway.iroh.mode` flag:
