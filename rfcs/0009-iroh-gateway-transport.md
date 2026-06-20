@@ -55,10 +55,12 @@ directly.
 
 ## Goals
 
-- Provide an optional Gateway connection path that is as simple to use as
-  starting the localhost Gateway and using it with the Telegram provider.
-
-- Provide an optional Gateway transport that works without requiring Tailscale or another VPN.
+- Provide an optional Gateway connection path that is:
+  - as simple to use as the localhost Gateway with the Telegram channel
+  - built on open protocols such as QUIC and Iroh's open-source stack
+  - avoids requiring users to depend on a single VPN provider or closed network
+  - directly integrated into OpenClaw without requiring the user to set up extra
+    infrastructure, such as VPNs
 - Let clients pair with a Gateway using an Iroh ticket or endpoint identity.
 - Allow paired clients to reconnect after Gateway network changes without
   requiring a new QR code or setup flow.
@@ -68,8 +70,8 @@ directly.
   entrypoint, while keeping Iroh-specific endpoint configuration aligned with
   normal Iroh configuration.
 - Keep Tailscale and existing Gateway URL discovery paths available.
-- Make the first implementation small enough to validate with mobile clients
-  first before committing to Iroh as a default transport.
+- Make the first implementation small enough to validate the benefits first
+  before committing to Iroh as one permanent transport option.
 - Leave room for a browser-based frontend to connect to the Iroh endpoint if the
   Iroh WASM implementation proves suitable, so contributors do not need the full
   OpenClaw app development environment to try the flow.
