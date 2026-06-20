@@ -6,7 +6,7 @@ created: 2026-06-20
 last_updated: 2026-06-20
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/22
 ---
 
 # Proposal: Multi-slot memory role architecture
