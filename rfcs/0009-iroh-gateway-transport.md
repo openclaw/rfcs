@@ -21,7 +21,7 @@ Clients should be able to pair with and reconnect to a Gateway through Iroh endp
 
 OpenClaw Nodes currently depend on reachable Gateway URLs, Tailscale Serve/Funnel, or LAN access if the Node is not on localhost. These work, but they add friction. A phone user may need to install a VPN, configure it, and keep it running just to reach a Gateway. Users behind carrier-grade NAT (CGNAT) need complicated DDNS and reverse-proxy setups to publish their OpenClaw Gateway so external OpenClaw Nodes can connect to their home instance. Iroh solves this by exposing the Gateway as an application-level encrypted connection instead.
 
-Iroh v1 provides a stable wire protocol plus APIs for Node.js, Rust, Python, Swift, and Kotlin. The `@number0/iroh` package and native mobile bindings make it a plausible transport for OpenClaw Gateway access through NATs.
+[Iroh v1](https://www.iroh.computer/blog/v1) provides a stable wire protocol plus APIs for Node.js, Rust, Python, Swift, and Kotlin. The `@number0/iroh` package and native mobile bindings make it a plausible transport for OpenClaw Gateway access through NATs.
 
 ## Product fit
 
