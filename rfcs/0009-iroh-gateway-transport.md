@@ -39,6 +39,9 @@ Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and nati
 
 ## Goals
 
+- Provide an optional Gateway connection path that is as simple to use as
+  starting the localhost Gateway and using it with the Telegram provider.
+
 - Provide an optional Gateway transport that works without requiring Tailscale or another VPN.
 - Let clients pair with a Gateway using an Iroh ticket or endpoint identity.
 - Allow paired clients to reconnect after Gateway network changes without
