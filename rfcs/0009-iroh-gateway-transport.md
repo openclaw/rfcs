@@ -24,28 +24,32 @@ OpenClaw's existing Gateway authorization model.
 OpenClaw currently relies on existing reachable Gateway URLs, remote URLs,
 Tailscale Serve/Funnel, or LAN/custom bind addresses during pairing. Tailscale is
 a strong option for desktop and trusted-network workflows, but it is a high-friction
-dependency for mobile clients because users need to install and configure a VPN.
+dependency for mobile clients because users need to install and configure a VPN and, most importantly, keep it running to be able to reach the gateway from the phone. This might increase battery draw and greatly reduces friction for low-bandwith, high-latency networks
 
-One concrete example is mobile app testing against a local Gateway. A developer
-may have an OpenClaw Gateway bound to localhost only. To test from an iPhone,
-they would need to open the Gateway port and then either forward it through a VPN
-such as NetBird or expose it through a reverse proxy. That feels more complex and
-less secure than directly pairing the phone with the Gateway over an
+One concrete example is mobile app testing (or production usage, too) against a local Gateway. A developer may have an OpenClaw Gateway bound to localhost only. To test from an iPhone,
+they would need to open the Gateway port and then either forward it through a VPN such as NetBird or expose it through a reverse proxy. That feels more complex and less secure than directly pairing the phone with the Gateway over an
 application-level Iroh connection.
 
 Iroh v1 provides a stable wire protocol and supported APIs for Rust, Python,
-Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and native
-mobile bindings for Swift and Kotlin. This makes it a plausible transport layer
-for OpenClaw clients that need to connect to a user-owned Gateway through NATs
-without asking users to set up a VPN.
+Node.js, Swift, and Kotlin. It exposes a Node package, `@number0/iroh`, and native mobile bindings for Swift and Kotlin. This makes it a plausible transport layer for OpenClaw clients that need to connect to a user-owned Gateway through NATs without asking users to set up a VPN. Also, this might be more performant than tunneling https trafic over a VPN, since it sets up on the transport protocol layer (QUIC) directly, including encrypting the connection 
+
+## Glossary
+
+- **Iroh ticket**: A shareable connection bootstrap value. For OpenClaw, it is
+  similar to a pairing code, but it can carry more network data, such as the
+  Gateway's Iroh endpoint identity, relay hints, and direct IP/port addresses
+  when they are available.
+- **Iroh `EndpointId`**: The stable public identity of an Iroh endpoint. It is
+  derived from the endpoint's secret key. If the Gateway persists that secret key
+  across restarts, clients can remember the Gateway's `EndpointId` and use Iroh
+  discovery to find its current address instead of depending on old ticket data.
 
 ## Goals
 
-- Provide an optional Gateway transport that works without requiring Tailscale or
-  another VPN.
+- Provide an optional Gateway transport that works without requiring Tailscale or another VPN.
 - Let clients pair with a Gateway using an Iroh ticket or endpoint identity.
-- Support reconnecting through a stable Iroh `EndpointId` rather than relying on
-  stale direct-address tickets.
+- Allow paired clients to reconnect after Gateway network changes without
+  requiring a new QR code or setup flow.
 - Preserve OpenClaw Gateway authentication, authorization, and device-pairing
   semantics.
 - Make the user-facing configuration describe product behavior, such as
@@ -160,6 +164,12 @@ Native Gateway protocol over Iroh streams is cleaner than a localhost bridge,
 but the bridge may be useful for a short spike. This RFC intentionally leaves the
 native-streams-versus-bridge decision unresolved so maintainers can decide it
 during review with more implementation evidence.
+
+## Future questions
+
+- Do we want to run OpenClaw relay servers to make this easier for users? The
+  suggested answer for now is to decide after measuring the impact on the user
+  flow when using Iroh's existing relay and discovery infrastructure.
 
 ## Unresolved questions
 
