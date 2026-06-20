@@ -23,6 +23,10 @@ OpenClaw Nodes currently depend on reachable Gateway URLs, Tailscale Serve/Funne
 
 Iroh v1 provides a stable wire protocol plus APIs for Node.js, Rust, Python, Swift, and Kotlin. The `@number0/iroh` package and native mobile bindings make it a plausible transport for OpenClaw Gateway access through NATs.
 
+## Product fit
+
+This fits OpenClaw’s focus on setup reliability, first-run UX, companion apps, and safe defaults by making phone-to-Gateway access simpler without replacing Gateway auth.
+
 ## Terms
 
 - Iroh ticket: A shareable bootstrap value with endpoint identity, relay hints, and direct addresses when available.
