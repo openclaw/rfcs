@@ -1,5 +1,5 @@
 ---
-title: Iroh Gateway transport as alternative to Tailscale or reverse proxy
+title: Iroh Gateway transport
 authors:
   - Benjamin Jesuiter
 created: 2026-06-20
