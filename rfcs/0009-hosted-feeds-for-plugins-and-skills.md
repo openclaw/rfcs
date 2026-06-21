@@ -5,7 +5,7 @@ authors:
   - Patrick
   - Gio
 created: 2026-06-18
-last_updated: 2026-06-18
+last_updated: 2026-06-20
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/19
@@ -41,11 +41,12 @@ plugins, regionalize provider availability, or let enterprises expose only the
 plugins they approve.
 
 A hosted feed gives OpenClaw a small, cacheable, reviewable distribution
-primitive. OpenClaw can fetch the public feed when online, detect changes through
-HTTP metadata and checksums, and fall back to the bundled feed when offline or
-blocked. ClawHub can curate the default public experience. Microsoft, other
-enterprises, and regional mirrors can consume ClawHub feeds, apply their own
-policy and private entries, and publish an effective feed to their clients.
+primitive. OpenClaw can fetch the public feed when online, detect changes
+through HTTP validators plus a locally computed payload checksum, and fall back
+to the bundled feed when offline or blocked. ClawHub can curate the default
+public experience. Microsoft, other enterprises, and regional mirrors can consume
+ClawHub feeds, apply their own policy and private entries, and publish an
+effective feed to their clients.
 
 This also aligns OpenClaw with proven package ecosystems. npm, Homebrew taps,
 and marketplace catalogs separate package storage from catalog composition. The
@@ -286,9 +287,13 @@ runtime the client should:
 4. On `304 Not Modified`, record a successful check without replacing the
    snapshot. On new content, validate the envelope, feed shape, signatures, and
    package-source references before accepting it.
-5. Store the latest verified snapshot, HTTP validators, feed sequence, expiry,
-   and signature metadata atomically in `state/openclaw.sqlite`.
-6. Use the verified cached snapshot during transient failures. Once it exceeds
+5. Compute a `sha256` checksum over the exact accepted feed payload bytes after
+   envelope verification. Persist that checksum with the feed snapshot. The
+   checksum is local state, not a field inside the signed payload, so it is not
+   self-referential.
+6. Store the latest verified snapshot, HTTP validators, payload checksum, feed
+   sequence, expiry, and signature metadata atomically in `state/openclaw.sqlite`.
+7. Use the verified cached snapshot during transient failures. Once it exceeds
    `maxStale`, fall back to the bundled feed and report stale catalog status.
 
 ### Feed authenticity and rotating trust
