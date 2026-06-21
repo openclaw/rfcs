@@ -3,7 +3,9 @@ title: Approval Prompt Markdown Contract
 authors:
   - omarshahine
 created: 2026-05-30
-last_updated: 2026-05-30
+last_updated: 2026-06-11
+status: accepted
+issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/4
 ---
 
@@ -105,6 +107,11 @@ Underline is excluded from the core subset because most channels cannot express
 it. iMessage may still map a channel-local marker if it wants, but core does
 not emit one.
 
+Fenced code block language hints are part of the contract but advisory. Core
+emits a small fixed set (`sh` for a pending command, none or `txt` for a plain
+block). A channel may honor a hint for native syntax highlighting and must drop
+an unsupported hint safely, without altering the fenced content.
+
 ### Plugin SDK ownership
 
 The plugin SDK owns:
@@ -117,7 +124,11 @@ The plugin SDK owns:
 
 ### Channel capability
 
-Channels gain an explicit capability on their approval handler:
+Channels gain an explicit capability on their approval handler. It is a field,
+`approvalText`, on the existing channel approval capability object, declared
+through the public plugin SDK. It is not a separate standalone capability or a
+parallel registration path, which keeps the approval capability surface
+cohesive. The field defaults to `"plaintext"`.
 
 - `approvalText: "markdown"` means the channel translates the canonical subset
   into its native styling. The channel owns the translation and any escaping.
@@ -192,11 +203,19 @@ emits incidentally rather than introducing a brand new format.
 
 ## Unresolved questions
 
-- Should the canonical subset include underline given only iMessage can express
-  it, or stay at the strict cross-channel intersection and let iMessage add a
-  local marker out of band.
-- Whether the capability lives on the existing channel approval capability
-  object or as a small standalone field, and how a plugin author declares it
-  through the public SDK.
-- Whether the exec fence language hints (`sh`, `txt`) should be normalized as
-  part of the contract or left to each channel to honor or drop.
+The questions raised during initial review are resolved as follows, and the
+decisions are reflected in the Proposal above. No open questions remain.
+
+- **Underline in the canonical subset.** Resolved: no. The canonical subset
+  stays at the strict cross-channel intersection, and core never emits
+  underline. iMessage may map a channel-local marker out of band, but it is not
+  part of the contract.
+- **Where the capability lives and how it is declared.** Resolved: it is a
+  field, `approvalText`, on the existing channel approval capability object,
+  declared through the public plugin SDK and defaulting to `"plaintext"`. There
+  is no separate standalone capability or parallel registration path.
+- **Exec fence language hints.** Resolved: the contract defines a small fixed
+  set of hints (`sh` for a pending command, none or `txt` for a plain block)
+  and treats them as advisory. A channel may honor a hint for native syntax
+  highlighting and must drop an unsupported hint safely, without altering the
+  fenced content.
