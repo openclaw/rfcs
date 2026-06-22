@@ -1,28 +1,29 @@
 ---
-title: Model Harness Profiles
+title: Agent Cards
 authors:
   - osolmaz
   - vincentkoc
 created: 2026-06-17
-last_updated: 2026-06-17
+last_updated: 2026-06-22
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/18
 ---
 
-# Proposal: Model Harness Profiles
+# Proposal: Agent Cards
 
 ## Summary
 
 Replace OpenClaw's binary `experimental.localModelLean` behavior with a
-versioned Model Profile system. A Model Profile is a bounded, portable
-description of how the OpenClaw agent harness should behave for a resolved
-model: tool exposure, Tool Search defaults, named system-prompt recipes, and
-supported reasoning defaults. It is separate from model identity, provider
-drivers, and managed-local serving presets. Phase one preserves four
-requested model-capacity classes as metadata, ships two capacity-derived
-behavioral baselines, migrates existing Lean/GPT-5/Claude model-specific
-behavior onto profiles, and leaves KV cache and engine tuning outside profiles.
+versioned Agent Card system. An Agent Card is a bounded, declarative artifact
+that tells an agent harness which shared behavior and harness-specific behavior
+to use for a resolved model: tool exposure, Tool Search defaults, named
+system-prompt presets, and supported reasoning modes. It is separate from model
+identity, provider drivers, and managed-local serving presets. Phase one
+preserves four requested model-capacity classes as metadata, ships two
+capacity-derived behavioral baselines, migrates existing
+Lean/GPT-5/Claude model-specific behavior onto cards, and leaves KV cache and
+engine tuning outside cards.
 
 ## Motivation
 
@@ -32,8 +33,8 @@ wrong long-term abstraction:
 - It makes locality stand in for agent-harness capability.
 - It is binary where current behavior already needs model-family rules.
 - GPT-5 response-style prompt overlays and Claude/Opus thinking defaults live
-  in separate model-specific paths rather than one inspectable policy system.
-- It cannot cleanly distinguish portable harness policy from local server
+  in separate model-specific paths rather than one inspectable behavior system.
+- It cannot cleanly distinguish portable harness behavior from local server
   configuration.
 - It encourages a future where a change intended to help local models can
   accidentally alter hosted-provider payloads or cache behavior.
@@ -41,30 +42,30 @@ wrong long-term abstraction:
 OpenClaw needs a small, deterministic decision path:
 
 1. Resolve canonical model identity and trusted metadata.
-2. Select the Model Profile using explicit overrides and registry bindings.
-3. Apply portable harness policy, constrained by driver capabilities.
+2. Select the Agent Card using explicit overrides and registry bindings.
+3. Apply portable harness behavior, constrained by driver capabilities.
 4. Keep provider protocol behavior in the driver.
 5. Apply engine/KV settings only through a separate Serving Preset for an
    OpenClaw-managed local service.
 
 This gives local and open-weight models a first-class path without making
 "local" a proxy for size, capability, or deployment control. It also gives
-hosted providers a consistent way to opt into portable model-family policy.
+hosted providers a consistent way to opt into portable model-family behavior.
 
 ## Goals
 
-- Replace `experimental.localModelLean` with versioned, testable model profiles.
+- Replace `experimental.localModelLean` with versioned, testable Agent Cards.
 - Preserve current Lean behavior exactly during migration.
 - Centralize existing GPT-5 response-style and Claude/Opus thinking-default
-  behavior under the profile resolution system.
+  behavior under the card resolution system.
 - Keep four capacity classes available as model metadata and diagnostics.
 - Ship a conservative phase-one fallback: lean behavior for trusted models up
   to 20B parameters and full behavior otherwise.
-- Make model identity, harness policy, driver behavior, and local serving
+- Make model identity, harness behavior, driver behavior, and local serving
   configuration separate ownership layers.
 - Provide deterministic selection, clear precedence, and explainable
   diagnostics.
-- Allow narrow, validated per-profile settings without adding a generic
+- Allow narrow, validated per-card settings without adding a generic
   provider parameter bag.
 - Preserve hosted provider payload and cache behavior unless a driver-owned
   change explicitly changes it.
@@ -83,34 +84,34 @@ hosted providers a consistent way to opt into portable model-family policy.
   request payloads.
 - This RFC does not require every provider to supply parameter counts, artifact
   digests, or family metadata.
-- This RFC does not make profiles dynamically fetched or evaluated at request
+- This RFC does not make cards dynamically fetched or evaluated at request
   time.
-- This RFC does not expose profiles as a replacement for provider/model
+- This RFC does not expose cards as a replacement for provider/model
   selection.
 
 ## Proposal
 
 ### Terminology and ownership
 
-The public name is **Model Profile**. In code and architecture documentation,
-use **Model Harness Profile** where it must be distinguished from the existing
-model-reference authentication suffix called `profile`.
+The public name is **Agent Card**. An Agent Card does not define an agent. It
+describes shared and harness-specific behavior that a harness applies after it
+has resolved the model identity and selected a matching card.
 
-`Model Driver` is not another name for profile:
+`Model Driver` is not another name for Agent Card:
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Model identity | canonical model id, family, artifact digest/kind, parameter count, model size class | prompt policy, server flags |
-| Model Profile | portable harness policy: tools, Tool Search, named prompt preset, reasoning mode | HTTP payloads, auth, KV cache, server flags |
-| Model Driver | provider protocol, auth, capabilities, payload transforms, streaming, native API settings | product harness policy |
-| Serving Preset | local managed-engine/artifact settings | hosted provider behavior, portable agent policy |
+| Model identity | canonical model id, family, artifact digest/kind, parameter count, model size class | prompt behavior, server flags |
+| Agent Card | shared and harness-specific behavior: tools, Tool Search, named prompt preset, reasoning mode | model identity, HTTP payloads, auth, KV cache, server flags |
+| Model Driver | provider protocol, auth, capabilities, payload transforms, streaming, native API settings | product harness behavior |
+| Serving Preset | local managed-engine/artifact settings | hosted provider behavior, portable agent behavior |
 
-A driver answers: "Can OpenClaw use this endpoint, and how?" A profile answers:
-"What harness policy should OpenClaw use with this model?"
+A driver answers: "Can the harness use this endpoint, and how?" An Agent Card
+answers: "What behavior should the agent harness use with this resolved model?"
 
 ### Model identity and capacity classes
 
-Profile selection consumes a prepared identity object:
+Card selection consumes a prepared identity object:
 
 ```ts
 type ModelCapacityClass = "tiny" | "small" | "medium" | "large";
@@ -154,34 +155,50 @@ Capacity-derived fallback requires trusted structured metadata:
 3. Explicitly configured structured metadata may be declared if it has a
    validated owner and diagnostic provenance.
 4. Bare names such as `foo-7b-instruct` are diagnostic only and must not
-   select a compact profile.
+   select a compact card.
 
 Generic OpenAI-compatible endpoints, including common vLLM and SGLang
 discovery paths, often expose only model ids. They report unknown capacity
 unless a registry/artifact binding supplies the missing fact. Unknown capacity
-uses the full profile.
+uses the full card.
 
 ### Registry and manifest format
 
-Profiles and bindings live in a schema-validated registry. The in-process
+Cards and bindings live in a schema-validated registry. The in-process
 contract is a materialized registry:
 
 ```ts
-type ModelHarnessProfileRegistry = {
+type AgentCardRegistry = {
   schemaVersion: 1;
-  profiles: ModelHarnessProfile[];
-  bindings: ModelProfileBinding[];
+  cards: AgentCard[];
+  bindings: AgentCardBinding[];
 };
 
-type ModelHarnessProfile = {
+type AgentCard = {
   schemaVersion: 1;
   id: string;
   extends?: string;
-  policy: ModelProfilePolicy;
-  settings?: ModelProfileSettingsSchema;
+  spec: AgentCardSpec;
 };
 
-type ModelProfileBinding = {
+type AgentCardSpec = {
+  common: AgentCardCommon;
+  "openclaw.ai"?: OpenClawAgentCardSpec;
+  settings?: AgentCardSettingsSchema;
+};
+
+type AgentCardCommon = {
+  promptPreset?: "standard-v1" | "gpt-5-v1";
+  reasoningMode?: "inherit" | "off" | "adaptive";
+  toolExposure?: "standard-v1" | "lean-v1";
+};
+
+type OpenClawAgentCardSpec = {
+  toolSearchPolicy?: "inherit" | "lean-v1";
+  contextPosture?: "standard" | "constrained";
+};
+
+type AgentCardBinding = {
   id: string;
   selector: {
     providerId?: string;
@@ -190,7 +207,7 @@ type ModelProfileBinding = {
     artifactDigest?: string;
     modelSizeClass?: ModelCapacityClass;
   };
-  profile: string;
+  card: string;
 };
 ```
 
@@ -199,31 +216,37 @@ JSON-compatible files or a typed source module validated against the same
 schema. The contract is declarative and JSON-compatible, similar in spirit to
 model manifests, but it is not a request-time config file.
 
-Profile artifacts should use a Kubernetes Resource Model style authoring shape
+Card artifacts should use a Kubernetes Resource Model style authoring shape
 so OpenClaw can reuse established base/overlay vocabulary instead of inventing
 a new layering language:
 
 ```yaml
-apiVersion: profiles.openclaw.ai/v1alpha1
-kind: ModelProfile
+apiVersion: agentcards.openclaw.ai/v1alpha1
+kind: AgentCard
 metadata:
   namespace: openclaw
   name: anthropic-agent-v1
 spec:
-  policy:
+  common:
     toolExposure: standard-v1
-    toolSearchPolicy: inherit
     promptPreset: standard-v1
     reasoningMode: inherit
+  openclaw.ai:
+    toolSearchPolicy: inherit
     contextPosture: standard
 ```
 
+All behavior fields live under `spec`. The `common` section is the
+harness-agnostic part. Domain-named sections such as `openclaw.ai` are owned
+by the corresponding harness or project and can grow independently without
+changing the common schema.
+
 The resource `spec` may also include `settings` with the same closed settings
-schema used by the materialized profile. For example, a GPT-5 profile artifact
+schema used by the materialized card. For example, a GPT-5 card artifact
 can declare the supported response-style setting without adding a generic
 config bag.
 
-Derived profiles may be authored as Kustomize-style overlays:
+Derived cards may be authored as Kustomize-style overlays:
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -232,37 +255,37 @@ resources:
   - ../anthropic-agent-v1
 patches:
   - target:
-      group: profiles.openclaw.ai
+      group: agentcards.openclaw.ai
       version: v1alpha1
-      kind: ModelProfile
+      kind: AgentCard
       name: anthropic-agent-v1
     patch: |-
       - op: replace
         path: /metadata/name
         value: claude-opus-4-7-agent-v1
       - op: replace
-        path: /spec/policy/reasoningMode
+        path: /spec/common/reasoningMode
         value: off
 ```
 
 OpenClaw does not need to expose all of Kustomize as product surface. The
-supported profile-pack subset should be limited to deterministic resource
-hydration and patches required to materialize `ModelProfile` and
-`ModelProfileBinding` resources. Generators, executable plugins, arbitrary
+supported card-pack subset should be limited to deterministic resource
+hydration and patches required to materialize `AgentCard` and
+`AgentCardBinding` resources. Generators, executable plugins, arbitrary
 transformers, and request-time remote fetches are out of scope. An installer may
 resolve registry artifact references to local immutable content before
 hydration; runtime resolution consumes only the validated materialized snapshot.
 
-This gives profiles Docker-like base-image ergonomics without making profile
-manifests imperative. A profile author can publish an Anthropic base profile,
-then publish Claude, enterprise, or unreleased-model overlays that override only
-the fields they need. The materialized output is still one schema-validated
+This gives Agent Cards Docker-like base-image ergonomics without making card
+manifests imperative. A card author can publish an Anthropic base card, then
+publish Claude, enterprise, or unreleased-model overlays that override only the
+fields they need. The materialized output is still one schema-validated
 registry snapshot with explicit provenance.
 
 The built-in registry loads and validates once during process startup. The
-process retains an immutable snapshot; an agent run receives a resolved policy
-snapshot, not a mutable registry pointer. Invalid built-ins fail development or
-build validation rather than falling back at request time.
+process retains an immutable snapshot; an agent run receives a resolved
+behavior snapshot, not a mutable registry pointer. Invalid built-ins fail
+development or build validation rather than falling back at request time.
 
 Future installed packs may be hosted by ClawHub, a public artifact registry, a
 private enterprise registry, or an intranet mirror. They require explicit
@@ -270,18 +293,18 @@ owner-controlled installation, schema validation, version/provenance
 attribution, digest pinning or equivalent immutable identity, and restart or
 explicit reload. They must never be fetched during a model request.
 
-Profile layering is resolved before runtime selection. The hydrated resource
-graph must materialize to unambiguous profile resources; the registry rejects
-cycles, unknown bases, ambiguous bindings, unknown prompt recipes, and invalid
+Card layering is resolved before runtime selection. The hydrated resource
+graph must materialize to unambiguous card resources; the registry rejects
+cycles, unknown bases, ambiguous bindings, unknown prompt presets, and invalid
 settings. Arrays and maps must use field-specific replacement/merge semantics;
 generic deep merge is not allowed.
 
 ### Selection order
 
-Profile resolution is deterministic and chooses one profile:
+Card resolution is deterministic and chooses one card:
 
-1. Explicit agent profile.
-2. Explicit global default profile.
+1. Explicit agent card.
+2. Explicit global default card.
 3. Exact artifact-digest binding.
 4. Exact canonical-model binding.
 5. Provider-scoped model-family binding.
@@ -289,7 +312,7 @@ Profile resolution is deterministic and chooses one profile:
 7. `openclaw/full-agent-v1`.
 
 ```ts
-type ModelHarnessProfileSelectionSource =
+type AgentCardSelectionSource =
   | "agent-explicit"
   | "defaults-explicit"
   | "artifact"
@@ -298,10 +321,10 @@ type ModelHarnessProfileSelectionSource =
   | "capacity"
   | "fallback";
 
-type ResolvedModelHarnessProfile = {
-  profile: ModelHarnessProfile;
-  selectionSource: ModelHarnessProfileSelectionSource;
-  profileBindingId: string | null;
+type ResolvedAgentCard = {
+  card: AgentCard;
+  selectionSource: AgentCardSelectionSource;
+  cardBindingId: string | null;
   modelIdentity: ResolvedModelIdentity;
 };
 ```
@@ -310,28 +333,28 @@ An ambiguous match at the same precedence level is a registry error. Exact
 artifact binding always wins over model, family, and capacity. Family bindings
 are provider scoped whenever native capabilities differ across routes.
 
-Profile policy remains subject to driver capabilities. A profile can request an
-adaptive thinking default, for example, but the driver remains authoritative on
+Agent Card behavior remains subject to driver capabilities. A card can request
+an adaptive thinking mode, for example, but the driver remains authoritative on
 whether the selected model/route supports it. Unsupported requested behavior
 uses a named, testable fallback and emits bounded diagnostics; it does not
 invent a provider payload.
 
-### Initial profiles
+### Initial cards
 
 Phase one deliberately keeps four capacity classes but ships two
 capacity-derived behavioral baselines:
 
-| Profile | Parent | Binding intent | Purpose |
+| Card | Parent | Binding intent | Purpose |
 | --- | --- | --- | --- |
 | `openclaw/full-agent-v1` | none | fallback; Medium/Large | general harness baseline |
 | `openclaw/lean-agent-v1` | `full-agent-v1` | trusted Tiny/Small; legacy config | exact Lean migration |
 | `openclaw/gpt-5-agent-v1` | `full-agent-v1` | current GPT-5 family behavior | prompt preset and response-style setting |
-| `openclaw/anthropic-agent-v1` | `full-agent-v1` | shared Anthropic/Claude behavior | base profile for Claude-family overrides |
+| `openclaw/anthropic-agent-v1` | `full-agent-v1` | shared Anthropic/Claude behavior | base card for Claude-family overrides |
 | `openclaw/claude-opus-4-7-agent-v1` | `anthropic-agent-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
 | `openclaw/claude-4-6-agent-v1` | `anthropic-agent-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
 
 The exact model aliases and family identities remain in canonical model/provider
-catalogs. Registry bindings refer to normalized identity; profiles are not a
+catalogs. Registry bindings refer to normalized identity; cards are not a
 second model catalog.
 
 `full-agent-v1` is behaviorally neutral:
@@ -340,12 +363,16 @@ second model catalog.
 {
   "schemaVersion": 1,
   "id": "openclaw/full-agent-v1",
-  "policy": {
-    "toolExposure": "standard-v1",
-    "toolSearchPolicy": "inherit",
-    "promptPreset": "standard-v1",
-    "reasoningModeDefault": "inherit",
-    "contextPosture": "standard"
+  "spec": {
+    "common": {
+      "toolExposure": "standard-v1",
+      "promptPreset": "standard-v1",
+      "reasoningMode": "inherit"
+    },
+    "openclaw.ai": {
+      "toolSearchPolicy": "inherit",
+      "contextPosture": "standard"
+    }
   }
 }
 ```
@@ -358,10 +385,14 @@ second model catalog.
   "schemaVersion": 1,
   "id": "openclaw/lean-agent-v1",
   "extends": "openclaw/full-agent-v1",
-  "policy": {
-    "toolExposure": "lean-v1",
-    "toolSearchPolicy": "lean-v1",
-    "contextPosture": "constrained"
+  "spec": {
+    "common": {
+      "toolExposure": "lean-v1"
+    },
+    "openclaw.ai": {
+      "toolSearchPolicy": "lean-v1",
+      "contextPosture": "constrained"
+    }
   }
 }
 ```
@@ -375,7 +406,7 @@ Phase-one `lean-v1` preserves today's behavior:
 
 The broader deny list proposed in local-model Lean PR `#87617` is not a
 compatible migration. It may be a later explicitly selected and benchmarked
-profile, such as `compact-agent-v2`, but must not alter `lean-agent-v1`.
+card, such as `compact-agent-v2`, but must not alter `lean-agent-v1`.
 
 The routing mechanism explored in `#87587`, where named tools can remain
 direct, is useful as an implementation detail:
@@ -390,7 +421,7 @@ type ToolExposurePolicy = {
 It does not change phase-one Lean semantics without an explicit product
 decision.
 
-The GPT-5 profile owns the migrated response-style setting and a code-owned
+The GPT-5 card owns the migrated response-style setting and a code-owned
 named prompt preset:
 
 ```json
@@ -398,27 +429,31 @@ named prompt preset:
   "schemaVersion": 1,
   "id": "openclaw/gpt-5-agent-v1",
   "extends": "openclaw/full-agent-v1",
-  "policy": {
-    "promptPreset": "gpt-5-v1"
-  },
-  "settings": {
-    "responseStyle": {
-      "allowedValues": ["friendly", "off"],
-      "default": "friendly"
+  "spec": {
+    "common": {
+      "promptPreset": "gpt-5-v1"
+    },
+    "settings": {
+      "responseStyle": {
+        "allowedValues": ["friendly", "off"],
+        "default": "friendly"
+      }
     }
   }
 }
 ```
 
-The Claude/Opus profiles migrate only existing thinking-default selection:
+The Claude/Opus cards migrate only existing thinking-default selection:
 
 ```json
 {
   "schemaVersion": 1,
   "id": "openclaw/claude-opus-4-7-agent-v1",
   "extends": "openclaw/anthropic-agent-v1",
-  "policy": {
-    "reasoningModeDefault": "off"
+  "spec": {
+    "common": {
+      "reasoningMode": "off"
+    }
   }
 }
 ```
@@ -428,40 +463,54 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
   "schemaVersion": 1,
   "id": "openclaw/claude-4-6-agent-v1",
   "extends": "openclaw/anthropic-agent-v1",
-  "policy": {
-    "reasoningMode": "adaptive"
+  "spec": {
+    "common": {
+      "reasoningMode": "adaptive"
+    }
   }
 }
 ```
 
-The profile selects a default; the driver continues to own allowed thinking
+The card selects a default; the driver continues to own allowed thinking
 levels, native parameter names, and final request validation. There is no
 current Claude prompt overlay to migrate, and this RFC does not create one.
 
-### Policy surface
+### Agent Card surface
 
-The phase-one policy surface is closed:
+The phase-one Agent Card surface is closed. `spec.common` contains the small
+set of behavior fields that may be useful across agent harnesses. Domain-named
+sections such as `spec.openclaw.ai` contain harness-specific fields owned by
+that project.
 
 ```ts
-type ModelProfilePolicy = {
+type AgentCardSpec = {
+  common: AgentCardCommon;
+  "openclaw.ai"?: OpenClawAgentCardSpec;
+  settings?: AgentCardSettingsSchema;
+};
+
+type AgentCardCommon = {
   toolExposure?: "standard-v1" | "lean-v1";
-  toolSearchPolicy?: "inherit" | "lean-v1";
   promptPreset?: "standard-v1" | "gpt-5-v1";
   reasoningMode?: "inherit" | "off" | "adaptive";
+};
+
+type OpenClawAgentCardSpec = {
+  toolSearchPolicy?: "inherit" | "lean-v1";
   contextPosture?: "standard" | "constrained";
 };
 ```
 
-| Field | Owner | Consumer | Phase-one meaning |
-| --- | --- | --- | --- |
-| `toolExposure` | agent harness | tool preparation | standard or Lean filter |
-| `toolSearchPolicy` | agent harness | embedded run planning | preserves undefined-only default semantics |
-| `promptPreset` | core prompt composition | system-prompt builder | selects code-owned contribution |
-| `reasoningMode` | resolver plus capability gate | current thinking-default callers | replaces model-id branching |
-| `contextPosture` | diagnostics/future policy | no hidden automatic rewrite | records compact/full intent |
+| Field | Section | Owner | Consumer | Phase-one meaning |
+| --- | --- | --- | --- | --- |
+| `toolExposure` | `spec.common` | agent harness | tool preparation | standard or Lean filter |
+| `promptPreset` | `spec.common` | prompt composition | system-prompt builder | selects code-owned contribution |
+| `reasoningMode` | `spec.common` | resolver plus capability gate | current thinking-default callers | replaces model-id branching |
+| `toolSearchPolicy` | `spec.openclaw.ai` | OpenClaw agent harness | embedded run planning | preserves undefined-only default semantics |
+| `contextPosture` | `spec.openclaw.ai` | OpenClaw diagnostics/future behavior | no hidden automatic rewrite | records compact/full intent |
 
 `contextPosture` is not a context-window override. It remains diagnostic until
-a concrete policy has benchmark and compatibility evidence.
+a concrete behavior has benchmark and compatibility evidence.
 
 The schema must not add raw system prompt bodies, arbitrary user tool
 allow/deny lists, endpoint data, transport headers, provider request fragments,
@@ -469,7 +518,7 @@ server launch arguments, cache controls, or generic `extra` maps.
 
 ### System prompt composition
 
-Profiles select named prompt presets. They do not contain arbitrary prompt text.
+Agent Cards select named prompt presets. They do not contain arbitrary prompt text.
 
 ```ts
 type PromptPresetId = "standard-v1" | "gpt-5-v1";
@@ -485,27 +534,27 @@ prompt caching, and safe from unreviewed remote registry content.
 
 The implementation defines and tests one composition order:
 
-1. Prepare model identity, driver capabilities, and resolved profile.
+1. Prepare model identity, driver capabilities, and resolved card.
 2. Build the generic OpenClaw system prompt.
-3. Add the selected profile recipe contribution.
+3. Add the selected card prompt preset contribution.
 4. Add core-owned dynamic channel, session, bootstrap, heartbeat, tool, and
    runtime fragments.
 5. Add existing generic provider/plugin prompt contributions.
 6. Let the driver perform protocol-specific request shaping.
 
 The existing GPT-5 contribution in `src/plugins/provider-runtime.ts` is
-replaced by the selected `gpt-5-v1` recipe contribution before generic
+replaced by the selected `gpt-5-v1` prompt preset contribution before generic
 provider/plugin contributions. Snapshot tests must prove that existing
 `friendly`, `off`, and heartbeat behavior retain their effective prompt order
 and contents.
 
 Channels remain transport implementations. They render portable actions and
-enforce transport constraints; they do not choose a model profile or own
-profile prompt text. Channel-specific dynamic instructions remain core-owned.
+enforce transport constraints; they do not choose an agent card or own
+card prompt text. Channel-specific dynamic instructions remain core-owned.
 
 Native Codex app-server `personality: "none"` behavior remains in the Codex
 driver. It is a protocol parameter used when OpenClaw owns instructions, not a
-portable profile personality mode.
+portable card personality mode.
 
 ### Driver boundary
 
@@ -532,11 +581,11 @@ create a competing registry. Drivers retain ownership of:
 - Codex app-server protocol fields;
 - request-level error behavior.
 
-Profiles must not bypass those contracts.
+Agent Cards must not bypass those contracts.
 
 ### Serving presets and KV cache
 
-Profiles do not alter KV cache behavior for hosted or unmanaged providers.
+Agent Cards do not alter KV cache behavior for hosted or unmanaged providers.
 They contain no cache headers, TTLs, cache-control markers, provider payload
 fields, or engine flags.
 
@@ -545,7 +594,7 @@ This protects the current hosted-provider boundary:
 - Anthropic prompt caching remains owned by existing Anthropic payload policy.
 - OpenAI payload compatibility remains owned by OpenAI runtime policy.
 - A third-party or self-hosted OpenAI-compatible endpoint receives no serving
-  or KV settings merely because a profile is selected.
+  or KV settings merely because a card is selected.
 
 A later **Serving Preset** layer owns managed local performance:
 
@@ -572,10 +621,10 @@ A Serving Preset may apply only when all of the following are true:
 4. A compatible preset exists.
 5. The selected preset and reason are visible to the operator.
 
-Profiles may eventually express a high-level context or serving intent, but
+Agent Cards may eventually express a high-level context or serving intent, but
 they do not contain vLLM versions, GGUF filenames, engine flags, or KV cache
 settings. Do not add `driverBindings` or serving presets to the phase-one
-profile manifest.
+card manifest.
 
 ### User configuration
 
@@ -583,31 +632,31 @@ Phase one adds one narrow selector at defaults and agent scope:
 
 ```json
 {
-  "agentProfiles": {
+  "agents": {
     "defaults": {
-      "modelProfileId": "auto"
+      "agentCardId": "auto"
     },
-    "items": [
+    "list": [
       {
         "id": "local-helper",
-        "modelProfileId": "openclaw/lean-agent-v1"
+        "agentCardId": "openclaw/lean-agent-v1"
       }
     ]
   }
 }
 ```
 
-`"auto"` is the default and invokes binding resolution. A registered profile id
+`"auto"` is the default and invokes binding resolution. A registered card id
 is an explicit operator choice. It is useful for a local model whose metadata
 is unknown but whose behavior has been evaluated.
 
-Settings are namespaced to the selected profile's closed settings schema:
+Settings are namespaced to the selected card's closed settings schema:
 
 ```json
 {
-  "agentProfiles": {
+  "agents": {
     "defaults": {
-      "modelProfileId": "openclaw/gpt-5-agent-v1",
+      "agentCardId": "openclaw/gpt-5-agent-v1",
       "settings": {
         "responseStyle": "off"
       }
@@ -617,21 +666,21 @@ Settings are namespaced to the selected profile's closed settings schema:
 ```
 
 The final field names should match existing agent-default conventions, but the
-surface remains one selector plus settings for that selected profile. Do not
+surface remains one selector plus settings for that selected card. Do not
 add equivalent settings at provider, driver, and agent scope.
 
 Validation rules:
 
 - `"auto"` and registered ids are accepted selectors.
-- Unknown profile ids fail validation.
-- Profile settings require an explicit non-`"auto"` profile at the same scope.
-  An inherited explicit profile is valid when its ownership is unambiguous.
-- Settings fail validation when the selected profile does not own them.
+- Unknown card ids fail validation.
+- Card settings require an explicit non-`"auto"` card at the same scope.
+  An inherited explicit card is valid when its ownership is unambiguous.
+- Settings fail validation when the selected card does not own them.
 - Raw prompt bodies are never accepted as settings.
 - Agent scope wins over defaults, which wins over registry binding.
 - Explicit selection still passes through driver capability gates.
 
-Runtime reads only canonical profile configuration. Doctor owns migration of
+Runtime reads only canonical card configuration. Doctor owns migration of
 legacy fields; steady-state runtime does not read both legacy and canonical
 shapes.
 
@@ -641,9 +690,9 @@ shapes.
 
 | Legacy input | Canonical output | Notes |
 | --- | --- | --- |
-| default `experimental.localModelLean: true` | default `modelProfileId: "openclaw/lean-agent-v1"` | preserves explicit Lean intent |
-| agent `experimental.localModelLean: true` | agent `modelProfileId: "openclaw/lean-agent-v1"` | preserves stronger scope |
-| legacy Lean `false` | remove legacy field | no explicit full profile needed |
+| default `experimental.localModelLean: true` | default `agentCardId: "openclaw/lean-agent-v1"` | preserves explicit Lean intent |
+| agent `experimental.localModelLean: true` | agent `agentCardId: "openclaw/lean-agent-v1"` | preserves stronger scope |
+| legacy Lean `false` | remove legacy field | no explicit full card needed |
 | GPT-5 overlay personality | GPT response-style setting | preserves `friendly`/`off` |
 | OpenAI plugin personality fallback | GPT response-style setting when no more-specific canonical value exists | preserves current precedence |
 
@@ -651,26 +700,26 @@ Doctor must validate rewritten config, be idempotent, avoid duplicating
 settings across scopes, remove legacy fields after success, and report
 same-precedence conflicts rather than guessing.
 
-The following current code moves to the profile system:
+The following current code moves to the card system:
 
 | Current surface | Current responsibility | Required result |
 | --- | --- | --- |
-| `src/agents/local-model-lean.ts` | boolean resolution and compact tool policy | profile policy implementation; delete boolean resolver |
+| `src/agents/local-model-lean.ts` | boolean resolution and compact tool behavior | card behavior implementation; delete boolean resolver |
 | `src/agents/agent-tools.ts` | normal-tool filtering | consume resolved `toolExposure` |
-| `src/agents/embedded-agent-runner/run/attempt.ts` | Tool Search default and pre/post-search filtering | consume resolved profile at both boundaries |
+| `src/agents/embedded-agent-runner/run/attempt.ts` | Tool Search default and pre/post-search filtering | consume resolved card at both boundaries |
 | `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | code-owned `gpt-5-v1` preset plus response-style setting |
-| `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve profile contribution before generic provider contribution |
+| `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve prompt preset contribution before generic provider contribution |
 | `extensions/openai/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
 | `extensions/codex/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
-| `src/config/zod-schema.agent-defaults.ts` | GPT overlay config | canonical profile schema and doctor migration |
-| `src/agents/model-thinking-default.ts` | model-id thinking defaults | profile resolver plus capability gate |
-| `docs/concepts/experimental-features.md` | Lean documentation | Model Profiles docs and migration guidance |
+| `src/config/zod-schema.agent-defaults.ts` | GPT overlay config | canonical card schema and doctor migration |
+| `src/agents/model-thinking-default.ts` | model-id thinking defaults | card resolver plus capability gate |
+| `docs/concepts/experimental-features.md` | Lean documentation | Agent Cards docs and migration guidance |
 
 The following remain in their current owners:
 
 | Current surface | Why it stays |
 | --- | --- |
-| `src/plugins/provider-claude-thinking.ts` | driver-supported thinking levels/default profiles |
+| `src/plugins/provider-claude-thinking.ts` | driver-supported thinking levels/defaults |
 | `packages/llm-core/src/model-contracts/anthropic.ts` | canonical Anthropic identity and native support |
 | `extensions/anthropic/register.runtime.ts` | catalog, context, max token, and native maps |
 | `extensions/anthropic/stream-wrappers.ts` | provider stream/beta/service behavior |
@@ -684,12 +733,12 @@ The following remain in their current owners:
 The implementation creates one pure resolver:
 
 ```ts
-resolveModelHarnessProfile({
+resolveAgentCard({
   identity,
   agentConfig,
   registry,
   driverCapabilities,
-}): ResolvedModelHarnessProfile
+}): ResolvedAgentCard
 ```
 
 It is resolved once with prepared model facts and carried through tool
@@ -699,7 +748,7 @@ provider/model discovery in each hot path.
 
 ### Rollout
 
-#### Phase 1: OpenClaw-owned profile platform
+#### Phase 1: OpenClaw-owned Agent Card platform
 
 Phase one covers the complete OpenClaw-owned implementation path. It establishes
 the local schema, resolver, built-in registry, migration path, and managed-local
@@ -708,20 +757,20 @@ serving boundary before any ClawHub or community registry is trusted.
 1. Accept this RFC.
 2. Open an implementation issue with owners across agent runtime, config/doctor,
    OpenAI, Anthropic, Codex, and local serving.
-3. Freeze initial profile ids and capacity boundaries.
+3. Freeze initial card ids and capacity boundaries.
 4. Confirm that `lean-agent-v1` is an exact migration rather than an
    opportunity to expand its tool deny list.
 5. Add identity/capacity types, registry schema, built-in registry, resolver,
    binding validation, and diagnostics.
 6. Add `full-agent-v1` and `lean-agent-v1`.
-7. Thread the resolved profile through run planning, tools, and prompt
+7. Thread the resolved card through run planning, tools, and prompt
    composition.
 8. Move Lean logic and doctor-migrate legacy Lean config.
 9. Add `gpt-5-agent-v1`, migrate response-style config, and replace direct
    prompt overlay resolution.
-10. Add `anthropic-agent-v1` plus exact Claude/Opus derived profiles, and move
+10. Add `anthropic-agent-v1` plus exact Claude/Opus derived cards, and move
     only existing thinking-default selection branches.
-11. Add profile inspection and documentation.
+11. Add card inspection and documentation.
 12. Remove retired runtime config reads and helper/re-export paths.
 13. Add reviewed artifact/family bindings only with canonical identity,
     driver/engine conditions, benchmark evidence, rationale, and
@@ -730,67 +779,67 @@ serving boundary before any ClawHub or community registry is trusted.
 14. Add a separate Serving Preset resolver for OpenClaw-managed local services.
     It validates engine/version/artifact compatibility, exposes applied
     settings to the operator, and is where KV cache tuning may be added.
-15. Consider signed/reviewed installed profile packs only after built-ins have
+15. Consider signed/reviewed installed card packs only after built-ins have
     proven stable. They remain startup or explicit-reload metadata, never
     request-time remote configuration.
 
-Phase one is complete only when profiles exist, wiring is in use, current
+Phase one is complete only when cards exist, wiring is in use, current
 behavior is covered by tests, legacy config has a doctor migration, family
 bindings and Serving Presets have owner-reviewed evidence, and any installed
 pack mechanism has explicit provenance and reload semantics.
 
-#### Phase 2: ClawHub model profile registry
+#### Phase 2: ClawHub agent card registry
 
-Phase two turns the profile system into a ClawHub-backed distribution and
+Phase two turns the card system into a ClawHub-backed distribution and
 discovery surface for open-weight models. This is the community and publisher
 registry layer proposed for moving beyond `localModelLean`; it must build on
 the phase-one schema, resolver, provenance, and safety boundaries rather than
 replacing them.
 
 ClawHub should allow Hugging Face model publishers, artifact publishers, and
-community maintainers to submit model profiles that target specific model
+community maintainers to submit agent cards that target specific model
 families, revisions, artifacts, or quantized files. Hugging Face identity should
 be treated as a primary source for open-model ownership and artifact identity
 where possible, including exact `hf://` model URIs, revisions, file paths, and
-stable publisher identifiers. Profiles for the same model may be official,
+stable publisher identifiers. Cards for the same model may be official,
 publisher-authored, OpenClaw-reviewed, or community-authored, but their
 provenance must be visible to operators.
 
 The same artifact model should support enterprise and pre-release workflows.
-An organization should be able to host private profile packs in an enterprise
+An organization should be able to host private card packs in an enterprise
 registry or intranet mirror while it optimizes an unreleased model, then later
-promote the same profile chain, or a reviewed derivative, to a public ClawHub
-profile when the model is released.
+promote the same card chain, or a reviewed derivative, to a public ClawHub
+card when the model is released.
 
 The ClawHub registry should support:
 
 - deterministic lookup by canonical model identity and exact artifact identity,
   not fuzzy model names;
-- profile provenance, owner, version, review status, download/install counts,
+- card provenance, owner, version, review status, download/install counts,
   benchmark evidence, and rollback metadata;
-- public, private, and intranet-hosted profile artifacts with immutable
+- public, private, and intranet-hosted card artifacts with immutable
   versions or digests;
 - publisher and community submission flows with schema validation before a
-  profile can be installed;
-- benchmark-informed profile recommendations for high-value open-weight models;
-- AI-assisted profile generation only as a proposal step, with reviewed output
+  card can be installed;
+- benchmark-informed card recommendations for high-value open-weight models;
+- AI-assisted card generation only as a proposal step, with reviewed output
   before distribution;
-- profile discovery from a ClawHub UI that can search Hugging Face models,
-  list available artifacts or quantizations, and show matching profiles;
+- card discovery from a ClawHub UI that can search Hugging Face models,
+  list available artifacts or quantizations, and show matching cards;
 - explicit user installation, startup loading, and visible diagnostics in
   OpenClaw.
 
-ClawHub profiles must not be fetched or evaluated during a model request. A
-downloaded profile pack still uses the phase-one installed-pack contract:
+ClawHub cards must not be fetched or evaluated during a model request. A
+downloaded card pack still uses the phase-one installed-pack contract:
 schema validation, version/provenance attribution, restart or explicit reload,
 and driver capability gates. Remote content must not inject raw prompt text,
 credentials, provider payload fragments, cache controls, server flags, or
 unreviewed code. If ClawHub eventually references prompt behavior, it should
-select reviewed named prompt recipes rather than carrying arbitrary prompt
+select reviewed named prompt presets rather than carrying arbitrary prompt
 bodies.
 
 Phase two is complete only when ClawHub can publish, discover, install, verify,
-and inspect model profiles for at least a small set of benchmarked open-weight
+and inspect agent cards for at least a small set of benchmarked open-weight
 families without weakening the built-in registry guarantees or hosted-provider
 boundaries.
 
@@ -799,8 +848,8 @@ boundaries.
 Registry and resolver:
 
 - reject duplicate ids, unknown parents, cycles, unknown bindings, ambiguous
-  bindings, unknown recipes, and invalid settings;
-- materialize KRM/Kustomize-style profile packs into stable registry snapshots;
+  bindings, unknown prompt presets, and invalid settings;
+- materialize KRM/Kustomize-style card packs into stable registry snapshots;
 - reject unsupported generators, executable plugins, arbitrary transformers,
   request-time remote fetches, and ambiguous overlay outputs;
 - table-test every capacity boundary;
@@ -821,7 +870,7 @@ GPT:
 
 - preserve current prompt snapshots for `friendly`, `off`, and heartbeat cases;
 - preserve contribution order before generic provider contributions;
-- prove non-GPT profiles receive no GPT contribution;
+- prove non-GPT cards receive no GPT contribution;
 - prove legacy overlay/plugin settings migrate and invalid settings fail.
 
 Claude/Opus:
@@ -835,12 +884,12 @@ Hosted provider regression:
 
 - Anthropic cache-marker and service-tier request tests remain unchanged;
 - OpenAI reasoning/verbosity/strict-tool request tests remain unchanged;
-- unmanaged endpoints receive no Serving Preset or KV settings from profile
+- unmanaged endpoints receive no Serving Preset or KV settings from card
   resolution.
 
 Diagnostics:
 
-- expose canonical model, capacity/provenance, selected profile/version,
+- expose canonical model, capacity/provenance, selected card/version,
   selection source, binding id, and driver capability fallback;
 - never expose prompt text, credentials, raw provider errors, or local paths.
 
@@ -848,7 +897,7 @@ The preferred operator surface is an existing model inspection namespace, for
 example:
 
 ```text
-openclaw models profile <provider/model>
+openclaw models card <provider/model>
 ```
 
 The final command name should follow current CLI ownership rather than adding a
@@ -856,11 +905,11 @@ new top-level command.
 
 ## Rationale
 
-### Model Profile versus Model Driver
+### Agent Card versus Model Driver
 
 The terms answer different questions and should remain distinct. Calling the
 registry a driver would pull transport, auth, and engine assumptions into a
-portable harness policy system. Calling a driver a profile would hide its
+portable harness behavior system. Calling a driver a card would hide its
 protocol and payload responsibilities. The split makes ownership clear and
 prevents a local performance setting from reaching a public provider.
 
@@ -878,29 +927,29 @@ Two initial behavior baselines have a concrete purpose:
 - `full-agent-v1` is the safe fallback for larger and unknown models.
 
 This avoids premature tuning policy while retaining a stable place to add
-benchmark-backed profiles later.
+benchmark-backed cards later.
 
-### Named prompt recipes instead of prompt text in manifests
+### Named prompt presets instead of prompt text in manifests
 
 Prompt content is security- and cache-sensitive product code. Keeping it in
 source provides code review, snapshots, deterministic order, and versioned
-rollouts. A profile manifest selects a recipe; it does not become a remote
+rollouts. A card manifest selects a preset; it does not become a remote
 prompt patch system.
 
 ### Separate Serving Presets
 
 KV cache dtype, context limits, and engine flags depend on serving engine,
 version, hardware, artifact format, and deployment ownership. They cannot be
-safely inferred from model size or profile id. Separating Serving Presets
+safely inferred from model size or card id. Separating Serving Presets
 protects hosted providers and avoids embedding high-churn operational details
-into the portable profile registry.
+into the portable card registry.
 
 ### Exact migration before tuning
 
 The existing Lean boolean is already user-configured behavior. Reinterpreting
 it with a broader deny list would be a behavior change hidden inside a
 refactor. This RFC migrates it exactly, then makes stricter or family-specific
-profiles an explicit later product decision.
+cards an explicit later product decision.
 
 ### Static built-in registry first
 
@@ -909,42 +958,42 @@ It establishes the schema and resolution contract before introducing the
 security, provenance, reload, and compatibility burden of an installed remote
 registry ecosystem.
 
-### KRM-style profile artifacts
+### KRM-style card artifacts
 
-Model profile artifacts should use Kubernetes Resource Model conventions for
+Agent Card artifacts should use Kubernetes Resource Model conventions for
 authoring because that ecosystem already has a clear language for
 `apiVersion`, `kind`, `metadata`, resources, bases, overlays, and patches. This
-keeps profile layering familiar to operators without turning profiles into a
+keeps card layering familiar to operators without turning cards into a
 Dockerfile-like imperative language.
 
 OpenClaw should reuse the Kustomize base/overlay shape only as a constrained
-profile-pack authoring and materialization format. The runtime still consumes a
-fully resolved profile snapshot. This avoids reinventing inheritance syntax
+card-pack authoring and materialization format. The runtime still consumes a
+fully resolved card snapshot. This avoids reinventing inheritance syntax
 while preserving OpenClaw-specific safety rules: no executable generators, no
 unbounded transformers, no request-time remote fetches, and no raw prompt or
 provider payload injection from remote artifacts.
 
-The artifact model also fits enterprise distribution. A profile pack can be
+The artifact model also fits enterprise distribution. A card pack can be
 public on ClawHub, private in a provider's pre-release registry, or mirrored on
 an intranet. In all cases, OpenClaw resolves and validates the dependency chain
-before use, records the resolved profile ancestry, and applies driver
+before use, records the resolved card ancestry, and applies driver
 capability gates after materialization.
 
 ## Unresolved Questions
 
-1. Should the public config field be `modelProfileId` or `harnessProfileId`?
-   This RFC recommends `modelProfileId` publicly and `ModelHarnessProfile` in
+1. Should the public config field be `agentCardId` or `harnessCardId`?
+   This RFC recommends `agentCardId` publicly and `AgentCard` in
    implementation types.
-2. Should an explicit profile be selectable per run in phase one? The
+2. Should an explicit card be selectable per run in phase one? The
    recommendation is defaults and agent scope only until a concrete run-level
    use case appears.
-3. Which existing CLI inspection command should display the resolved profile?
+3. Which existing CLI inspection command should display the resolved card?
 4. Should Ollama parameter metadata be marked `declared` rather than
    `verified` unless an artifact digest is registry-bound? This RFC recommends
    `declared`, while still allowing capacity fallback with visible provenance.
-5. Should a future compact profile keep tools such as `exec` direct? This is a
+5. Should a future compact card keep tools such as `exec` direct? This is a
    benchmark/product decision and must not be folded into Lean migration.
 6. What signature and provenance contract is sufficient before installed
-   registry packs can reference reviewed prompt recipes and artifact bindings?
+   registry packs can reference reviewed prompt presets and artifact bindings?
 7. Does future local capacity policy need hardware/memory facts? Those belong
    to Serving Presets unless a concrete portable harness behavior needs them.
