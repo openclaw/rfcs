@@ -5,7 +5,7 @@ authors:
   - Patrick
   - Gio
 created: 2026-06-18
-last_updated: 2026-06-20
+last_updated: 2026-06-22
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/19
@@ -16,12 +16,14 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/19
 ## Summary
 
 Define a hosted feed model for OpenClaw plugins and skills. A feed is a JSON
-catalog document that describes available packages, named local package sources,
-version and integrity metadata, and feed-level governance state such as
-recommended, disabled, blocked, or update available. OpenClaw should move the
-existing file-backed external plugin catalog to this feed model first, keep a
-bundled fallback for offline environments, and later extend the same contract to
-skills and organization-specific catalogs.
+catalog document that describes available packages, version and integrity
+metadata, package-source references, and feed-level governance state such as
+recommended, disabled, blocked, or update available. A package-source reference
+is a name that the local OpenClaw deployment maps to npm, ClawHub, Git, or a
+private registry configuration. OpenClaw should move the existing file-backed
+external plugin catalog to this feed model first, keep a bundled fallback for
+offline environments, and later extend the same contract to skills and
+organization-specific catalogs.
 
 The first implementation should preserve the package model OpenClaw already
 uses. External plugins can continue to install from npm or ClawHub, with Git
@@ -66,8 +68,9 @@ package source layer.
 - Define immutable Git source installs using full commit hashes.
 - Define a feed entry shape for plugins first, with room for skills and other
   package types.
-- Support edge-hosted and regional feeds so provider availability can differ by
-  geography or deployment environment.
+- Support edge-hosted feed variants so provider availability can differ by
+  geography or deployment environment without requiring clients to interpret a
+  complex regional policy language.
 - Let ClawHub publish one or more public feeds for OpenClaw clients.
 - Let enterprises publish composed effective feeds that subset, block, pin, or
   augment public feeds.
@@ -75,8 +78,9 @@ package source layer.
   the private registry RBAC model.
 - Let clients check feeds on a named, lifecycle-owned refresh schedule using
   HTTP `Last-Modified` and `ETag`.
-- Support signed remote feeds and an optional, small trust envelope for signing
-  key rotation without requiring a full update framework in the first version.
+- Support signed remote feeds with directly configured publisher keys first,
+  while leaving room for a later signed key-rotation document if ClawHub needs
+  remote publisher-key rotation.
 - Keep a bundled feed in every OpenClaw build so offline, Docker, and
   air-gapped environments continue to work.
 - Create an RFC and implementation plan that ClawHub, Microsoft, Tencent,
@@ -105,8 +109,11 @@ OpenClaw should treat feeds as the catalog primitive underneath plugin and skill
 marketplace experiences. A feed is fetched from an HTTP endpoint or loaded from a
 local file. The client validates the document shape, verifies a configured
 signature policy when present, and uses entry-level package metadata to drive
-search, recommendation, install, update notices, and feed-level allow/block
-decisions.
+recommendations, installs, update notices, and feed-level allow/block decisions.
+Registry-owned search can still remain with ClawHub or another marketplace
+service. In that model the registry returns ranked results, and the OpenClaw
+client filters or annotates those results against the configured feeds before
+showing or installing them.
 
 The initial implementation should refactor the existing external plugin catalog
 rather than introduce a parallel catalog. Today the relevant OpenClaw entry
@@ -126,8 +133,15 @@ source from bundled-only JSON to hosted JSON with bundled fallback.
 
 A feed document should be a deterministic JSON document with a schema version,
 feed id, generated timestamp, monotonic sequence number, expiry, and entries.
-Entry ids must be stable. Entries select a configured local source by name rather
-than embedding a registry domain, credentials, or trust roots.
+Entry ids must be stable registry identities, not mutable display slugs. If a
+registry allows user-editable slugs, the feed should either carry an immutable
+package id or use the canonical package coordinate as the stable id. Display
+slugs and titles can still appear as metadata, but installs and policy decisions
+should not depend on them. Publisher trust should start with ClawHub's current
+binary distinction of official or not official, rather than inventing reviewed or
+verified publisher labels in the first feed. Entries select a configured local
+source by name using `sourceRef` rather than embedding a registry domain,
+credentials, or trust roots.
 
 ```jsonc
 {
@@ -156,9 +170,6 @@ than embedding a registry domain, credentials, or trust roots.
             "integrity": "sha512-..."
           }
         ]
-      },
-      "regions": {
-        "include": ["global"]
       }
     }
   ]
@@ -168,22 +179,30 @@ than embedding a registry domain, credentials, or trust roots.
 The initial states should cover the known plugin catalog needs:
 
 - `available`: entry can be shown and installed.
-- `recommended`: entry can be highlighted in onboarding or search.
-- `disabled`: entry is known but not currently installable from this feed.
-- `blocked`: entry should not be installed through this feed.
+- `recommended`: entry can be highlighted by a client or tenant overlay, but it
+  should not replace a registry-owned search ranking by itself.
+- `disabled`: entry is known but intentionally not offered for new install from
+  this feed. This is useful for temporary availability, rollout, or regional
+  reasons where the package may still exist elsewhere.
+- `blocked`: entry is an explicit deny decision. A composed feed can use this to
+  remove or override an entry inherited from a parent feed.
 - `deprecated`: entry remains visible for migration but should not be selected
   for new installs.
 
 The exact enum names can change during implementation, but the RFC should keep
 these concepts separate. A recommended package is not the same as a merely
-available package. A disabled package is not the same as a blocked package.
+available package. A disabled package is not the same as a blocked package:
+`disabled` means unavailable from this feed, while `blocked` means explicitly
+denied by this feed.
 
 ### Local feed and source configuration
 
 Feed names and source profile names are deployment-local. There is no
 `enterprise` feed or registry shape. A deployment can name feeds and sources
 after its own topology, while a feed entry refers only to a configured
-`sourceRef`.
+`sourceRef`. For example, `public-npm` is not a domain from the feed. It is a
+local profile that OpenClaw resolves to an npm registry URL, credentials, and
+installer behavior already trusted by that deployment.
 
 ```jsonc
 {
@@ -274,6 +293,13 @@ same discovery contract, but skill installation remains staged until the native
 skill installer accepts catalog candidates. A ClawHub skill must not be routed
 through the plugin installer merely because both appear in a feed.
 
+Skills also need extra care because the Agent Skills specification does not
+require a version, and ClawHub can index skills that are installed directly from
+GitHub rather than mirrored by ClawHub. A feed candidate for such a skill should
+be allowed to point at an approved GitHub source profile with `repo`, `path`, a
+full commit hash, and a content hash. The feed should not assume every skill has
+a ClawHub-hosted package artifact or a semantic version.
+
 ### Feed discovery and fallback
 
 OpenClaw should have a default feed URL for the ClawHub public feed. At build or
@@ -319,8 +345,9 @@ threshold are the initial trust anchor; a remote feed cannot bootstrap or replac
 them. `verification.mode: "signed"` fails closed. An unsigned HTTPS feed requires
 the explicit local `verification.mode: "unsigned"` opt-in.
 
-Most feeds can use directly configured public keys. When remote signing-key
-rotation is needed, the same envelope format can wrap a small trust document:
+Most feeds can use directly configured public keys. That should be the first
+implementation. If ClawHub later needs remote signing-key rotation, the same
+envelope format can wrap a small signed key-rotation document:
 
 ```jsonc
 {
@@ -334,14 +361,15 @@ rotation is needed, the same envelope format can wrap a small trust document:
 }
 ```
 
-The configured root-key quorum verifies the trust envelope. The verified
-`feedKeys` quorum then verifies feed envelopes. A trust update must be signed by
-the currently trusted root quorum, and the client persists the accepted sequence
-and expiry to reject rollback and freeze attempts. Root-key replacement remains a
-local operator action for emergency recovery. The bundled fallback is trusted as
-part of the shipped OpenClaw artifact, not as an unsigned replacement for a
-configured signed remote feed. `verification.trustUrl` is optional; when absent,
-the configured root keys directly verify feed envelopes.
+If key rotation is enabled, a locally configured root-key quorum verifies the
+signed key-rotation document. The verified `feedKeys` quorum then verifies feed
+envelopes. A key-rotation update must be signed by the currently trusted root
+quorum, and the client persists the accepted sequence and expiry to reject
+rollback and freeze attempts. Replacing root keys remains a local operator action
+for emergency recovery. The bundled fallback is trusted as part of the shipped
+OpenClaw artifact, not as an unsigned replacement for a configured signed remote
+feed. `verification.trustUrl` is optional; when absent, the configured local keys
+directly verify feed envelopes.
 
 ```mermaid
 flowchart LR
@@ -390,6 +418,16 @@ parent feed and apply local rules: include only some entries, block entries,
 change recommendation state, pin versions, add private entries, or publish a
 regional variant.
 
+When multiple feeds or overlays mention the same stable entry id, the effective
+state should be deterministic. The recommended first resolution order is:
+`blocked` wins over every other state, then `disabled`, then `deprecated`, then
+`recommended`, then `available`. Pinning a version or adding a private candidate
+should not override a `blocked` decision unless the composing system explicitly
+removes the block before publishing the final effective feed. ClawHub can ignore
+recommendation overrides in its own public search ranking, while enterprises can
+use recommendation and pinning metadata as tenant-local ranking or onboarding
+overrides.
+
 The screen-share model from the design discussion used `register.openclaw.ai` as
 the public OpenClaw feed endpoint and a tenant endpoint such as
 `tenant.msft.azure.example` as a composed feed. Those names are illustrative,
@@ -434,9 +472,16 @@ their own registry, CI job, private Git repository, or static hosting service.
 
 The feed model should allow regional variants. Some providers are only useful in
 certain markets. Some providers may be unavailable or blocked in certain regions.
-The feed endpoint can use edge routing, or the client can be configured with an
-explicit regional feed URL. The feed document should make regional intent visible
-so reviewers and mirrors can reason about it.
+The simplest model is for ClawHub or a mirror to publish separate effective feed
+documents per region and cache those documents at the edge. A client can then use
+edge routing or an explicit configured regional feed URL. This avoids requiring
+the first client to evaluate a complex `regions` field at install time.
+
+A feed document may still carry human-readable regional metadata for review and
+mirror operations, but regional selection should initially be a feed-selection
+problem rather than a per-entry policy language. The bundled fallback can remain
+global; if a distribution needs an offline regional fallback, it can bundle that
+regional feed variant in its own build.
 
 ```mermaid
 flowchart TD
@@ -499,16 +544,19 @@ from richer systems such as ClawHub, MOS3, private Git repositories, or CI jobs.
 
 This proposal deliberately separates the feed from package storage and source
 configuration. npm already solves package distribution for current external
-plugins. ClawHub can remain the public registry and package discovery surface.
-Organizations can keep private artifacts in their own registries or Git hosts.
-The feed only selects approved package candidates and records immutable
-integrity data; local source profiles decide where those candidates resolve and
-how the client authenticates.
+plugins. ClawHub can remain the public registry, marketplace, and package
+discovery surface, including ownership of its own search algorithm. Organizations
+can keep private artifacts in their own registries or Git hosts. The feed only
+selects approved package candidates and records immutable integrity data; local
+source profiles decide where those candidates resolve and how the client
+authenticates.
 
-The trust envelope is intentionally smaller than a full updater framework.
-Directly configured keys cover the normal case. The optional trust document adds
-remote publisher-key rotation and expiry without making the first implementation
-own generic delegation, mirror, or artifact-update roles.
+The signed envelope is intentionally smaller than a full updater framework.
+Directly configured publisher keys cover the normal case and should be enough for
+the first release. If ClawHub later needs remote publisher-key rotation, a
+separate signed key-rotation document can describe the currently valid feed
+signing keys and expiry. That follow-up should be treated as a distinct design
+step, not as a requirement for the first hosted feed.
 
 The bundled fallback is not optional. Without it, a feed outage or blocked
 endpoint would break onboarding and plugin discovery. With it, hosted feeds add
@@ -516,43 +564,44 @@ freshness and control while preserving today’s offline behavior.
 
 ## Rollout plan
 
-1. Refactor the existing external plugin manifest so the current local catalog
+1. Align on the RFC enough to proceed with implementation, including source
+   profile terminology, search ownership, state precedence, signing scope, and
+   the plugin-first rollout boundary.
+2. Refactor the existing external plugin manifest so the current local catalog
    shape can be generated from a feed document.
-2. Add named feed and source profiles, including npm registry overrides,
+3. Add named feed and source profiles, including npm registry overrides,
    ClawHub-compatible base URLs, Git base paths, and secret-reference
    authentication.
-3. Publish the first ClawHub-hosted feed for the existing official external
-   plugins.
-4. Update OpenClaw to load the bundled fallback, refresh hosted feeds after
+4. Add signed feed envelopes with directly configured keys for public hosted
+   feeds. Self-hosted unsigned HTTPS feeds remain an explicit local opt-in.
+5. Publish the first ClawHub-hosted feed for the current external plugin catalog.
+   The first feed may include all current external entries; ClawHub can narrow
+   future default feeds to official packages as the official catalog grows.
+6. Update OpenClaw to load the bundled fallback, refresh hosted feeds after
    gateway startup, and store verified snapshots in SQLite.
-5. Add conditional HTTP update detection with `ETag` and `Last-Modified`.
-6. Add signed feed envelopes with directly configured keys, then add the
-   optional rotating trust envelope when publisher-key rotation is required.
-7. Add regional feed support once the default hosted feed path is stable.
-8. Extend the same discovery contract to skills after the skill installer
-   accepts catalog candidates.
-9. Add composition guidance and examples for Microsoft/MOS3 and other
-   tenant-admin systems.
-10. Align Tencent, Xiaomi, and other regional mirrors before the spec is treated
+7. Add conditional HTTP update detection with `ETag` and `Last-Modified`.
+8. Add regional feed variants once the default hosted feed path is stable.
+9. Extend the same discovery contract to skills after the skill installer
+   accepts catalog candidates, including GitHub-indexed skills that do not have
+   ClawHub-hosted artifacts.
+10. Add composition guidance and examples for Microsoft/MOS3 and other
+    tenant-admin systems.
+11. Align Tencent, Xiaomi, and other regional mirrors before the spec is treated
     as stable.
+12. Land implementation through small draft PRs that maintainers can review,
+    adjust, and merge as the RFC stabilizes.
 
 ## Unresolved questions
 
-- Should the default ClawHub feed include only official entries, reviewed
-  entries, trusted publisher entries, or several named feeds?
 - Which `npm`, `clawhub`, and `git` source-profile fields should become stable
   user configuration, and which should remain installer implementation details?
-- Should regional selection be client-configured, edge-routed, tenant-driven, or
-  a combination?
-- What user-facing noun should OpenClaw use: feed, marketplace, registry, or
-  another term?
-- Should a signed public feed be required from the first release, or should
-  unsigned HTTPS feeds remain an explicit opt-in for self-hosted deployments?
-- When should the optional trust envelope be introduced, and do public feeds need
-  separate offline root keys from online publisher keys from day one?
+- Should regional selection be edge-routed, explicit-feed configured,
+  tenant-driven, or a combination after the first global feed works?
+- Should OpenClaw use "marketplace" for the user-facing surface and reserve
+  "feed" for the protocol and propagation artifact?
 - Which runtime policy metadata should feed entries be allowed to reference
   without turning the feed into a policy engine?
 - How many stable OpenClaw releases should ship hosted feed fallback before
   Scout, Microsoft, and other clients depend on the contract?
-- How should ClawHub represent trusted, verified, official, and reviewed
-  publishers in the public feed?
+- Should a later LTS release define stronger compatibility guarantees for feed
+  schema versions and fallback behavior?
