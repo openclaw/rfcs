@@ -20,8 +20,8 @@ that tells an agent harness which shared behavior and harness-specific behavior
 to use for a resolved model: tool exposure, Tool Search defaults, named
 system-prompt presets, and supported reasoning modes. It is separate from model
 identity, provider drivers, and managed-local serving presets. Phase one
-preserves four requested model-capacity classes as metadata, ships two
-capacity-derived behavioral baselines, migrates existing
+preserves four requested model-size classes as metadata, ships two
+size-derived behavioral baselines, migrates existing
 Lean/GPT-5/Claude model-specific behavior onto cards, and leaves KV cache and
 engine tuning outside cards.
 
@@ -58,7 +58,7 @@ hosted providers a consistent way to opt into portable model-family behavior.
 - Preserve current Lean behavior exactly during migration.
 - Centralize existing GPT-5 response-style and Claude/Opus thinking-default
   behavior under the card resolution system.
-- Keep four capacity classes available as model metadata and diagnostics.
+- Keep four model size classes available as model metadata and diagnostics.
 - Ship a conservative phase-one fallback: lean behavior for trusted models up
   to 20B parameters and full behavior otherwise.
 - Make model identity, harness behavior, driver behavior, and local serving
@@ -109,12 +109,12 @@ has resolved the model identity and selected a matching card.
 A driver answers: "Can the harness use this endpoint, and how?" An Agent Card
 answers: "What behavior should the agent harness use with this resolved model?"
 
-### Model identity and capacity classes
+### Model identity and model size classes
 
 Card selection consumes a prepared identity object:
 
 ```ts
-type ModelCapacityClass = "tiny" | "small" | "medium" | "large";
+type ModelSizeClass = "tiny" | "small" | "medium" | "large";
 
 type ResolvedModelIdentity = {
   providerId: string;
@@ -126,11 +126,11 @@ type ResolvedModelIdentity = {
     artifactKind: "safetensors" | "gguf" | "ollama" | "api" | "unknown";
   };
   parameterCount: number | null;
-  modelSizeClass: ModelCapacityClass | null;
+  modelSizeClass: ModelSizeClass | null;
 };
 ```
 
-The requested capacity classes use total parameter count:
+The requested model size classes use total parameter count:
 
 | Class | Total parameters |
 | --- | --- |
@@ -147,7 +147,7 @@ For mixture-of-experts models, phase one classifies by total parameters.
 Future metadata may record active parameters, but active parameters must not
 quietly change this selection contract.
 
-Capacity-derived fallback requires trusted structured metadata:
+Size-derived fallback requires trusted structured metadata:
 
 1. A reviewed registry binding may provide verified artifact/model metadata.
 2. Ollama metadata may provide a declared parameter size through structured
@@ -158,9 +158,9 @@ Capacity-derived fallback requires trusted structured metadata:
    select a compact card.
 
 Generic OpenAI-compatible endpoints, including common vLLM and SGLang
-discovery paths, often expose only model ids. They report unknown capacity
-unless a registry/artifact binding supplies the missing fact. Unknown capacity
-uses the full card.
+discovery paths, often expose only model ids. They report unknown model size
+unless a registry/artifact binding supplies the missing fact. Unknown model
+size uses the full card.
 
 ### Registry and manifest format
 
@@ -205,7 +205,7 @@ type AgentCardBinding = {
     canonicalModelId?: string;
     canonicalModelFamilyId?: string;
     artifactDigest?: string;
-    modelSizeClass?: ModelCapacityClass;
+    modelSizeClass?: ModelSizeClass;
   };
   card: string;
 };
@@ -308,7 +308,7 @@ Card resolution is deterministic and chooses one card:
 3. Exact artifact-digest binding.
 4. Exact canonical-model binding.
 5. Provider-scoped model-family binding.
-6. Trusted capacity-class binding.
+6. Trusted model-size-class binding.
 7. `openclaw/full-agent-v1`.
 
 ```ts
@@ -318,7 +318,7 @@ type AgentCardSelectionSource =
   | "artifact"
   | "model"
   | "family"
-  | "capacity"
+  | "model-size"
   | "fallback";
 
 type ResolvedAgentCard = {
@@ -330,8 +330,8 @@ type ResolvedAgentCard = {
 ```
 
 An ambiguous match at the same precedence level is a registry error. Exact
-artifact binding always wins over model, family, and capacity. Family bindings
-are provider scoped whenever native capabilities differ across routes.
+artifact binding always wins over model, family, and model size. Family
+bindings are provider scoped whenever native capabilities differ across routes.
 
 Agent Card behavior remains subject to driver capabilities. A card can request
 an adaptive thinking mode, for example, but the driver remains authoritative on
@@ -341,8 +341,8 @@ invent a provider payload.
 
 ### Initial cards
 
-Phase one deliberately keeps four capacity classes but ships two
-capacity-derived behavioral baselines:
+Phase one deliberately keeps four model size classes but ships two
+size-derived behavioral baselines:
 
 | Card | Parent | Binding intent | Purpose |
 | --- | --- | --- | --- |
@@ -757,11 +757,11 @@ serving boundary before any ClawHub or community registry is trusted.
 1. Accept this RFC.
 2. Open an implementation issue with owners across agent runtime, config/doctor,
    OpenAI, Anthropic, Codex, and local serving.
-3. Freeze initial card ids and capacity boundaries.
+3. Freeze initial card ids and model size boundaries.
 4. Confirm that `lean-agent-v1` is an exact migration rather than an
    opportunity to expand its tool deny list.
-5. Add identity/capacity types, registry schema, built-in registry, resolver,
-   binding validation, and diagnostics.
+5. Add identity/model size types, registry schema, built-in registry,
+   resolver, binding validation, and diagnostics.
 6. Add `full-agent-v1` and `lean-agent-v1`.
 7. Thread the resolved card through run planning, tools, and prompt
    composition.
@@ -852,9 +852,9 @@ Registry and resolver:
 - materialize KRM/Kustomize-style card packs into stable registry snapshots;
 - reject unsupported generators, executable plugins, arbitrary transformers,
   request-time remote fetches, and ambiguous overlay outputs;
-- table-test every capacity boundary;
-- prove unknown/untrusted capacity selects `full-agent-v1`;
-- prove exact artifact beats model, family, and capacity;
+- table-test every model size boundary;
+- prove unknown/untrusted model size selects `full-agent-v1`;
+- prove exact artifact beats model, family, and model size;
 - prove explicit agent/default selection precedence;
 - prove selection source and binding diagnostics are stable.
 
@@ -889,7 +889,7 @@ Hosted provider regression:
 
 Diagnostics:
 
-- expose canonical model, capacity/provenance, selected card/version,
+- expose canonical model, model size/provenance, selected card/version,
   selection source, binding id, and driver capability fallback;
 - never expose prompt text, credentials, raw provider errors, or local paths.
 
@@ -913,12 +913,13 @@ portable harness behavior system. Calling a driver a card would hide its
 protocol and payload responsibilities. The split makes ownership clear and
 prevents a local performance setting from reaching a public provider.
 
-### Four capacity classes, two phase-one baselines
+### Four model size classes, two phase-one baselines
 
-The four requested classes are useful for reporting, bindings, and later
-benchmarking. They do not yet justify four different prompt/tool configurations.
-An `xsmall` class is intentionally omitted for now to keep phase one simple; it
-can be added later if evidence shows the `small` range needs to be split.
+The four requested model size classes are useful for reporting, bindings, and
+later benchmarking. They do not yet justify four different prompt/tool
+configurations. An `xsmall` class is intentionally omitted for now to keep
+phase one simple; it can be added later if evidence shows the `small` range
+needs to be split.
 
 Two initial behavior baselines have a concrete purpose:
 
@@ -990,10 +991,11 @@ capability gates after materialization.
 3. Which existing CLI inspection command should display the resolved card?
 4. Should Ollama parameter metadata be marked `declared` rather than
    `verified` unless an artifact digest is registry-bound? This RFC recommends
-   `declared`, while still allowing capacity fallback with visible provenance.
+   `declared`, while still allowing size fallback with visible provenance.
 5. Should a future compact card keep tools such as `exec` direct? This is a
    benchmark/product decision and must not be folded into Lean migration.
 6. What signature and provenance contract is sufficient before installed
    registry packs can reference reviewed prompt presets and artifact bindings?
-7. Does future local capacity policy need hardware/memory facts? Those belong
-   to Serving Presets unless a concrete portable harness behavior needs them.
+7. Does future local size-based policy need hardware/memory facts? Those
+   belong to Serving Presets unless a concrete portable harness behavior needs
+   them.
