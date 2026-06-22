@@ -3,7 +3,7 @@ title: SQLite State Snapshot Command
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-06-19
+last_updated: 2026-06-22
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -449,6 +449,22 @@ The current Phase 1 implementation stack is:
 | -------------------------------------------------------------------------- | --------------------------------------------- |
 | [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Core snapshot command and safe-sync artifact  |
 | [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967) | Snapshot stress harness for Phase 1 greenlight |
+
+Before maintainers accept this RFC or land the core command, the same
+artifact-boundary idea should be exercised in Microsoft Scout/Lobster for about
+one week through the Lobster-owned snapshot plugin path. That pilot is not a
+replacement for the core command proposal; it is the operational evidence
+checkpoint for it. The pilot should answer:
+
+- whether hosts can reliably sync only completed `manifest.json` and
+  `database.sqlite` snapshot artifacts while ignoring live SQLite files,
+  temporary files, and sidecars
+- how often Scout needs snapshots to meet its recovery expectations
+- observed snapshot artifact size and creation time for real hosted use
+- whether users or operators need a core `openclaw snapshot` command, a
+  host-owned plugin command, or both
+- whether Phase 2 WAL bundles are justified by measured size, timing, or
+  frequency data
 
 Earlier provider, CLI, and named-target slices were collapsed into
 [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) so
