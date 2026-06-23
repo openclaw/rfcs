@@ -101,7 +101,7 @@ has resolved the model identity and selected a matching card.
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Model identity | canonical model id, family, artifact digest/kind, parameter count, model size class | prompt behavior, server flags |
+| Model identity | provider model id, canonical model id, family, artifact digest, model size class | prompt behavior, server flags |
 | Agent Card | shared and harness-specific behavior: tools, Tool Search, named prompt preset, reasoning mode | model identity, HTTP payloads, auth, KV cache, server flags |
 | Model Driver | provider protocol, auth, capabilities, payload transforms, streaming, native API settings | product harness behavior |
 | Serving Preset | local managed-engine/artifact settings | hosted provider behavior, portable agent behavior |
@@ -122,13 +122,17 @@ type ResolvedModelIdentity = {
   canonicalModelId: string | null;
   canonicalModelFamilyId: string | null;
   artifact: {
-    digest: string | null;
-    artifactKind: "safetensors" | "gguf" | "ollama" | "api" | "unknown";
-  };
-  parameterCount: number | null;
+    digest: string;
+  } | null;
   modelSizeClass: ModelSizeClass | null;
 };
 ```
+
+`artifact.digest` is an algorithm-prefixed content digest for an exact model
+artifact, for example `sha256:<hex>`. The artifact object is `null` when the
+resolver does not know an exact immutable artifact, including hosted API-only
+models. Runtime ecosystems such as Ollama and delivery modes such as hosted
+API are not artifact kinds.
 
 The requested model size classes use total parameter count:
 
@@ -146,6 +150,9 @@ into `small` and `xsmall` in a future schema version.
 For mixture-of-experts models, phase one classifies by total parameters.
 Future metadata may record active parameters, but active parameters must not
 quietly change this selection contract.
+
+The identity object stores the derived `modelSizeClass`, not the raw parameter
+count. Raw parameter metadata remains resolver input or diagnostics.
 
 Size-derived fallback requires trusted structured metadata:
 
@@ -199,7 +206,6 @@ type OpenClawAgentCardSpec = {
 };
 
 type AgentCardBinding = {
-  id: string;
   selector: {
     providerId?: string;
     canonicalModelId?: string;
@@ -207,7 +213,7 @@ type AgentCardBinding = {
     artifactDigest?: string;
     modelSizeClass?: ModelSizeClass;
   };
-  card: string;
+  cardId: string;
 };
 ```
 
@@ -295,9 +301,10 @@ explicit reload. They must never be fetched during a model request.
 
 Card layering is resolved before runtime selection. The hydrated resource
 graph must materialize to unambiguous card resources; the registry rejects
-cycles, unknown bases, ambiguous bindings, unknown prompt presets, and invalid
-settings. Arrays and maps must use field-specific replacement/merge semantics;
-generic deep merge is not allowed.
+cycles, unknown bases, bindings that reference unknown cards, ambiguous
+bindings, unknown prompt presets, and invalid settings. Arrays and maps must
+use field-specific replacement/merge semantics; generic deep merge is not
+allowed.
 
 ### Selection order
 
@@ -324,7 +331,6 @@ type AgentCardSelectionSource =
 type ResolvedAgentCard = {
   card: AgentCard;
   selectionSource: AgentCardSelectionSource;
-  cardBindingId: string | null;
   modelIdentity: ResolvedModelIdentity;
 };
 ```
@@ -617,7 +623,7 @@ A Serving Preset may apply only when all of the following are true:
 
 1. OpenClaw manages the local service.
 2. The engine and version are recognized.
-3. The model artifact digest and kind are trusted.
+3. The model artifact digest is trusted.
 4. A compatible preset exists.
 5. The selected preset and reason are visible to the operator.
 
@@ -847,8 +853,9 @@ boundaries.
 
 Registry and resolver:
 
-- reject duplicate ids, unknown parents, cycles, unknown bindings, ambiguous
-  bindings, unknown prompt presets, and invalid settings;
+- reject duplicate ids, unknown parents, cycles, bindings that reference
+  unknown cards, ambiguous bindings, unknown prompt presets, and invalid
+  settings;
 - materialize KRM/Kustomize-style card packs into stable registry snapshots;
 - reject unsupported generators, executable plugins, arbitrary transformers,
   request-time remote fetches, and ambiguous overlay outputs;
@@ -856,7 +863,7 @@ Registry and resolver:
 - prove unknown/untrusted model size selects `full-agent-v1`;
 - prove exact artifact beats model, family, and model size;
 - prove explicit agent/default selection precedence;
-- prove selection source and binding diagnostics are stable.
+- prove selection source and selector diagnostics are stable.
 
 Lean:
 
@@ -890,7 +897,7 @@ Hosted provider regression:
 Diagnostics:
 
 - expose canonical model, model size/provenance, selected card/version,
-  selection source, binding id, and driver capability fallback;
+  selection source, matching selector, and driver capability fallback;
 - never expose prompt text, credentials, raw provider errors, or local paths.
 
 The preferred operator surface is an existing model inspection namespace, for
