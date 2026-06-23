@@ -5,7 +5,7 @@ authors:
   - Patrick
   - Gio
 created: 2026-06-18
-last_updated: 2026-06-22
+last_updated: 2026-06-23
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/19
@@ -562,6 +562,55 @@ The bundled fallback is not optional. Without it, a feed outage or blocked
 endpoint would break onboarding and plugin discovery. With it, hosted feeds add
 freshness and control while preserving today’s offline behavior.
 
+### Feed telemetry and observability addendum
+
+Feeds are also a measurement boundary. OpenClaw already has diagnostics events,
+local diagnostics bundles, and the official `diagnostics-otel` plugin for
+OpenTelemetry metrics, traces, and logs. Plugin install records also preserve
+source details such as npm or ClawHub. That means hosted feeds do not need a
+separate telemetry pipeline first, but feed usage will not be measured correctly
+unless clients preserve feed provenance from fetch through install and runtime
+activation.
+
+A generic plugin install, plugin load, or skill usage event is not enough to
+answer whether a package came from a specific feed, feed sequence, policy state,
+or source profile. Feed-backed install records should therefore include a small
+provenance block with the feed id, configured feed profile, sequence or payload
+checksum, entry id, entry type, source ref, and effective policy state. The exact
+storage shape can vary, but the runtime must be able to attribute a later plugin
+or skill activation back to the accepted feed snapshot that authorized it.
+
+The feed implementation should emit low-cardinality diagnostic events when
+diagnostics are enabled:
+
+- feed fetch and validation result, including whether hosted, cached, local, or
+  bundled fallback content was used
+- active snapshot load, including feed id, sequence, age bucket, entry counts,
+  and invalid, disabled, or blocked entry counts
+- entry actions such as view, install, update, skip, reject, disable, block, or
+  revoke, with outcome and failure category
+- policy decisions that allow, disable, block, or revoke an entry, including
+  whether the decision came from the effective feed, a local override, or a
+  runtime policy layer
+- plugin or skill activation when the installed package carries feed provenance
+
+The `diagnostics-otel` exporter can map those events to counters, histograms,
+spans, and logs such as feed fetch count, fetch duration, snapshot age, entry
+action outcomes, update outcomes, and feed-backed activation count. Attributes
+should remain bounded: feed ids, entry ids, source profile names, package source
+types, policy states, and outcome categories are acceptable. Raw URLs, local file
+paths, package tarball URLs, account ids, tenant ids, user ids, session keys,
+secrets, prompts, tool arguments, tool outputs, and skill contents must not be
+emitted. If an enterprise needs tenant attribution, clients should emit a
+configured scope label or stable hash rather than a raw tenant identifier.
+
+This lets ClawHub and enterprise administrators answer practical questions
+without inspecting user content: adoption by feed and entry, stale snapshot rate,
+fallback rate to bundled catalogs, install and update success rate, entries that
+are frequently selected but blocked by policy, update propagation lag, clients
+running old feed sequences, and feed entries that are present but never
+activated.
+
 ## Rollout plan
 
 1. Align on the RFC enough to proceed with implementation, including source
@@ -586,9 +635,11 @@ freshness and control while preserving today’s offline behavior.
    ClawHub-hosted artifacts.
 10. Add composition guidance and examples for Microsoft/MOS3 and other
     tenant-admin systems.
-11. Align Tencent, Xiaomi, and other regional mirrors before the spec is treated
+11. Add feed provenance to feed-backed install records and emit diagnostics for
+    fetch, snapshot load, entry action, policy decision, update, and activation.
+12. Align Tencent, Xiaomi, and other regional mirrors before the spec is treated
     as stable.
-12. Land implementation through small draft PRs that maintainers can review,
+13. Land implementation through small draft PRs that maintainers can review,
     adjust, and merge as the RFC stabilizes.
 
 ## Unresolved questions
@@ -605,3 +656,5 @@ freshness and control while preserving today’s offline behavior.
   Scout, Microsoft, and other clients depend on the contract?
 - Should a later LTS release define stronger compatibility guarantees for feed
   schema versions and fallback behavior?
+- Which feed telemetry fields should be mandatory for client conformance versus
+  optional for richer enterprise or ClawHub reporting?
