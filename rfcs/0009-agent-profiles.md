@@ -226,7 +226,7 @@ so OpenClaw can reuse established base/overlay vocabulary instead of inventing
 a new layering language:
 
 ```yaml
-apiVersion: agentprofiles.org/v1
+apiVersion: agentprofiles.io/v1
 kind: AgentProfile
 metadata:
   namespace: openclaw
@@ -260,7 +260,7 @@ resources:
   - ../anthropic-profile-v1
 patches:
   - target:
-      group: agentprofiles.org
+      group: agentprofiles.io
       version: v1
       kind: AgentProfile
       name: anthropic-profile-v1
