@@ -233,22 +233,31 @@ JSON-compatible files or a typed source module validated against the same
 schema. The contract is declarative and JSON-compatible, similar in spirit to
 model manifests, but it is not a request-time config file.
 
-Profile artifacts should use a Kubernetes Resource Model style authoring shape
-so OpenClaw can reuse established base/overlay vocabulary instead of inventing
-a new layering language:
+An Agent Profile pack is a directory with a required `profile.yaml` file. The
+folder is the boundary for any files the profile references:
+
+```text
+qwen3-6-35b-a3b-profile-v1/
+├── profile.yaml
+├── prompts/
+│   └── system.md
+└── README.md
+```
+
+The `profile.yaml` file contains one `AgentProfile` resource:
 
 ```yaml
 apiVersion: agentprofiles.io/v1
 kind: AgentProfile
 metadata:
   namespace: openclaw
-  name: anthropic-profile-v1
+  name: qwen3-6-35b-a3b-profile-v1
 spec:
   common:
     toolExposure: standard-v1
     systemPrompt:
       file:
-        path: ./prompts/standard-v1.md
+        path: ./prompts/system.md
     reasoningMode: inherit
   openclaw.ai:
     toolSearchPolicy: inherit
@@ -265,41 +274,12 @@ schema used by the materialized profile. For example, a GPT-5 profile artifact
 can declare the supported response-style setting without adding a generic
 config bag.
 
-Derived profiles may be authored as Kustomize-style overlays:
+Referenced files must stay inside the profile folder. A path such as
+`./prompts/system.md` is valid; a path such as `../shared/system.md` is invalid.
 
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - ../anthropic-profile-v1
-patches:
-  - target:
-      group: agentprofiles.io
-      version: v1
-      kind: AgentProfile
-      name: anthropic-profile-v1
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: claude-opus-4-7-profile-v1
-      - op: replace
-        path: /spec/common/reasoningMode
-        value: off
-```
-
-OpenClaw does not need to expose all of Kustomize as product surface. The
-supported profile-pack subset should be limited to deterministic resource
-hydration and patches required to materialize `AgentProfile` and
-`AgentProfileBinding` resources. Generators, executable plugins, arbitrary
-transformers, and request-time remote fetches are out of scope. An installer may
-resolve registry artifact references to local immutable content before
-hydration; runtime resolution consumes only the validated materialized snapshot.
-
-This gives Agent Profiles Docker-like base-image ergonomics without making
-profile manifests imperative. A profile author can publish an Anthropic base
-profile, then publish Claude, enterprise, or unreleased-model overlays that
-override only the fields they need. The materialized output is still one
-schema-validated registry snapshot with explicit provenance.
+Profiles can still inherit from another profile by using `extends` in
+`profile.yaml`. Inheritance is resolved before runtime selection. The resolved
+output is one schema-validated profile with explicit provenance.
 
 The built-in registry loads and validates once during process startup. The
 process retains an immutable snapshot; an agent run receives a resolved
@@ -312,12 +292,11 @@ owner-controlled installation, schema validation, version/provenance
 attribution, digest pinning or equivalent immutable identity, and restart or
 explicit reload. They must never be fetched during a model request.
 
-Profile layering is resolved before runtime selection. The hydrated resource
-graph must materialize to unambiguous profile resources; the registry rejects
-cycles, unknown bases, bindings that reference unknown profiles, ambiguous
-bindings, invalid system prompt sources, and invalid settings. Arrays and maps must
-use field-specific replacement/merge semantics; generic deep merge is not
-allowed.
+Profile inheritance is resolved before runtime selection. The registry rejects
+cycles, unknown parents, bindings that reference unknown profiles, ambiguous
+bindings, prompt paths that escape the profile folder, invalid system prompt
+sources, and invalid settings. Arrays and maps must use field-specific
+replacement/merge semantics; generic deep merge is not allowed.
 
 ### Selection order
 
@@ -579,8 +558,8 @@ The resolver enforces these rules:
 - `file.path` is relative to the `AgentProfile` resource file;
 - file paths cannot escape the profile pack root;
 - if `file.digest` is present, the resolved file content must match it;
-- overlays replace `systemPrompt` as a whole unless a later RFC defines explicit
-  merge behavior.
+- child profiles replace `systemPrompt` as a whole unless a later RFC defines
+  explicit merge behavior.
 
 OpenClaw's built-in profiles can keep prompt text in source-controlled prompt
 files. Installed profile packs can carry their own prompt files, but they are
@@ -905,9 +884,9 @@ Registry and resolver:
 - reject duplicate ids, unknown parents, cycles, bindings that reference
   unknown profiles, ambiguous bindings, invalid system prompt sources, and
   invalid settings;
-- materialize KRM/Kustomize-style profile packs into stable registry snapshots;
-- reject unsupported generators, executable plugins, arbitrary transformers,
-  request-time remote fetches, and ambiguous overlay outputs;
+- load profile folders into stable registry snapshots;
+- reject missing `profile.yaml` files, prompt paths that escape the profile
+  folder, request-time remote fetches, and ambiguous inherited outputs;
 - table-test every model size boundary;
 - prove unknown/untrusted model size selects `full-profile-v1`;
 - prove exact artifact beats model, family, and model size;
@@ -1015,20 +994,15 @@ It establishes the schema and resolution contract before introducing the
 security, provenance, reload, and compatibility burden of an installed remote
 registry ecosystem.
 
-### KRM-style profile artifacts
+### Profile folders
 
-Agent Profile artifacts should use Kubernetes Resource Model conventions for
-authoring because that ecosystem already has a clear language for
-`apiVersion`, `kind`, `metadata`, resources, bases, overlays, and patches. This
-keeps profile layering familiar to operators without turning profiles into a
-Dockerfile-like imperative language.
+Agent Profiles should use a folder format like Agent Skills: one required
+`profile.yaml` file, plus any referenced files in the same folder. This keeps
+authoring simple and makes the trust boundary obvious.
 
-OpenClaw should reuse the Kustomize base/overlay shape only as a constrained
-profile-pack authoring and materialization format. The runtime still consumes a
-fully resolved profile snapshot. This avoids reinventing inheritance syntax
-while preserving OpenClaw-specific safety rules: no executable generators, no
-unbounded transformers, no request-time remote fetches, and no provider payload
-injection from remote artifacts.
+The runtime still consumes a fully resolved profile snapshot. Profile folders
+must not require executable code to resolve, request-time remote fetches, or
+provider payload fragments.
 
 The artifact model also fits enterprise distribution. A profile pack can be
 public on ClawHub, private in a provider's pre-release registry, or mirrored on
