@@ -18,7 +18,7 @@ Replace OpenClaw's binary `experimental.localModelLean` behavior with a
 versioned Agent Profile system. An Agent Profile is a bounded, declarative
 artifact that tells an agent harness which shared behavior and harness-specific
 behavior to use for a resolved model: tool exposure, Tool Search defaults,
-system prompt sources, and supported reasoning modes. It is separate from
+system prompt sources, and supported thinking levels. It is separate from
 model identity, provider drivers, and managed-local serving presets. Phase one
 preserves four requested model-size classes as metadata, ships two size-derived
 behavioral baselines, migrates existing Lean/GPT-5/Claude model-specific
@@ -102,7 +102,7 @@ after it has resolved the model identity and selected a matching profile.
 | Layer | Owns | Does not own |
 | --- | --- | --- |
 | Model identity | provider model id, canonical model id, family, artifact digest, model size class | prompt behavior, server flags |
-| Agent Profile | shared and harness-specific behavior: tools, Tool Search, system prompt source, reasoning mode | model identity, HTTP payloads, auth, KV cache, server flags |
+| Agent Profile | shared and harness-specific behavior: tools, Tool Search, system prompt source, thinking level | model identity, HTTP payloads, auth, KV cache, server flags |
 | Model Driver | provider protocol, auth, capabilities, payload transforms, streaming, native API settings | product harness behavior |
 | Serving Preset | local managed-engine/artifact settings | hosted provider behavior, portable agent behavior |
 
@@ -196,9 +196,11 @@ type AgentProfileSpec = {
 
 type AgentProfileCommon = {
   systemPrompt?: AgentProfileSystemPromptSource;
-  reasoningMode?: "inherit" | "off" | "adaptive";
+  thinkingLevel?: AgentProfileThinkingLevel;
   toolExposure?: "standard-v1" | "lean-v1";
 };
+
+type AgentProfileThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 type AgentProfileSystemPromptSource =
   | {
@@ -214,6 +216,7 @@ type AgentProfileSystemPromptSource =
 type OpenClawAgentProfileSpec = {
   toolSearchPolicy?: "inherit" | "lean-v1";
   contextPosture?: "standard" | "constrained";
+  thinkingLevel?: "adaptive" | "max";
 };
 
 type AgentProfileBinding = {
@@ -258,7 +261,7 @@ spec:
     systemPrompt:
       file:
         path: ./prompts/system.md
-    reasoningMode: inherit
+    thinkingLevel: high
   openclaw.ai:
     toolSearchPolicy: inherit
     contextPosture: standard
@@ -368,8 +371,7 @@ second model catalog.
         "file": {
           "path": "./prompts/standard-v1.md"
         }
-      },
-      "reasoningMode": "inherit"
+      }
     },
     "openclaw.ai": {
       "toolSearchPolicy": "inherit",
@@ -458,7 +460,7 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
   "extends": "openclaw/anthropic-profile-v1",
   "spec": {
     "common": {
-      "reasoningMode": "off"
+      "thinkingLevel": "off"
     }
   }
 }
@@ -470,8 +472,8 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
   "id": "openclaw/claude-4-6-profile-v1",
   "extends": "openclaw/anthropic-profile-v1",
   "spec": {
-    "common": {
-      "reasoningMode": "adaptive"
+    "openclaw.ai": {
+      "thinkingLevel": "adaptive"
     }
   }
 }
@@ -498,8 +500,10 @@ type AgentProfileSpec = {
 type AgentProfileCommon = {
   toolExposure?: "standard-v1" | "lean-v1";
   systemPrompt?: AgentProfileSystemPromptSource;
-  reasoningMode?: "inherit" | "off" | "adaptive";
+  thinkingLevel?: AgentProfileThinkingLevel;
 };
+
+type AgentProfileThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 type AgentProfileSystemPromptSource =
   | {
@@ -515,6 +519,7 @@ type AgentProfileSystemPromptSource =
 type OpenClawAgentProfileSpec = {
   toolSearchPolicy?: "inherit" | "lean-v1";
   contextPosture?: "standard" | "constrained";
+  thinkingLevel?: "adaptive" | "max";
 };
 ```
 
@@ -522,9 +527,10 @@ type OpenClawAgentProfileSpec = {
 | --- | --- | --- | --- | --- |
 | `toolExposure` | `spec.common` | agent harness | tool preparation | standard or Lean filter |
 | `systemPrompt` | `spec.common` | prompt composition | system-prompt builder | loads inline text or a profile-pack file |
-| `reasoningMode` | `spec.common` | resolver plus capability gate | current thinking-default callers | replaces model-id branching |
+| `thinkingLevel` | `spec.common` | agent harness | current thinking-default callers | selects a portable default thinking level |
 | `toolSearchPolicy` | `spec.openclaw.ai` | OpenClaw agent harness | embedded run planning | preserves undefined-only default semantics |
 | `contextPosture` | `spec.openclaw.ai` | OpenClaw diagnostics/future behavior | no hidden automatic rewrite | records compact/full intent |
+| `thinkingLevel` | `spec.openclaw.ai` | OpenClaw agent harness | provider capability gate | OpenClaw-only `adaptive` or `max` thinking |
 
 `contextPosture` is not a context-window override. It remains diagnostic until
 a concrete behavior has benchmark and compatibility evidence.
@@ -599,7 +605,16 @@ capabilities:
 ```ts
 type ModelDriverCapabilities = {
   supportsToolUse: boolean;
-  supportedReasoningModes: readonly ("off" | "adaptive")[];
+  supportedThinkingLevels: readonly (
+    | "off"
+    | "minimal"
+    | "low"
+    | "medium"
+    | "high"
+    | "xhigh"
+    | "adaptive"
+    | "max"
+  )[];
   supportsPromptCaching: boolean;
 };
 ```
