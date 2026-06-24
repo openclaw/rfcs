@@ -4,7 +4,7 @@ authors:
   - osolmaz
   - vincentkoc
 created: 2026-06-17
-last_updated: 2026-06-24
+last_updated: 2026-06-25
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/18
@@ -18,7 +18,7 @@ Replace OpenClaw's binary `experimental.localModelLean` behavior with a
 versioned Agent Profile system. An Agent Profile is a bounded, declarative
 artifact that tells an agent harness which shared behavior and harness-specific
 behavior to use for a resolved model: tool exposure, Tool Search defaults,
-named system-prompt presets, and supported reasoning modes. It is separate from
+system prompt sources, and supported reasoning modes. It is separate from
 model identity, provider drivers, and managed-local serving presets. Phase one
 preserves four requested model-size classes as metadata, ships two size-derived
 behavioral baselines, migrates existing Lean/GPT-5/Claude model-specific
@@ -73,9 +73,10 @@ hosted providers a consistent way to opt into portable model-family behavior.
 
 ## Non-Goals
 
-- This RFC does not define a generic user-authored prompt-file system.
-- This RFC does not add raw prompt text, arbitrary tool lists, or generic
-  `extra` settings to model configuration.
+- This RFC does not define arbitrary runtime prompt-file discovery outside
+  profile packs.
+- This RFC does not add arbitrary tool lists or generic `extra` settings to
+  model configuration.
 - This RFC does not claim parameter count alone can optimize a model.
 - This RFC does not add vLLM, SGLang, llama.cpp, Ollama, or GGUF tuning to
   phase one.
@@ -101,7 +102,7 @@ after it has resolved the model identity and selected a matching profile.
 | Layer | Owns | Does not own |
 | --- | --- | --- |
 | Model identity | provider model id, canonical model id, family, artifact digest, model size class | prompt behavior, server flags |
-| Agent Profile | shared and harness-specific behavior: tools, Tool Search, named prompt preset, reasoning mode | model identity, HTTP payloads, auth, KV cache, server flags |
+| Agent Profile | shared and harness-specific behavior: tools, Tool Search, system prompt source, reasoning mode | model identity, HTTP payloads, auth, KV cache, server flags |
 | Model Driver | provider protocol, auth, capabilities, payload transforms, streaming, native API settings | product harness behavior |
 | Serving Preset | local managed-engine/artifact settings | hosted provider behavior, portable agent behavior |
 
@@ -194,10 +195,21 @@ type AgentProfileSpec = {
 };
 
 type AgentProfileCommon = {
-  promptPreset?: "standard-v1" | "gpt-5-v1";
+  systemPrompt?: AgentProfileSystemPromptSource;
   reasoningMode?: "inherit" | "off" | "adaptive";
   toolExposure?: "standard-v1" | "lean-v1";
 };
+
+type AgentProfileSystemPromptSource =
+  | {
+      text: string;
+    }
+  | {
+      file: {
+        path: string;
+        digest?: string;
+      };
+    };
 
 type OpenClawAgentProfileSpec = {
   toolSearchPolicy?: "inherit" | "lean-v1";
@@ -234,7 +246,9 @@ metadata:
 spec:
   common:
     toolExposure: standard-v1
-    promptPreset: standard-v1
+    systemPrompt:
+      file:
+        path: ./prompts/standard-v1.md
     reasoningMode: inherit
   openclaw.ai:
     toolSearchPolicy: inherit
@@ -301,7 +315,7 @@ explicit reload. They must never be fetched during a model request.
 Profile layering is resolved before runtime selection. The hydrated resource
 graph must materialize to unambiguous profile resources; the registry rejects
 cycles, unknown bases, bindings that reference unknown profiles, ambiguous
-bindings, unknown prompt presets, and invalid settings. Arrays and maps must
+bindings, invalid system prompt sources, and invalid settings. Arrays and maps must
 use field-specific replacement/merge semantics; generic deep merge is not
 allowed.
 
@@ -353,7 +367,7 @@ size-derived behavioral baselines:
 | --- | --- | --- | --- |
 | `openclaw/full-profile-v1` | none | fallback; Medium/Large | general harness baseline |
 | `openclaw/lean-profile-v1` | `full-profile-v1` | trusted Tiny/Small; legacy config | exact Lean migration |
-| `openclaw/gpt-5-profile-v1` | `full-profile-v1` | current GPT-5 family behavior | prompt preset and response-style setting |
+| `openclaw/gpt-5-profile-v1` | `full-profile-v1` | current GPT-5 family behavior | system prompt source and response-style setting |
 | `openclaw/anthropic-profile-v1` | `full-profile-v1` | shared Anthropic/Claude behavior | base profile for Claude-family overrides |
 | `openclaw/claude-opus-4-7-profile-v1` | `anthropic-profile-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
 | `openclaw/claude-4-6-profile-v1` | `anthropic-profile-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
@@ -371,7 +385,11 @@ second model catalog.
   "spec": {
     "common": {
       "toolExposure": "standard-v1",
-      "promptPreset": "standard-v1",
+      "systemPrompt": {
+        "file": {
+          "path": "./prompts/standard-v1.md"
+        }
+      },
       "reasoningMode": "inherit"
     },
     "openclaw.ai": {
@@ -426,8 +444,8 @@ type ToolExposurePolicy = {
 It does not change phase-one Lean semantics without an explicit product
 decision.
 
-The GPT-5 profile owns the migrated response-style setting and a code-owned
-named prompt preset:
+The GPT-5 profile owns the migrated response-style setting and a system prompt
+source:
 
 ```json
 {
@@ -436,7 +454,11 @@ named prompt preset:
   "extends": "openclaw/full-profile-v1",
   "spec": {
     "common": {
-      "promptPreset": "gpt-5-v1"
+      "systemPrompt": {
+        "file": {
+          "path": "./prompts/gpt-5-v1.md"
+        }
+      }
     },
     "settings": {
       "responseStyle": {
@@ -496,9 +518,20 @@ type AgentProfileSpec = {
 
 type AgentProfileCommon = {
   toolExposure?: "standard-v1" | "lean-v1";
-  promptPreset?: "standard-v1" | "gpt-5-v1";
+  systemPrompt?: AgentProfileSystemPromptSource;
   reasoningMode?: "inherit" | "off" | "adaptive";
 };
+
+type AgentProfileSystemPromptSource =
+  | {
+      text: string;
+    }
+  | {
+      file: {
+        path: string;
+        digest?: string;
+      };
+    };
 
 type OpenClawAgentProfileSpec = {
   toolSearchPolicy?: "inherit" | "lean-v1";
@@ -509,7 +542,7 @@ type OpenClawAgentProfileSpec = {
 | Field | Section | Owner | Consumer | Phase-one meaning |
 | --- | --- | --- | --- | --- |
 | `toolExposure` | `spec.common` | agent harness | tool preparation | standard or Lean filter |
-| `promptPreset` | `spec.common` | prompt composition | system-prompt builder | selects code-owned contribution |
+| `systemPrompt` | `spec.common` | prompt composition | system-prompt builder | loads inline text or a profile-pack file |
 | `reasoningMode` | `spec.common` | resolver plus capability gate | current thinking-default callers | replaces model-id branching |
 | `toolSearchPolicy` | `spec.openclaw.ai` | OpenClaw agent harness | embedded run planning | preserves undefined-only default semantics |
 | `contextPosture` | `spec.openclaw.ai` | OpenClaw diagnostics/future behavior | no hidden automatic rewrite | records compact/full intent |
@@ -517,42 +550,59 @@ type OpenClawAgentProfileSpec = {
 `contextPosture` is not a context-window override. It remains diagnostic until
 a concrete behavior has benchmark and compatibility evidence.
 
-The schema must not add raw system prompt bodies, arbitrary user tool
-allow/deny lists, endpoint data, transport headers, provider request fragments,
-server launch arguments, cache controls, or generic `extra` maps.
+The schema must not add arbitrary user tool allow/deny lists, endpoint data,
+transport headers, provider request fragments, server launch arguments, cache
+controls, or generic `extra` maps.
 
 ### System prompt composition
 
-Agent Profiles select named prompt presets. They do not contain arbitrary
-prompt text.
+Agent Profiles can choose the stable system prompt text for a model. The source
+is explicit: a profile may carry inline text, or it may point at a prompt file
+inside the same profile pack.
 
 ```ts
-type PromptPresetId = "standard-v1" | "gpt-5-v1";
-
-type PromptPresetContribution = {
-  text: string;
-};
+type AgentProfileSystemPromptSource =
+  | {
+      text: string;
+    }
+  | {
+      file: {
+        path: string;
+        digest?: string;
+      };
+    };
 ```
 
-Prompt text stays in source-controlled OpenClaw code. This keeps prompt
-changes reviewable, versioned, testable with snapshots, deterministic for
-prompt caching, and safe from unreviewed remote registry content.
+The resolver enforces these rules:
+
+- exactly one source type is set;
+- `file.path` is relative to the `AgentProfile` resource file;
+- file paths cannot escape the profile pack root;
+- if `file.digest` is present, the resolved file content must match it;
+- overlays replace `systemPrompt` as a whole unless a later RFC defines explicit
+  merge behavior.
+
+OpenClaw's built-in profiles can keep prompt text in source-controlled prompt
+files. Installed profile packs can carry their own prompt files, but they are
+resolved and validated before runtime use. The runtime must not fetch or read a
+new prompt file during a model request.
 
 The implementation defines and tests one composition order:
 
 1. Prepare model identity, driver capabilities, and resolved profile.
-2. Build the generic OpenClaw system prompt.
-3. Add the selected profile prompt preset contribution.
+2. Resolve `spec.common.systemPrompt` to text, or use the built-in default when
+   it is omitted.
+3. Build the generic OpenClaw system prompt around that profile prompt text.
 4. Add core-owned dynamic channel, session, bootstrap, heartbeat, tool, and
    runtime fragments.
 5. Add existing generic provider/plugin prompt contributions.
 6. Let the driver perform protocol-specific request shaping.
 
 The existing GPT-5 contribution in `src/plugins/provider-runtime.ts` is
-replaced by the selected `gpt-5-v1` prompt preset contribution before generic
+replaced by the GPT-5 profile's `systemPrompt` source before generic
 provider/plugin contributions. Snapshot tests must prove that existing
-`friendly`, `off`, and heartbeat behavior retain their effective prompt order
-and contents.
+`friendly`, `off`, and heartbeat behavior keep their effective prompt order and
+contents.
 
 Channels remain transport implementations. They render portable actions and
 enforce transport constraints; they do not choose an agent profile or own
@@ -682,7 +732,8 @@ Validation rules:
 - Profile settings require an explicit non-`"auto"` profile at the same scope.
   An inherited explicit profile is valid when its ownership is unambiguous.
 - Settings fail validation when the selected profile does not own them.
-- Raw prompt bodies are never accepted as settings.
+- Prompt text is accepted only through `spec.common.systemPrompt`, not as a
+  setting.
 - Agent scope wins over defaults, which wins over registry binding.
 - Explicit selection still passes through driver capability gates.
 
@@ -713,8 +764,8 @@ The following current code moves to the profile system:
 | `src/agents/local-model-lean.ts` | boolean resolution and compact tool behavior | profile behavior implementation; delete boolean resolver |
 | `src/agents/agent-tools.ts` | normal-tool filtering | consume resolved `toolExposure` |
 | `src/agents/embedded-agent-runner/run/attempt.ts` | Tool Search default and pre/post-search filtering | consume resolved profile at both boundaries |
-| `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | code-owned `gpt-5-v1` preset plus response-style setting |
-| `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve prompt preset contribution before generic provider contribution |
+| `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | `gpt-5-v1` system prompt source plus response-style setting |
+| `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve profile system prompt source before generic provider contribution |
 | `extensions/openai/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
 | `extensions/codex/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
 | `src/config/zod-schema.agent-defaults.ts` | GPT overlay config | canonical profile schema and doctor migration |
@@ -838,11 +889,9 @@ The ClawHub registry should support:
 ClawHub profiles must not be fetched or evaluated during a model request. A
 downloaded profile pack still uses the phase-one installed-pack contract:
 schema validation, version/provenance attribution, restart or explicit reload,
-and driver capability gates. Remote content must not inject raw prompt text,
-credentials, provider payload fragments, cache controls, server flags, or
-unreviewed code. If ClawHub eventually references prompt behavior, it should
-select reviewed named prompt presets rather than carrying arbitrary prompt
-bodies.
+and driver capability gates. Remote content may provide a `systemPrompt` source,
+but it must not inject credentials, provider payload fragments, cache controls,
+server flags, or unreviewed code.
 
 Phase two is complete only when ClawHub can publish, discover, install, verify,
 and inspect agent profiles for at least a small set of benchmarked open-weight
@@ -854,8 +903,8 @@ boundaries.
 Registry and resolver:
 
 - reject duplicate ids, unknown parents, cycles, bindings that reference
-  unknown profiles, ambiguous bindings, unknown prompt presets, and invalid
-  settings;
+  unknown profiles, ambiguous bindings, invalid system prompt sources, and
+  invalid settings;
 - materialize KRM/Kustomize-style profile packs into stable registry snapshots;
 - reject unsupported generators, executable plugins, arbitrary transformers,
   request-time remote fetches, and ambiguous overlay outputs;
@@ -937,12 +986,12 @@ Two initial behavior baselines have a concrete purpose:
 This avoids premature tuning policy while retaining a stable place to add
 benchmark-backed profiles later.
 
-### Named prompt presets instead of prompt text in manifests
+### Explicit system prompt sources
 
-Prompt content is security- and cache-sensitive product code. Keeping it in
-source provides code review, snapshots, deterministic order, and versioned
-rollouts. A profile manifest selects a preset; it does not become a remote
-prompt patch system.
+Prompt content is security- and cache-sensitive. The profile must name exactly
+where the prompt comes from: inline `text` or a `file.path` inside the profile
+pack. File paths are resolved during profile materialization, not during a model
+request.
 
 ### Separate Serving Presets
 
@@ -978,8 +1027,8 @@ OpenClaw should reuse the Kustomize base/overlay shape only as a constrained
 profile-pack authoring and materialization format. The runtime still consumes a
 fully resolved profile snapshot. This avoids reinventing inheritance syntax
 while preserving OpenClaw-specific safety rules: no executable generators, no
-unbounded transformers, no request-time remote fetches, and no raw prompt or
-provider payload injection from remote artifacts.
+unbounded transformers, no request-time remote fetches, and no provider payload
+injection from remote artifacts.
 
 The artifact model also fits enterprise distribution. A profile pack can be
 public on ClawHub, private in a provider's pre-release registry, or mirrored on
@@ -1002,7 +1051,7 @@ capability gates after materialization.
 5. Should a future compact profile keep tools such as `exec` direct? This is a
    benchmark/product decision and must not be folded into Lean migration.
 6. What signature and provenance contract is sufficient before installed
-   registry packs can reference reviewed prompt presets and artifact bindings?
+   registry packs can carry prompt files and artifact bindings?
 7. Does future local size-based policy need hardware/memory facts? Those
    belong to Serving Presets unless a concrete portable harness behavior needs
    them.
