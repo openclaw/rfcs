@@ -197,7 +197,6 @@ type AgentProfileSpec = {
 type AgentProfileCommon = {
   systemPrompt?: AgentProfileSystemPromptSource;
   thinkingLevel?: AgentProfileThinkingLevel;
-  toolExposure?: "standard-v1" | "lean-v1";
 };
 
 type AgentProfileThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -214,8 +213,8 @@ type AgentProfileSystemPromptSource =
     };
 
 type OpenClawAgentProfileSpec = {
-  toolSearchPolicy?: "inherit" | "lean-v1";
-  contextPosture?: "standard" | "constrained";
+  toolProfile?: "lean";
+  contextPosture?: "constrained";
   thinkingLevel?: "adaptive" | "max";
 };
 
@@ -257,14 +256,12 @@ metadata:
   name: qwen3-6-35b-a3b-profile-v1
 spec:
   common:
-    toolExposure: standard-v1
     systemPrompt:
       file:
         path: ./prompts/system.md
     thinkingLevel: high
   openclaw.ai:
-    toolSearchPolicy: inherit
-    contextPosture: standard
+    toolProfile: lean
 ```
 
 All behavior fields live under `spec`. The `common` section is the
@@ -366,16 +363,11 @@ second model catalog.
   "id": "openclaw/full-profile-v1",
   "spec": {
     "common": {
-      "toolExposure": "standard-v1",
       "systemPrompt": {
         "file": {
-          "path": "./prompts/standard-v1.md"
+          "path": "./prompts/system.md"
         }
       }
-    },
-    "openclaw.ai": {
-      "toolSearchPolicy": "inherit",
-      "contextPosture": "standard"
     }
   }
 }
@@ -390,18 +382,15 @@ second model catalog.
   "id": "openclaw/lean-profile-v1",
   "extends": "openclaw/full-profile-v1",
   "spec": {
-    "common": {
-      "toolExposure": "lean-v1"
-    },
     "openclaw.ai": {
-      "toolSearchPolicy": "lean-v1",
+      "toolProfile": "lean",
       "contextPosture": "constrained"
     }
   }
 }
 ```
 
-Phase-one `lean-v1` preserves today's behavior:
+The OpenClaw `lean` tool profile preserves today's behavior:
 
 - filter `browser`, `cron`, and `message` from normal model tool exposure;
 - preserve forced-direct `message` when the runtime requires it;
@@ -416,8 +405,8 @@ The routing mechanism explored in `#87587`, where named tools can remain
 direct, is useful as an implementation detail:
 
 ```ts
-type ToolExposurePolicy = {
-  preset: "standard-v1" | "lean-v1";
+type OpenClawToolProfilePolicy = {
+  toolProfile?: "lean";
   directToolIds: readonly string[];
 };
 ```
@@ -498,7 +487,6 @@ type AgentProfileSpec = {
 };
 
 type AgentProfileCommon = {
-  toolExposure?: "standard-v1" | "lean-v1";
   systemPrompt?: AgentProfileSystemPromptSource;
   thinkingLevel?: AgentProfileThinkingLevel;
 };
@@ -517,19 +505,18 @@ type AgentProfileSystemPromptSource =
     };
 
 type OpenClawAgentProfileSpec = {
-  toolSearchPolicy?: "inherit" | "lean-v1";
-  contextPosture?: "standard" | "constrained";
+  toolProfile?: "lean";
+  contextPosture?: "constrained";
   thinkingLevel?: "adaptive" | "max";
 };
 ```
 
 | Field | Section | Owner | Consumer | Phase-one meaning |
 | --- | --- | --- | --- | --- |
-| `toolExposure` | `spec.common` | agent harness | tool preparation | standard or Lean filter |
 | `systemPrompt` | `spec.common` | prompt composition | system-prompt builder | loads inline text or a profile-pack file |
 | `thinkingLevel` | `spec.common` | agent harness | current thinking-default callers | selects a portable default thinking level |
-| `toolSearchPolicy` | `spec.openclaw.ai` | OpenClaw agent harness | embedded run planning | preserves undefined-only default semantics |
-| `contextPosture` | `spec.openclaw.ai` | OpenClaw diagnostics/future behavior | no hidden automatic rewrite | records compact/full intent |
+| `toolProfile` | `spec.openclaw.ai` | OpenClaw agent harness | tool preparation and Tool Search | applies current Lean behavior |
+| `contextPosture` | `spec.openclaw.ai` | OpenClaw diagnostics/future behavior | no hidden automatic rewrite | records compact intent |
 | `thinkingLevel` | `spec.openclaw.ai` | OpenClaw agent harness | provider capability gate | OpenClaw-only `adaptive` or `max` thinking |
 
 `contextPosture` is not a context-window override. It remains diagnostic until
@@ -756,7 +743,7 @@ The following current code moves to the profile system:
 | Current surface | Current responsibility | Required result |
 | --- | --- | --- |
 | `src/agents/local-model-lean.ts` | boolean resolution and compact tool behavior | profile behavior implementation; delete boolean resolver |
-| `src/agents/agent-tools.ts` | normal-tool filtering | consume resolved `toolExposure` |
+| `src/agents/agent-tools.ts` | normal-tool filtering | consume resolved OpenClaw `toolProfile` |
 | `src/agents/embedded-agent-runner/run/attempt.ts` | Tool Search default and pre/post-search filtering | consume resolved profile at both boundaries |
 | `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | `gpt-5-v1` system prompt source plus response-style setting |
 | `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve profile system prompt source before generic provider contribution |
