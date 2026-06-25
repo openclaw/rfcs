@@ -15,14 +15,15 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/18
 ## Summary
 
 Replace OpenClaw's binary `experimental.localModelLean` behavior with a
-versioned Agent Profile system. An Agent Profile is a bounded, declarative
-artifact that tells an agent harness which shared behavior and harness-specific
-behavior to use for a resolved model: tool exposure, Tool Search defaults,
-system prompt sources, and supported thinking levels. It is separate from
-model identity, provider drivers, and managed-local serving presets. Phase one
-preserves four requested model-size classes as metadata, ships two size-derived
-behavioral baselines, migrates existing Lean/GPT-5/Claude model-specific
-behavior onto profiles, and leaves KV cache and engine tuning outside profiles.
+schema-validated Agent Profile system. An Agent Profile is a bounded,
+declarative artifact that tells an agent harness which shared behavior and
+harness-specific behavior to use for a resolved model: tool exposure, Tool
+Search defaults, system prompt sources, and supported thinking levels. It is
+separate from model identity, provider drivers, and managed-local serving
+presets. Phase one preserves four requested model-size classes as metadata,
+ships `openclaw/base` plus size-derived child profiles, migrates existing
+Lean/GPT-5/Claude model-specific behavior onto profiles, and leaves KV cache
+and engine tuning outside profiles.
 
 ## Motivation
 
@@ -53,13 +54,13 @@ hosted providers a consistent way to opt into portable model-family behavior.
 
 ## Goals
 
-- Replace `experimental.localModelLean` with versioned, testable Agent Profiles.
+- Replace `experimental.localModelLean` with named, testable Agent Profiles.
 - Preserve current Lean behavior exactly during migration.
 - Centralize existing GPT-5 response-style and Claude/Opus thinking-default
   behavior under the profile resolution system.
 - Keep four model size classes available as model metadata and diagnostics.
-- Ship a conservative phase-one fallback: lean behavior for trusted models up
-  to 20B parameters and full behavior otherwise.
+- Ship `openclaw/base` plus size-derived OpenClaw child profiles, with Lean
+  behavior preserved in `openclaw/small`.
 - Make model identity, harness behavior, driver behavior, and local serving
   configuration separate ownership layers.
 - Provide deterministic selection, clear precedence, and explainable
@@ -167,7 +168,7 @@ Size-derived fallback requires trusted structured metadata:
 Generic OpenAI-compatible endpoints, including common vLLM and SGLang
 discovery paths, often expose only model ids. They report unknown model size
 unless a registry/artifact binding supplies the missing fact. Unknown model
-size uses the full profile.
+size uses `openclaw/base`.
 
 ### Registry and manifest format
 
@@ -239,7 +240,7 @@ An Agent Profile pack is a directory with a required `profile.yaml` file. The
 folder is the boundary for any files the profile references:
 
 ```text
-qwen3-6-35b-a3b-profile-v1/
+acme-1-30b/
 ├── profile.yaml
 ├── prompts/
 │   └── system.md
@@ -253,7 +254,7 @@ apiVersion: agentprofiles.io/v1
 kind: AgentProfile
 metadata:
   namespace: openclaw
-  name: qwen3-6-35b-a3b-profile-v1
+  name: acme-1-30b
 spec:
   common:
     systemPrompt:
@@ -308,7 +309,7 @@ Profile resolution is deterministic and chooses one profile:
 4. Exact canonical-model binding.
 5. Provider-scoped model-family binding.
 6. Trusted model-size-class binding.
-7. `openclaw/full-profile-v1`.
+7. `openclaw/base`.
 
 ```ts
 type AgentProfileSelectionSource =
@@ -339,28 +340,30 @@ diagnostics; it does not invent a provider payload.
 
 ### Initial profiles
 
-Phase one deliberately keeps four model size classes but ships two
-size-derived behavioral baselines:
+Phase one deliberately keeps four model size classes and gives OpenClaw one
+base profile plus size-derived child profiles:
 
 | Profile | Parent | Binding intent | Purpose |
 | --- | --- | --- | --- |
-| `openclaw/full-profile-v1` | none | fallback; Medium/Large | general harness baseline |
-| `openclaw/lean-profile-v1` | `full-profile-v1` | trusted Tiny/Small; legacy config | exact Lean migration |
-| `openclaw/gpt-5-profile-v1` | `full-profile-v1` | current GPT-5 family behavior | system prompt source and response-style setting |
-| `openclaw/anthropic-profile-v1` | `full-profile-v1` | shared Anthropic/Claude behavior | base profile for Claude-family overrides |
-| `openclaw/claude-opus-4-7-profile-v1` | `anthropic-profile-v1` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
-| `openclaw/claude-4-6-profile-v1` | `anthropic-profile-v1` | current direct Anthropic Claude 4.6 behavior | preserves adaptive thinking default |
+| `openclaw/base` | none | fallback; shared OpenClaw behavior | general harness baseline |
+| `openclaw/small` | `openclaw/base` | trusted Tiny/Small; legacy config | exact Lean migration |
+| `openclaw/medium` | `openclaw/base` | trusted Medium | stable medium-size layer |
+| `openclaw/large` | `openclaw/base` | trusted Large | stable large-size layer |
+| `openclaw/gpt-5` | `openclaw/base` | current GPT-5 family behavior | system prompt source and response-style setting |
+| `openclaw/claude` | `openclaw/base` | shared Claude behavior | base profile for Claude-family overrides |
+| `openclaw/claude-opus-4-7` | `openclaw/claude` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
+| `openclaw/claude-4-6` | `openclaw/claude` | current direct Claude 4.6 behavior | preserves adaptive thinking default |
 
 The exact model aliases and family identities remain in canonical model/provider
 catalogs. Registry bindings refer to normalized identity; profiles are not a
 second model catalog.
 
-`full-profile-v1` is behaviorally neutral:
+`openclaw/base` is behaviorally neutral:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "openclaw/full-profile-v1",
+  "id": "openclaw/base",
   "spec": {
     "common": {
       "systemPrompt": {
@@ -373,15 +376,16 @@ second model catalog.
 }
 ```
 
-`lean-profile-v1` is the exact migration target for
+`openclaw/small` is the exact migration target for
 `experimental.localModelLean: true`:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "openclaw/lean-profile-v1",
-  "extends": "openclaw/full-profile-v1",
+  "id": "openclaw/small",
+  "extends": "openclaw/base",
   "spec": {
+    "common": {},
     "openclaw.ai": {
       "toolProfile": "lean",
       "contextPosture": "constrained"
@@ -389,6 +393,10 @@ second model catalog.
   }
 }
 ```
+
+`openclaw/medium` and `openclaw/large` inherit `openclaw/base` in phase one.
+They create stable size layers for future benchmark-backed overrides without
+changing the fallback profile.
 
 The OpenClaw `lean` tool profile preserves today's behavior:
 
@@ -399,7 +407,7 @@ The OpenClaw `lean` tool profile preserves today's behavior:
 
 The broader deny list proposed in local-model Lean PR `#87617` is not a
 compatible migration. It may be a later explicitly selected and benchmarked
-profile, such as `compact-profile-v2`, but must not alter `lean-profile-v1`.
+profile, such as `openclaw/compact`, but must not alter `openclaw/small`.
 
 The routing mechanism explored in `#87587`, where named tools can remain
 direct, is useful as an implementation detail:
@@ -420,13 +428,13 @@ source:
 ```json
 {
   "schemaVersion": 1,
-  "id": "openclaw/gpt-5-profile-v1",
-  "extends": "openclaw/full-profile-v1",
+  "id": "openclaw/gpt-5",
+  "extends": "openclaw/base",
   "spec": {
     "common": {
       "systemPrompt": {
         "file": {
-          "path": "./prompts/gpt-5-v1.md"
+          "path": "./prompts/gpt-5.md"
         }
       }
     },
@@ -445,8 +453,8 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
 ```json
 {
   "schemaVersion": 1,
-  "id": "openclaw/claude-opus-4-7-profile-v1",
-  "extends": "openclaw/anthropic-profile-v1",
+  "id": "openclaw/claude-opus-4-7",
+  "extends": "openclaw/claude",
   "spec": {
     "common": {
       "thinkingLevel": "off"
@@ -458,9 +466,10 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
 ```json
 {
   "schemaVersion": 1,
-  "id": "openclaw/claude-4-6-profile-v1",
-  "extends": "openclaw/anthropic-profile-v1",
+  "id": "openclaw/claude-4-6",
+  "extends": "openclaw/claude",
   "spec": {
+    "common": {},
     "openclaw.ai": {
       "thinkingLevel": "adaptive"
     }
@@ -676,7 +685,7 @@ Phase one adds one narrow selector at defaults and agent scope:
     "list": [
       {
         "id": "local-helper",
-        "agentProfileId": "openclaw/lean-profile-v1"
+        "agentProfileId": "openclaw/small"
       }
     ]
   }
@@ -693,7 +702,7 @@ Settings are namespaced to the selected profile's closed settings schema:
 {
   "agents": {
     "defaults": {
-      "agentProfileId": "openclaw/gpt-5-profile-v1",
+      "agentProfileId": "openclaw/gpt-5",
       "settings": {
         "responseStyle": "off"
       }
@@ -728,9 +737,9 @@ shapes.
 
 | Legacy input | Canonical output | Notes |
 | --- | --- | --- |
-| default `experimental.localModelLean: true` | default `agentProfileId: "openclaw/lean-profile-v1"` | preserves explicit Lean intent |
-| agent `experimental.localModelLean: true` | agent `agentProfileId: "openclaw/lean-profile-v1"` | preserves stronger scope |
-| legacy Lean `false` | remove legacy field | no explicit full profile needed |
+| default `experimental.localModelLean: true` | default `agentProfileId: "openclaw/small"` | preserves explicit Lean intent |
+| agent `experimental.localModelLean: true` | agent `agentProfileId: "openclaw/small"` | preserves stronger scope |
+| legacy Lean `false` | remove legacy field | no explicit base profile needed |
 | GPT-5 overlay personality | GPT response-style setting | preserves `friendly`/`off` |
 | OpenAI plugin personality fallback | GPT response-style setting when no more-specific canonical value exists | preserves current precedence |
 
@@ -796,17 +805,18 @@ serving boundary before any ClawHub or community registry is trusted.
 2. Open an implementation issue with owners across agent runtime, config/doctor,
    OpenAI, Anthropic, Codex, and local serving.
 3. Freeze initial profile ids and model size boundaries.
-4. Confirm that `lean-profile-v1` is an exact migration rather than an
+4. Confirm that `openclaw/small` is an exact Lean migration rather than an
    opportunity to expand its tool deny list.
 5. Add identity/model size types, registry schema, built-in registry,
    resolver, binding validation, and diagnostics.
-6. Add `full-profile-v1` and `lean-profile-v1`.
+6. Add `openclaw/base`, `openclaw/small`, `openclaw/medium`, and
+   `openclaw/large`.
 7. Thread the resolved profile through run planning, tools, and prompt
    composition.
 8. Move Lean logic and doctor-migrate legacy Lean config.
-9. Add `gpt-5-profile-v1`, migrate response-style config, and replace direct
+9. Add `openclaw/gpt-5`, migrate response-style config, and replace direct
    prompt overlay resolution.
-10. Add `anthropic-profile-v1` plus exact Claude/Opus derived profiles, and move
+10. Add `openclaw/claude` plus exact Claude/Opus derived profiles, and move
     only existing thinking-default selection branches.
 11. Add profile inspection and documentation.
 12. Remove retired runtime config reads and helper/re-export paths.
@@ -890,7 +900,7 @@ Registry and resolver:
 - reject missing `profile.yaml` files, prompt paths that escape the profile
   folder, request-time remote fetches, and ambiguous inherited outputs;
 - table-test every model size boundary;
-- prove unknown/untrusted model size selects `full-profile-v1`;
+- prove unknown/untrusted model size selects `openclaw/base`;
 - prove exact artifact beats model, family, and model size;
 - prove explicit agent/default selection precedence;
 - prove selection source and selector diagnostics are stable.
@@ -926,7 +936,7 @@ Hosted provider regression:
 
 Diagnostics:
 
-- expose canonical model, model size/provenance, selected profile/version,
+- expose canonical model, model size/provenance, selected profile id,
   selection source, matching selector, and driver capability fallback;
 - never expose prompt text, credentials, raw provider errors, or local paths.
 
@@ -950,22 +960,25 @@ portable harness behavior system. Calling a driver a profile would hide its
 protocol and payload responsibilities. The split makes ownership clear and
 prevents a local performance setting from reaching a public provider.
 
-### Four model size classes, two phase-one baselines
+### Size-derived OpenClaw layers
 
 The four requested model size classes are useful for reporting, bindings, and
-later benchmarking. They do not yet justify four different prompt/tool
-configurations. An `xsmall` class is intentionally omitted for now to keep
+later benchmarking. An `xsmall` class is intentionally omitted for now to keep
 phase one simple; it can be added later if evidence shows the `small` range
 needs to be split.
 
-Two initial behavior baselines have a concrete purpose:
+OpenClaw ships one base profile and three size-derived child layers:
 
-- `lean-profile-v1` is a compatibility target for existing explicit Lean users
-  and trusted models up to 20B.
-- `full-profile-v1` is the safe fallback for larger and unknown models.
+- `openclaw/base` is the safe fallback for unknown or untrusted model size.
+- `openclaw/small` inherits `openclaw/base` and is the compatibility target for
+  existing explicit Lean users and trusted Tiny/Small models.
+- `openclaw/medium` inherits `openclaw/base` and starts without extra behavior
+  until benchmarks justify a medium-size override.
+- `openclaw/large` inherits `openclaw/base` and starts without extra behavior
+  until benchmarks justify a large-size override.
 
-This avoids premature tuning policy while retaining a stable place to add
-benchmark-backed profiles later.
+This avoids premature tuning policy while retaining stable profile ids for
+benchmark-backed size behavior later.
 
 ### Explicit system prompt sources
 
