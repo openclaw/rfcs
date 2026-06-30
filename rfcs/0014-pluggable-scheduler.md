@@ -3,7 +3,7 @@ title: Pluggable Scheduler Seam in Gateway
 authors:
   - amittell
 created: 2026-05-31
-last_updated: 2026-06-29
+last_updated: 2026-06-30
 rfc_pr: https://github.com/openclaw/rfcs/pull/5
 status: draft
 issue:
@@ -173,11 +173,29 @@ therefore treat scheduler events as untrusted input:
   marks the scheduler projection degraded and leaves built-in Cron fallback as a
   restart-time ownership decision rather than attempting a hot failover.
 
-A diagram of the discovery flow will be added under `rfcs/0010/` in a follow-up
+A diagram of the discovery flow will be added under `rfcs/0014/` in a follow-up
 revision once the seam shape is settled. In short: when the scheduler plugin
 manifest declares `owns: "scheduled-jobs"`, the gateway swaps its built-in cron
 registration for a forwarder to the plugin runtime, and ingests run lifecycle
 through the scheduler run-state adapter. Heartbeats stay in core.
+
+## Acceptance gates
+
+This RFC should stay in `draft` until maintainers accept the scheduler ownership
+boundary and create the implementation issue required by the RFC lifecycle.
+Acceptance should also record these gates for the first implementation PR:
+
+- Scheduler ownership requires an explicit operator config opt-in in addition to
+  an enabled plugin manifest with `owns: "scheduled-jobs"`.
+- The implementation must prove built-in Cron remains the default when no
+  scheduler plugin is enabled or when the explicit opt-in is absent.
+- The implementation must prove restart-time fallback from scheduler-plugin
+  ownership back to built-in Cron when the plugin is disabled or uninstalled.
+- The implementation must validate, provenance-tag, deduplicate, and lifecycle
+  order scheduler run-state events before projecting them into gateway-owned
+  status, hook, or transcript-adjacent surfaces.
+- The implementation issue should be linked in the `issue` frontmatter before
+  this RFC is merged as accepted.
 
 ## Rationale
 
