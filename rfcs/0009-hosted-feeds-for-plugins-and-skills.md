@@ -495,6 +495,27 @@ ClawHub product stack:
    that downstream registries can consume, while preserving their own scans,
    approval workflows, and registry-inclusion decisions.
 
+The next ClawHub implementation stack should build on those foundations without
+collapsing the trust gates:
+
+1. Follow controls and followed-publisher discovery: add follow and unfollow
+   controls on publisher surfaces, followed-publisher lists, and search filters
+   such as "people I follow" or "new from followed publishers", with clear
+   reasons for why entries appear.
+2. Follow notification delivery: emit notification events when followed
+   publishers publish or update skills and plugins, with user preferences,
+   mute or unsubscribe controls, replay/backfill rules, rate limits, and audit
+   records.
+3. Public feed and profile pages: expose account and publisher feed pages backed
+   by the account-feed API, including empty, restricted, official, review, and
+   scan states that reflect only recorded facts.
+4. Registry submission workflow: let eligible ClawHub publisher entries be
+   idempotently queued, retried, withdrawn, or resubmitted for downstream
+   registry review and scanning while keeping submission separate from approval.
+5. Reflected registry and scan state: persist and display downstream review,
+   scan, inclusion, and local approval states, including status history, only
+   when those systems report them back to ClawHub.
+
 OpenClaw trust and runtime stack:
 
 1. Feed envelope and verifier primitives: parse ClawHub-authored feed envelopes,
