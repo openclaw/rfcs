@@ -1,15 +1,3 @@
-<!--
-Agent Event I/O Contract — base contract for RFC 0008 (normalized provider→channel stream grammar).
-
-Origin: extracted from openclaw/openclaw #92216 (fix(gateway): mirror hidden commentary-phase
-assistant events), docs commit f92c1bfcd2. The upstream maintainer asked that this contract be
-split out of that behavior PR so it could be owned and edited separately from runtime code; this
-RFC sidecar is that separately-ownable home. RFC 0008's four [AMENDS BASE] points are folded into
-this file inline, each marked "[RFC 0008 amendment, §x.x]" so the as-split #92216 baseline and the
-RFC 0008 deltas stay distinguishable for the maintainer who owns the upstream contract.
-
-Contributed for RFC 0008 by ragesaq (as-split baseline); amendments folded in for RFC 0008.
--->
 ---
 summary: "Provider input and channel output contract for assistant commentary, tool activity, lifecycle, and final answers"
 read_when:
@@ -18,6 +6,19 @@ read_when:
   - Debugging missing preamble, commentary, or tool progress in channel sessions
 title: "Agent event I/O contract"
 ---
+
+<!--
+Agent Event I/O Contract — base contract for RFC 0015 (normalized provider→channel stream grammar).
+
+Origin: extracted from openclaw/openclaw #92216 (fix(gateway): mirror hidden commentary-phase
+assistant events), docs commit f92c1bfcd2. The upstream maintainer asked that this contract be
+split out of that behavior PR so it could be owned and edited separately from runtime code; this
+RFC sidecar is that separately-ownable home. RFC 0015's four [AMENDS BASE] points are folded into
+this file inline, each marked "[RFC 0015 amendment, §x.x]" so the as-split #92216 baseline and the
+RFC 0015 deltas stay distinguishable for the maintainer who owns the upstream contract.
+
+Contributed for RFC 0015 by ragesaq (as-split baseline); amendments folded in for RFC 0015.
+-->
 
 # Agent Event I/O Contract
 
@@ -131,7 +132,7 @@ Rules:
   progress unless a later or enclosing provider signal marks it as final.
 - Private reasoning, hidden analysis, chain-of-thought, and provider-only traces must use a
   separate stream such as `thinking`. They must not be disguised as assistant commentary.
-  **[RFC 0008 amendment, §3.2]** Wire-carried reasoning must **not** be dropped before event
+  **[RFC 0015 amendment, §3.2]** Wire-carried reasoning must **not** be dropped before event
   emission: emission onto the `thinking` stream is unconditional whenever the wire carries
   reasoning, and display is gated downstream at presentation. (The earlier "or must be dropped
   before event emission" allowance is removed — a dropped thought cannot be shown by a later
@@ -170,7 +171,7 @@ Rules:
 
 - Emit `phase: "start"` at the earliest moment the call id and name are available (first tool-call
   delta, Anthropic `content_block_start`, Responses `output_item.added`) — never delayed until
-  argument assembly completes. **[RFC 0008 amendment, §3.3]** (Tightens the prior "before the tool
+  argument assembly completes. **[RFC 0015 amendment, §3.3]** (Tightens the prior "before the tool
   or command begins whenever the provider/runtime knows the call in advance.")
 - Emit `phase: "end"` after completion, failure, or cancellation.
 - Reuse `itemId` and `toolCallId` across updates for the same logical tool call.
@@ -200,10 +201,10 @@ Required behavior:
 | Function/tool call begin                                   | `stream: "item"` or `tool` with start/running status before execution            |
 | Function/tool call result                                  | `stream: "item"` or `tool` with end/completed or end/failed status               |
 | Claude/Anthropic inter-tool narration                      | `stream: "assistant"`, `data.phase: "commentary"` when it is visible narration   |
-| Claude/Anthropic thinking/reasoning                        | `stream: "thinking"` (variant `raw`/`summary`/`redacted`); never dropped — display gated downstream **[RFC 0008, §3.2]** |
+| Claude/Anthropic thinking/reasoning                        | `stream: "thinking"` (variant `raw`/`summary`/`redacted`); never dropped — display gated downstream **[RFC 0015, §3.2]** |
 | Harmony `commentary` channel text                          | `stream: "assistant"`, `data.phase: "commentary"`                                |
 | Harmony `final` channel text                               | final reply path and, if emitted as an event, `data.phase: "final_answer"`       |
-| Harmony `analysis` channel text                            | `stream: "thinking"`; never dropped **[RFC 0008, §3.2]**                          |
+| Harmony `analysis` channel text                            | `stream: "thinking"`; never dropped **[RFC 0015, §3.2]**                          |
 | ACP or subagent progress/status                            | `stream: "item"` or `lifecycle`; not assistant final text                        |
 | Non-streaming provider with one final response             | final reply path only, unless the provider emits separate progress               |
 
@@ -222,7 +223,7 @@ Both subscriber classes must be able to receive channel-eligible runtime activit
 When `isControlUiVisible` is false, the gateway must mirror these events to the exact session
 subscriber set selected by `resolveSessionDeliveryKey(sessionKey, agentId)`:
 
-- **[RFC 0008 amendment, §5.1]** `stream: "thinking"` events (all variants: `raw`, `summary`,
+- **[RFC 0015 amendment, §5.1]** `stream: "thinking"` events (all variants: `raw`, `summary`,
   `redacted`), mirrored on their own stream — never disguised as commentary. Display suppression is
   the channel's job, not the gateway's.
 - Tool lifecycle/progress events that channels use for tool rows or progress status.
@@ -237,7 +238,7 @@ subscriber set selected by `resolveSessionDeliveryKey(sessionKey, agentId)`:
 
 - `stream: "assistant"` with `data.phase === "final_answer"`.
 - Empty assistant frames with neither non-empty `delta` nor non-empty `text`.
-- Private reasoning or analysis events **disguised as commentary**. **[RFC 0008 amendment, §5.1]**
+- Private reasoning or analysis events **disguised as commentary**. **[RFC 0015 amendment, §5.1]**
   Reasoning is still mirrored — on the `thinking` stream (see the mirror list above), not the
   commentary path; this rule forbids only re-tagging it as `assistant`/`commentary`.
 - Events from aborted runs after the abort guard is active.
@@ -287,7 +288,7 @@ Channels should use stable keys to avoid duplicate progress:
 
 - Assistant commentary segment: a provider item id **only where the provider supplies a stable
   one** (Anthropic block index; Responses composite `item_id:content_index` — `item_id` alone
-  collapses distinct segments), else `runId + seq`. **[RFC 0008 amendment, §7.3]** Synthesized
+  collapses distinct segments), else `runId + seq`. **[RFC 0015 amendment, §7.3]** Synthesized
   counters are forbidden as idempotency keys — they are reconnect-unstable.
 - Tool item: `runId + itemId + phase`, or `runId + toolCallId + phase`.
 - Final answer: normal message idempotency and delivery mirror rules, not the progress key.
