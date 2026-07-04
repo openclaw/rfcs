@@ -6,7 +6,7 @@ created: 2026-07-04
 last_updated: 2026-07-04
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/28
 ---
 
 # Proposal: OpenClaw Mobile App Design Directions
