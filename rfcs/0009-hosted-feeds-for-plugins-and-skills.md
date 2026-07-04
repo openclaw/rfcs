@@ -5,7 +5,7 @@ authors:
   - Patrick
   - Gio
 created: 2026-06-18
-last_updated: 2026-06-29
+last_updated: 2026-07-03
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/19
@@ -474,6 +474,17 @@ These tracks intentionally meet at discovery first. Install authority, official
 status, Microsoft registry inclusion, tenant approval, security-scan results,
 and package artifact verification remain separate gates that later PRs must
 wire explicitly.
+
+Implementation update: the ClawHub account-feed discovery work in this RFC is
+now backed by the current ClawHub PR stack. The code-backed slices are
+`#2948` through `#2959`: account-feed model/API (`#2948`), claim and
+official-state facts (`#2949`), follow graph API (`#2950`), profile and
+discovery surfaces (`#2951`), registry and scan bridge (`#2953`), follow
+controls and followed-publisher discovery (`#2957`), follow notification
+delivery (`#2958`), and public feed/profile routes (`#2959`). Those PRs keep
+the same boundary described above: following and discovery do not imply
+official status, registry inclusion, install eligibility, or security-scan
+bypass.
 
 The likely PR stacks are:
 
