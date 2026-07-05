@@ -1,5 +1,5 @@
 ---
-title: CLI Catalog Overlay for AI-Routable Surfaces
+title: CLI Catalog View for OpenClaw Command Surfaces
 authors:
   - Gio
 created: 2026-07-04
@@ -9,54 +9,63 @@ issue:
 rfc_pr:
 ---
 
-# Proposal: CLI Catalog Overlay for AI-Routable Surfaces
+# Proposal: CLI Catalog View for OpenClaw Command Surfaces
 
 ## Summary
 
 Create one read-only catalog view over existing OpenClaw command and tool
-surfaces so different consumers can inspect the same normalized inventory
-through scoped lenses. The first implementation makes static CLI descriptors,
-command-route policy, routed operations, runtime-registered Commander commands,
-plugin CLI descriptors, and explicit agent/tool surfaces visible through a
-single source-labeled catalog. It then derives separate prompt, audit, coverage,
-and operator lenses from that catalog instead of making every consumer parse the
-same giant view.
+registries so maintainers, operators, docs, tests, and prompt routing can
+inspect the same normalized inventory. The catalog does not replace those
+registries. It joins static CLI descriptors, command-route policy, routed
+operations, runtime-registered Commander commands, plugin CLI descriptors, and
+explicit agent/tool surfaces into one source-labeled view, then derives scoped
+outputs for prompt routing, audit, coverage, docs, and operator handoffs.
 
-The catalog overlay is metadata only. It does not add a new execution
-dispatcher, runtime hook, gateway plugin, policy engine, or expression language.
-Selected commands and tools continue to own validation, permissions,
-confirmation, execution, and results.
+The catalog view is metadata only. It does not add a new execution dispatcher,
+runtime hook, gateway plugin, policy engine, or expression language. Selected
+commands and tools continue to own validation, permissions, confirmation,
+execution, and results.
 
 ## Motivation
 
-OpenClaw has several prompt-like operational surfaces that already map to
-bounded commands or tools: session status, process control, gateway operations,
-skill proposal lifecycle, delegation, config updates, exports, diagnostics, and
-similar command surfaces. Today those flows are often described to the model as
-conversation text even when the correct behavior is already finite.
+OpenClaw already has several bounded operational surfaces: session status,
+process control, gateway operations, skill proposal lifecycle, delegation,
+config updates, exports, diagnostics, and similar command or tool surfaces.
+Their metadata is split across several useful registries and prose surfaces.
+Today a consumer that wants to answer "what command/tool surfaces exist, where
+did they come from, and which ones are safe for this context?" has to combine
+CLI descriptors, command routing metadata, routed-command definitions, plugin
+descriptors, tool-backed surfaces, and prompt guidance by hand.
 
 That creates three problems:
 
-- the model can phrase or sequence the operation incorrectly
-- the operation contract is harder to audit and test
+- no single place lists the available command/tool surfaces with source labels
+  and risk metadata
+- docs, tests, prompts, and audits can drift because they each infer the same
+  inventory differently
+- model-facing guidance can phrase or sequence bounded operations incorrectly
+  when it relies on prose instead of structured metadata
 - repeated flows consume prompt space restating bounded behavior already present
   in command metadata
 
-The goal is not primarily token reduction. The bigger win is removing ambiguity
-from actions that already have fixed contracts and already exist as commands or
-tools.
+The goal is not primarily token reduction. The bigger win is a single
+inspection point for existing command/tool metadata so bounded actions become
+easier to inspect, document, test, audit, and route.
 
 ## Goals
 
-- Let the AI choose an existing command or tool surface from reviewable
+- Provide one read-only catalog view over existing OpenClaw command and tool
+  registries.
+- Let prompt routing choose an existing command or tool surface from reviewable
   metadata.
 - Keep the selected surface responsible for validation, permissions,
   confirmation, execution, and output.
 - Keep prompt-facing metadata lean enough to avoid turning the catalog into a
   large prompt tax.
 - Provide a programmatic and CLI-readable list of OpenClaw command/tool surfaces
-  for maintainers and operators.
-- Distinguish static descriptors, route-policy entries, explicit overlay
+  for maintainers, operators, docs, tests, audit, and future policy/admin
+  consumers.
+- Distinguish static descriptors, route-policy entries, explicit catalog
   entries, runtime-registered commands, and plugin descriptor entries with
   source/discovery metadata.
 - Generate scoped lenses from the same inventory for prompts, audit/policy
@@ -69,6 +78,7 @@ tools.
 - Replacing open-ended reasoning, code review, design review, or
   troubleshooting.
 - Turning every prompt into a DSL.
+- Replacing existing CLI, route, plugin, provider, channel, or model catalogs.
 - Adding a general-purpose expression language.
 - Encoding product judgment or policy enforcement into the catalog itself.
 - Adding a new execution surface, dispatcher, runtime hook, or gateway plugin.
@@ -89,7 +99,8 @@ a second command registry. The first list is structured as:
   command-route registry and routed-command definitions. In the prototype this
   is 14 routed operations.
 - `agentToolSurfaces`: explicit metadata for tool-backed or non-CLI surfaces
-  that the AI also needs for routing. In the prototype this is 5 surfaces.
+  that prompt routing and operator views also need. In the prototype this is 5
+  surfaces.
 - `cli.runtimeCommands`: optional entries discovered from the currently
   registered Commander tree for this invocation.
 - `cli.pluginCommands`: optional plugin CLI descriptor entries, source-labeled
@@ -178,7 +189,7 @@ summaries read from those APIs instead of duplicating metadata.
 
 ### Maintainability Model
 
-The catalog is designed to be easy to maintain because it is an overlay on
+The catalog is designed to be easy to maintain because it is a view over
 existing OpenClaw data structures, not a replacement for them.
 
 - CLI descriptors continue to come from the existing core and sub-CLI
@@ -198,31 +209,32 @@ existing registry or a focused guard points to the missing metadata update. The
 catalog should not grow into a new execution system, policy engine, or parallel
 source of truth.
 
-### Why Existing Catalogs Do Not Already Cover This
+### Why Existing Registries Do Not Already Cover This
 
 OpenClaw already has several useful catalogs and descriptor registries, but they
-serve narrower domains:
+serve narrower domains. None of them is the single joined command/tool
+inventory this proposal needs:
 
-- model catalogs describe model/provider availability
-- channel and plugin catalogs describe installed or official integration
-  surfaces
-- provider/install catalogs describe package or extension discovery
-- CLI descriptors drive help output and command registration
-- the command catalog drives command-path routing and startup policy
-- routed-command definitions own command execution fast paths
-- prompt guidance describes tool usage in prose
+| Existing source | What it owns today | What is missing for this use |
+| --- | --- | --- |
+| CLI descriptors | Help text, top-level/sub-CLI registration metadata, command descriptions | Route policy, routed-operation IDs, prompt scope, audit grouping, runtime/plugin detail |
+| `cliCommandCatalog` | Command paths, startup policy, route policy keys | Descriptor details, routed-operation metadata, prompt-safe shape, plugin/runtime entries |
+| Routed-command definitions | Mechanical command execution fast paths | Complete command inventory, help descriptors, audit/coverage views |
+| Plugin descriptors and registries | Plugin-provided CLI metadata and installed/official integration surfaces | A joined view with core commands, route policy, prompt filtering, and audit grouping |
+| Model/provider/channel catalogs | Provider, model, channel, and integration availability | OpenClaw command/tool operation inventory |
+| Prompt guidance | Prose instructions for tool usage | Machine-readable source labels, stable IDs, risk/effect metadata, drift guards |
 
 Those pieces are necessary, and this proposal reuses them. What does not exist
-today is one read-only view that joins them into an AI-routable operational
+today is one read-only view that joins them into an operational command/tool
 inventory: command descriptors, command routes, route-policy keys, routed
-operation IDs, explicit tool-backed surfaces, risk/confirmation/effect metadata,
-and a lean prompt projection. Without that joined view, docs, prompts, tests,
-operator views, and audits either duplicate small command lists or infer intent
-from prose/help output.
+operation IDs, explicit tool-backed surfaces, runtime/plugin entries,
+risk/confirmation/effect metadata, and a lean prompt projection. Without that
+joined view, docs, prompts, tests, operator views, and audits either duplicate
+small command lists or infer intent from prose/help output.
 
 This RFC therefore does not introduce "another catalog" for its own sake. It
 adds the missing joined view over existing catalogs and registries, with drift
-guards to keep the overlay honest.
+guards to keep the view honest.
 
 ### Runtime Flow
 
@@ -230,9 +242,10 @@ guards to keep the overlay honest.
    explicit agent/tool metadata.
 2. The prompt renderer reads the prompt projection API, not the full catalog
    list.
-3. The AI identifies a routed operation or agent/tool surface by `id` or lean
-   metadata match.
-4. The AI chooses the existing command or tool surface described by that entry.
+3. Prompt routing identifies a routed operation or agent/tool surface by `id` or
+   lean metadata match.
+4. The model chooses the existing command or tool surface described by that
+   entry.
 5. The selected surface validates arguments, policy, and preconditions using
    existing behavior.
 6. If required, the selected surface asks for confirmation.
@@ -250,22 +263,32 @@ openclaw catalog list --json
 openclaw catalog list --markdown
 ```
 
-The command is not an execution dispatcher. JSON output is the one-stop
-structured view for humans, automation, docs, and future policy/admin consumers.
+The command is not an execution dispatcher. JSON output is the joined structured
+view for humans, automation, docs, and future policy/admin consumers.
 Markdown output is a concise operator view.
 
 ### Proposed Implementation Stack
 
-1. Add the prompt projection API, prompt renderer, and focused tests over the
-   first routed-operation and agent/tool projection.
-2. Expose `buildCatalogList()` as the read-only programmatic catalog list API
-   over CLI descriptors, command routes, routed operations, and agent/tool
-   surfaces.
-3. Add `openclaw catalog list` plus a thin script wrapper for JSON/Markdown
-   output.
-4. Generate an AI surface catalog docs page from the full catalog hierarchy.
-5. Add guards for required metadata, descriptor alignment, prompt size, and
-   generated output drift.
+The implementation should land as a small review stack that shows the catalog
+view first, then layers dynamic inventory, prompt routing, drift guards, docs,
+and hardening on top.
+
+1. Foundation catalog view: add `buildCatalogList()`, `openclaw catalog list`,
+   static CLI descriptors, command routes, routed operations, explicit
+   agent/tool surfaces, source labels, and parseable JSON/Markdown output.
+2. Dynamic and operator lenses: add runtime Commander-tree entries, opt-in
+   plugin descriptor entries, `catalog audit`, `catalog test-matrix`, and
+   `catalog summary`.
+3. Prompt projection: add the lean prompt-facing projection and prompt renderer
+   that read from the catalog rather than duplicating command prose.
+4. Schema fixtures: add checked JSON fixtures that protect schema versions,
+   required fields, stable IDs, and value kinds while treating counts as
+   reviewable snapshots.
+5. Generated docs: generate the catalog reference page from the same APIs, with
+   docs-map/i18n updates and a `--check` freshness mode.
+6. Hardening: enrich runtime/plugin detail, preserve hidden/private plugin
+   metadata through registry normalization, write richer advisory report
+   artifacts, and document the CLI-first consumer contract.
 
 ### Full Integration Plan
 
@@ -304,135 +327,79 @@ implementations.
 ### Proposed PR Plan
 
 Because the catalog's value is the combination of normalized inventory plus
-consumer-specific lenses, the first implementation stack should prove the full
-vertical slice rather than landing only a static list first.
+consumer-specific lenses, the first implementation stack should show the shared
+catalog view and its most important consumers without making reviewers evaluate
+ten tiny PRs.
 
-1. Foundation: normalized catalog inventory
+1. Foundation catalog view
    - Deliverables: `buildCatalogList()`, `openclaw catalog list`, static core
      and sub-CLI descriptors, command-route policy entries, routed operations,
      explicit agent/tool surfaces, schema version, source/discovery metadata,
-     visibility metadata, startup-policy entry, script wrapper, and drift guards.
-   - Scenario: `openclaw catalog list --json` shows static OpenClaw command and
-     tool surfaces in one source-labeled shape.
-   - Non-goal: no new dispatcher and no policy enforcement.
-   - Acceptance: static catalog counts are deterministic; descriptors/routes are
-     source-labeled; JSON/Markdown output is parseable and proxy-safe.
+     and JSON/Markdown output.
+   - Scenario: `openclaw catalog list --json` shows OpenClaw command and tool
+     surfaces in one source-labeled shape.
+   - Non-goal: no dispatcher, policy enforcement, or replacement registry.
+   - Acceptance: output is parseable, source-labeled, and derived from existing
+     registries wherever possible.
 
-2. Runtime command lens
-   - Deliverables: Commander-tree enumeration for commands registered in the
-     current invocation, including nested subcommands already loaded in the
-     runtime command tree.
-   - Scenario: an operator can ask what commands OpenClaw has actually
-     registered right now instead of only seeing static descriptor placeholders.
-   - Non-goal: do not force-load command trees just to discover them.
-   - Acceptance: runtime entries are labeled `runtime-registered` and can be
-     passed into the catalog without changing static catalog output.
+2. Dynamic inventory and operator lenses
+   - Deliverables: runtime Commander-tree entries, opt-in plugin descriptor
+     entries, `catalog audit`, `catalog test-matrix`, and `catalog summary`.
+   - Scenario: maintainers can inspect static, runtime, plugin, route, and tool
+     surfaces by the lens that matches their job: live inventory, audit/policy
+     review, smoke coverage planning, or operator handoff.
+   - Non-goal: do not force-load command trees or plugin runtime code only for
+     discovery; do not fail CI or enforce policy from the first reports.
+   - Acceptance: dynamic entries are source-labeled, plugin entries are opt-in
+     or caller-supplied, and operator/audit outputs consume catalog data rather
+     than prompt text or hand-maintained lists.
 
-3. Plugin descriptor lens
-   - Deliverables: plugin CLI descriptors projected into catalog command entries
-     with `source_kind=plugin`, plugin ID, command path, and discovery mode.
-   - Scenario: a plugin can contribute command metadata that appears in catalog
-     output without hand-editing prompt prose or core command lists.
-   - Non-goal: do not make the default catalog command execute arbitrary plugin
-     code solely for discovery.
-   - Acceptance: plugin descriptor entries are opt-in or caller-supplied,
-     source-labeled, and not prompt-visible unless a prompt lens explicitly
-     enables that plugin.
-
-4. Prompt lens
+3. Prompt projection
    - Deliverables: lean prompt projection, prompt renderer, available-tool
      filtering, prompt budget guard, and explicit opt-in for plugin descriptor
      commands that are allowed into prompt scope.
-   - Scenario: the AI sees the small set of surfaces available in its current
-     scope, including eligible plugin surfaces, without seeing the full audit or
-     operator inventory.
+   - Scenario: the model sees the small set of surfaces available in its
+     current scope without seeing the full audit or operator inventory.
    - Non-goal: do not dump the full catalog into the prompt.
    - Acceptance: prompt projection remains small, filters unavailable tools, and
-     only includes plugin entries when a trusted/allowed plugin ID is supplied.
+     only includes plugin entries when an allowed plugin ID is supplied.
 
-5. Audit, coverage, and operator lenses
-   - Deliverables: read-only `catalog audit`, `catalog test-matrix`, and
-     `catalog summary` outputs for risk/effect/confirmation grouping, route
-     policy keys, smoke coverage gaps, and compact operator/admin handoffs.
-   - Scenario: maintainers can inspect static, runtime, plugin, route, and tool
-     surfaces by the lens that matches their job: audit/policy review, coverage
-     planning, or operator handoff.
-   - Non-goal: do not fail CI or enforce policy from these reports in the first
-     stack.
-   - Acceptance: each lens is deterministic, covered by focused tests, and
-     consumes catalog data rather than prompt text or hand-maintained lists.
-
-After that first vertical slice lands, the next stack should harden the catalog
-as a reusable integration surface without turning it into a dispatcher or policy
-engine.
-
-6. Stable JSON schema fixtures
+4. Schema fixtures
    - Deliverables: checked fixtures for `catalog list`, `catalog audit`,
      `catalog test-matrix`, `catalog summary`, and prompt projection output.
-     Fixtures should lock schema versions, stable IDs, required fields, and
-     value kinds while treating inventory counts as expected-to-change
-     snapshots.
    - Scenario: maintainers can review catalog contract changes intentionally
      instead of discovering JSON-shape drift through downstream consumers.
    - Non-goal: do not freeze every command count as a compatibility promise.
    - Acceptance: fixture checks fail on removed/renamed fields, unstable IDs, or
      schema-version drift, but allow deliberate inventory count updates.
 
-7. Generated reference docs for all lenses
-   - Deliverables: generated docs for `catalog list`, `catalog audit`,
-     `catalog test-matrix`, `catalog summary`, runtime entries, plugin entries,
-     and prompt scope, plus docs-map and i18n glossary updates where the
-     generated page participates in the normal docs index.
+5. Generated reference docs
+   - Deliverables: generated docs for the catalog commands and lenses, plus
+     docs-map and i18n glossary updates where the generated page participates in
+     the normal docs index.
    - Scenario: users and maintainers can inspect the catalog surfaces from docs
      generated by the same APIs used by automation.
    - Non-goal: do not hand-write parallel catalog tables.
-   - Acceptance: docs generation has a `--check` mode, consumes catalog APIs
-     rather than prompt text, produces exactly the checked-in formatting, and
-     keeps public docs deterministic even when local/private QA CLI flags are
-     enabled.
+   - Acceptance: docs generation has a `--check` mode, consumes catalog APIs,
+     preserves checked-in formatting, and keeps public docs deterministic when
+     private/local QA CLI flags are enabled.
 
-8. Deeper runtime and plugin enumeration
-   - Deliverables: richer runtime and plugin metadata where OpenClaw can collect
-     it without force-loading arbitrary plugin runtime code, including clearer
-     source labels, parent paths, hidden-command filtering, and metadata-only
-     plugin behavior. Hidden/private descriptor metadata must survive the real
-     plugin registry and captured-registration normalization paths before any
-     catalog lens filters it.
-   - Scenario: audit and operator consumers can tell static descriptors,
-     currently registered commands, and plugin-provided descriptors apart.
-   - Non-goal: do not execute plugin registrars or arbitrary plugin runtime code
-     only to make the catalog look complete.
-   - Acceptance: runtime/plugin entries remain source-labeled, metadata-only
-     plugin loading is JSON-safe, and hidden/private commands stay out of
-     public lenses.
-
-9. Advisory CI and report integration
-   - Deliverables: non-blocking catalog summary and test-matrix artifacts for
-     PRs, with coverage-gap and drift summaries that maintainers can inspect.
-   - Scenario: a PR touching command routes, descriptors, prompts, or tools can
-     see catalog impact without making the first reports hard gates.
-   - Non-goal: do not fail normal CI on catalog coverage gaps until maintainers
-     choose specific gate semantics.
-   - Acceptance: reports are deterministic, easy to attach to PR validation,
-     and clearly labeled advisory.
-
-10. Policy/admin consumer contract
-    - Deliverables: a documented CLI JSON contract for policy, diagnostics, and
-      future admin consumers, plus guidance on which fields are stable contracts
-      versus inventory snapshots. Source modules remain repo-internal until
-      OpenClaw deliberately adds package exports for them.
-    - Scenario: policy/admin code can consume catalog metadata without scraping
-      help output or coupling to prompt-rendering internals.
-    - Non-goal: do not add enforcement, conditional enablement, or a new
-      catalog execution path, and do not promise `src/` implementation imports
-      as a published API.
-    - Acceptance: `openclaw catalog ... --json` is documented as the stable
-      external read path; any future import/export surface is added explicitly,
-      tested, and scoped to read-only metadata.
+6. Hardening and consumer boundary
+   - Deliverables: richer runtime/plugin metadata, hidden/private plugin
+     metadata preservation through registry normalization, richer advisory
+     report artifacts, and a documented CLI-first consumer contract.
+   - Scenario: downstream consumers can use `openclaw catalog ... --json` and
+     advisory report artifacts without scraping help output or coupling to
+     prompt-rendering internals.
+   - Non-goal: do not promise `src/` implementation imports as a published API
+     and do not make advisory report artifacts blocking gates.
+   - Acceptance: runtime/plugin entries stay source-labeled, hidden/private
+     commands stay out of public lenses, advisory outputs remain clearly
+     non-blocking, and any future package export is added deliberately.
 
 ### Review Learnings Incorporated
 
-The PR6-10 review pass tightened several boundaries in this RFC:
+The implementation review pass tightened several boundaries in this RFC:
 
 - Checked JSON fixtures are reviewable snapshots. They should protect schema
   versions, required fields, stable IDs, and value kinds, while treating counts
@@ -457,8 +424,8 @@ The PR6-10 review pass tightened several boundaries in this RFC:
 ## Rationale
 
 This design uses OpenClaw's existing command registration and tool contracts as
-the source of truth. That keeps the overlay small and reviewable while avoiding
-a second control plane.
+the source of truth. That keeps the catalog view small and reviewable while
+avoiding a second control plane.
 
 The main alternative is to create a typed operation or DSL layer. That would
 make bounded operations explicit, but it would also create a new surface that
@@ -467,14 +434,14 @@ catalog is lower risk because every catalog entry must point at an existing
 surface.
 
 The prompt projection and catalog list APIs are intentionally separate. The
-catalog list is one-stop shopping for structured metadata. The prompt needs only
-a compact routing view. Separating them avoids prompt scraping while keeping
-token cost visible.
+catalog list is the broad structured metadata view. The prompt needs only a
+compact routing view. Separating them avoids prompt scraping while keeping token
+cost visible.
 
 ## Evaluation Plan
 
-Compare current prompt-driven behavior with catalog-overlay behavior on a fixed
-set of bounded tasks:
+Compare current prompt-driven behavior with catalog-view behavior on a fixed set
+of bounded tasks:
 
 - set or inspect session state
 - approve or reject a bounded action
@@ -496,9 +463,17 @@ Track:
 - policy violations
 - audit completeness
 
-The overlay is better only if it is at least as safe as the current path,
+The catalog view is better only if it is at least as safe as the current path,
 reduces retries or prompt ambiguity on repeated mechanical operations, preserves
 user-visible behavior, and produces a readable audit trail for covered actions.
+
+Example comparisons:
+
+| Task | Current behavior to compare | Catalog-view behavior to validate |
+| --- | --- | --- |
+| Inspect Gateway status | Prompt guidance or help text points the model toward `gateway status`. | Prompt projection exposes the `gateway` surface with command hints, while `catalog list --json` shows the source and risk metadata. |
+| Review command-route policy | Maintainers inspect route definitions or command catalog entries directly. | `catalog audit --json` groups command paths by route policy key and reports routes without policy keys. |
+| Plan routed-operation smoke tests | Maintainers hand-map routed operations to candidate tests. | `catalog test-matrix --json` lists routed-operation smoke candidates and coverage gaps. |
 
 ## Unresolved Questions
 
