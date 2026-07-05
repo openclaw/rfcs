@@ -3,7 +3,7 @@ title: Normalized provider→channel stream grammar
 authors:
   - Peter Lindsey (@Marvinthebored)
 created: 2026-06-15
-last_updated: 2026-07-04
+last_updated: 2026-07-05
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/16
@@ -199,13 +199,15 @@ discovered later:
   removes already-streamed unsafe text from channel rendering; the archive
   retains it for audit, as it does today.
 
-The merged implementations already ship the display-gating half of this model:
-openclaw/openclaw#96106 emits raw Anthropic thinking and inferred pre-tool
-commentary as bus events with display gated downstream, and
-openclaw/openclaw#97875 / openclaw/openclaw#98907 gate channel exposure per
-setting. The open openclaw/openclaw#99401 review poses the same acceptance
-question for the CLI envelope; this section is the RFC-level answer
-maintainers are asked to ratify or amend.
+The merged implementations already ship this model: openclaw/openclaw#96106
+emits raw Anthropic thinking and inferred pre-tool commentary as bus events
+with display gated downstream, and openclaw/openclaw#97875 /
+openclaw/openclaw#98907 gate channel exposure per setting. The
+openclaw/openclaw#99401 review posed the same acceptance question for the CLI
+envelope explicitly, and its merge (2026-07-04) answered it — maintainers
+accepted raw thinking reaching the bus/archive with presentation gated
+downstream for the CLI path as well. This section states that already-shipped
+policy at the RFC level, for maintainers to ratify or amend.
 
 ### Conformance (§8)
 
@@ -219,7 +221,7 @@ contract rather than against each other.
 
 The framework did not land as one PR; it landed as a series of
 maintainer-reviewed fixes on `main`, each implementing a slice of this contract
-for one wire family or one channel. As of 2026-07-04:
+for one wire family or one channel. As of 2026-07-05, all seven are merged:
 
 | PR | Merged | Contract slice it implements |
 |----|--------|------------------------------|
@@ -229,17 +231,16 @@ for one wire family or one channel. As of 2026-07-04:
 | openclaw/openclaw#97875 | 2026-06-30 | Telegram: durable reasoning delivered when enabled — presentation-gated 🧠 lane (§4, §7) |
 | openclaw/openclaw#96106 | 2026-07-01 | F1 (Anthropic SSE): pre-tool text tagged `phase: commentary` at the transport parser; raw thinking emitted as bus events with display gated downstream (session-record persistence of thinking replay pre-exists this PR) (§3.2 [AMENDS BASE], §5.1) |
 | openclaw/openclaw#98907 | 2026-07-03 | Telegram: full streamed-lane presentation gate — `/reasoning off\|stream\|on` matrix, 🧠/💬 lane distinguishability, single stationary draft window, durable-before-final replacement (§4, §7 truth table); plus core-owned, channel-agnostic durable commentary delivery (`/verbose on`), closing openclaw/openclaw#90962 |
-| openclaw/openclaw#99401 | open | F1e (claude-cli stream-json envelope): native thinking parsed, bridged into the same `/reasoning` presentation gates, durable reasoning payloads (§3.2) |
+| openclaw/openclaw#99401 | 2026-07-04 | F1e (claude-cli stream-json envelope): native thinking parsed, bridged into the same `/reasoning` presentation gates, durable reasoning payloads (§3.2) |
 
-The **merged** set ratifies the three pillars — emit-always with lane tagging
-at the source, display gating decoupled from emission, one presentation gate —
-across F1, F2, and the codex envelope, with **Discord**
+The merged set ratifies the three pillars — emit-always with lane tagging at
+the source, display gating decoupled from emission, one presentation gate —
+across **F1, F1e, F2, and the codex envelope**, with **Discord**
 (openclaw/openclaw#96106) and **Telegram** (openclaw/openclaw#97875,
-openclaw/openclaw#98907) as the shipped presentation gates. F1e is in review
-(openclaw/openclaw#99401) and is listed for completeness, not claimed as
-landed.
-Remaining un-upstreamed slices: the conformance harness itself, and per-family
-adapter completeness per the spec's catalogue.
+openclaw/openclaw#98907) as the shipped presentation gates. With
+openclaw/openclaw#99401 merged (2026-07-04), **every implementation slice
+cited above is on `main`.** Remaining un-upstreamed: the conformance harness
+itself, and per-family adapter completeness per the spec's catalogue.
 
 **Lineage.** The original stacked reference implementation (core
 openclaw/openclaw#93342, `Marvinthebored:pipeline-core`; Discord overlay
