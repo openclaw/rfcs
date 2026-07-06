@@ -18,8 +18,9 @@ registries so maintainers, operators, docs, tests, and prompt routing can
 inspect the same normalized inventory. The catalog does not replace those
 registries. It joins static CLI descriptors, command-route policy, routed
 operations, runtime-registered Commander commands, plugin CLI descriptors, and
-explicit agent/tool surfaces into one source-labeled view, then derives scoped
-outputs for prompt routing, audit, coverage, docs, and operator handoffs.
+ownerless tool-surface adapters into one source-labeled view, then derives
+scoped outputs for prompt routing, audit, coverage, docs, and operator
+handoffs.
 
 The catalog view is metadata only. It does not add a new execution dispatcher,
 runtime hook, gateway plugin, policy engine, or expression language. Selected
@@ -65,7 +66,7 @@ easier to inspect, document, test, audit, and route.
 - Provide a programmatic and CLI-readable list of OpenClaw command/tool surfaces
   for maintainers, operators, docs, tests, audit, and future policy/admin
   consumers.
-- Distinguish static descriptors, route-policy entries, explicit catalog
+- Distinguish static descriptors, route-policy entries, ownerless adapter
   entries, runtime-registered commands, and plugin descriptor entries with
   source/discovery metadata.
 - Generate scoped lenses from the same inventory for prompts, audit/policy
@@ -99,9 +100,14 @@ a second command registry. The first list is structured as:
   registry.
 - `cli.routedOperations`: the mechanical fast-path route IDs derived from the
   command-route registry and routed-command definitions.
-- `agentToolSurfaces`: explicit metadata for tool-backed or non-CLI surfaces
-  that prompt routing and operator views also need, only when no existing
-  structured CLI descriptor or route metadata already represents the surface.
+- Catalog metadata fields on owning descriptors and routes: optional fields on
+  CLI descriptors, command-route entries, and plugin CLI descriptors provide
+  prompt, audit, operator, and docs metadata where those registries already own
+  the surface.
+- `agentToolSurfaces`: projected tool-backed or non-CLI surfaces. Most entries
+  should come from the owning descriptor/route/plugin metadata; explicit
+  adapter entries are reserved for surfaces that do not yet have an owning
+  structured registry.
 - `cli.runtimeCommands`: optional entries discovered from the currently
   registered Commander tree for this invocation.
 - `cli.pluginCommands`: optional plugin CLI descriptor entries, source-labeled
@@ -115,19 +121,22 @@ Exact counts are intentionally omitted from the contract. They are useful in
 fixtures and reports as reviewable snapshots, but command inventory changes
 over time and should not become a permanent compatibility promise.
 
-The explicit agent/tool surface metadata covers:
+The initial owner mapping is:
 
-- `skill_workshop` - manage durable skill proposal lifecycle.
-- `session_status` - report current session state and model-use status.
-- `sessions_spawn` - delegate work to a sub-agent or ACP session.
-- `process` - inspect and manage active exec/process work.
-- `gateway` - inspect, reconfigure, or restart the OpenClaw Gateway.
+- CLI descriptors own command-level catalog metadata such as `gateway`.
+- Command-route entries own routed-operation metadata such as route title,
+  prompt risk, confirmation requirement, and command hints.
+- Plugin CLI descriptors own plugin command metadata, including optional
+  visibility, risk, confirmation, effect mode, and command hints.
+- The adapter owns only ownerless tool-backed surfaces such as
+  `skill_workshop`, `session_status`, `sessions_spawn`, and `process` until
+  OpenClaw has a structured source for them.
 
-These entries are the exception path, not a new parallel registry. They cover
-tool-backed or non-CLI surfaces that do not already have enough structured CLI
-metadata to join from existing registries. If OpenClaw later adds structured
-descriptors for those surfaces, the catalog should read them from that source
-instead of keeping duplicate hand-authored metadata.
+Explicit adapter entries are the exception path, not a new parallel registry.
+They cover tool-backed or non-CLI surfaces that do not already have enough
+structured metadata to join from existing registries. If OpenClaw later adds
+structured descriptors for those surfaces, the catalog should read them from
+that source instead of keeping duplicate hand-authored metadata.
 
 Each surface entry declares:
 
@@ -186,10 +195,12 @@ The initial implementation has a normalized inventory layer plus scoped lenses:
 - Plugin descriptor inventory: can project plugin CLI descriptors into catalog
   entries, labeled by plugin ID and discovery mode, without making plugin
   execution a new default catalog requirement.
-- Agent/tool surface adapter: supplies focused metadata for non-CLI or
-  tool-backed model surfaces only when existing descriptors do not already have
-  enough structure, including examples, aliases, risk, confirmation, effect
-  mode, effects, visibility, and command hints.
+- Catalog metadata adapters on existing owners: CLI descriptors, route entries,
+  and plugin CLI descriptors can carry focused metadata such as examples,
+  aliases, risk, confirmation, effect mode, effects, visibility, and command
+  hints.
+- Ownerless tool adapter: supplies the same metadata only for non-CLI or
+  tool-backed model surfaces that do not yet have an owning descriptor or route.
 - Prompt lens: exposes only lean model-facing routing fields and filters by
   available tools plus explicitly prompt-enabled plugin IDs.
 - Audit, coverage, and operator lenses: consume the same inventory to group risk,
@@ -212,13 +223,18 @@ The catalog is designed to be easy to maintain because it is a view over
 existing OpenClaw data structures, not a replacement for them.
 
 - CLI descriptors continue to come from the existing core and sub-CLI
-  descriptor registries.
+  descriptor registries, with optional catalog metadata on the descriptor that
+  owns the command.
 - Command paths and startup-policy metadata continue to come from the existing
-  command catalog.
+  command catalog, with route-local catalog metadata for routed operations that
+  need prompt/audit/operator labels.
+- Plugin command metadata lives on plugin CLI descriptors so plugin authors do
+  not need a second catalog registration path.
 - Routed operations are derived from existing command-route metadata instead of
   loading route runners or defining a second operation registry.
-- Tool-backed and non-CLI surfaces use explicit metadata only where OpenClaw
-  does not already have a structured CLI descriptor to read.
+- Tool-backed and non-CLI surfaces use explicit adapter metadata only where
+  OpenClaw does not already have a structured descriptor, route, or plugin
+  entry to read.
 - Prompt guidance, generated docs, audit reports, and future operator views all
   consume catalog APIs instead of maintaining their own hardcoded lists.
 
@@ -246,7 +262,7 @@ inventory this proposal needs:
 Those pieces are necessary, and this proposal reuses them. What does not exist
 today is one read-only view that joins them into an operational command/tool
 inventory: command descriptors, command routes, route-policy keys, routed
-operation IDs, explicit tool-backed surfaces, runtime/plugin entries,
+operation IDs, ownerless tool-backed surfaces, runtime/plugin entries,
 risk/confirmation/effect metadata, and a lean prompt projection. Without that
 joined view, docs, prompts, tests, operator views, and audits either duplicate
 small command lists or infer intent from prose/help output.
@@ -258,7 +274,8 @@ guards to keep the view honest.
 ### Runtime Flow
 
 1. The catalog list API builds the full hierarchy from existing registries and
-   explicit agent/tool metadata.
+   optional catalog metadata on owning descriptors/routes/plugins, plus
+   ownerless tool adapters where no owning registry exists yet.
 2. The prompt renderer reads the prompt projection API, not the full catalog
    list.
 3. Prompt routing identifies a routed operation or agent/tool surface by `id` or
@@ -293,8 +310,9 @@ view first, then layers dynamic inventory, prompt routing, drift guards, docs,
 and hardening on top.
 
 1. Foundation catalog view: add `buildCatalogList()`, `openclaw catalog list`,
-   static CLI descriptors, command routes, routed operations, explicit
-   agent/tool surfaces, source labels, and parseable JSON/Markdown output.
+   static CLI descriptors with optional catalog metadata, command routes with
+   route-local catalog metadata, routed operations, ownerless tool adapters,
+   source labels, and parseable JSON/Markdown output.
 2. Dynamic and operator lenses: add runtime Commander-tree entries, opt-in
    plugin descriptor entries, `catalog audit`, `catalog test-matrix`, and
    `catalog summary`.
@@ -356,9 +374,10 @@ ten tiny PRs.
 
 1. Foundation catalog view
    - Deliverables: `buildCatalogList()`, `openclaw catalog list`, static core
-     and sub-CLI descriptors, command-route policy entries, routed operations,
-     explicit agent/tool surfaces, schema version, source/discovery metadata,
-     and JSON/Markdown output.
+     and sub-CLI descriptors with optional catalog metadata, command-route
+     policy entries with route-local catalog metadata, routed operations,
+     ownerless adapter surfaces, schema version, source/discovery metadata, and
+     JSON/Markdown output.
    - Scenario: `openclaw catalog list --json` shows OpenClaw command and tool
      surfaces in one source-labeled shape.
    - Non-goal: no dispatcher, policy enforcement, or replacement registry.
