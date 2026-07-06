@@ -78,9 +78,9 @@ package source layer.
   the private registry RBAC model.
 - Let clients check feeds on a named, lifecycle-owned refresh schedule using
   HTTP `Last-Modified` and `ETag`.
-- Support signed remote feeds with directly configured publisher keys first,
-  while leaving room for a later signed key-rotation document if ClawHub needs
-  remote publisher-key rotation.
+- Support signed remote feeds with directly configured publisher public keys
+  first, while leaving room for later publisher key-management work if ClawHub
+  or enterprise feed publishers need remote key rotation.
 - Keep a bundled feed in every OpenClaw build so offline, Docker, and
   air-gapped environments continue to work.
 - Create an RFC and implementation plan that ClawHub, Microsoft, Tencent,
@@ -102,6 +102,8 @@ package source layer.
 - Solving private registry authentication or RBAC inside the feed format.
 - Allowing a feed to define registry domains, credentials, or bootstrap trust
   keys for the client that consumes it.
+- Reusing OpenClaw platform signing identities, Apple certificates, or release
+  signing material as feed signing keys.
 
 ## Proposal
 
@@ -533,8 +535,8 @@ OpenClaw trust and runtime stack:
    verify configured trust anchors, fail closed on invalid signatures, and keep
    unsigned or failed-verification bodies inert.
 2. Source-profile trust config: define which ClawHub feed profiles and account
-   feed endpoints are locally trusted, including key rotation and explicit
-   unsigned opt-in behavior for self-hosted feeds.
+   feed endpoints are locally trusted, including directly configured publisher
+   public keys and explicit unsigned opt-in behavior for self-hosted feeds.
 3. Refresh and snapshot trust state: persist verification result, sequence,
    freshness, and fallback state with the cached feed snapshot without granting
    install or search authority by persistence alone.
@@ -752,11 +754,28 @@ source profiles decide where those candidates resolve and how the client
 authenticates.
 
 The signed envelope is intentionally smaller than a full updater framework.
-Directly configured publisher keys cover the normal case and should be enough for
-the first release. If ClawHub later needs remote publisher-key rotation, a
-separate signed key-rotation document can describe the currently valid feed
-signing keys and expiry. That follow-up should be treated as a distinct design
-step, not as a requirement for the first hosted feed.
+Directly configured publisher public keys cover the normal verification case and
+should be enough for the first release. These public keys are not secrets; they
+belong in local source-profile trust configuration with stable key ids or
+fingerprints and bounded diagnostics.
+
+Feed signing private keys are different. They should follow the same management
+principle OpenClaw already uses for platform signing and App Store Connect keys:
+private material stays outside normal OpenClaw config, for example in Keychain,
+a secret provider, CI secret storage, or an explicit operator-provided path,
+while config and status surfaces expose only non-secret key identity,
+fingerprint, and provenance. Feed signing keys should not reuse Apple platform
+signing certificates, Developer ID identities, notarization credentials, or
+other release-signing material. Platform keys prove binary/app publisher
+identity to operating-system verifiers; feed keys prove feed document integrity
+to OpenClaw clients and should have separate rotation and blast-radius
+boundaries.
+
+If ClawHub later needs remote publisher-key rotation, revocation, or publisher
+signing-key bootstrap UX, a separate signed key-management document can describe
+the currently valid feed signing public keys, expiry, and retirement rules.
+That follow-up should be treated as a distinct design step, not as a requirement
+for the first hosted feed.
 
 The bundled fallback is not optional. Without it, a feed outage or blocked
 endpoint would break onboarding and plugin discovery. With it, hosted feeds add
@@ -821,11 +840,15 @@ activated.
 3. Add named feed and source profiles, including npm registry overrides,
    ClawHub-compatible base URLs, Git base paths, and secret-reference
    authentication.
-4. Add signed feed envelopes with directly configured keys for public hosted
-   feeds. Self-hosted unsigned HTTPS feeds remain an explicit local opt-in. Land
-   this through the five-PR trust verification series: RFC addendum, envelope
-   verifier primitives, trust config, refresh/cache verification state, and
-   CLI/operator visibility.
+4. Add signed feed envelopes with directly configured publisher public keys for
+   public hosted feeds. Self-hosted unsigned HTTPS feeds remain an explicit
+   local opt-in. Land this through the five-PR trust verification series: RFC
+   addendum, envelope verifier primitives, trust config, refresh/cache
+   verification state, and CLI/operator visibility. Publisher private-key
+   management remains a later publishing workflow slice and should follow the
+   platform-signing model: external private material, non-secret key
+   id/fingerprint references in config, status/doctor visibility, and no reuse
+   of platform release-signing identities.
 5. Publish the first ClawHub-hosted feed for the current external plugin catalog.
    The first feed may include all current external entries; ClawHub can narrow
    future default feeds to official packages as the official catalog grows.
