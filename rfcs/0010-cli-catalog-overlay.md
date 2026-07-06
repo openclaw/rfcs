@@ -85,6 +85,8 @@ easier to inspect, document, test, audit, and route.
 - Requiring skill authors or command owners to learn a new authoring format in
   the first pass.
 - Exposing this as a public plugin SDK contract in the first implementation.
+- Treating prompt projection as required for the catalog list, audit, docs, or
+  operator views to be useful.
 
 ## Proposal
 
@@ -92,15 +94,14 @@ Start with a hierarchical, additive catalog over existing registries instead of
 a second command registry. The first list is structured as:
 
 - `cli.descriptors`: the existing top-level/core and sub-CLI descriptor
-  inventory. In the prototype this is 56 descriptors.
+  inventory.
 - `cli.commandRoutes`: the existing command-path routing and startup-policy
-  registry. In the prototype this is 93 command routes.
+  registry.
 - `cli.routedOperations`: the mechanical fast-path route IDs derived from the
-  command-route registry and routed-command definitions. In the prototype this
-  is 14 routed operations.
+  command-route registry and routed-command definitions.
 - `agentToolSurfaces`: explicit metadata for tool-backed or non-CLI surfaces
-  that prompt routing and operator views also need. In the prototype this is 5
-  surfaces.
+  that prompt routing and operator views also need, only when no existing
+  structured CLI descriptor or route metadata already represents the surface.
 - `cli.runtimeCommands`: optional entries discovered from the currently
   registered Commander tree for this invocation.
 - `cli.pluginCommands`: optional plugin CLI descriptor entries, source-labeled
@@ -108,7 +109,11 @@ a second command registry. The first list is structured as:
   to the caller.
 - `promptProjection`: a compact model-facing subset derived from routed
   operations, prompt-visible agent/tool surfaces, and explicitly prompt-enabled
-  plugin entries. In the static prototype this is 19 prompt items.
+  plugin entries.
+
+Exact counts are intentionally omitted from the contract. They are useful in
+fixtures and reports as reviewable snapshots, but command inventory changes
+over time and should not become a permanent compatibility promise.
 
 The explicit agent/tool surface metadata covers:
 
@@ -117,6 +122,12 @@ The explicit agent/tool surface metadata covers:
 - `sessions_spawn` - delegate work to a sub-agent or ACP session.
 - `process` - inspect and manage active exec/process work.
 - `gateway` - inspect, reconfigure, or restart the OpenClaw Gateway.
+
+These entries are the exception path, not a new parallel registry. They cover
+tool-backed or non-CLI surfaces that do not already have enough structured CLI
+metadata to join from existing registries. If OpenClaw later adds structured
+descriptors for those surfaces, the catalog should read them from that source
+instead of keeping duplicate hand-authored metadata.
 
 Each surface entry declares:
 
@@ -281,11 +292,15 @@ and hardening on top.
    `catalog summary`.
 3. Prompt projection: add the lean prompt-facing projection and prompt renderer
    that read from the catalog rather than duplicating command prose.
+   This PR is intentionally separate so maintainers can review model-facing
+   behavior apart from the catalog list, audit, docs, and operator surfaces.
 4. Schema fixtures: add checked JSON fixtures that protect schema versions,
    required fields, stable IDs, and value kinds while treating counts as
    reviewable snapshots.
 5. Generated docs: generate the catalog reference page from the same APIs, with
    docs-map/i18n updates and a `--check` freshness mode.
+   This is a drift guard for a new public CLI reference, not a hand-written
+   docs exercise.
 6. Hardening: enrich runtime/plugin detail, preserve hidden/private plugin
    metadata through registry normalization, write richer advisory report
    artifacts, and document the CLI-first consumer contract.
