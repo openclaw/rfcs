@@ -3,7 +3,7 @@ title: CLI Catalog View for OpenClaw Command Surfaces
 authors:
   - Gio
 created: 2026-07-04
-last_updated: 2026-07-05
+last_updated: 2026-07-06
 status: draft
 issue:
 rfc_pr:
@@ -13,17 +13,16 @@ rfc_pr:
 
 ## Summary
 
-Create one read-only catalog view over existing OpenClaw command and tool
-registries so maintainers, operators, docs, tests, and prompt routing can
-inspect the same normalized inventory. The catalog does not replace those
-registries. It joins static CLI descriptors, command-route policy, routed
-operations, runtime-registered Commander commands, plugin CLI descriptors, and
-ownerless tool-surface adapters into one source-labeled view, then derives
-scoped outputs for prompt routing, audit, coverage, docs, and operator
-handoffs.
+Add a read-only `openclaw catalog` command over existing OpenClaw command and
+tool metadata so maintainers, operators, docs, tests, and prompt routing can
+inspect the same normalized inventory. OpenClaw already has internal command
+catalogs, descriptors, route metadata, plugin descriptors, and tool surfaces,
+but it does not have a user-facing command that joins them into one structured
+view. This proposal adds that missing view without replacing the existing
+registries.
 
 The catalog view is metadata only. It does not add a new execution dispatcher,
-runtime hook, gateway plugin, policy engine, or expression language. Selected
+runtime hook, gateway plugin, policy engine, or expression language. Existing
 commands and tools continue to own validation, permissions, confirmation,
 execution, and results.
 
@@ -32,11 +31,11 @@ execution, and results.
 OpenClaw already has several bounded operational surfaces: session status,
 process control, gateway operations, skill proposal lifecycle, delegation,
 config updates, exports, diagnostics, and similar command or tool surfaces.
-Their metadata is split across several useful registries and prose surfaces.
-Today a consumer that wants to answer "what command/tool surfaces exist, where
-did they come from, and which ones are safe for this context?" has to combine
-CLI descriptors, command routing metadata, routed-command definitions, plugin
-descriptors, tool-backed surfaces, and prompt guidance by hand.
+Their metadata is split across useful internal sources such as CLI descriptors,
+`cliCommandCatalog`, routed-command definitions, plugin descriptors, and prompt
+guidance. Today there is no `openclaw catalog` command that answers "what
+command/tool surfaces exist, where did they come from, and which ones are safe
+for this context?"
 
 That creates three problems:
 
@@ -91,8 +90,9 @@ easier to inspect, document, test, audit, and route.
 
 ## Proposal
 
-Start with a hierarchical, additive catalog over existing registries instead of
-a second command registry. The first list is structured as:
+Start with a hierarchical, additive `openclaw catalog` view over existing
+registries instead of a second command registry. The first list is structured
+as:
 
 - `cli.descriptors`: the existing top-level/core and sub-CLI descriptor
   inventory.
@@ -244,32 +244,23 @@ existing registry or a focused guard points to the missing metadata update. The
 catalog should not grow into a new execution system, policy engine, or parallel
 source of truth.
 
-### Why Existing Registries Do Not Already Cover This
+### Relationship to Existing Registries
 
-OpenClaw already has several useful catalogs and descriptor registries, but they
-serve narrower domains. None of them is the single joined command/tool
-inventory this proposal needs:
+This is additive. OpenClaw already has internal command catalogs and descriptor
+registries, but current `main` does not expose a user-facing
+`openclaw catalog` command or one joined read-only inventory.
 
-| Existing source | What it owns today | What is missing for this use |
-| --- | --- | --- |
-| CLI descriptors | Help text, top-level/sub-CLI registration metadata, command descriptions | Route policy, routed-operation IDs, prompt scope, audit grouping, runtime/plugin detail |
-| `cliCommandCatalog` | Command paths, startup policy, route policy keys | Descriptor details, routed-operation metadata, prompt-safe shape, plugin/runtime entries |
-| Routed-command definitions | Mechanical command execution fast paths | Complete command inventory, help descriptors, audit/coverage views |
-| Plugin descriptors and registries | Plugin-provided CLI metadata and installed/official integration surfaces | A joined view with core commands, route policy, prompt filtering, and audit grouping |
-| Model/provider/channel catalogs | Provider, model, channel, and integration availability | OpenClaw command/tool operation inventory |
-| Prompt guidance | Prose instructions for tool usage | Machine-readable source labels, stable IDs, risk/effect metadata, drift guards |
+The closest existing source is `cliCommandCatalog`, which owns command paths,
+startup policy, and route policy keys. Other sources own adjacent pieces:
+sub-CLI descriptors own help and registration metadata, routed-command
+definitions own mechanical fast paths, plugin descriptors own plugin CLI
+metadata, and prompts/docs describe selected usage in prose.
 
-Those pieces are necessary, and this proposal reuses them. What does not exist
-today is one read-only view that joins them into an operational command/tool
-inventory: command descriptors, command routes, route-policy keys, routed
-operation IDs, ownerless tool-backed surfaces, runtime/plugin entries,
-risk/confirmation/effect metadata, and a lean prompt projection. Without that
-joined view, docs, prompts, tests, operator views, and audits either duplicate
-small command lists or infer intent from prose/help output.
-
-This RFC therefore does not introduce "another catalog" for its own sake. It
-adds the missing joined view over existing catalogs and registries, with drift
-guards to keep the view honest.
+This RFC keeps those sources as the owners. The catalog command reads them,
+adds small optional metadata where the owning source needs prompt/audit/operator
+labels, and exposes joined JSON/Markdown views for docs, audit, test planning,
+prompt routing, and operator review. It should not become a parallel registry or
+new execution path.
 
 ### Runtime Flow
 
