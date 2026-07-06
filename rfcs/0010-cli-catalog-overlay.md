@@ -186,9 +186,10 @@ The initial implementation has a normalized inventory layer plus scoped lenses:
 - Plugin descriptor inventory: can project plugin CLI descriptors into catalog
   entries, labeled by plugin ID and discovery mode, without making plugin
   execution a new default catalog requirement.
-- Agent/tool surface registry: owns complete metadata for non-CLI or tool-backed
-  model surfaces, including examples, aliases, risk, confirmation, effect mode,
-  effects, visibility, and command hints.
+- Agent/tool surface adapter: supplies focused metadata for non-CLI or
+  tool-backed model surfaces only when existing descriptors do not already have
+  enough structure, including examples, aliases, risk, confirmation, effect
+  mode, effects, visibility, and command hints.
 - Prompt lens: exposes only lean model-facing routing fields and filters by
   available tools plus explicitly prompt-enabled plugin IDs.
 - Audit, coverage, and operator lenses: consume the same inventory to group risk,
@@ -197,6 +198,13 @@ The initial implementation has a normalized inventory layer plus scoped lenses:
 Consumers such as the prompt renderer, catalog list command/script, generated
 reference docs, drift guards, audit reports, coverage reports, and operator
 summaries read from those APIs instead of duplicating metadata.
+
+The first stack should demonstrate live value in more than one consumer:
+`openclaw catalog list --json` for inspection, generated docs for reference
+freshness, audit/test-matrix/summary outputs for maintainer review, and prompt
+projection for model-facing routing. Plugin metadata remains opt-in and
+metadata-only so plugin authors can make command surfaces discoverable without
+the catalog executing arbitrary plugin runtime code.
 
 ### Maintainability Model
 
