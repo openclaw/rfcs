@@ -3,7 +3,7 @@ title: Normalized provider→channel stream grammar
 authors:
   - Peter Lindsey (@Marvinthebored)
 created: 2026-06-15
-last_updated: 2026-07-05
+last_updated: 2026-07-06
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/16
@@ -23,14 +23,16 @@ everywhere. The governing principle is **emit always, archive always, gate only
 at presentation**. Integrating a new channel (GUI, TUI, Discord, anything) means
 following this output contract and overlaying channel UX — nothing more.
 
-The full normative specification, evidence files (per-family wire captures), a
-conformance harness (37 tests across 28 golden captures), and two red-team passes live in a
-companion repository, pinned for review at commit
-[`0d354d9ed075`](https://github.com/Marvinthebored/openclaw-provider-stream-spec/tree/0d354d9ed075).
-This RFC is the design narrative; the spec is the contract. It extends the agent
-event I/O contract — vendored into this RFC at
-[`0015/agent-event-io-contract.md`](0015/agent-event-io-contract.md) from
-openclaw/openclaw#92216 (merged 2026-06-13) by ragesaq — and marks its four
+The full normative specification is **vendored in this RFC's tree** at
+[`0015/stream-grammar-spec.md`](0015/stream-grammar-spec.md) (from the
+previously-pinned companion commit
+[`0d354d9ed075`](https://github.com/Marvinthebored/openclaw-provider-stream-spec/tree/0d354d9ed075);
+the companion repository remains the home of the evidence files — per-family
+golden wire captures — and the executable conformance harness, 37 tests across
+28 goldens, plus two red-team passes). This RFC is the design narrative; the
+vendored spec is the contract. It extends the agent event I/O contract —
+vendored at [`0015/agent-event-io-contract.md`](0015/agent-event-io-contract.md)
+from openclaw/openclaw#92216 (merged 2026-06-13) by ragesaq — and marks its four
 explicit amendments as **[AMENDS BASE]**.
 
 > **Renumbering note:** originally filed as RFC 0008; renumbered to 0015 because
@@ -119,6 +121,10 @@ Five streams on the existing `AgentEventPayload` envelope:
   cumulative usage. `update` is diagnostics (debug log, not rendered by default).
   Abnormal transport close emits a synthetic `lifecycle/error reason:"stream_closed"`.
 
+> **Shipped:** lane tagging at the source for F1 (openclaw/openclaw#96106) and
+> F1e (openclaw/openclaw#99401); stable-id idempotency for the codex envelope
+> (openclaw/openclaw#93343).
+
 ### Finality resolution (§3.5, normative)
 
 A total dispatch over every catalogued stop signal selects one path —
@@ -127,6 +133,10 @@ the agent loop continues). Key rules: zero-text finalize emits no final_answer;
 Reject is a *destructive settle* (already-streamed unsafe text is retracted in
 the channel, surviving only in the archive); the durable final **replaces** the
 draft rendering of its segment, so double-posting is structurally impossible.
+
+> **Shipped:** the reasoning/answer boundary seal for F2
+> (openclaw/openclaw#95283); durable-replaces-draft on Telegram
+> (openclaw/openclaw#98907). The full dispatch table remains spec-normative.
 
 ### Settings model (§4) — three flags, one gate class
 
@@ -162,6 +172,26 @@ every flag (operator/audit surface only). Channels declare a capability tier and
 project the same events into tier-appropriate UX; a normative truth table fixes
 the rendering for each (event × setting) pair, including the degenerate-draft and
 path-independence rules.
+
+> **Shipped:** the commentary-phase mirror (openclaw/openclaw#92216); channel
+> presentation gates on Discord (openclaw/openclaw#96106) and Telegram
+> (openclaw/openclaw#97875, openclaw/openclaw#98907 — the full
+> `/reasoning off|stream|on` matrix with a single stationary draft window).
+
+#### Proposed channel capability tiers (answers a previously-unresolved question)
+
+| Tier | Channel shape | Minimum obligations |
+|------|---------------|---------------------|
+| **T0 persist-only** | send-once messages, no edits (e.g. email-like, webhook sinks) | durable finals; durable 🧠/💬 only when the gate opts in; no draft window; MUST still honor zero-text-finalize and replacement semantics (skip, never double-send) |
+| **T1 editable-draft** | messages editable after send (Discord, Telegram, Slack-like) | one stationary draft window per turn (edit in place, never delete+repost); durable final **replaces** the draft; persistent-XOR-window for gated lanes; lane distinguishability (🧠 vs 💬) in rendering |
+| **T2 native-stream** | owned rendering surface (TUI, web GUI) | true token streaming per lane; all T1 semantics; lane transitions rendered as they resolve |
+
+Path-independence rule (all tiers): the settled transcript after a turn MUST be
+identical whether the turn ran primary or queued, and whether the channel
+streamed or fell back to persist-only. Tier declaration is per-channel
+capability metadata; conformance checks a channel only against its declared
+tier. Discord and Telegram (T1) are the shipped references; this table is
+proposed for maintainer amendment rather than left as an open question.
 
 ### Reasoning privacy & archival boundary
 
@@ -242,11 +272,40 @@ openclaw/openclaw#99401 merged (2026-07-04), **every implementation slice
 cited above is on `main`.** Remaining un-upstreamed: the conformance harness
 itself, and per-family adapter completeness per the spec's catalogue.
 
+These landings also closed independently-reported instances of exactly the
+§Motivation failure classes: openclaw/openclaw#96079 (reasoning and pre-tool
+narration produced but never surfaced on Discord) and openclaw/openclaw#90962
+(inter-tool commentary clobbering tool progress on Telegram, filed by a third
+party) — evidence the divergence was a recognized problem class, not a
+single-reporter itch.
+
 **Lineage.** The original stacked reference implementation (core
 openclaw/openclaw#93342, `Marvinthebored:pipeline-core`; Discord overlay
 Marvinthebored/openclaw#2) predates these landings and remains checkout-able as
 a whole-framework build, but `main` is now the better reference for every slice
 listed above.
+
+## Applying this RFC to future work
+
+The practical purpose of accepting this document: future PRs get held to a
+section reference instead of re-deriving design in each review thread.
+
+- **Adding a provider adapter** → map the wire onto the §3 grammar; emission is
+  unconditional (§3.2) — never gate wire-carried content at the adapter; use
+  provider-supplied stable ids, never synthesized counters (§3.1/§7.3); capture
+  golden frames and run the conformance harness.
+- **Adding or upgrading a channel** → declare a capability tier and project
+  events per §5/§7; one presentation gate driven by `/reasoning` and `/verbose`
+  (§4); identical semantics on primary and queued turns; the durable final
+  replaces the draft (§3.5) — no dedup heuristics.
+- **Changing reasoning/commentary display** → the gate lives in presentation,
+  nowhere else (§4); thinking is opt-in only; thinking is never disguised as
+  commentary (§5.1).
+- **Triaging "reasoning doesn't show" reports** → first check what the model
+  actually emitted (archive/goldens) before suspecting the pipeline: several
+  models emit signature-only/empty thinking, and harness prompts that mandate
+  narration suppress thinking summaries entirely. Absence of emission is not
+  evidence of a pipeline fault.
 
 ## Rationale
 
@@ -287,15 +346,16 @@ elimination of an entire bug class and the drop in new-channel integration cost.
 
 ## Unresolved questions
 
-- **Base-contract doc home.** Whether the amended
-  [`0015/agent-event-io-contract.md`](0015/agent-event-io-contract.md) should be
-  upstreamed into the maintained docs tree, or this RFC sidecar remains its
-  home. Maintainer preference wanted.
-- **Channel tier minimums.** openclaw/openclaw#98907 concretized one high-tier
-  answer (persistent-XOR-window, durable-before-final, single stationary
-  draft); the remaining question is codifying the *minimum* obligations for
-  low-tier channels — and how strictly conformance enforces path-independence —
-  as a tier table.
-- **Conformance harness home.** The harness (37 tests / 28 goldens) lives in the
-  pinned companion repo; whether any of it should move in-tree as adapter CI is
-  a maintainer call.
+- **Sidecar doc home.** Whether the vendored contracts
+  ([`0015/agent-event-io-contract.md`](0015/agent-event-io-contract.md),
+  [`0015/stream-grammar-spec.md`](0015/stream-grammar-spec.md)) should later be
+  upstreamed into the maintained docs tree, or this RFC's sidecar remains their
+  home. Maintainer preference wanted. (The normative *content* is now in-tree
+  either way; this is only a question of final location.)
+- **Conformance harness home.** The executable harness (37 tests / 28 goldens)
+  and the golden captures live in the companion repo (pinned); whether any of
+  it should move in-tree as adapter CI is a maintainer call.
+
+*(Resolved in this revision: channel tier minimums — now a concrete proposed
+table under §Gateway contract & channel projection, awaiting maintainer
+amendment rather than open-ended input.)*
