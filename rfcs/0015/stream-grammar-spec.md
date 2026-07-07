@@ -6,17 +6,24 @@ previously pinned as normative), vendored 2026-07-06 in response to review feedb
 personal companion repository should not be the normative source for an accepted RFC.
 THIS COPY IS NOW THE NORMATIVE TEXT; the companion repo remains the home of the evidence
 files (golden wire captures) and the executable conformance harness it references.
+
+Vendoring sync (2026-07-07, addressing review findings): (1) base-contract reference
+repointed to the in-tree sidecar agent-event-io-contract.md; (2) stale F5 "catalogue
+pending" evidence status superseded (completed 2026-06-18); (3) §7 channel tier taxonomy
+unified with the RFC's T0/T1/T2 table — legacy letters map A→T1, B→T2, C→T2 with a
+declared clamp, D→T0. The reasoning archival boundary is UNCHANGED from the pinned text.
 -->
 
 # Provider Content Pipeline — Normalized Stream Specification
 
 **Version:** 0.4-draft (2026-06-12) · **Status:** Phase 1, post-red-team-2 + full capture reconciliation (all families golden-verified; 6 reconciliation contradictions folded)
-**Base:** extends `docs/channels/agent-event-io-contract.md` (ragesaq, PR #92216).
+**Base:** extends [`agent-event-io-contract.md`](agent-event-io-contract.md) (ragesaq, from openclaw/openclaw#92216 — vendored alongside this spec in the RFC 0015 tree, its four amendments folded inline).
 Explicit amendments to the base contract are marked **[AMENDS BASE]** — there are four
 (§3.2, §3.3, §5.1, §7.3). Everything else is additive.
 **Evidence:** all wire-format claims trace to `evidence/*.md`; golden captures exist for
-F1/F1e/F2 (pioneer, OpenRouter, deepseek-direct, moonshot)/F3 and gemini (F5, catalogue
-pending). Red-team passes: `RED-TEAM-claude.md` (27 findings → v0.2),
+F1/F1e/F2 (pioneer, OpenRouter, deepseek-direct, moonshot)/F3 and gemini (F5) — the F5
+catalogue, marked pending in the 0.4 original, was completed 2026-06-18 (see the RFC's
+Resolved-since-draft list). Red-team passes: `RED-TEAM-claude.md` (27 findings → v0.2),
 `RED-TEAM-codex.md` (16 findings → v0.3).
 
 ---
@@ -328,10 +335,10 @@ flowchart TB
 
 (The 13 before-sites are enumerated with file:line in `evidence/openclaw-internals.md` §1.)
 
-### 4.3 Behavior truth table (normative, Tier A)
+### 4.3 Behavior truth table (normative, T1)
 
 Path-independence (primary == queued) is a **requirement on channels**, not an observed
-property: a Tier A channel MUST maintain an active draft for queued/followup turns
+property: a T1 channel MUST maintain an active draft for queued/followup turns
 exactly as for primary turns (red-team AS3-01 — today followup turns may run without an
 in-progress draft, silently degrading `/reasoning stream`; migration item 13).
 
@@ -432,19 +439,21 @@ conformance §8.1 counts them as covered.
 
 ### 7.1 Capability tiers
 
-| Tier | Capabilities | Examples |
-|------|--------------|----------|
-| A | editable draft + durable messages | Discord, Telegram, ClickClack |
-| B | full event UI (cards, live panes, collapse) | Control UI / GUI |
-| C | status line / single pane | TUI status, CLI |
-| D | append-only plain text | minimal bridges |
+| Tier | Capabilities | Examples | Legacy id |
+|------|--------------|----------|-----------|
+| **T0 persist-only** | append-only / send-once messages, no edits | minimal bridges, webhook sinks | D |
+| **T1 editable-draft** | editable draft + durable messages | Discord, Telegram, ClickClack | A |
+| **T2 native-stream** | owned rendering surface — full event UI or status pane | Control UI / GUI; TUI status = T2 with a declared clamp | B, C |
 
 Required for every tier: final answer exactly once; errors surfaced; "agent is working"
-backed by real events. Settings clamp to tier ceiling **declaredly, not silently**.
+backed by real events. Settings clamp to tier ceiling **declaredly, not silently** — a
+status-line TUI is a T2 surface with a clamped ceiling, not a separate tier. Minimum
+per-tier obligations are normative in RFC 0015 §"Proposed channel capability tiers".
+*[RFC 0015 vendoring sync, 2026-07-07]*
 
 ### 7.2 Worked projections
 
-**Tier A — Discord (reference).** UX policy RATIFIED at T2 (Peter, 2026-06-12):
+**T1 — Discord (reference).** UX policy RATIFIED (Peter, 2026-06-12):
 🧠-blockquote thinking, collapse-to-summary settle, truncation suffix line, Reject
 placeholder — these are decisions, not suggestions. Liveness: native typing indicator
 from first event to settle (§11); the activity draft is created lazily by the first
@@ -463,15 +472,15 @@ routeReply/dispatch drops are **deleted**; rendering policy is the truth table,
 identical on primary and followup paths (which requires followup turns to carry an
 active draft — migration item 13).
 
-**Tier B — Control UI.** Closest to spec today; gains redacted markers, variant labels,
+**T2 — Control UI.** Closest to spec today; gains redacted markers, variant labels,
 truncation indicators, unified item rows. `response.incomplete`-style ends render as
 "incomplete" state, not error (§3.4).
 
-**Tier C — TUI.** Status line: spinner + current item title + last commentary line;
+**T2 (clamped) — TUI.** Status line: spinner + current item title + last commentary line;
 `/reasoning stream` clamps to `on` (declared); thinking renders as a dim block post-
 segment. Final answer printed normally.
 
-**Tier D — minimal text.** Single "working…" notice or nothing; final answer + errors
+**T0 — minimal text.** Single "working…" notice or nothing; final answer + errors
 only; clamping declared on settings change.
 
 ### 7.3 Idempotency, ordering, reconnect
@@ -541,7 +550,7 @@ it — they see server re-exposures, which ARE captured.
 | 14 | finality edge paths unhandled anywhere (refusal/content_filter delivered as final; pause_turn; stream death) | §3.5 dispatch table INCLUDING channel draft retraction on Reject and F3 `incomplete_details.reason` classification; conformance §8.1+§8.3 cases | adapter + channel |
 
 Sequencing unchanged (PROPOSAL.md): adapter+gateway upstream, coordinated with ragesaq
-post-#92216; Discord (Tier A reference) local-first on ga-build.
+post-#92216; Discord (T1 reference) local-first on ga-build.
 
 ## 10. Assumptions and open risks
 
@@ -562,7 +571,7 @@ post-#92216; Discord (Tier A reference) local-first on ga-build.
 5. **Privacy stance on raw thinking display**: rendered only on explicit `/reasoning`;
    channels MAY summarize-before-show for F4 `analysis` (cookbook recommendation);
    variant labels make raw vs summary distinguishable.
-6. **Rate limits**: Tier A edit cadence respects channel limits via existing gateway
+6. **Rate limits**: T1 edit cadence respects channel limits via existing gateway
    throttle lanes (assistant + thinking); overflow handled by §7.2 elision.
 7. **Archive privacy** (red-team AS5-01): the archive holds raw thinking for all turns
    by design. Until a dedicated access-control spec exists, the archive is
@@ -582,6 +591,6 @@ post-#92216; Discord (Tier A reference) local-first on ga-build.
 - **settle** — final state transition of a draft: collapse, summarize, paused/error state, or dismissal (when content-free)
 - **marker** — a content-free event recording that something happened (redacted thinking)
 - **archive tap** — settings-independent persistence of the normalized event sequence; operator/audit-only
-- **liveness indicator** — the minimum honest signal that work is in progress, backed by real events. Tier A: the channel's **native typing indicator** (Discord typing, Telegram chat action), triggered on the first event of the turn and refreshed on activity until settle — the draft is NOT created for liveness alone (resolves red-team COD-AS3-01: no empty-draft contradiction; the draft is created lazily by the first event that actually renders). Channels without a typing primitive fall back to a one-line status draft. Tier B: native progress state. Tier C/D: spinner or static "working…" line. Must not be absent while work is ongoing
+- **liveness indicator** — the minimum honest signal that work is in progress, backed by real events. T1: the channel's **native typing indicator** (Discord typing, Telegram chat action), triggered on the first event of the turn and refreshed on activity until settle — the draft is NOT created for liveness alone (resolves red-team COD-AS3-01: no empty-draft contradiction; the draft is created lazily by the first event that actually renders). Channels without a typing primitive fall back to a one-line status draft. T2: native progress state. Clamped-T2 / T0: spinner or static "working…" line. Must not be absent while work is ongoing
 - **destructive settle** — the Reject-path settle (§3.5): already-rendered text of the rejected segment is replaced with an error/redacted placeholder; the text survives only in the archive
 - **adapter provider-native transcript** — byte-stable provider blocks for API replay (signatures, encrypted content); never leaves the adapter

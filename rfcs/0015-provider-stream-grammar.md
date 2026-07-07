@@ -193,6 +193,11 @@ capability metadata; conformance checks a channel only against its declared
 tier. Discord and Telegram (T1) are the shipped references; this table is
 proposed for maintainer amendment rather than left as an open question.
 
+This taxonomy supersedes the legacy A/B/C/D surface letters in the vendored
+spec's §7 (mapped there: A→T1, B→T2, C→T2 with a declared clamp, D→T0; the
+spec's worked projections are relabeled accordingly — see its vendoring-sync
+note).
+
 ### Reasoning privacy & archival boundary
 
 Model thinking is privacy-sensitive, and this contract deliberately changes
