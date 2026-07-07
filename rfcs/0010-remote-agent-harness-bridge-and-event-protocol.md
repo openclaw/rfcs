@@ -64,7 +64,7 @@ container.
 - Keep runtime selection explicit and fail-closed: when a model/provider selects
   the remote harness, the attempt either runs remotely or fails visibly.
 - Keep the protocol transport-neutral: stdio, WebSocket, TCP, Unix socket, and
-  host-adapter paths are routing choices, not semantic differences.
+  `hostAdapter` paths are routing choices, not semantic differences.
 - Keep identity authority host-owned and explicit. `RunStart` stream context,
   not headers, hostnames, URL paths, or arbitrary transport metadata, is
   authoritative for run/session/workspace identity.
@@ -79,8 +79,9 @@ container.
 ## Non-Goals
 
 - This RFC does not make remote harness the default OpenClaw runtime.
-- This RFC does not define a cloud worker pool, deployment system, Azure/Plex/EV2
-  integration, ECS/rollout policy, or production audience gate.
+- This RFC does not define a cloud worker pool, deployment system,
+  host-specific rollout policy, deployment health gate, or production audience
+  gate.
 - This RFC does not standardize connector auth, service discovery, certificates,
   retries, or connection pooling; those can be owned by the host-side runtime
   container or platform.
@@ -122,6 +123,36 @@ The upstream protocol standardizes the Gateway-to-host contract. It does not
 standardize how a host deploys, scales, warms, authenticates, or connects its
 runtime containers.
 
+### Upstream contract and host adapter boundary
+
+This RFC defines the public OpenClaw contract for portable remote-harness
+implementations. Implementations should treat the names and semantics in this
+RFC as the upstream source of truth instead of exposing product- or
+platform-specific dialects as protocol surface.
+
+The upstream contract owns:
+
+- the portable `remote-harness` AgentHarness shape;
+- the protocol envelope, frame families, frame names, and wire-field casing;
+- event preservation semantics and canonical `AgentEvent` stream names;
+- fail-closed runtime selection behavior;
+- conformance fixtures and validation expectations;
+- the eventual SDK/package ownership for public frame types.
+
+The host or container adapter owns:
+
+- rollout targeting and deployment policy;
+- container or worker allocation;
+- reverse-proxy, sidecar, service-mesh, or service-DNS admission;
+- certificates, connection pooling, retries, and route authentication;
+- deployment health gates;
+- platform-specific identity and routing integration below the `RunStart`
+  identity boundary.
+
+If a host uses local aliases, URLs, hostnames, or adapter-specific routing terms,
+those names are translated at the host adapter boundary. They are not additional
+v1 protocol names unless this RFC lists them.
+
 ### End-to-end remote harness workflow
 
 A conforming remote run follows this workflow:
@@ -134,7 +165,7 @@ A conforming remote run follows this workflow:
    If any required piece is missing, the attempt fails instead of falling back to
    local model execution.
 3. **Transport open.** The Gateway-side harness opens stdio, WebSocket, TCP,
-   Unix socket, or a host-adapter endpoint. Transport auth and connection
+   Unix socket, or a `hostAdapter` endpoint. Transport auth and connection
    management remain outside the OpenClaw-visible config.
 4. **Run start.** The Gateway sends `RunStart` as the first accepted frame. It
    carries the stream identity, selected inner harness id, model/provider facts,
@@ -182,8 +213,8 @@ Configuration requirements:
 | --- | --- |
 | fallback | Remote selection is fail-closed and must not silently use a local runtime. |
 | inner harnesses | At least one inner harness id is allowlisted; the default inner harness must be allowlisted. |
-| transports | v1 allows stdio, WebSocket, TCP, Unix socket, and host-adapter routing paths. |
-| connector | `connector` is not a v1 OpenClaw transport kind. Container/platform networking can provide connector-like reachability outside the spec. |
+| transports | v1 allows `stdio`, `websocket`, `tcp`, `unix`, and `hostAdapter` routing paths. |
+| connector | `connector` and `grpc` are not v1 OpenClaw transport kinds. Container/platform networking can provide connector-like reachability outside the spec. |
 | credentials | OpenClaw-visible config must not contain broad bearer, provider, model, caller, Graph/M365, GitHub, or session credentials. |
 | egress | If a host configures egress proxy enforcement, startup fails unless that enforcement is actually wired by the host/platform. |
 | unknown fields | Unknown top-level config fields are rejected to avoid silent policy drift. |
@@ -234,7 +265,7 @@ transcripts.
 | --- | --- | --- | --- |
 | Gateway → Host | Run control | start, cancel, heartbeat, reset, compaction-control | Host validates stream identity and applies only to the current run. |
 | Gateway → Host | Decisions | approval, permission, user input, dynamic tool, memory write | Host correlates by request id and must fail closed on unavailable or denied decisions. |
-| Gateway → Host | Optional model proxy response | model chunk/final/error, if a separate host-egress design enables it | v1 implementations may reject model-proxy requests unless explicitly supported. |
+| Gateway → Host | Optional model-egress response | model chunk/final/error, if a separate host-egress design enables it | v1 implementations may reject `ModelRequest` unless explicitly supported. |
 | Host → Gateway | Run acknowledgement | selected inner harness and version | Must occur before non-terminal events. |
 | Host → Gateway | Observable events | assistant, reasoning, lifecycle, item, plan, tool, command output, patch, compaction, approval, usage, diagnostic streams | Gateway maps them to normal OpenClaw callbacks and event streams. |
 | Host → Gateway | Decision requests | approval, permission, user input, dynamic tool, memory write | Gateway owns policy and returns explicit decision frames. |
@@ -246,7 +277,10 @@ transcripts.
 Remote/local equivalence means that a user-visible or lifecycle-relevant event
 produced by the selected inner harness must reach the same OpenClaw surface that
 a local harness would have reached, unless the bridge explicitly rejects the
-unsupported event before execution.
+unsupported event before execution. A v1 bridge preserves the event classes the
+selected inner harness observes or produces. It is not required to synthesize
+event classes unsupported by that inner harness, but it must not collapse
+supported structured events into plain assistant text or terminal-only output.
 
 The bridge must preserve these canonical event classes:
 
@@ -289,8 +323,10 @@ preserves existing OpenClaw streams and harness-specific extension streams.
 ### Protocol schema summary
 
 All frames include the envelope fields above. The tables below list each core
-frame's payload schema. Receivers reject missing required fields and reject
-unknown core frame kinds in v1.
+frame's payload schema. v1 wire fields use the casing listed in these schema
+tables. Host adapters may translate local aliases at their boundary, but casing
+aliases are not part of v1 conformance unless this RFC lists them. Receivers
+reject missing required fields and reject unknown core frame kinds in v1.
 
 #### Gateway-to-host frame schemas
 
@@ -307,9 +343,9 @@ unknown core frame kinds in v1.
 | `PermissionDecision` | `requestId`, `permissions`, `scope` | `strictAutoReview` | Resolves a host permission request. |
 | `UserInputResponse` | `requestId`, `answers` | none | Resolves a host user-input request. |
 | `DynamicToolResponse` | `requestId`, `contentItems`, `success` | none | Returns a Gateway-executed dynamic-tool result. |
-| `ModelProxyChunk` | `requestId`, `delta` | none | Reserved model-proxy response chunk when model proxying is enabled. |
-| `ModelProxyFinal` | `requestId`, `output` | `usage` | Reserved model-proxy final response when model proxying is enabled. |
-| `ModelProxyError` | `requestId`, `error` | none | Reserved model-proxy error response when model proxying is enabled. |
+| `ModelChunk` | `requestId`, `delta` | none | Reserved model-egress response chunk when Gateway-owned model egress is enabled. |
+| `ModelFinal` | `requestId`, `output` | `usage` | Reserved model-egress final response when Gateway-owned model egress is enabled. |
+| `ModelError` | `requestId`, `error` | none | Reserved model-egress error response when Gateway-owned model egress is enabled. |
 
 `RunStart.context` is a structured object with these v1 fields:
 
@@ -360,7 +396,7 @@ unknown core frame kinds in v1.
 | `PermissionRequested` | `requestId`, `permissions` | `reason`, `cwd`, `environmentId` | Requests Gateway permission decision. |
 | `UserInputRequested` | `requestId`, `questions` | `autoResolutionMs` | Requests Gateway-mediated user input. |
 | `DynamicToolCallRequested` | `requestId`, `tool`, `arguments` | `namespace` | Requests Gateway dynamic-tool execution. |
-| `ModelProxyRequest` | `requestId`, `model`, `payload` | none | Reserved model-proxy request when model proxying is enabled. |
+| `ModelRequest` | `requestId`, `model`, `payload` | none | Reserved host request for Gateway-owned model egress when enabled. |
 | `Checkpoint` | `checkpointId`, `state` | none | Reports recoverable host state. |
 | `ArtifactProduced` | `artifactId`, `uri` | `metadata` | Reports host-produced artifact. |
 | `RunFinal` | `result` | `assistantTexts`, `usage`, `replayMetadata`, `itemLifecycle` | Completes the run successfully. |
@@ -416,7 +452,7 @@ They must request them from the Gateway instead of acting independently.
 | user input | prompt presentation, secret handling, auto-resolution, response persistence | If the user route is unavailable, return explicit empty/denied/unavailable result according to policy. |
 | dynamic tool | tool lookup, argument validation, execution, result redaction | Unknown or denied tools fail closed; host must not synthesize success. |
 | memory write | memory policy, storage target, review state | Denied/unavailable means no memory write. |
-| optional model proxy | provider/model credential use and response streaming | Out of core v1 unless a host enables a separate model-egress contract. |
+| optional model egress | provider/model credential use and response streaming | Reserved in v1; unavailable unless the Gateway enables an explicit model-egress path. |
 
 This preserves Codex-style request-permissions, request-user-input, and dynamic
 tool calls without putting OpenClaw policy into the remote container.
@@ -462,8 +498,8 @@ provide authority outside this spec through:
 
 The remote-harness protocol does not standardize connector auth, connection
 pooling, service discovery, retries, certificate handling, or credential
-projection. Deployments such as Lobster can solve those concerns in the
-container or host platform and expose only a reachable endpoint to the bridge.
+projection. A host can solve those concerns in the container or platform layer
+and expose only a reachable endpoint to the bridge.
 
 ### Container-runtime contribution boundary
 
@@ -478,7 +514,7 @@ container orchestration:
 | Reference command harness/container | optional upstream reference | host may replace |
 | Event conformance suite | yes | host must pass |
 | Container allocator interface | future RFC or implementation issue | provider-specific allocator |
-| Worker pool, deployment, EV2/Azure/Plex/ECS wiring | no | yes |
+| Worker pool, deployment, rollout, and deployment-health wiring | no | yes |
 | Container DNS, hostnames, sidecars, service mesh, certificates, and connection management | no | yes |
 | Rollout audience authoring | no | yes |
 | Runtime admission storage/evaluation | invariant is upstream | mechanism is host-specific |
@@ -524,8 +560,11 @@ second protocol.
 
 ### Conformance requirements
 
-A third-party host claiming v1 support should pass a conformance suite that
-covers at least:
+This RFC defines the conformance scenarios. The sidecar contains reviewable
+golden transcript sketches. Implementation PRs that claim v1 support should add
+executable fixtures or a fake-host test harness for these scenarios. A
+third-party host claiming v1 support should pass a conformance suite that covers
+at least:
 
 1. **Schema validation.** Required envelope fields, immutable identity,
    monotonic sequences, terminal uniqueness, and fail-closed unknown core frames.
@@ -594,11 +633,9 @@ operate the selected run.
 
 ## Unresolved questions
 
-- Should the host-adapter transport be named `hostUri`, `hostAdapter`, or
-  something else that better describes validated reverse-proxy/container paths?
-- Should model-proxy request/response frames be entirely deferred to a separate
-  model-egress RFC, or kept as reserved fail-closed v1 frame families in the
-  protocol reference?
+- Should reserved `ModelRequest` / `ModelChunk` / `ModelFinal` / `ModelError`
+  frames remain in v1 as fail-closed model-egress frame families, or should
+  model egress move entirely to a follow-up RFC?
 - Which package should own the public frame types:
   `openclaw/plugin-sdk/agent-harness`, a new `openclaw/remote-harness-protocol`,
   or both with one re-exporting the other?
