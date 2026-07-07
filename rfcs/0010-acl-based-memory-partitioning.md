@@ -804,6 +804,20 @@ reasoning would require model-level enforcement that doesn't exist reliably.
    required before an auto-bound identity can issue cross-user grants?
    (See risk 4 in the Security Posture section.)
 
+## Prior Art
+
+- [#96883 — Scope agent cron operations to the calling agent](https://github.com/openclaw/openclaw/pull/96883) (merged):
+  Establishes the Gateway-side caller-identity plumbing pattern this RFC's
+  session-scoped attribution builds on. Introduces a runtime identity token
+  (`src/gateway/agent-runtime-identity-token.ts`), a caller-context extractor
+  for Gateway RPC (`src/agents/tools/gateway-caller-context.ts`), and
+  server-side scope enforcement that limits agent-tool calls to their own
+  resources while preserving unscoped operator access. The memory broker's
+  `SessionEnvelope` would extend this same `callerScope` pattern from
+  `agentId` to the session's resolved user/channel principal, and the
+  evaluator would consume it the way cron's server methods do — scoped for
+  agent/user sessions, unscoped for operator/admin paths.
+
 ## Implementation
 
 [Implementation plan](0010/implementation-plan.md) — component breakdown,
