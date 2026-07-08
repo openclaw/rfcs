@@ -3,7 +3,7 @@ title: Pluggable Scheduler Seam in Gateway
 authors:
   - amittell
 created: 2026-05-31
-last_updated: 2026-06-30
+last_updated: 2026-07-08
 rfc_pr: https://github.com/openclaw/rfcs/pull/5
 status: draft
 issue:
@@ -256,9 +256,16 @@ carry the reference implementation as a follow-up PR against `openclaw/openclaw`
 
 ## Unresolved questions
 
-- Should acceptance require a separate implementation issue before merge, or is
-  maintainer approval on this RFC enough to create that issue as part of the
-  first implementation PR?
-- Should the first implementation require an explicit config opt-in in addition
-  to the scheduler plugin manifest, or is installing an enabled
-  `owns: "scheduled-jobs"` plugin sufficient operator intent?
+The two contract questions previously tracked here (implementation issue
+before merge, explicit config opt-in) are decided text in the Acceptance
+gates section. What remains out of scope for v1 but relevant:
+
+- Hot scheduler ownership handoff without a gateway restart. v1 makes
+  ownership a startup decision; a live ownership-transfer contract would be
+  a follow-up RFC.
+- Doctor migration for operators running external schedulers over direct
+  HTTP today. Folded into Non-Goals; the doctor finding and migration shape
+  belong in a follow-up RFC.
+- Heartbeats with job-grade durability. Decided out of this seam; a future
+  host that needs them would introduce a new `owns` token in a follow-up
+  RFC rather than widening this one.
