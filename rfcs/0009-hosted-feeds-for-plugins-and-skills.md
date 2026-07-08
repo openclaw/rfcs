@@ -5,7 +5,7 @@ authors:
   - Patrick
   - Gio
 created: 2026-06-18
-last_updated: 2026-07-03
+last_updated: 2026-07-08
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/19
@@ -28,10 +28,13 @@ organization-specific catalogs.
 The first implementation should preserve the package model OpenClaw already
 uses. External plugins can continue to install from npm or ClawHub, with Git
 available for immutable source installs. The feed provides package selection,
-version, and checksum data; local configuration supplies the source endpoint,
-credentials, and trust policy. ClawHub can publish the default public feed.
-Organizations can publish effective feeds by subsetting, filtering, or
-augmenting ClawHub feeds with private entries and policy decisions.
+version, and checksum data; local configuration supplies the source endpoint
+and credentials. ClawHub can publish the default public feed and other
+ClawHub-hosted public, named, account, organization, or composed feeds. Those
+ClawHub-hosted feeds should be signed by the ClawHub platform feed-signing key,
+with the matching public key bundled in OpenClaw so ordinary ClawHub feed use is
+zero-config. Organizations can publish effective feeds by subsetting, filtering,
+or augmenting ClawHub feeds with private entries and policy decisions.
 
 ## Motivation
 
@@ -78,9 +81,11 @@ package source layer.
   the private registry RBAC model.
 - Let clients check feeds on a named, lifecycle-owned refresh schedule using
   HTTP `Last-Modified` and `ETag`.
-- Support signed remote feeds with directly configured publisher public keys
-  first, while leaving room for later publisher key-management work if ClawHub
-  or enterprise feed publishers need remote key rotation.
+- Support signed remote feeds. ClawHub-hosted feeds should verify against a
+  bundled ClawHub platform public key by default; third-party and self-hosted
+  feeds use directly configured publisher public keys first, with room for
+  later publisher key-management work if ClawHub or enterprise feed publishers
+  need remote key rotation.
 - Keep a bundled feed in every OpenClaw build so offline, Docker, and
   air-gapped environments continue to work.
 - Create an RFC and implementation plan that ClawHub, Microsoft, Tencent,
@@ -206,6 +211,17 @@ after its own topology, while a feed entry refers only to a configured
 local profile that OpenClaw resolves to an npm registry URL, credentials, and
 installer behavior already trusted by that deployment.
 
+The default ClawHub feed profile is special only in its bootstrap trust. OpenClaw
+can ship a bundled ClawHub platform public key and use it to verify any
+ClawHub-hosted feed URL whose identity is inside the signed payload. That covers
+`clawhub-public`, ClawHub named feeds, account feeds, organization feeds, and
+ClawHub-served composed feeds without requiring users to paste keys for each
+feed. The feed document still carries its `feedId`, owner or organization scope,
+visibility, sequence, expiry, and entries; ClawHub still enforces ACLs before it
+serves private account or organization feeds. Non-ClawHub feed URLs do not
+inherit this trust and must either use an explicitly configured trust root or an
+explicit unsigned opt-in.
+
 ```jsonc
 {
   "catalog": {
@@ -304,9 +320,10 @@ a ClawHub-hosted package artifact or a semantic version.
 
 ### Feed discovery and fallback
 
-OpenClaw should have a default feed URL for the ClawHub public feed. At build or
-deploy time, OpenClaw should also bundle the latest generated feed file. At
-runtime the client should:
+OpenClaw should have a default feed URL for the ClawHub public feed and a
+bundled ClawHub platform public key for ClawHub-hosted feeds. At build or deploy
+time, OpenClaw should also bundle the latest generated feed file. At runtime the
+client should:
 
 1. Load the bundled feed as the fallback catalog.
 2. Start the lifecycle-owned refresh service after the gateway is ready.
@@ -347,9 +364,12 @@ threshold are the initial trust anchor; a remote feed cannot bootstrap or replac
 them. `verification.mode: "signed"` fails closed. An unsigned HTTPS feed requires
 the explicit local `verification.mode: "unsigned"` opt-in.
 
-Most feeds can use directly configured public keys. That should be the first
-implementation. If ClawHub later needs remote signing-key rotation, the same
-envelope format can wrap a small signed key-rotation document:
+The default ClawHub public key is bundled with OpenClaw so `clawhub-public` and
+other ClawHub-hosted feeds can be verified without user configuration. Directly
+configured public keys remain the override path for development, private
+ClawHub deployments, third-party publishers, and emergency root replacement.
+If ClawHub later needs remote signing-key rotation, the same envelope format can
+wrap a small signed key-rotation document:
 
 ```jsonc
 {
@@ -363,15 +383,16 @@ envelope format can wrap a small signed key-rotation document:
 }
 ```
 
-If key rotation is enabled, a locally configured root-key quorum verifies the
-signed key-rotation document. The verified `feedKeys` quorum then verifies feed
-envelopes. A key-rotation update must be signed by the currently trusted root
-quorum, and the client persists the accepted sequence and expiry to reject
-rollback and freeze attempts. Replacing root keys remains a local operator action
-for emergency recovery. The bundled fallback is trusted as part of the shipped
-OpenClaw artifact, not as an unsigned replacement for a configured signed remote
-feed. `verification.trustUrl` is optional; when absent, the configured local keys
-directly verify feed envelopes.
+If key rotation is enabled, the bundled ClawHub root or a locally configured
+root-key quorum verifies the signed key-rotation document. The verified
+`feedKeys` quorum then verifies feed envelopes. A key-rotation update must be
+signed by the currently trusted root quorum, and the client persists the accepted
+sequence and expiry to reject rollback and freeze attempts. Replacing root keys
+remains a local operator action for emergency recovery. The bundled fallback is
+trusted as part of the shipped OpenClaw artifact, not as an unsigned replacement
+for a configured signed remote feed. `verification.trustUrl` is optional; when
+absent, the bundled ClawHub root or configured local keys directly verify feed
+envelopes.
 
 ### Trust verification implementation series
 
@@ -840,18 +861,22 @@ activated.
 3. Add named feed and source profiles, including npm registry overrides,
    ClawHub-compatible base URLs, Git base paths, and secret-reference
    authentication.
-4. Add signed feed envelopes with directly configured publisher public keys for
-   public hosted feeds. Self-hosted unsigned HTTPS feeds remain an explicit
-   local opt-in. Land this through the five-PR trust verification series: RFC
+4. Add signed feed envelopes. Bundle the ClawHub platform public key for
+   ClawHub-hosted feeds and keep directly configured keys for third-party or
+   self-hosted feeds. Self-hosted unsigned HTTPS feeds remain an explicit local
+   opt-in. Land this through the five-PR trust verification series: RFC
    addendum, envelope verifier primitives, trust config, refresh/cache
    verification state, and CLI/operator visibility. Publisher private-key
-   management remains a later publishing workflow slice and should follow the
+   management remains a publishing workflow slice and should follow the
    platform-signing model: external private material, non-secret key
    id/fingerprint references in config, status/doctor visibility, and no reuse
    of platform release-signing identities.
 5. Publish the first ClawHub-hosted feed for the current external plugin catalog.
-   The first feed may include all current external entries; ClawHub can narrow
-   future default feeds to official packages as the official catalog grows.
+   The same ClawHub platform signing path should sign `clawhub-public`, named
+   feeds, account feeds, organization feeds, and ClawHub-served composed feeds.
+   The first public feed may include all current external entries; ClawHub can
+   narrow future default feeds to official packages as the official catalog
+   grows.
 6. Update OpenClaw to load the bundled fallback, refresh hosted feeds after
    gateway startup, and store verified snapshots in SQLite.
 7. Add conditional HTTP update detection with `ETag` and `Last-Modified`.
