@@ -222,6 +222,16 @@ serves private account or organization feeds. Non-ClawHub feed URLs do not
 inherit this trust and must either use an explicitly configured trust root or an
 explicit unsigned opt-in.
 
+OpenClaw must not bootstrap trust by downloading ClawHub's initial public key
+from the same feed host, such as a `/public-key` endpoint. If that host is
+compromised, the attacker could serve both a malicious feed and a matching key.
+The initial ClawHub public key should come from OpenClaw's shipped artifacts,
+source-controlled release metadata, or an operator-controlled local
+configuration channel. ClawHub can store the corresponding private signing key
+in its deployment secret store and may expose public-key metadata for human
+inspection, but that metadata is informational until verified by an already
+trusted root or a signed rotation document.
+
 ```jsonc
 {
   "catalog": {
@@ -393,6 +403,12 @@ trusted as part of the shipped OpenClaw artifact, not as an unsigned replacement
 for a configured signed remote feed. `verification.trustUrl` is optional; when
 absent, the bundled ClawHub root or configured local keys directly verify feed
 envelopes.
+
+A public-key discovery endpoint can help operators inspect or compare keys, but
+it is not a trust bootstrap mechanism. Clients should accept a new ClawHub feed
+signing key only when it is bundled in a trusted OpenClaw release, configured by
+the local operator, or delivered through a rotation document signed by an
+already trusted key.
 
 ### Trust verification implementation series
 
