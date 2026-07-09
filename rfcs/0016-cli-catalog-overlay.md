@@ -45,6 +45,43 @@ them in order.
 - PR5 generated docs: [giodl73-repo/openclaw#15](https://github.com/giodl73-repo/openclaw/pull/15)
 - PR6 hardening and consumer contract: [giodl73-repo/openclaw#16](https://github.com/giodl73-repo/openclaw/pull/16)
 
+## Draft Status And Proof
+
+This RFC is still a draft and should not be merged as accepted until
+maintainers choose the public CLI/API boundary and the RFC lifecycle is
+complete. This PR can serve as the design discussion vehicle; if maintainers
+prefer a separate `maintainer-discussion` thread, that link should be added here
+before acceptance.
+
+The linked implementation branch is also draft review material, not proof that
+the RFC is already accepted. Current implementation validation is tracked on
+[openclaw/openclaw#100960](https://github.com/openclaw/openclaw/pull/100960)
+and includes catalog unit coverage, generated fixture checks, generated docs
+checks, formatting checks, and one Codex review pass per stacked branch. Runtime
+behavior proof should stay with the implementation PR because this RFC
+repository only carries the design document.
+
+The current implementation review branch inventories:
+
+- 61 CLI descriptors
+- 97 command routes
+- 14 routed operations
+- 5 explicit agent/tool surfaces
+- supplied node/operator command metadata
+
+The audit/report layer then groups the same inventory by state-changing versus
+read-only/mixed effects, confirmation-required surfaces, route policy keys,
+routes missing policy keys, routed-operation smoke-test coverage gaps,
+node/operator commands, and approval-required node commands.
+
+This is not just a static help dump. `openclaw catalog list` collects the live
+Commander tree for the current invocation, and
+`openclaw catalog list --plugin-descriptors` also includes plugin-provided CLI
+descriptor metadata when that metadata is explicitly requested. Scout's
+plugin-only container proof demonstrates why that distinction matters: the
+loaded config currently exposes 13 plugins, 11 enabled plugins, 2 plugin CLI
+commands, 8 plugin tools, and 23 allowed command/tool names.
+
 ## Motivation
 
 OpenClaw already has several bounded operational surfaces: session status,
