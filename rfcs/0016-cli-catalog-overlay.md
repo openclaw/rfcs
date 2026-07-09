@@ -117,16 +117,11 @@ prompt, generated-docs, and node/operator detail as follow-up lenses.
 
 ## Registry Metadata Budget
 
-The higher-risk part is not the JSON output shape; it is what gets added to
-existing registries as source metadata. The prototype used a generic
-`catalog?: CliCatalogMetadata` bag on CLI descriptors, routed command entries,
-and plugin CLI descriptors. That was useful for discovery, but it is not the
-right default shape for a stable OpenClaw contract.
-
-The better direction is to keep each existing registry native and small, then
-make the catalog builder do the hard N-to-1 normalization work. The source
-registry additions should be typed around the facts they actually represent:
-operational effects and catalog exposure.
+The source-registry addition is intentionally small and compliance-oriented: a
+command/tool can report its operational effect consistently wherever it appears.
+Source registries should stay native and small, while the catalog builder does
+the hard N-to-1 normalization work. The two source concepts are operational
+effects and catalog exposure.
 
 ```ts
 type CommandEffectProfile = {
@@ -154,9 +149,8 @@ type CatalogExposure = {
 - Node/operator commands should come from the node pairing/runtime declaration,
   not from a global catalog metadata bag.
 
-For a first stable registry contract, avoid adding a 17-field generic bag to
-multiple registries. Prefer small native optional structs that map to concrete
-missing facts:
+For a first stable registry contract, prefer small native optional structs that
+map to concrete missing facts:
 
 - `effectProfile?`
 - `catalogExposure?`
