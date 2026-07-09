@@ -3,7 +3,7 @@ title: CLI Catalog View for OpenClaw Command Surfaces
 authors:
   - Gio
 created: 2026-07-04
-last_updated: 2026-07-06
+last_updated: 2026-07-08
 status: draft
 issue:
 rfc_pr:
@@ -356,6 +356,54 @@ implementations.
    until a concrete consumer proves that the existing command/tool invocation
    path is insufficient.
 
+### Node-Operator Prompt Lens
+
+PR7 in this series should add a node-operator prompt/catalog lens for agents
+operating paired Desktop/Gateway nodes. The base catalog already lists `node`
+and `nodes` as CLI descriptors, command-route entries, and runtime Commander
+entries, but node operation needs a scoped prompt view rather than a dump of
+every node command into every model prompt.
+
+This lens should answer a narrower question: when an OpenClaw agent is operating
+through a paired node, which node commands are available, what arguments do they
+expect, what approval boundary applies, and which commands should the model see
+for the current node context?
+
+Evidence comes from the current `gim-home/m` node-mode command stack:
+
+- `gim-home/m#4045` adds node-routed MCP commands:
+  `mcp.help`, `mcp.invoke`, `mcp.status`, and `mcp.cancel`.
+- `gim-home/m#4086` adds filesystem node commands:
+  `filesystem.read`, `filesystem.write`, and `filesystem.patch`.
+- `gim-home/m#4088` adds browser/file-open node commands:
+  `browser.open` and `file.openWithDefaultApp`, plus Desktop-owned Playwright
+  MCP approval behavior.
+
+Those PRs show the catalog value beyond generic prompt routing. Each node slice
+has a command name, argument shape, approval model, risk boundary, docs text,
+and model-facing behavior that must stay aligned. Without a structured catalog
+lens, every new node command family requires manual prompt/docs/help updates and
+can drift from the actual Gateway/Desktop approval path.
+
+The node-operator lens should be scoped:
+
+- General catalog/audit views list all known `node`/`nodes` descriptors,
+  command routes, runtime commands, and plugin-provided node command
+  descriptors.
+- Prompt projection includes only node commands available in the active
+  node-control context.
+- Low-risk read/status/help commands can be prompt-visible by default in node
+  mode.
+- Mutating or side-effecting commands such as filesystem writes, browser opens,
+  app/file opens, shell/system commands, or M365 actions carry risk,
+  confirmation, and approval-boundary metadata.
+- Plugin-provided `nodes ...` commands remain opt-in and trust-scoped.
+
+This is still metadata-only. The selected node command continues to execute
+through the existing OpenClaw/Gateway/Desktop command path, and Desktop remains
+the owner of local validation, permission cards, policy, approval memory, and
+runtime execution.
+
 ### Proposed PR Plan
 
 Because the catalog's value is the combination of normalized inventory plus
@@ -430,6 +478,63 @@ ten tiny PRs.
      commands stay out of public lenses, advisory outputs remain clearly
      non-blocking, and any future package export is added deliberately.
 
+7. Node-operator prompt lens
+   - Deliverables: node command source metadata plus a scoped node-operator
+     prompt projection over MCP, filesystem, browser/file-open, and future
+     system/M365 node command families.
+   - Scenario: Scout/OpenClaw can operate a paired node with model-visible
+     command names, argument hints, risk, confirmation, and approval-boundary
+     metadata that match the Desktop/Gateway command implementation.
+   - Non-goal: do not execute node commands from the catalog, import Desktop
+     runtime code into OpenClaw catalog generation, or dump every node command
+     into every default prompt.
+   - Acceptance: node command metadata is source-labeled, prompt output is
+     small and context-filtered, plugin-provided node commands remain opt-in,
+     and audit/test-matrix reports can cite node command families and approval
+     boundaries.
+
+### PR7 Shape: Node-Operator Lens
+
+PR7 can be implemented as one focused PR with three internal pieces:
+
+1. Node command source metadata
+   - Deliverables: catalog metadata for node-routed command families from the
+     Gateway/Desktop node command source, including command ID, title, argument
+     hints, owner, risk, effect mode, confirmation requirement, approval kind,
+     and trust boundary.
+   - Scenario: `openclaw catalog list --json` can identify node commands such
+     as `mcp.invoke`, `filesystem.write`, and `browser.open` as node-operated
+     surfaces rather than opaque prose.
+   - Non-goal: do not execute node commands from the catalog and do not import
+     Desktop runtime code into OpenClaw catalog generation.
+   - Acceptance: node command metadata is source-labeled, generated or
+     supplied by the owning node command registry where possible, and absent
+     commands do not appear in prompt scope.
+
+2. Node-operator prompt projection
+   - Deliverables: a scoped prompt lens, for example
+     `listCliCatalogPromptSurfaces({ scope: "node-operator", ... })`, that
+     includes only node commands available to the active node context.
+   - Scenario: an OpenClaw agent operating a paired node sees how to inspect MCP
+     status, invoke an allowed MCP tool, read or patch workspace files, and open
+     browser/file targets without seeing unrelated catalog inventory.
+   - Non-goal: do not dump full audit metadata or every node/plugin command
+     into the default system prompt.
+   - Acceptance: prompt output is small, context-filtered, and carries enough
+     command/argument/risk hints for correct tool choice.
+
+3. Node trust/audit/test-matrix lens
+   - Deliverables: catalog audit/test-matrix support for node command families,
+     including approval kind, side-effect classification, command availability,
+     and smoke-test candidates.
+   - Scenario: maintainers can compare the OpenClaw node prompt surface against
+     the actual Desktop/Gateway node command stack and find missing coverage or
+     mismatched risk/approval metadata.
+   - Non-goal: do not make this a blocking CI gate until maintainers choose
+     explicit policy semantics.
+   - Acceptance: reports can cite node command families and approval boundaries
+     in a stable JSON shape suitable for PR review artifacts.
+
 ### Review Learnings Incorporated
 
 The implementation review pass tightened several boundaries in this RFC:
@@ -483,6 +588,8 @@ of bounded tasks:
 - export session or trajectory data
 - install, enable, disable, or refresh a skill/plugin
 - collect a diagnostic or audit bundle
+- operate a paired node through MCP, filesystem, browser/file-open, or future
+  system/M365 node commands
 
 Track:
 
@@ -507,6 +614,7 @@ Example comparisons:
 | Inspect Gateway status | Prompt guidance or help text points the model toward `gateway status`. | Prompt projection exposes the `gateway` surface with command hints, while `catalog list --json` shows the source and risk metadata. |
 | Review command-route policy | Maintainers inspect route definitions or command catalog entries directly. | `catalog audit --json` groups command paths by route policy key and reports routes without policy keys. |
 | Plan routed-operation smoke tests | Maintainers hand-map routed operations to candidate tests. | `catalog test-matrix --json` lists routed-operation smoke candidates and coverage gaps. |
+| Operate a paired node | Prompt guidance must be manually updated as node command families are added in PRs such as `gim-home/m#4045`, `#4086`, and `#4088`. | A node-operator prompt lens exposes the available node commands, argument hints, and approval boundaries for the active node context. |
 
 ## Unresolved Questions
 
@@ -519,3 +627,6 @@ Example comparisons:
   needed?
 - When should OpenClaw add package exports for catalog builders instead of
   keeping the external contract on `openclaw catalog ... --json`?
+- Should the node-operator lens consume node command metadata from an exported
+  OpenClaw/Gateway registry, generated command descriptors, or an artifact
+  produced by the Desktop/Gateway node command stack?
