@@ -82,6 +82,39 @@ plugin-only container proof demonstrates why that distinction matters: the
 loaded config currently exposes 13 plugins, 11 enabled plugins, 2 plugin CLI
 commands, 8 plugin tools, and 23 allowed command/tool names.
 
+## Field Budget And Trim Boundary
+
+The field surface should be treated as part of the proposal, not incidental
+implementation detail. The implementation branch currently explores several
+entry kinds with different field counts:
+
+- descriptors: about 9 fields per entry
+- command routes: about 8 fields per entry
+- routed operations: about 5 fields per entry
+- runtime commands: about 13 fields per entry
+- plugin commands: about 17 fields per entry
+- supplied node/operator commands: about 20 fields per entry
+- prompt projection entries: about 9 fields per entry
+
+That is useful for review because it shows the catalog can serve audit, docs,
+prompt, operator, and test-matrix consumers, but it should not all become the
+minimum stable contract by accident.
+
+The minimum `catalog list --json` contract should be small:
+
+- identity: stable id, command path/name, and display title or description
+- provenance: source kind, source id, and discovery mode
+- scope: visibility/lens membership so consumers know where the entry is meant
+  to appear
+- safety summary: risk, effect mode, and confirmation requirement when known
+
+Fields such as examples, aliases, command hints, effects, owner, status,
+confidence, policy keys, approval kind, trust boundary, and node-specific
+availability are valuable, but they should remain advisory or lens-specific
+until a concrete consumer needs them. If maintainers want a narrower first PR,
+the catalog should trim to the minimum contract above and leave audit/policy,
+prompt, generated-docs, and node/operator detail as follow-up lenses.
+
 ## Motivation
 
 OpenClaw already has several bounded operational surfaces: session status,
