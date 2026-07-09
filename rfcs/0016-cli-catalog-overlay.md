@@ -175,6 +175,32 @@ summaries, but those should be derived or supplied by explicit catalog overlays
 rather than forced into every source registry. This keeps the registries
 familiar and puts the integration burden in the catalog layer, where it belongs.
 
+## Effect Profile Semantics
+
+`CommandEffectProfile` describes the operational shape of a command or tool. It
+does not grant permission, bypass confirmation, or replace the command's own
+validation.
+
+- `effectMode: "read"` means the surface is expected to inspect or report state
+  without intentionally changing OpenClaw, the host, a remote service, or user
+  data. Examples include status, list, health, and help-style commands.
+- `effectMode: "mutating"` means the surface is expected to change state,
+  configuration, files, sessions, plugin state, node state, or external service
+  state.
+- `effectMode: "mixed"` means the surface has both read and mutating
+  subcommands, or the top-level descriptor is too broad to classify as only one
+  mode. The catalog can refine this at a deeper command path when the registry
+  has enough detail.
+- `confirmationRequired` means callers should expect an explicit human/operator
+  confirmation boundary before the effect is committed. It is a catalog signal,
+  not the enforcement mechanism.
+- `risk` is separate from `effectMode`. A read command can still be medium or
+  high risk if it exposes sensitive data, and a mutating command can be low risk
+  if it only changes local ephemeral state.
+- `commandHints` are concise invocation examples used by generated docs,
+  operator summaries, or compact prompt projections. They are not a parser or a
+  promise that the command accepts only those forms.
+
 ## Motivation
 
 OpenClaw already has several bounded operational surfaces: session status,
