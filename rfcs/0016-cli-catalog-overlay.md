@@ -112,8 +112,8 @@ Fields such as examples, aliases, command hints, effects, owner, status,
 confidence, policy keys, approval kind, trust boundary, and node-specific
 availability are valuable, but they should remain advisory or lens-specific
 until a concrete consumer needs them. If maintainers want a narrower first PR,
-the catalog should trim to the minimum contract above and leave audit/policy,
-prompt, generated-docs, and node/operator detail as follow-up lenses.
+the catalog should trim to the minimum contract above and leave audit inventory,
+prompt projection, generated-docs, and node/operator detail as follow-up lenses.
 
 ## Registry Metadata Budget
 
@@ -232,13 +232,13 @@ easier to inspect, document, test, audit, and route.
 - Keep prompt-facing metadata lean enough to avoid turning the catalog into a
   large prompt tax.
 - Provide a programmatic and CLI-readable list of OpenClaw command/tool surfaces
-  for maintainers, operators, docs, tests, audit, and future policy/admin
+  for maintainers, operators, docs, tests, audit inventory, and future admin
   consumers.
 - Distinguish static descriptors, route-policy entries, ownerless adapter
   entries, runtime-registered commands, and plugin descriptor entries with
   source/discovery metadata.
-- Generate scoped lenses from the same inventory for prompts, audit/policy
-  review, smoke coverage, and operator handoffs.
+- Generate scoped lenses from the same inventory for prompts, audit inventory,
+  smoke coverage, and operator handoffs.
 - Add drift guards so descriptor-backed entries, list output, prompt projection,
   and consumer lenses stay aligned.
 
@@ -296,7 +296,7 @@ The initial owner mapping is:
 - Command-route entries own routed-operation metadata such as route title,
   prompt risk, confirmation requirement, and command hints.
 - Plugin CLI descriptors own plugin command metadata, including optional
-  visibility, risk, confirmation, effect mode, and command hints.
+  catalog exposure, risk, confirmation, effect mode, and command hints.
 - The adapter owns only ownerless tool-backed surfaces such as
   `skill_workshop`, `session_status`, `sessions_spawn`, and `process` until
   OpenClaw has a structured source for them.
@@ -317,7 +317,7 @@ Each surface entry declares:
 - `source_kind`
 - `source_id`
 - `discovery_mode`
-- `visibility`
+- `catalog_exposure`
 - `intent`
 - `examples`
 - `aliases`
@@ -365,9 +365,10 @@ The initial implementation has a normalized inventory layer plus scoped lenses:
   entries, labeled by plugin ID and discovery mode, without making plugin
   execution a new default catalog requirement.
 - Catalog metadata adapters on existing owners: CLI descriptors, route entries,
-  and plugin CLI descriptors can carry focused metadata such as examples,
-  aliases, risk, confirmation, effect mode, effects, visibility, and command
-  hints.
+  and plugin CLI descriptors can carry focused source metadata through
+  `effectProfile` and `catalogExposure`. The catalog layer can then derive
+  examples, aliases, effects, ownership, status, dispatch mode, and lens
+  membership without forcing those fields into every registry.
 - Ownerless tool adapter: supplies the same metadata only for non-CLI or
   tool-backed model surfaces that do not yet have an owning descriptor or route.
 - Prompt lens: exposes only lean model-facing routing fields and filters by
@@ -460,7 +461,7 @@ openclaw catalog list --markdown
 ```
 
 The command is not an execution dispatcher. JSON output is the joined structured
-view for humans, automation, docs, and future policy/admin consumers.
+view for humans, automation, docs, audit inventory, and future admin consumers.
 Markdown output is a concise operator view.
 
 ### Proposed Implementation Stack
@@ -597,8 +598,8 @@ ten tiny PRs.
    - Deliverables: runtime Commander-tree entries, opt-in plugin descriptor
      entries, `catalog audit`, `catalog test-matrix`, and `catalog summary`.
    - Scenario: maintainers can inspect static, runtime, plugin, route, and tool
-     surfaces by the lens that matches their job: live inventory, audit/policy
-     review, smoke coverage planning, or operator handoff.
+     surfaces by the lens that matches their job: live inventory, audit
+     inventory, smoke coverage planning, or operator handoff.
    - Non-goal: do not force-load command trees or plugin runtime code only for
      discovery; do not fail CI or enforce policy from the first reports.
    - Acceptance: dynamic entries are source-labeled, plugin entries are opt-in
