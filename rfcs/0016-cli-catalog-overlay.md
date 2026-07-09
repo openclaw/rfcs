@@ -115,6 +115,41 @@ until a concrete consumer needs them. If maintainers want a narrower first PR,
 the catalog should trim to the minimum contract above and leave audit/policy,
 prompt, generated-docs, and node/operator detail as follow-up lenses.
 
+## Registry Metadata Budget
+
+The higher-risk part is not the JSON output shape; it is what gets added to
+existing registries as source metadata. The current implementation branch adds:
+
+- `catalog?: CliCatalogMetadata` to CLI command descriptors
+- `route.catalog?: CliCatalogMetadata` to routed command entries
+- `catalog?: CliCatalogMetadata` to plugin CLI command descriptors
+- `hidden?: boolean` to plugin CLI command descriptors so private placeholders
+  can stay out of generated catalog views
+
+`CliCatalogMetadata` currently has 17 optional fields: `id`, `title`, `kind`,
+`dispatchMode`, `target`, `visibility`, `intent`, `examples`, `aliases`,
+`owner`, `status`, `confidence`, `risk`, `confirmationRequired`, `effectMode`,
+`effects`, and `commandHints`.
+
+That breadth is useful for prototyping, but the first stable registry addition
+should be narrower unless maintainers explicitly want the larger bag. A trimmed
+registry contract can carry only fields that are hard to infer from existing
+registries:
+
+- `title?`
+- `visibility?`
+- `risk?`
+- `confirmationRequired?`
+- `effectMode?`
+- `commandHints?`
+
+Everything else can be derived by the catalog builder or kept in explicit
+overlay/advisory data until a consumer proves it is worth making part of the
+registry contract. In particular, `id`, `kind`, `dispatchMode`, `target`,
+`owner`, `status`, and `confidence` should not be accepted as registry fields
+just because the prototype used them. They need a concrete consumer or should
+remain generated/advisory.
+
 ## Motivation
 
 OpenClaw already has several bounded operational surfaces: session status,
