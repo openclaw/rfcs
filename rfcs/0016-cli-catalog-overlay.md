@@ -118,37 +118,44 @@ prompt, generated-docs, and node/operator detail as follow-up lenses.
 ## Registry Metadata Budget
 
 The higher-risk part is not the JSON output shape; it is what gets added to
-existing registries as source metadata. The current implementation branch adds:
+existing registries as source metadata. The prototype used a generic
+`catalog?: CliCatalogMetadata` bag on CLI descriptors, routed command entries,
+and plugin CLI descriptors. That was useful for discovery, but it is not the
+right default shape for a stable OpenClaw contract.
 
-- `catalog?: CliCatalogMetadata` to CLI command descriptors
-- `route.catalog?: CliCatalogMetadata` to routed command entries
-- `catalog?: CliCatalogMetadata` to plugin CLI command descriptors
-- `hidden?: boolean` to plugin CLI command descriptors so private placeholders
-  can stay out of generated catalog views
+The better direction is to keep each existing registry native and small, then
+make the catalog builder do the hard N-to-1 normalization work:
 
-`CliCatalogMetadata` currently has 17 optional fields: `id`, `title`, `kind`,
-`dispatchMode`, `target`, `visibility`, `intent`, `examples`, `aliases`,
-`owner`, `status`, `confidence`, `risk`, `confirmationRequired`, `effectMode`,
-`effects`, and `commandHints`.
+- CLI descriptors already own `name`, `description`, `hasSubcommands`, and
+  `parentDefaultHelp`. They should only need missing catalog hints such as
+  prompt/docs visibility or safety classification when those cannot be inferred.
+- Routed command entries already own `commandPath`, `exact`, route id, and
+  policy data. They should only need route-local safety metadata such as
+  `risk`, `confirmationRequired`, or `effectMode` when policy/route data cannot
+  express it.
+- Plugin CLI descriptors already own plugin id, parent path, descriptor name,
+  description, and subcommand shape through the plugin registry. They should
+  only need plugin-native catalog hints and a hidden/private marker if generated
+  catalog views must omit a placeholder.
+- Node/operator commands should come from the node pairing/runtime declaration,
+  not from a global catalog metadata bag.
 
-That breadth is useful for prototyping, but the first stable registry addition
-should be narrower unless maintainers explicitly want the larger bag. A trimmed
-registry contract can carry only fields that are hard to infer from existing
-registries:
+For a first stable registry contract, avoid adding a 17-field generic bag to
+multiple registries. Prefer small native optional fields that map to concrete
+missing facts:
 
-- `title?`
 - `visibility?`
 - `risk?`
 - `confirmationRequired?`
 - `effectMode?`
 - `commandHints?`
+- plugin descriptor `hidden?`
 
-Everything else can be derived by the catalog builder or kept in explicit
-overlay/advisory data until a consumer proves it is worth making part of the
-registry contract. In particular, `id`, `kind`, `dispatchMode`, `target`,
-`owner`, `status`, and `confidence` should not be accepted as registry fields
-just because the prototype used them. They need a concrete consumer or should
-remain generated/advisory.
+The catalog output can still present a normalized record with ids, source
+labels, ownership, dispatch mode, status, examples, and derived summaries, but
+those should be derived or supplied by explicit catalog overlays rather than
+forced into every source registry. This keeps the registries familiar and puts
+the integration burden in the catalog layer, where it belongs.
 
 ## Motivation
 
