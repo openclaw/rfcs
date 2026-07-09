@@ -3,7 +3,7 @@ title: CLI Catalog View for OpenClaw Command Surfaces
 authors:
   - Gio
 created: 2026-07-04
-last_updated: 2026-07-08
+last_updated: 2026-07-09
 status: draft
 issue:
 rfc_pr:
@@ -25,6 +25,25 @@ The catalog view is metadata only. It does not add a new execution dispatcher,
 runtime hook, gateway plugin, policy engine, or expression language. Existing
 commands and tools continue to own validation, permissions, confirmation,
 execution, and results.
+
+## Implementation Review Links
+
+There is already one upstream OpenClaw draft PR with the full end-state branch:
+
+- Rollup implementation PR: [openclaw/openclaw#100960](https://github.com/openclaw/openclaw/pull/100960)
+
+For review convenience, the same work is also prepared as fork-local stacked
+draft PRs. These are not asking maintainers to merge from the fork; they are a
+review aid so the stack can be read one layer at a time. If maintainers prefer,
+I am happy to open the same PRs against `openclaw/openclaw` separately and merge
+them in order.
+
+- PR1 foundation: [giodl73-repo/openclaw#11](https://github.com/giodl73-repo/openclaw/pull/11)
+- PR2 dynamic/operator lenses: [giodl73-repo/openclaw#12](https://github.com/giodl73-repo/openclaw/pull/12)
+- PR3 prompt projection: [giodl73-repo/openclaw#13](https://github.com/giodl73-repo/openclaw/pull/13)
+- PR4 schema fixtures: [giodl73-repo/openclaw#14](https://github.com/giodl73-repo/openclaw/pull/14)
+- PR5 generated docs: [giodl73-repo/openclaw#15](https://github.com/giodl73-repo/openclaw/pull/15)
+- PR6 hardening and consumer contract: [giodl73-repo/openclaw#16](https://github.com/giodl73-repo/openclaw/pull/16)
 
 ## Motivation
 
