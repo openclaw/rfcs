@@ -6,7 +6,7 @@ created: 2026-07-09
 last_updated: 2026-07-09
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/33
 ---
 
 # Proposal: Standard Hosting Profiles and Ready Check
