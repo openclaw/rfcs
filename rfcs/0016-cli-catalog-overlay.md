@@ -104,8 +104,8 @@ The minimum `catalog list --json` contract should be small:
 
 - identity: stable id, command path/name, and display title or description
 - provenance: source kind, source id, and discovery mode
-- scope: visibility/lens membership so consumers know where the entry is meant
-  to appear
+- exposure: whether the source is suitable for public catalog/docs output or
+  should stay internal unless explicitly requested
 - safety summary: risk, effect mode, and confirmation requirement when known
 
 Fields such as examples, aliases, command hints, effects, owner, status,
@@ -137,7 +137,7 @@ type CommandEffectProfile = {
 };
 
 type CatalogExposure = {
-  visibility?: readonly ("docs" | "prompt" | "audit" | "operator" | "policy")[];
+  tier?: "public" | "internal";
 };
 ```
 
@@ -150,7 +150,7 @@ type CatalogExposure = {
 - Plugin CLI descriptors already own plugin id, parent path, descriptor name,
   description, and subcommand shape through the plugin registry. They should
   only need plugin-native `catalogExposure`, `effectProfile`, and a
-  hidden/private marker if generated catalog views must omit a placeholder.
+  `hidden` marker if generated catalog views must omit a placeholder.
 - Node/operator commands should come from the node pairing/runtime declaration,
   not from a global catalog metadata bag.
 
@@ -162,11 +162,18 @@ missing facts:
 - `catalogExposure?`
 - plugin descriptor `hidden?`
 
+`catalogExposure` is not a per-consumer allowlist. It should not say "docs but
+not audit" or "operator but not policy". Those choices belong in catalog lenses.
+The source registry should only say whether the entry is suitable for public
+catalog/docs output or should stay internal by default. Explicit `hidden`
+markers remain useful for plugin placeholders or private/local QA surfaces that
+should be omitted from generated catalog views unless a developer asks for them.
+
 The catalog output can still present a normalized record with ids, source
-labels, ownership, dispatch mode, status, examples, and derived summaries, but
-those should be derived or supplied by explicit catalog overlays rather than
-forced into every source registry. This keeps the registries familiar and puts
-the integration burden in the catalog layer, where it belongs.
+labels, ownership, dispatch mode, status, examples, lens membership, and derived
+summaries, but those should be derived or supplied by explicit catalog overlays
+rather than forced into every source registry. This keeps the registries
+familiar and puts the integration burden in the catalog layer, where it belongs.
 
 ## Motivation
 
