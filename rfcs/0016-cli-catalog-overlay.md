@@ -124,31 +124,42 @@ and plugin CLI descriptors. That was useful for discovery, but it is not the
 right default shape for a stable OpenClaw contract.
 
 The better direction is to keep each existing registry native and small, then
-make the catalog builder do the hard N-to-1 normalization work:
+make the catalog builder do the hard N-to-1 normalization work. The source
+registry additions should be typed around the facts they actually represent:
+operational effects and catalog exposure.
+
+```ts
+type CommandEffectProfile = {
+  effectMode: "read" | "mutating" | "mixed";
+  confirmationRequired?: boolean;
+  risk?: "low" | "medium" | "high";
+  commandHints?: readonly string[];
+};
+
+type CatalogExposure = {
+  visibility?: readonly ("docs" | "prompt" | "audit" | "operator" | "policy")[];
+};
+```
 
 - CLI descriptors already own `name`, `description`, `hasSubcommands`, and
-  `parentDefaultHelp`. They should only need missing catalog hints such as
-  prompt/docs visibility or safety classification when those cannot be inferred.
+  `parentDefaultHelp`. They should only need missing `catalogExposure` or
+  `effectProfile` data when those facts cannot be inferred.
 - Routed command entries already own `commandPath`, `exact`, route id, and
-  policy data. They should only need route-local safety metadata such as
-  `risk`, `confirmationRequired`, or `effectMode` when policy/route data cannot
-  express it.
+  policy data. They should only need route-local `effectProfile` data when
+  policy/route data cannot express it.
 - Plugin CLI descriptors already own plugin id, parent path, descriptor name,
   description, and subcommand shape through the plugin registry. They should
-  only need plugin-native catalog hints and a hidden/private marker if generated
-  catalog views must omit a placeholder.
+  only need plugin-native `catalogExposure`, `effectProfile`, and a
+  hidden/private marker if generated catalog views must omit a placeholder.
 - Node/operator commands should come from the node pairing/runtime declaration,
   not from a global catalog metadata bag.
 
 For a first stable registry contract, avoid adding a 17-field generic bag to
-multiple registries. Prefer small native optional fields that map to concrete
+multiple registries. Prefer small native optional structs that map to concrete
 missing facts:
 
-- `visibility?`
-- `risk?`
-- `confirmationRequired?`
-- `effectMode?`
-- `commandHints?`
+- `effectProfile?`
+- `catalogExposure?`
 - plugin descriptor `hidden?`
 
 The catalog output can still present a normalized record with ids, source
