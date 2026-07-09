@@ -356,18 +356,19 @@ implementations.
    until a concrete consumer proves that the existing command/tool invocation
    path is insufficient.
 
-### Node-Operator Prompt Lens
+### Node-Operator Catalog Support
 
-PR7 in this series should add a node-operator prompt/catalog lens for agents
-operating paired Desktop/Gateway nodes. The base catalog already lists `node`
-and `nodes` as CLI descriptors, command-route entries, and runtime Commander
-entries, but node operation needs a scoped prompt view rather than a dump of
-every node command into every model prompt.
+Node/operator command metadata should be folded through the first six PRs rather
+than introduced as a separate follow-up. The base catalog already lists `node` and
+`nodes` as CLI descriptors, command-route entries, and runtime Commander
+entries, but paired-node operation needs structured command metadata and a
+scoped prompt view rather than a dump of every node command into every model
+prompt.
 
-This lens should answer a narrower question: when an OpenClaw agent is operating
-through a paired node, which node commands are available, what arguments do they
-expect, what approval boundary applies, and which commands should the model see
-for the current node context?
+This support should answer a narrower question: when an OpenClaw agent is
+operating through a paired node, which node commands are available, what
+arguments do they expect, what approval boundary applies, and which commands
+should the model see for the current node context?
 
 Evidence comes from the current `gim-home/m` node-mode command stack:
 
@@ -385,7 +386,7 @@ and model-facing behavior that must stay aligned. Without a structured catalog
 lens, every new node command family requires manual prompt/docs/help updates and
 can drift from the actual Gateway/Desktop approval path.
 
-The node-operator lens should be scoped:
+The node/operator catalog support should be scoped:
 
 - General catalog/audit views list all known `node`/`nodes` descriptors,
   command routes, runtime commands, and plugin-provided node command
@@ -478,24 +479,25 @@ ten tiny PRs.
      commands stay out of public lenses, advisory outputs remain clearly
      non-blocking, and any future package export is added deliberately.
 
-7. Node-operator prompt lens
-   - Deliverables: node command source metadata plus a scoped node-operator
-     prompt projection over MCP, filesystem, browser/file-open, and future
-     system/M365 node command families.
-   - Scenario: Scout/OpenClaw can operate a paired node with model-visible
-     command names, argument hints, risk, confirmation, and approval-boundary
-     metadata that match the Desktop/Gateway command implementation.
-   - Non-goal: do not execute node commands from the catalog, import Desktop
-     runtime code into OpenClaw catalog generation, or dump every node command
-     into every default prompt.
-   - Acceptance: node command metadata is source-labeled, prompt output is
-     small and context-filtered, plugin-provided node commands remain opt-in,
-     and audit/test-matrix reports can cite node command families and approval
-     boundaries.
+The node/operator work should be distributed across the six PRs:
 
-### PR7 Shape: Node-Operator Lens
+- PR1 foundation: define the supplied `cli.nodeCommands` list shape and its
+  source, availability, approval, risk, effect, argument-hint, and trust-boundary
+  fields.
+- PR2 dynamic/operator lenses: include node command metadata in audit,
+  test-matrix, and operator summary views.
+- PR3 prompt lens: add a scoped `node-operator` prompt projection that is
+  disabled by default.
+- PR4 schema fixtures: snapshot representative paired-node/node-host command
+  records.
+- PR5 generated docs: document node/operator commands as a supported dynamic
+  catalog family.
+- PR6 hardening: carry node command fields through advisory reports and the
+  CLI-first consumer contract.
 
-PR7 can be implemented as one focused PR with three internal pieces:
+### Node-Operator Shape
+
+The node/operator support has three internal pieces:
 
 1. Node command source metadata
    - Deliverables: catalog metadata for node-routed command families from the
