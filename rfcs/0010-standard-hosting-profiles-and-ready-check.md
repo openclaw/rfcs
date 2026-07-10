@@ -334,6 +334,21 @@ type DetailedGatewayReadyResponse = HostingReadinessResult & {
   uptimeMs: number;
   eventLoop?: GatewayEventLoopHealth;
 };
+
+type ReadinessEvaluationErrorResponse = {
+  ready: false;
+  failing: ["internal"];
+  uptimeMs: 0;
+};
+
+type RedactedRemoteReadyResponse = {
+  ready: boolean;
+};
+
+type GatewayReadyHttpBody =
+  | DetailedGatewayReadyResponse
+  | ReadinessEvaluationErrorResponse
+  | RedactedRemoteReadyResponse;
 ```
 
 For local or authenticated detailed `GET /ready` and `GET /readyz` requests,
@@ -344,6 +359,12 @@ list; `failures` is the canonical deduplicated union described above. HTTP is
 `200` when `ready` is true and `503` otherwise. `HEAD` returns the same status
 without a body. Unauthenticated remote probes retain the redacted shape
 `{ "ready": boolean }` and do not disclose condition details.
+
+If readiness evaluation itself throws before it can produce the canonical
+object, the existing detailed fail-closed response is
+`{ "ready": false, "failing": ["internal"], "uptimeMs": 0 }`; an
+unauthenticated remote caller still receives only `{ "ready": false }`. This
+exception envelope is not a second readiness model and must never report ready.
 
 Gateway health and `status --json` embed the canonical object once:
 
