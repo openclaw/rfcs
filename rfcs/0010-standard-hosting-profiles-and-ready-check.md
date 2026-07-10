@@ -13,11 +13,13 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/33
 
 ## Summary
 
-Define standard hosting profiles for running OpenClaw as a workload, plus a
-canonical ready check that evaluates the selected profile against existing
-runtime status/config fields and reports stable readiness conditions through
-host-facing surfaces such as Gateway `/ready` and `/readyz`, `status --json`,
-and Gateway health.
+Add a small support contract for running OpenClaw as a workload. A
+built-in hosting profile names a validated composition of existing OpenClaw
+settings; readiness reports whether the running process satisfies that
+composition. This extends the existing Gateway `/ready` and `/readyz` result
+and projects the same conditions into `status --json` and Gateway health. It
+does not add a second config system, generate config, or replace existing
+Gateway readiness.
 
 ## Motivation
 
@@ -36,6 +38,12 @@ baked config, environment restore lists, persistence wrappers, and adapter-only
 readiness logic. That makes hosted OpenClaw harder to test upstream and harder
 to upgrade downstream.
 
+A concrete example is a container that starts successfully with a loopback-only
+Gateway. Existing lifecycle readiness can correctly report that the process is
+healthy while the selected container topology is unusable from outside the
+container. The missing information is not another liveness probe; it is the
+runtime assertion that this process satisfies the container support contract.
+
 Profiles turn the broad claim "OpenClaw supports hosted deployments" into a
 reviewable support matrix and a supportable subset that issues can be validated
 against:
@@ -46,6 +54,11 @@ Each profile has stable readiness conditions.
 Each release can test those conditions.
 Hosts can prove which profile they are running.
 ```
+
+This gives bug reports and release tests a reproducible starting point. Instead
+of debugging an unbounded hosted configuration, maintainers can ask for the
+selected profile and its stable condition result. Profiles complement maturity
+work by turning a support claim into executable release evidence.
 
 ## Goals
 
@@ -102,6 +115,15 @@ profile selection
 + readiness condition evaluation
 -> ready/not-ready result
 ```
+
+Four constraints keep this narrow:
+
+1. A profile does not write, merge, or repair configuration.
+2. Operators may continue to configure every OpenClaw setting directly.
+3. Profile readiness is an additional conjunction with existing Gateway
+   readiness, never a replacement for it.
+4. The first contract evaluates only facts owned by OpenClaw core. Optional
+   plugins, policy, and doctor may consume the result but are not dependencies.
 
 The contract is not a parallel hosted config tree. Existing OpenClaw config
 continues to own Gateway, proxy, plugin, model, session, node, and state
@@ -167,6 +189,17 @@ Profile selection should be visible in normal hosting mechanisms:
 - environment: `OPENCLAW_HOSTING_PROFILE`
 - startup: `openclaw gateway run --hosting-profile <profile>`
 
+Selection precedence is deterministic:
+
+```text
+gateway startup flag > environment > openclaw.json > local default
+```
+
+An invalid value from any explicitly supplied source is a startup/config error;
+it must not silently fall through to a lower-priority source or to `local`.
+The effective value after precedence resolution is the profile reported by all
+readiness and status surfaces.
+
 The selected profile should be reported in `/ready`, `/readyz`, `status --json`,
 and Gateway health so hosts and release tests can assert that the running
 process selected the intended profile. A later optional CLI wrapper can add an
@@ -201,6 +234,49 @@ Readiness should use Kubernetes-style conditions:
 
 Hosts and tests should key on `type`, `status`, and `reason`. `message` is for
 operators and should remain non-normative.
+
+### Compatibility and operational cost
+
+No explicit selection is required. Existing installations resolve to `local`,
+and their Gateway/session/plugin configuration remains unchanged. Selecting a
+profile does not enable auth, change bind addresses, install plugins, move
+state, or provision nodes. It only changes which runtime-owned facts must be
+true for profile readiness.
+
+The readiness result is intentionally stricter than the old result in one
+case: an activation error from a selected plugin makes the default `local`
+profile not ready. Explicitly disabled plugins do not block. This treats
+"configured but failed to activate" as incomplete startup rather than a
+healthy process, and makes the failure visible through a stable reason instead
+of host-specific log scraping. Because this can change an existing probe from
+200 to 503, it requires release notes and upgrade coverage; it is not presented
+as a behavior-neutral migration.
+
+This keeps the operational contract familiar to container hosts:
+
+```text
+host supplies config and selects a supported runtime shape
+OpenClaw starts using its normal config semantics
+host waits for the existing readiness endpoint
+readiness explains both lifecycle and profile conformance
+```
+
+Hosts that do not set a profile retain the existing endpoints and configuration
+model, with `local` as the reported and evaluated support contract.
+
+### Why this belongs in core
+
+Doctor can explain or repair static misconfiguration, and policy can restrict
+what configuration is allowed. Neither is the right owner for a workload's
+live readiness contract: both are optional, while `/ready` is consumed during
+startup and continuously by supervisors. Core already owns the authoritative
+Gateway, plugin, proxy, pairing, and live-node facts used here. The smallest
+reliable implementation is therefore a projection over those facts at the
+existing core readiness boundary.
+
+Keeping the predicates in core also makes the support promise testable in the
+OpenClaw release matrix. Downstream hosts remain responsible for tenant routing,
+deployment, storage destinations, telemetry backends, and product policy.
 
 ### Future extensibility
 
@@ -272,6 +348,21 @@ selection, built-in profile composition from reusable criteria, exact built-in
 container/reverse-proxy/managed predicates, and node-mode rules backed by the
 live node registry.
 
+### Incremental adoption
+
+The proposal does not require one all-or-nothing implementation landing:
+
+1. Land the condition shape and default `local` projection into existing
+   readiness, health, and status surfaces.
+2. Add explicit selection plus `container`, `reverse-proxy`, and `managed`
+   predicates over effective runtime facts.
+3. Add `node-mode` using pairing and live node-registry evidence.
+
+The first slice is independently useful because it creates one canonical,
+explainable result without introducing non-local hosting behavior. If the
+profile catalog needs further design, maintainers can accept that foundation
+without committing to every proposed profile at once.
+
 ## Rationale
 
 This follows the normal contract between a host and a hosted workload. The host
@@ -286,6 +377,12 @@ profile, not the primary CLI noun.
 Built-in profiles make the support promise concrete. Instead of one broad
 hosted-deployment claim, OpenClaw can say which profiles are supported, which
 conditions are stable, and which release tests prove them.
+
+This is intentionally less powerful than a general profile or policy engine.
+Its value comes from OpenClaw owning a small number of definitions and testing
+them release after release. A host-specific profile language would move the
+support boundary back downstream and recreate the ambiguity this RFC is meant
+to remove.
 
 The ready check is intentionally smaller than the profile model. Container
 hosters can use it directly as their readiness probe, while hosts that already
