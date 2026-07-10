@@ -387,6 +387,12 @@ fourth branch:
 - PR 21 selects that packaged profile matrix in the non-advisory release
   workflow, preserving its targeted plan, log, timing, and summary artifacts.
 
+PR 21 validation confirms the release workflow selects `hosting-profiles`, the
+Docker planner resolves the lane with both package and functional-image
+requirements, and the existing 33 planner assertions remain green. Formatting,
+diff checks, and a full branch Codex review against PR 19 also passed with no
+actionable findings.
+
 The lane is the reproducible behavior proof for upstream review. A brokered
 Linux/Crabbox execution should be attached before the implementation PRs are
 promoted upstream; the draft branches do not depend on Crabbox to define the
