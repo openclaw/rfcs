@@ -368,10 +368,12 @@ fork before upstream OpenClaw PRs are opened:
 | Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`cefbe89976`) |
 | Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`00fef7fde8`) |
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`c034dc4311`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`d2047d8f21`) |
 
 The stack includes one package-installed Docker conformance lane,
-`pnpm test:docker:hosting-profiles`, built incrementally across the three
-branches:
+`pnpm test:docker:hosting-profiles`, built incrementally across the runtime
+branches and promoted into blocking package-acceptance release checks by the
+fourth branch:
 
 - PR 17 proves an unset profile defaults to `local`, `/readyz` returns 200, and
   required/advisory aggregation is stable.
@@ -382,6 +384,8 @@ branches:
 - PR 19 starts a real node host and proves `node-mode` transitions from 503 to
   200 only after approved pairing, a correlated live target, an advertised
   approved command, and a connected control channel are all observed.
+- PR 21 selects that packaged profile matrix in the non-advisory release
+  workflow, preserving its targeted plan, log, timing, and summary artifacts.
 
 The lane is the reproducible behavior proof for upstream review. A brokered
 Linux/Crabbox execution should be attached before the implementation PRs are
@@ -402,6 +406,7 @@ The proposal does not require one all-or-nothing implementation landing:
 2. Add explicit selection plus `container` and `reverse-proxy` predicates over
    effective runtime facts.
 3. Add `node-mode` using pairing and live node-registry evidence.
+4. Make the packaged profile matrix a blocking package-acceptance release gate.
 
 The first slice is independently useful because it creates one canonical,
 explainable result without introducing non-local hosting behavior. If the
@@ -443,7 +448,5 @@ stable readiness conditions.
   weakening the meaning of required profile conformance?
 - Should later plugin or driver hooks publish namespaced criteria evidence, and
   what identity, scoping, freshness, and trust boundary should that require?
-- Should future profile conformance live in QA Lab, maturity scorecards, Docker
-  E2E, or a dedicated profile conformance runner?
 - Which stable telemetry event names should accompany readiness transitions in a
   follow-up PR?
