@@ -243,6 +243,7 @@ readiness result.
 | `GatewayStartupComplete` | Required | Gateway startup dependencies and startup sidecars are no longer pending. | `GatewayStartupPending` |
 | `GatewayAcceptingWork` | Required | The Gateway is not draining and can admit new work. | `GatewayDraining` |
 | `ChannelRuntimeReady` | Required | No selected channel has an unsuppressed runtime-health failure under the existing channel readiness policy. | `ChannelRuntimeUnavailable` |
+| `ChannelRuntimeSuppressed` | Advisory when present | One or more channel runtime failures are intentionally suppressed by the existing autostart/crash-loop policy. | `ChannelRuntimeSuppressed` |
 | `EventLoopHealthy` | Advisory | The existing event-loop health observation is within its healthy threshold. It remains advisory unless a separate compatibility-reviewed change intentionally makes it gate readiness. | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
 | `ProfileSelected` | Required | The runtime resolved and reports the selected built-in or configured custom profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
 | `ConfigLoaded` | Required | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
@@ -251,7 +252,7 @@ readiness result.
 | `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
 | `ContainerStateReady` | Required for `container` | The effective Gateway mode is `local` and the resolved listener host is not loopback. The port has already passed normal config validation. Config-only status reports `Unknown` when an `auto` bind has not been resolved. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
 | `TrustedProxyReady` | Required for `reverse-proxy` | Auth mode is `trusted-proxy`, `trustedProxy.userHeader` is non-empty, and `gateway.trustedProxies` contains at least one address/CIDR. Loopback is valid for a same-host proxy. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
-| `NodePairingReady` | Required for `node-mode` | The pairing store is readable and contains at least one approved pairing. | `NodePairingUnavailable`, `NodePairingPending`, `NodePairingMissing` |
+| `NodePairingReady` | Required for `node-mode` | The pairing store is readable and contains at least one approved pairing. | `NodePairingUnavailable`, `NodePairingTimedOut`, `NodePairingPending`, `NodePairingMissing` |
 | `ControlledTargetsReady` | Required for `node-mode` | The live Gateway node registry contains at least one connected node whose id is approved in the pairing store. Persisted pairing alone is insufficient. | `ControlledTargetsDisconnected` |
 | `CommandApprovalReady` | Required for `node-mode` | A connected paired node advertises at least one command that is granted by pairing or `gateway.nodes.allowCommands` and not removed by `gateway.nodes.denyCommands`. A deny-only list is not approval evidence. | `CommandApprovalMissing` |
 | `ControlChannelReady` | Required for `node-mode` | At least one connected node session is correlated to an approved pairing. Gateway HTTP responsiveness alone is insufficient. | `ControlChannelUnavailable` |
@@ -330,6 +331,7 @@ type CoreReadinessCriterionId =
   | "GatewayStartupComplete"
   | "GatewayAcceptingWork"
   | "ChannelRuntimeReady"
+  | "ChannelRuntimeSuppressed"
   | "EventLoopHealthy"
   | "ProfileSelected"
   | "ConfigLoaded"
@@ -625,7 +627,7 @@ not introduce unbounded readiness-path I/O.
 | Startup, drain, Gateway response, config, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config snapshots. |
 | Channel runtime | One finite pass over the current in-memory channel snapshot, cached for one second. |
 | Workspace writability | One-second hard timeout with five-second cache/coalescing. |
-| Node mode | Pairing snapshot cached for one second; live sessions and command policy are finite in-memory passes. A later event-driven pairing snapshot may remove readiness-time storage reads entirely. |
+| Node mode | Pairing reads have a one-second condition-level deadline and one-second cache; live sessions and command policy are finite in-memory passes. Timeout emits `NodePairingTimedOut` before the outer watchdog is needed. |
 | Plugin providers | All providers run concurrently; each has a core-enforced one-second `Promise.race` deadline and five-second cache/coalescing. The deadline does not depend on the callback honoring cancellation. |
 | Complete readiness evaluation | Independent two-second outer watchdog around workspace, provider, and node evaluation, which run concurrently. |
 
@@ -720,12 +722,12 @@ conditions before adding profile-specific conditions:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Core conditions and local profile | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`1bb6bfd5`) |
-| Standard profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`a7cba836`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`ca8ab296`) |
-| Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`781df835`) |
-| Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`07c6aae3`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`b0974bb7`) |
+| Core conditions and local profile | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`cc9c4246`) |
+| Standard profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`39a3b947`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`270f7a3d`) |
+| Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5723f664`) |
+| Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`399cf745`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`cd643a42`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
@@ -757,10 +759,10 @@ sixth branch:
 PR 21 validation confirms the release workflow selects `hosting-profiles`, the
 Docker planner resolves the lane with both package and functional-image
 requirements, and the existing 33 planner assertions remain green. After the
-condition/provider amendments, the focused provider-registry, provider
-evaluation, hosting config, Gateway readiness, timeout, and HTTP probe suites
-pass 132 routed assertions. Earlier status-contract coverage remains part of
-the stack.
+condition/provider amendments, the latest focused provider-registry, provider
+evaluation, hosting config, Gateway readiness, node/workspace timeout, and
+status projection run passes 120 routed assertions. The corrected PR 17 health,
+status, and legacy-condition run passes another 114 assertions.
 
 The workspace-readiness composed branch passed 188 focused profile,
 Gateway-probe, health-state, status, node, and workspace assertions. After the
