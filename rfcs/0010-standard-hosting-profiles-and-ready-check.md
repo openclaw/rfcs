@@ -15,8 +15,9 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/33
 
 Define standard hosting profiles for running OpenClaw as a workload, plus a
 canonical ready check that evaluates the selected profile against existing
-runtime status/config fields and reports stable readiness conditions through host-facing surfaces
-such as `openclaw ready`, `status --json`, and Gateway health.
+runtime status/config fields and reports stable readiness conditions through
+host-facing surfaces such as Gateway `/ready` and `/readyz`, `status --json`,
+and Gateway health.
 
 ## Motivation
 
@@ -52,8 +53,8 @@ Hosts can prove which profile they are running.
 - Make `local` the default profile when no profile is selected.
 - Add a canonical readiness result with stable condition `type`, `status`,
   `reason`, and human-readable `message`.
-- Add a focused `openclaw ready --json` command for host readiness probes.
-- Expose the same readiness result through existing status and health surfaces.
+- Expose the same readiness result through existing HTTP readiness, status, and
+  health surfaces.
 - Add explicit profile selection through config, environment, and Gateway
   startup.
 - Keep OpenClaw generic: no Lobster, Scout, Microsoft, tenant, Teams, Kusto, or
@@ -78,7 +79,7 @@ Hosts can prove which profile they are running.
   semantics or built-in condition names.
 - Encode host-specific probe intervals, retries, start periods, or timeout
   values into OpenClaw profile config.
-- Make `openclaw ready` depend on doctor, lint, policy, or another optional
+- Make readiness depend on doctor, lint, policy, or another optional
   conformance layer.
 
 ## Proposal
@@ -142,9 +143,11 @@ Profile selection should be visible in normal hosting mechanisms:
 - environment: `OPENCLAW_HOSTING_PROFILE`
 - startup: `openclaw gateway run --hosting-profile <profile>`
 
-`openclaw ready --expect-profile <profile>` should be an assertion, not a
-selection mechanism. If the running Gateway selected a different profile, the
-ready result should be `ready=false` with a stable `ProfileMismatch` reason.
+The selected profile should be reported in `/ready`, `/readyz`, `status --json`,
+and Gateway health so hosts and release tests can assert that the running
+process selected the intended profile. A later optional CLI wrapper can add an
+`openclaw ready --expect-profile <profile>` assertion if maintainers want that
+ergonomic surface, but it is not required for the first contract.
 
 ### Ready result
 
@@ -153,7 +156,6 @@ Readiness should use Kubernetes-style conditions:
 ```jsonc
 {
   "profile": "container",
-  "expectedProfile": "container",
   "ready": false,
   "conditions": [
     {
@@ -207,7 +209,7 @@ Intervals, retries, start periods, and timeouts belong in Docker, Compose,
 Kubernetes, systemd, Nomad, ECS, or another host manifest. OpenClaw can document
 recommended host manifests, and a later doctor/lint conformance pass can emit
 findings and fix recommendations when config does not match the selected
-profile, but `openclaw ready` should not depend on that optional repair path.
+profile, but core `/ready` should not depend on that optional repair path.
 
 ### OCC and AgentHarness alignment
 
@@ -236,16 +238,17 @@ fork before upstream OpenClaw PRs are opened:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` |
-| Profile selection and reusable criteria | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`ed4823d67d`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`662a0034c3`) |
+| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`0c5aaa2b88`) |
+| Profile selection and reusable criteria | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`068bc0ced0`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`7d51aee03a`) |
 
 The remaining proof work should happen before upstream OpenClaw implementation
 PRs are filed:
 
-- local Docker proof for default `local` readiness using `openclaw ready --json`
-- local Docker proof for `container` using
-  `openclaw ready --expect-profile container --json`
+- local Docker proof for default `local` readiness using Gateway `/ready`
+- local Docker proof for `container` using `OPENCLAW_HOSTING_PROFILE=container`
+  or `gateway run --hosting-profile container`, then asserting `/ready` reports
+  the selected `container` profile
 - local Docker proof for `node-mode` readiness behavior
 - local Docker proof for custom criteria/profile readiness behavior
 - Crabbox Linux/container proof when reviewer-grade platform evidence is needed
@@ -277,8 +280,9 @@ stable readiness conditions.
 
 ## Unresolved questions
 
-- Should OpenClaw also add an HTTP `/ready` endpoint, or is `openclaw ready` plus
-  Gateway health enough for the first release?
+- Should OpenClaw later add an `openclaw ready` CLI wrapper over the same
+  readiness result, or are HTTP `/ready` plus status/health enough for the first
+  release?
 - Which profile conditions should be release-blocking versus warning-only as
   `container`, `reverse-proxy`, and `managed` mature?
 - Should later plugin or driver hooks be able to publish criteria evidence into
