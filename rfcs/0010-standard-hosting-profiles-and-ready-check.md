@@ -735,10 +735,9 @@ evaluation, hosting config, Gateway readiness, and HTTP probe suites pass 121
 routed assertions. Earlier status-contract coverage remains part of the stack.
 
 The workspace-readiness composed branch passed 188 focused profile,
-Gateway-probe, health-state, status, node, and workspace assertions. PR 21's
-changed release-workflow assertion and all 33 Docker planner assertions also
-pass. The full package-acceptance test file retains five unrelated Windows
-Telegram shell/executable-bit fixture failures and 44 passing assertions.
+Gateway-probe, health-state, status, node, and workspace assertions. After the
+restack, PR 21's package-acceptance workflow file passes all 49 assertions and
+the Docker planner passes all 33 assertions on Linux.
 
 Actual execution of the new workspace `tmpfs` failure/recovery scenario remains
 pending because Docker Desktop was unavailable on the authoring host. The
