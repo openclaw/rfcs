@@ -1,5 +1,5 @@
 ---
-title: Readiness Framework and Hosting Profiles
+title: Readiness Providers and Hosting Profiles
 authors:
   - Gio
 created: 2026-07-09
@@ -9,17 +9,17 @@ issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
 ---
 
-# Proposal: Readiness Framework and Hosting Profiles
+# Proposal: Readiness Providers and Hosting Profiles
 
 ## Summary
 
-Add a canonical readiness framework for evaluating reusable runtime criteria
-and projecting one result through Gateway `/ready`, `/readyz`, health, and
-status. Hosting profiles compose those criteria into named, release-tested
-support contracts for running OpenClaw as a workload. The readiness framework
-is independently useful without selecting a non-default profile, and profiles
-do not add a second config system, generate config, or replace existing Gateway
-readiness.
+Add a canonical readiness-provider contract for publishing reusable runtime
+criteria and projecting one result through Gateway `/ready`, `/readyz`, health,
+and status. Built-in hosting profiles compose those criteria into named,
+OpenClaw-owned, release-tested support contracts for running OpenClaw as a
+workload. The readiness-provider contract is independently useful without
+selecting a non-default profile, and profiles do not add a second config system,
+generate config, or replace existing Gateway readiness.
 
 ## Motivation
 
@@ -102,6 +102,8 @@ future telemetry consume the same runtime truth.
 - Let plugins register namespaced advisory criteria through the existing plugin
   lifecycle, and let operators promote them only through additive custom
   profiles.
+- Make readiness providers enumerable and self-describing so status, operators,
+  and future doctor tooling can discover the active criterion catalog.
 - Leave room for later doctor/lint conformance findings that recommend fixes
   for config that does not match the selected built-in profile.
 
@@ -492,7 +494,8 @@ redefine what `local`, `container`, or `node-mode` means. They can define a
 namespaced profile that extends one built-in profile and adds reusable built-in
 or plugin criteria.
 
-Plugins register observed-state producers during normal activation:
+Plugins register self-describing observed-state providers during normal
+activation:
 
 ```ts
 type PluginReadinessResult = {
@@ -501,31 +504,87 @@ type PluginReadinessResult = {
   message: string;
 };
 
+type PluginReadinessProvider = {
+  id: string;
+  description: string;
+  check: (context: {
+    config: OpenClawConfig;
+    pluginConfig: unknown;
+    signal: AbortSignal;
+  }) => Promise<PluginReadinessResult> | PluginReadinessResult;
+};
+
 api.registerReadinessCriterion({
   id: "backend",
+  description: "Reports whether the plugin backend can accept work.",
   check: async ({ config, pluginConfig, signal }) => {
     // Return PluginReadinessResult.
   },
 });
 ```
 
-Core owns namespacing, lifecycle, timeout, caching, coalescing, invalid-result,
-error, and missing-registration behavior. Registrations live in the existing
-Gateway-pinned plugin registry, so plugin load rollback and reload replace the
-criterion with the rest of that registry. There is no process-global hosting
-registry and no downstream-specific publication path.
+The registration is a readiness provider: a lifecycle-owned producer with a
+stable identity, owner, description, and bounded evaluator. Core owns
+namespacing, lifecycle, enumeration, timeout, caching, coalescing,
+invalid-result, error, and missing-registration behavior. Registrations live in
+the existing Gateway-pinned plugin registry, so plugin load rollback and reload
+replace the provider with the rest of that registry. There is no process-global
+hosting registry and no downstream-specific publication path.
 
-Every plugin criterion is advisory by default. A plugin cannot choose its
-requirement class. An operator promotes a criterion by listing its full id in a
-custom profile's `requiredCriteria`. A required criterion that is absent,
-times out, throws, or reports `False` or `Unknown` blocks readiness. An absent
-selected criterion emits `Unknown` with `CriterionUnavailable`. Plugin failures
-use generic messages so readiness does not expose thrown error details.
+The active provider catalog is enumerable from that pinned registry. Detailed
+readiness and status expose each evaluated provider through its canonical
+condition type; future doctor or administrative surfaces may list the same
+descriptor catalog without inventing another registration mechanism. Provider
+identity is the namespaced condition type. Plugin-owned reasons must be stable
+within that identity, and messages are non-normative and must not contain
+credentials, tokens, personal data, or thrown error details.
+
+Every active plugin provider is evaluated and reported as advisory by default,
+even when the selected profile does not reference it. Installing a plugin may
+therefore add advisory conditions, but cannot make an otherwise ready built-in
+profile unready. A plugin cannot choose its requirement class. An operator
+promotes a criterion by listing its full id in a custom profile's
+`requiredCriteria`. A required criterion that is absent, times out, throws, or
+reports `False` or `Unknown` blocks readiness. An absent selected criterion
+emits `Unknown` with `CriterionUnavailable`. Plugin failures use generic
+messages so readiness does not expose thrown error details.
 
 The initial implementation evaluates registered checks concurrently, supplies
 an `AbortSignal`, uses a one-second deadline, and caches/coalesces each result
 for five seconds. These mechanics are core-owned rather than profile-authored
 numeric values.
+
+A provider check is an observational probe, not a lifecycle or repair hook. It
+must be read-only, idempotent, safe under concurrent and repeated invocation,
+avoid blocking synchronous I/O, and honor the supplied `AbortSignal`. It must
+not start dependencies, rewrite config, repair state, or emit durable audit
+claims. The cache duration bounds how stale a reported observation may be; a
+cached result is not historical or audit-grade evidence.
+
+### Profile inheritance and support ownership
+
+Every operator profile extends exactly one built-in profile and inherits all of
+its required and advisory criteria. It may add requirements, but cannot remove,
+replace, or demote the inherited contract. This gives custom hosting models a
+known OpenClaw support baseline instead of allowing each operator to redefine
+what a healthy Gateway means.
+
+Support ownership follows the composition:
+
+- OpenClaw owns, documents, and release-tests each built-in profile and its
+  inherited criteria.
+- An extended profile retains that OpenClaw-tested baseline. A failure in an
+  inherited criterion can be reproduced against and supported as the built-in
+  profile it extends.
+- The plugin or operator owns added provider semantics and the additional
+  support promise made by the extended profile. OpenClaw does not certify an
+  arbitrary downstream composition merely because it inherits a built-in.
+
+A namespaced profile is therefore still an operator's own profile, but it is
+never a from-scratch replacement for core readiness. In v1, requiring
+`extends` is intentional: a completely independent profile with no built-in
+baseline would weaken the support and compatibility promise this RFC is meant
+to create.
 
 Built-in profile names and condition names remain reserved. Operators configure
 the underlying OpenClaw settings; they do not redefine built-in semantics.
@@ -672,8 +731,10 @@ special "hosted OpenClaw" command tree. "Hosted" is a runtime posture and suppor
 profile, not the primary CLI noun.
 
 Built-in profiles make the support promise concrete. Instead of one broad
-hosted-deployment claim, OpenClaw can say which profiles are supported, which
-conditions are stable, and which release tests prove them.
+hosted-deployment claim, OpenClaw can say which built-in profiles it supports,
+which conditions are stable, and which release tests prove them. An operator
+profile preserves the tested baseline it inherits while clearly identifying
+the additional criteria whose support belongs to the operator or plugin owner.
 
 This is intentionally less powerful than a general profile or policy engine.
 Its value comes from OpenClaw owning a small number of built-in definitions and
