@@ -613,6 +613,33 @@ not start dependencies, rewrite config, repair state, or emit durable audit
 claims. The cache duration bounds how stale a reported observation may be; a
 cached result is not historical or audit-grade evidence.
 
+### Evaluation budgets and fail-closed behavior
+
+Every readiness condition must have a bounded evaluation strategy in code. A
+condition may read an already-owned in-memory snapshot, perform a finite pass
+over configured runtime state, or use a core-owned timeout and cache. It must
+not introduce unbounded readiness-path I/O.
+
+| Condition family | Code-owned bound |
+| --- | --- |
+| Startup, drain, Gateway response, config, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config snapshots. |
+| Channel runtime | One finite pass over the current in-memory channel snapshot, cached for one second. |
+| Workspace writability | One-second hard timeout with five-second cache/coalescing. |
+| Node mode | Pairing snapshot cached for one second; live sessions and command policy are finite in-memory passes. A later event-driven pairing snapshot may remove readiness-time storage reads entirely. |
+| Plugin providers | All providers run concurrently; each has a core-enforced one-second `Promise.race` deadline and five-second cache/coalescing. The deadline does not depend on the callback honoring cancellation. |
+| Complete readiness evaluation | Independent two-second outer watchdog around workspace, provider, and node evaluation, which run concurrently. |
+
+Timeout, throw, invalid result, or missing registration becomes `Unknown` with a
+stable reason. It blocks readiness when required and remains visible without
+blocking when advisory. If the complete evaluation exceeds its outer deadline,
+the existing HTTP exception path returns `503` and never reports ready.
+
+An in-process timer cannot interrupt JavaScript that synchronously blocks the
+Node.js event loop. Core evaluators therefore use bounded snapshot work, and the
+plugin contract forbids blocking synchronous I/O or computation. Stronger
+isolation against a malicious plugin would require worker/process execution and
+is outside this RFC; it is not implied by `AbortSignal`.
+
 ### Profile inheritance and support ownership
 
 In v1, every operator profile extends exactly one standard profile and inherits
@@ -697,8 +724,8 @@ conditions before adding profile-specific conditions:
 | Standard profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`a7cba836`) |
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`ca8ab296`) |
 | Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`781df835`) |
-| Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`a073f69e`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`f7362189`) |
+| Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`07c6aae3`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`b0974bb7`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
@@ -731,8 +758,9 @@ PR 21 validation confirms the release workflow selects `hosting-profiles`, the
 Docker planner resolves the lane with both package and functional-image
 requirements, and the existing 33 planner assertions remain green. After the
 condition/provider amendments, the focused provider-registry, provider
-evaluation, hosting config, Gateway readiness, and HTTP probe suites pass 121
-routed assertions. Earlier status-contract coverage remains part of the stack.
+evaluation, hosting config, Gateway readiness, timeout, and HTTP probe suites
+pass 132 routed assertions. Earlier status-contract coverage remains part of
+the stack.
 
 The workspace-readiness composed branch passed 188 focused profile,
 Gateway-probe, health-state, status, node, and workspace assertions. After the
