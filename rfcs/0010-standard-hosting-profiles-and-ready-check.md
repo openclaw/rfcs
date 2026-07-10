@@ -212,9 +212,8 @@ fork before upstream OpenClaw PRs are opened:
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
 | Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` |
-| Profile selection | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` |
+| Profile selection and reusable criteria | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` |
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` |
-| Extensible readiness criteria | https://github.com/giodl73-repo/openclaw/pull/20 | `user/giodl/hosting-readiness-extensibility` |
 
 The remaining proof work should happen before upstream OpenClaw implementation
 PRs are filed:
