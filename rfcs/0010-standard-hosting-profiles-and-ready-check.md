@@ -70,7 +70,8 @@ Hosts can prove which profile they are running.
   routing, UI, deployment system, or worker-pool model.
 - Put assistant deltas, tool frames, approvals, patches, compaction events, or
   harness protocol frames into the hosting contract.
-- Make arbitrary operator-defined conditions part of the first core contract.
+- Allow arbitrary operator-defined conditions to redefine built-in profile
+  semantics or built-in condition names.
 
 ## Proposal
 
@@ -245,8 +246,8 @@ conditions are stable, and which release tests prove them.
   Gateway health enough for the first release?
 - Which profile conditions should be release-blocking versus warning-only as
   `container`, `reverse-proxy`, and `managed` mature?
-- What is the right plugin or driver hook for namespaced custom readiness
-  conditions?
+- Should later plugin or driver hooks be able to publish criteria evidence into
+  the same `hosting.criteria` model, and what trust boundary should that use?
 - Should future profile conformance live in QA Lab, maturity scorecards, Docker
   E2E, or a dedicated profile conformance runner?
 - Which stable telemetry event names should accompany readiness transitions in a
