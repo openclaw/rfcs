@@ -110,29 +110,13 @@ OpenClaw should ship profile definitions rather than ask every host to invent
 one. Operators can still configure the underlying OpenClaw settings; the profile
 names the support contract.
 
-| Profile | Purpose |
-| --- | --- |
-| `local` | Developer/local foreground process readiness. |
-| `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. |
-| `reverse-proxy` | Gateway running behind a trusted reverse proxy. |
-| `managed` | Platform-hosted OpenClaw with managed lifecycle expectations. |
-| `node-mode` | Platform-controlled execution node or cell readiness. |
-
-The initial `local` readiness condition set should include:
-
-- `ProfileSelected`
-- `ConfigLoaded`
-- `GatewayResponding`
-- `WorkspaceUsable`
-- `PluginsLoaded`
-
-The initial `node-mode` condition set should add:
-
-- `NodePairingReady`
-- `ControlledTargetsReady`
-- `CommandApprovalReady`
-- `ControlChannelReady`
-- `StateReady`
+| Profile | Purpose | Readiness signals |
+| --- | --- | --- |
+| `local` | Developer/local foreground process readiness. | `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`, `WorkspaceUsable`, `PluginsLoaded` |
+| `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | Core signals plus `ContainerStateReady`: writable state path, usable workspace mount, Gateway bind address/port resolved, plugin load failures surfaced. |
+| `reverse-proxy` | Gateway running behind a trusted reverse proxy. | Container signals plus `TrustedProxyReady`: advertised public URL/proxy origin configured, forwarded header trust mode explicit, Gateway reachable through the proxy path. |
+| `managed` | Platform-hosted OpenClaw with managed lifecycle expectations. | Reverse-proxy signals plus `ManagedLifecycleReady`: selected managed profile, durable state location present, required host criteria declared, telemetry/audit hooks can report readiness without blocking core startup. |
+| `node-mode` | Platform-controlled execution node or cell readiness. | Core signals plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady`, `StateReady`. |
 
 `node-mode` must stay product-neutral. A controlled target can be a desktop,
 sandbox, VM, pod, browser, or another execution surface. OpenClaw should not
