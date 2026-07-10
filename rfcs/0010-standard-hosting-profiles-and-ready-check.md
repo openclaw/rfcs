@@ -3,7 +3,7 @@ title: Standard Hosting Profiles and Ready Check
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-09
+last_updated: 2026-07-10
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -60,6 +60,8 @@ Hosts can prove which profile they are running.
   plugins.
 - Leave room for later namespaced plugin or driver readiness conditions without
   letting operators redefine built-in profile semantics.
+- Leave room for later doctor/lint conformance findings that recommend fixes
+  for config that does not match the selected built-in profile.
 
 ## Non-Goals
 
@@ -72,6 +74,10 @@ Hosts can prove which profile they are running.
   harness protocol frames into the hosting contract.
 - Allow arbitrary operator-defined conditions to redefine built-in profile
   semantics or built-in condition names.
+- Encode host-specific probe intervals, retries, start periods, or timeout
+  values into OpenClaw profile config.
+- Make `openclaw ready` depend on doctor, lint, policy, or another optional
+  conformance layer.
 
 ## Proposal
 
@@ -225,8 +231,8 @@ fork before upstream OpenClaw PRs are opened:
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
 | Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` |
-| Profile selection and reusable criteria | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` |
+| Profile selection and reusable criteria | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`17473adc33`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`d24dd5f241`) |
 
 The remaining proof work should happen before upstream OpenClaw implementation
 PRs are filed:
