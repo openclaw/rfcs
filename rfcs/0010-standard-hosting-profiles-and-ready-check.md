@@ -1,5 +1,5 @@
 ---
-title: Standard Hosting Profiles and Ready Check
+title: Readiness Framework and Hosting Profiles
 authors:
   - Gio
 created: 2026-07-09
@@ -9,17 +9,17 @@ issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
 ---
 
-# Proposal: Standard Hosting Profiles and Ready Check
+# Proposal: Readiness Framework and Hosting Profiles
 
 ## Summary
 
-Add a small support contract for running OpenClaw as a workload. A
-built-in hosting profile names a validated composition of existing OpenClaw
-settings; readiness reports whether the running process satisfies that
-composition. This extends the existing Gateway `/ready` and `/readyz` result
-and projects the same conditions into `status --json` and Gateway health. It
-does not add a second config system, generate config, or replace existing
-Gateway readiness.
+Add a canonical readiness framework for evaluating reusable runtime criteria
+and projecting one result through Gateway `/ready`, `/readyz`, health, and
+status. Hosting profiles compose those criteria into named, release-tested
+support contracts for running OpenClaw as a workload. The readiness framework
+is independently useful without selecting a non-default profile, and profiles
+do not add a second config system, generate config, or replace existing Gateway
+readiness.
 
 ## Motivation
 
