@@ -75,8 +75,8 @@ work by turning a support claim into executable release evidence.
   product-specific host concepts.
 - Keep the first implementation in core so readiness works without optional
   plugins.
-- Define the exact truth predicates and stable non-ready reasons for every
-  built-in profile condition.
+- Define the requirement class, exact truth predicates, and stable non-ready
+  reasons for every built-in profile condition.
 - Reserve namespaced plugin or driver readiness conditions for a later contract
   that defines trusted runtime evidence publication.
 - Leave room for later doctor/lint conformance findings that recommend fixes
@@ -124,6 +124,8 @@ Four constraints keep this narrow:
    readiness, never a replacement for it.
 4. The first contract evaluates only facts owned by OpenClaw core. Optional
    plugins, policy, and doctor may consume the result but are not dependencies.
+5. Only required conditions affect the binary ready result. Advisory conditions
+   remain visible without turning a useful diagnostic into an outage.
 
 The contract is not a parallel hosted config tree. Existing OpenClaw config
 continues to own Gateway, proxy, plugin, model, session, node, and state
@@ -145,7 +147,7 @@ OpenClaw-owned evaluator that emits the runtime readiness condition.
 
 | Profile | Purpose | Built-in criteria | Status fields read | Emitted readiness signals |
 | --- | --- | --- | --- | --- |
-| `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.gateway-responding`, `openclaw.plugins-loaded` | config load, Gateway reachability, selected plugin activation status | `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`, `PluginsLoaded` |
+| `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.gateway-responding`, `openclaw.plugins-loaded` | config load, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`. Advisory: `PluginsLoaded`. |
 | `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `openclaw.container-state-ready` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
 | `managed` | Platform-hosted OpenClaw behind managed ingress. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. Existing Gateway readiness remains the lifecycle source of truth. |
@@ -160,23 +162,29 @@ assume one node maps to exactly one target.
 Profile readiness is composed with, and does not replace, the existing Gateway
 readiness result. Final `/ready` and `/readyz` readiness is true only when the
 existing startup/channel/drain/event-loop evaluation is ready and every
-condition listed for the selected profile is `True`. Both `False` and `Unknown`
-block profile readiness. A status surface that did not observe a required fact
-reports `Unknown`; it must not turn missing evidence into a positive readiness
-result.
+required condition listed for the selected profile is `True`. `False` and
+`Unknown` required conditions block profile readiness. Non-`True` advisory
+conditions are reported but do not change the binary result.
 
-| Condition | True when | Stable non-ready reasons |
-| --- | --- | --- |
-| `ProfileSelected` | The runtime resolved and reports the selected built-in profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
-| `ConfigLoaded` | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
-| `GatewayResponding` | The running Gateway is evaluating its own readiness request. | `GatewayUnavailable`, `GatewayNotChecked` |
-| `PluginsLoaded` | The active plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not block. | `PluginLoadFailures`, `PluginStatusUnavailable` |
-| `ContainerStateReady` | The effective Gateway mode is `local` and the resolved listener host is not loopback. The port has already passed normal config validation. Config-only status reports `Unknown` when an `auto` bind has not been resolved. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
-| `TrustedProxyReady` | Auth mode is `trusted-proxy`, `trustedProxy.userHeader` is non-empty, and `gateway.trustedProxies` contains at least one address/CIDR. Loopback is valid for a same-host proxy. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
-| `NodePairingReady` | The pairing store is readable and contains at least one approved pairing. | `NodePairingUnavailable`, `NodePairingPending`, `NodePairingMissing` |
-| `ControlledTargetsReady` | The live Gateway node registry contains at least one connected node whose id is approved in the pairing store. Persisted pairing alone is insufficient. | `ControlledTargetsDisconnected` |
-| `CommandApprovalReady` | A connected paired node advertises at least one command that is granted by pairing or `gateway.nodes.allowCommands` and not removed by `gateway.nodes.denyCommands`. A deny-only list is not approval evidence. | `CommandApprovalMissing` |
-| `ControlChannelReady` | At least one connected node session is correlated to an approved pairing. Gateway HTTP responsiveness alone is insufficient. | `ControlChannelUnavailable` |
+The condition contract and aggregation rules are shared across surfaces; the
+observed status may differ with probe depth and observation time. A status
+surface that did not observe a required fact reports `Unknown` and cannot claim
+ready. A status operation that successfully probes the Gateway may project that
+observation as `True`. Missing required evidence must never become a positive
+readiness result.
+
+| Condition | Requirement | True when | Stable non-ready reasons |
+| --- | --- | --- | --- |
+| `ProfileSelected` | Required | The runtime resolved and reports the selected built-in profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
+| `ConfigLoaded` | Required | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
+| `GatewayResponding` | Required | The running Gateway is evaluating its own readiness request, or the current status/health operation successfully probed that Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
+| `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
+| `ContainerStateReady` | Required for `container` | The effective Gateway mode is `local` and the resolved listener host is not loopback. The port has already passed normal config validation. Config-only status reports `Unknown` when an `auto` bind has not been resolved. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
+| `TrustedProxyReady` | Required for `reverse-proxy` and `managed` | Auth mode is `trusted-proxy`, `trustedProxy.userHeader` is non-empty, and `gateway.trustedProxies` contains at least one address/CIDR. Loopback is valid for a same-host proxy. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
+| `NodePairingReady` | Required for `node-mode` | The pairing store is readable and contains at least one approved pairing. | `NodePairingUnavailable`, `NodePairingPending`, `NodePairingMissing` |
+| `ControlledTargetsReady` | Required for `node-mode` | The live Gateway node registry contains at least one connected node whose id is approved in the pairing store. Persisted pairing alone is insufficient. | `ControlledTargetsDisconnected` |
+| `CommandApprovalReady` | Required for `node-mode` | A connected paired node advertises at least one command that is granted by pairing or `gateway.nodes.allowCommands` and not removed by `gateway.nodes.denyCommands`. A deny-only list is not approval evidence. | `CommandApprovalMissing` |
+| `ControlChannelReady` | Required for `node-mode` | At least one connected node session is correlated to an approved pairing. Gateway HTTP responsiveness alone is insufficient. | `ControlChannelUnavailable` |
 
 ### Profile selection
 
@@ -218,22 +226,30 @@ Readiness should use Kubernetes-style conditions:
     {
       "type": "ProfileSelected",
       "status": "True",
+      "requirement": "required",
       "reason": "ProfileSelected",
       "message": "Runtime selected the container hosting profile."
     },
     {
       "type": "GatewayResponding",
       "status": "False",
+      "requirement": "required",
       "reason": "GatewayUnavailable",
       "message": "Gateway did not respond to the readiness request."
     }
   ],
-  "failures": ["GatewayUnavailable"]
+  "failures": ["GatewayUnavailable"],
+  "advisories": []
 }
 ```
 
-Hosts and tests should key on `type`, `status`, and `reason`. `message` is for
-operators and should remain non-normative.
+Hosts and tests should key on `type`, `status`, `requirement`, and `reason`.
+`failures` is the deduplicated union of existing Gateway lifecycle failure
+reasons and non-`True` required profile-condition reasons. This preserves
+existing channel/startup/drain/event-loop explanations even though those legacy
+checks are not duplicated as profile conditions. `advisories` is the set of
+non-`True` advisory profile reasons. `message` is for operators and should
+remain non-normative.
 
 ### Compatibility and operational cost
 
@@ -243,14 +259,10 @@ profile does not enable auth, change bind addresses, install plugins, move
 state, or provision nodes. It only changes which runtime-owned facts must be
 true for profile readiness.
 
-The readiness result is intentionally stricter than the old result in one
-case: an activation error from a selected plugin makes the default `local`
-profile not ready. Explicitly disabled plugins do not block. This treats
-"configured but failed to activate" as incomplete startup rather than a
-healthy process, and makes the failure visible through a stable reason instead
-of host-specific log scraping. Because this can change an existing probe from
-200 to 503, it requires release notes and upgrade coverage; it is not presented
-as a behavior-neutral migration.
+Plugin activation errors are advisory in the default profile. They remain
+visible through stable conditions and the `advisories` list without changing an
+existing healthy readiness response from 200 to 503. Explicitly disabled
+plugins do not report an advisory.
 
 This keeps the operational contract familiar to container hosts:
 
@@ -295,6 +307,13 @@ Built-in profile names, `openclaw.*` criterion names, and built-in condition
 names remain reserved. Operators configure the underlying OpenClaw settings;
 they do not redefine built-in profile semantics.
 
+Condition identity and requirement class are part of the support contract.
+Changing an advisory condition to required, adding a new required condition to
+an existing profile, or changing a stable reason can alter host behavior and
+must receive compatibility review, release notes, and profile conformance
+coverage. New diagnostics should default to advisory unless failure means the
+named runtime shape cannot perform its supported role.
+
 Built-in profiles also should not encode host-specific numeric probe values.
 Intervals, retries, start periods, and timeouts belong in Docker, Compose,
 Kubernetes, systemd, Nomad, ECS, or another host manifest. OpenClaw can document
@@ -329,9 +348,9 @@ fork before upstream OpenClaw PRs are opened:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`63ad1aaa64`) |
-| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`468b0f289d`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`464310eefa`) |
+| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`bf44ae3b45`) |
+| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`cc43cc5a02`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`88d44534af`) |
 
 The remaining proof work should happen before upstream OpenClaw implementation
 PRs are filed:
@@ -394,8 +413,8 @@ stable readiness conditions.
 - Should OpenClaw later add an `openclaw ready` CLI wrapper over the same
   readiness result, or are HTTP `/ready` plus status/health enough for the first
   release?
-- Which profile conditions should be release-blocking versus warning-only as
-  `container`, `reverse-proxy`, and `managed` mature?
+- Which additional advisory conditions would improve supportability without
+  weakening the meaning of required profile conformance?
 - Should later plugin or driver hooks publish namespaced criteria evidence, and
   what identity, scoping, freshness, and trust boundary should that require?
 - Should future profile conformance live in QA Lab, maturity scorecards, Docker
