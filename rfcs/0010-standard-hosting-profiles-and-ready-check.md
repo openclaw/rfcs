@@ -202,6 +202,26 @@ Profile selection should be visible in normal hosting mechanisms:
 - environment: `OPENCLAW_HOSTING_PROFILE`
 - startup: `openclaw gateway run --hosting-profile <profile>`
 
+The v1 config schema is intentionally closed:
+
+```ts
+type HostingProfileId = "local" | "container" | "reverse-proxy" | "node-mode";
+
+type HostingConfig = {
+  profile?: HostingProfileId;
+};
+
+type OpenClawConfig = {
+  hosting?: HostingConfig;
+  // Existing OpenClaw fields remain unchanged.
+};
+```
+
+`hosting` is a strict object and `profile` is its only v1 field. Unknown fields
+and profile ids fail normal config validation. The environment variable and
+startup flag accept the same closed profile-id set. The `local` default is
+resolved at runtime and does not need to be persisted into `openclaw.json`.
+
 Selection precedence is deterministic:
 
 ```text
@@ -222,6 +242,41 @@ ergonomic surface, but it is not required for the first contract.
 ### Ready result
 
 Readiness should use Kubernetes-style conditions:
+
+```ts
+type HostingReadinessConditionType =
+  | "ProfileSelected"
+  | "ConfigLoaded"
+  | "GatewayResponding"
+  | "PluginsLoaded"
+  | "ContainerStateReady"
+  | "TrustedProxyReady"
+  | "NodePairingReady"
+  | "ControlledTargetsReady"
+  | "CommandApprovalReady"
+  | "ControlChannelReady";
+
+type HostingReadinessCondition = {
+  type: HostingReadinessConditionType;
+  status: "True" | "False" | "Unknown";
+  requirement: "required" | "advisory";
+  reason: string;
+  message: string;
+};
+
+type HostingReadinessResult = {
+  profile: HostingProfileId;
+  ready: boolean;
+  conditions: HostingReadinessCondition[];
+  failures: string[];
+  advisories: string[];
+};
+```
+
+Every field in `HostingReadinessResult` is required whenever the result is
+present; empty `conditions`, `failures`, or `advisories` are serialized as empty
+arrays rather than omitted. Built-in condition types and the stable reasons in
+the truth-predicate table are reserved by OpenClaw.
 
 ```jsonc
 {
@@ -256,10 +311,58 @@ checks are not duplicated as profile conditions. `advisories` is the set of
 non-`True` advisory profile reasons. `message` is for operators and should
 remain non-normative.
 
-The top-level fields above are the one canonical public result. Implementations
-should not serialize a second nested copy of the profile readiness object;
-health and status should project the same result rather than create another
-consumer choice or source of drift.
+`conditions` has map semantics keyed by `type`; a built-in result contains at
+most one condition of each type, and consumers must not depend on array order.
+`failures` and `advisories` have deduplicated set semantics, and their order is
+not contractual. Condition and reason identity is stable; `message` wording is
+not.
+
+The object above is the one canonical public result. Transports may embed or
+flatten that object exactly once, but implementations must not serialize a
+second nested copy that gives consumers another contract or source of drift.
+
+### Transport projections
+
+The existing HTTP readiness envelope remains backward compatible:
+
+```ts
+type DetailedGatewayReadyResponse = HostingReadinessResult & {
+  // Existing Gateway readiness fields.
+  ready: boolean;
+  failing: string[];
+  suppressed?: string[];
+  uptimeMs: number;
+  eventLoop?: GatewayEventLoopHealth;
+};
+```
+
+For local or authenticated detailed `GET /ready` and `GET /readyz` requests,
+the canonical hosting fields are flattened once into this existing Gateway
+envelope. `ready` is the conjunction of Gateway lifecycle readiness and all
+required profile conditions. `failing` remains the legacy Gateway-oriented
+list; `failures` is the canonical deduplicated union described above. HTTP is
+`200` when `ready` is true and `503` otherwise. `HEAD` returns the same status
+without a body. Unauthenticated remote probes retain the redacted shape
+`{ "ready": boolean }` and do not disclose condition details.
+
+Gateway health and `status --json` embed the canonical object once:
+
+```ts
+type HealthReadinessProjection = {
+  readiness?: HostingReadinessResult;
+};
+
+type StatusReadinessProjection = {
+  readiness: HostingReadinessResult;
+};
+```
+
+The optional health field preserves existing observation-depth and
+compatibility behavior. A surface that cannot authoritatively observe required
+runtime evidence must omit the result or report the affected condition as
+`Unknown`; it must never invent a positive observation. When `readiness` is
+present, all five canonical fields are required. Text status is a human summary
+of this object and is not a separate machine-readable schema.
 
 ### Compatibility and operational cost
 
@@ -366,9 +469,9 @@ fork before upstream OpenClaw PRs are opened:
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
 | Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`cefbe89976`) |
-| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`00fef7fde8`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`c034dc4311`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`d2047d8f21`) |
+| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`c423b77720`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`0dc6c7184f`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`504310c0b9`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
@@ -380,7 +483,8 @@ fourth branch:
 - PR 18 proves a LAN-bound `container` profile returns 200 and a loopback-bound
   `container` profile returns 503 with `ContainerGatewayLoopback`. It also
   proves a configured trusted-proxy posture returns 200 for `reverse-proxy`
-  while token auth returns 503 with `TrustedProxyAuthMissing`.
+  while token auth returns 503 with `TrustedProxyAuthMissing`, and projects the
+  canonical result into Gateway health without a duplicate nested payload.
 - PR 19 starts a real node host and proves `node-mode` transitions from 503 to
   200 only after approved pairing, a correlated live target, an advertised
   approved command, and a connected control channel are all observed.
@@ -392,6 +496,10 @@ Docker planner resolves the lane with both package and functional-image
 requirements, and the existing 33 planner assertions remain green. Formatting,
 diff checks, and a full branch Codex review against PR 19 also passed with no
 actionable findings.
+
+After the schema/projection audit, the final composed branch passed 193 focused
+profile, config-schema, Gateway-health, status, and node assertions, plus the
+release-workflow assertion and all 33 Docker planner assertions.
 
 The lane is the reproducible behavior proof for upstream review. A brokered
 Linux/Crabbox execution should be attached before the implementation PRs are
