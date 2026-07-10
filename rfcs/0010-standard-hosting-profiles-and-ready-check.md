@@ -173,10 +173,15 @@ The first contract should keep built-in profile conditions stable and
 OpenClaw-owned. Operators should not be able to redefine what `local`,
 `container`, or `node-mode` means.
 
-Future work can add namespaced plugin or driver conditions, for example
-`acme.backupReady` or `driver.egressReady`. Those conditions should append to
-the readiness result and participate in readiness only through explicit profile
-or host policy, rather than mutating the built-in profile definitions.
+Custom readiness should use a reusable criteria model, not ad hoc profile
+redefinitions. Operators can declare namespaced criteria under a registry such
+as `hosting.criteria`, then custom profiles or host policy can reference those
+criteria as required or optional. For example, `acme.backup-ready` can be
+defined once and reused by `acme.managed` and `acme.node-cell`.
+
+Built-in profile names and built-in condition names remain reserved.
+Custom profiles extend built-in profiles and append criteria; they do not
+mutate the built-in definitions.
 
 ### OCC and AgentHarness alignment
 
@@ -208,6 +213,7 @@ fork before upstream OpenClaw PRs are opened:
 | Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` |
 | Profile selection | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` |
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` |
+| Extensible readiness criteria | https://github.com/giodl73-repo/openclaw/pull/20 | `user/giodl/hosting-readiness-extensibility` |
 
 The remaining proof work should happen before upstream OpenClaw implementation
 PRs are filed:
@@ -216,6 +222,7 @@ PRs are filed:
 - local Docker proof for `container` using
   `openclaw ready --expect-profile container --json`
 - local Docker proof for `node-mode` readiness behavior
+- local Docker proof for custom criteria/profile readiness behavior
 - Crabbox Linux/container proof when reviewer-grade platform evidence is needed
 
 ## Rationale
