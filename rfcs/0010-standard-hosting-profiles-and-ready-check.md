@@ -20,9 +20,10 @@ such as `openclaw ready`, `status --json`, and Gateway health.
 
 ## Motivation
 
-OpenClaw can be hosted today, but it does not yet expose the small workload
-contract that container hosts and orchestrators expect. Hosts need to answer one
-question before routing traffic:
+OpenClaw can be hosted today, but it is not obvious which hosting models are
+turnkey, supportable, and release-validated. It also does not yet expose the
+small workload contract that container hosts and orchestrators expect. Hosts
+need to answer one question before routing traffic:
 
 ```text
 Is this OpenClaw instance ready under the hosting profile it was started with?
@@ -34,7 +35,8 @@ readiness logic. That makes hosted OpenClaw harder to test upstream and harder
 to upgrade downstream.
 
 Profiles turn the broad claim "OpenClaw supports hosted deployments" into a
-reviewable support matrix:
+reviewable support matrix and a supportable subset that issues can be validated
+against:
 
 ```text
 OpenClaw supports these profiles.
@@ -80,6 +82,13 @@ Hosts can prove which profile they are running.
   conformance layer.
 
 ## Proposal
+
+The RFC has two pieces that can be reviewed together or split if maintainers
+prefer:
+
+1. Standard hosting profiles: named support contracts for the OpenClaw runtime.
+2. A canonical ready check: a host-facing pass/fail surface for the selected
+   profile.
 
 OpenClaw should expose a standard hostee contract:
 
@@ -257,6 +266,11 @@ profile, not the primary CLI noun.
 Built-in profiles make the support promise concrete. Instead of one broad
 hosted-deployment claim, OpenClaw can say which profiles are supported, which
 conditions are stable, and which release tests prove them.
+
+The ready check is intentionally smaller than the profile model. Container
+hosters can use it directly as their readiness probe, while hosts that already
+have their own probe plumbing can still benefit from standard profiles and
+stable readiness conditions.
 
 ## Unresolved questions
 
