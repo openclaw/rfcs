@@ -63,7 +63,7 @@ work by turning a support claim into executable release evidence.
 ## Goals
 
 - Define built-in hosting profiles for `local`, `container`, `reverse-proxy`,
-  `managed`, and `node-mode`.
+  and `node-mode`.
 - Make `local` the default profile when no profile is selected.
 - Add a canonical readiness result with stable condition `type`, `status`,
   `reason`, and human-readable `message`.
@@ -140,6 +140,12 @@ OpenClaw should ship profile definitions rather than ask every host to invent
 one. Operators can still configure the underlying OpenClaw settings; the profile
 names the support contract.
 
+A profile names the expected ingress/runtime posture, not the packaging
+technology. A Gateway directly reachable through its container listener uses
+`container`. A Gateway in a container behind a trusted identity proxy uses
+`reverse-proxy`. New profile names should be added only when they define a
+distinct OpenClaw-owned invariant and conformance scenario.
+
 Profiles should be declarative compositions of reusable readiness criteria. A
 built-in profile references OpenClaw-owned `openclaw.*` criteria. Each criterion
 is a named rule over OpenClaw runtime status/config fields and has one
@@ -150,7 +156,6 @@ OpenClaw-owned evaluator that emits the runtime readiness condition.
 | `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.gateway-responding`, `openclaw.plugins-loaded` | config load, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`. Advisory: `PluginsLoaded`. |
 | `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `openclaw.container-state-ready` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
-| `managed` | Platform-hosted OpenClaw behind managed ingress. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. Existing Gateway readiness remains the lifecycle source of truth. |
 | `node-mode` | Gateway/controller for one or more controlled execution nodes. | `local` + node-mode `openclaw.*` criteria | pairing store, live node registry, paired command grants, `gateway.nodes.allowCommands` | Core signals plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady`. |
 
 `node-mode` must stay product-neutral. A controlled target can be a desktop,
@@ -180,7 +185,7 @@ readiness result.
 | `GatewayResponding` | Required | The running Gateway is evaluating its own readiness request, or the current status/health operation successfully probed that Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
 | `ContainerStateReady` | Required for `container` | The effective Gateway mode is `local` and the resolved listener host is not loopback. The port has already passed normal config validation. Config-only status reports `Unknown` when an `auto` bind has not been resolved. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
-| `TrustedProxyReady` | Required for `reverse-proxy` and `managed` | Auth mode is `trusted-proxy`, `trustedProxy.userHeader` is non-empty, and `gateway.trustedProxies` contains at least one address/CIDR. Loopback is valid for a same-host proxy. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
+| `TrustedProxyReady` | Required for `reverse-proxy` | Auth mode is `trusted-proxy`, `trustedProxy.userHeader` is non-empty, and `gateway.trustedProxies` contains at least one address/CIDR. Loopback is valid for a same-host proxy. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
 | `NodePairingReady` | Required for `node-mode` | The pairing store is readable and contains at least one approved pairing. | `NodePairingUnavailable`, `NodePairingPending`, `NodePairingMissing` |
 | `ControlledTargetsReady` | Required for `node-mode` | The live Gateway node registry contains at least one connected node whose id is approved in the pairing store. Persisted pairing alone is insufficient. | `ControlledTargetsDisconnected` |
 | `CommandApprovalReady` | Required for `node-mode` | A connected paired node advertises at least one command that is granted by pairing or `gateway.nodes.allowCommands` and not removed by `gateway.nodes.denyCommands`. A deny-only list is not approval evidence. | `CommandApprovalMissing` |
@@ -251,6 +256,11 @@ checks are not duplicated as profile conditions. `advisories` is the set of
 non-`True` advisory profile reasons. `message` is for operators and should
 remain non-normative.
 
+The top-level fields above are the one canonical public result. Implementations
+should not serialize a second nested copy of the profile readiness object;
+health and status should project the same result rather than create another
+consumer choice or source of drift.
+
 ### Compatibility and operational cost
 
 No explicit selection is required. Existing installations resolve to `local`,
@@ -307,6 +317,13 @@ Built-in profile names, `openclaw.*` criterion names, and built-in condition
 names remain reserved. Operators configure the underlying OpenClaw settings;
 they do not redefine built-in profile semantics.
 
+`node-mode` requires at least one approved, connected, controllable target. It
+does not prove that every target desired by OCC or a host platform is present;
+desired fleet cardinality remains a control-plane concern. Pairing snapshots
+used by frequent readiness probes should be briefly cached or event-driven,
+while live node sessions and current command policy are evaluated on each
+observation.
+
 Condition identity and requirement class are part of the support contract.
 Changing an advisory condition to required, adding a new required condition to
 an existing profile, or changing a stable reason can alter host behavior and
@@ -348,9 +365,9 @@ fork before upstream OpenClaw PRs are opened:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`f11b19d553`) |
-| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`87cf11e944`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`22bdbbd3c8`) |
+| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`cefbe89976`) |
+| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`00fef7fde8`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`c034dc4311`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the three
@@ -359,7 +376,9 @@ branches:
 - PR 17 proves an unset profile defaults to `local`, `/readyz` returns 200, and
   required/advisory aggregation is stable.
 - PR 18 proves a LAN-bound `container` profile returns 200 and a loopback-bound
-  `container` profile returns 503 with `ContainerGatewayLoopback`.
+  `container` profile returns 503 with `ContainerGatewayLoopback`. It also
+  proves a configured trusted-proxy posture returns 200 for `reverse-proxy`
+  while token auth returns 503 with `TrustedProxyAuthMissing`.
 - PR 19 starts a real node host and proves `node-mode` transitions from 503 to
   200 only after approved pairing, a correlated live target, an advertised
   approved command, and a connected control channel are all observed.
@@ -371,7 +390,7 @@ contract.
 
 This first stack proves the core ready/result shape, explicit profile
 selection, built-in profile composition from reusable criteria, exact built-in
-container/reverse-proxy/managed predicates, and node-mode rules backed by the
+container/reverse-proxy predicates, and node-mode rules backed by the
 live node registry.
 
 ### Incremental adoption
@@ -380,8 +399,8 @@ The proposal does not require one all-or-nothing implementation landing:
 
 1. Land the condition shape and default `local` projection into existing
    readiness, health, and status surfaces.
-2. Add explicit selection plus `container`, `reverse-proxy`, and `managed`
-   predicates over effective runtime facts.
+2. Add explicit selection plus `container` and `reverse-proxy` predicates over
+   effective runtime facts.
 3. Add `node-mode` using pairing and live node-registry evidence.
 
 The first slice is independently useful because it creates one canonical,
