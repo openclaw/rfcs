@@ -15,7 +15,7 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/33
 
 Add a canonical readiness-provider contract for publishing reusable runtime
 criteria and projecting one result through Gateway `/ready`, `/readyz`, health,
-and status. Built-in hosting profiles compose those criteria into named,
+and status. Standard hosting profiles compose those criteria into named,
 OpenClaw-owned, release-tested support contracts for running OpenClaw as a
 workload. The readiness-provider contract is independently useful without
 selecting a non-default profile, and profiles do not add a second config system,
@@ -173,11 +173,14 @@ fact that status does not expose yet, the implementation should add that
 missing status field. Plugin-owned dependencies use the readiness registration
 contract below rather than a host-specific endpoint or global evidence store.
 
-### Built-in profiles
+### Standard profiles
 
-OpenClaw should ship profile definitions rather than ask every host to invent
-one. Operators can still configure the underlying OpenClaw settings; the profile
-names the support contract.
+OpenClaw should ship a small catalog of standard profile definitions rather
+than ask every host to invent one. Operators can still configure the underlying
+OpenClaw settings; the profile names the support contract. These profiles are
+implemented in core, which is why the schema calls their ids "built-in," but
+their product role is to be OpenClaw's documented and release-gated standard
+profiles.
 
 A profile names the expected ingress/runtime posture, not the packaging
 technology. A Gateway directly reachable through its container listener uses
@@ -514,6 +517,10 @@ type PluginReadinessProvider = {
   }) => Promise<PluginReadinessResult> | PluginReadinessResult;
 };
 
+type RegisterReadinessCriterion = (
+  provider: PluginReadinessProvider,
+) => void;
+
 api.registerReadinessCriterion({
   id: "backend",
   description: "Reports whether the plugin backend can accept work.",
@@ -522,6 +529,19 @@ api.registerReadinessCriterion({
   },
 });
 ```
+
+`registerReadinessCriterion` is available to an activated OpenClaw plugin
+through its normal `OpenClawPluginApi`. Registration installs the descriptor and
+callback into the Gateway-pinned registry for that plugin activation. Core
+criteria use internal core evaluators; operators, host config, and OCC do not
+register executable callbacks. They only select profiles and reference full
+provider ids.
+
+The `check` member is the provider callback. The Gateway readiness evaluator
+invokes it asynchronously with the effective OpenClaw config, that plugin's
+resolved config, and an `AbortSignal`. The callback returns one observed
+condition result. Core validates and namespaces the result before adding it to
+the canonical readiness projection.
 
 The registration is a readiness provider: a lifecycle-owned producer with a
 stable identity, owner, description, and bounded evaluator. Core owns
@@ -563,15 +583,15 @@ cached result is not historical or audit-grade evidence.
 
 ### Profile inheritance and support ownership
 
-Every operator profile extends exactly one built-in profile and inherits all of
-its required and advisory criteria. It may add requirements, but cannot remove,
+In v1, every operator profile extends exactly one standard profile and inherits
+all of its required and advisory criteria. It may add requirements, but cannot remove,
 replace, or demote the inherited contract. This gives custom hosting models a
 known OpenClaw support baseline instead of allowing each operator to redefine
 what a healthy Gateway means.
 
 Support ownership follows the composition:
 
-- OpenClaw owns, documents, and release-tests each built-in profile and its
+- OpenClaw owns, documents, and release-tests each standard profile and its
   inherited criteria.
 - An extended profile retains that OpenClaw-tested baseline. A failure in an
   inherited criterion can be reproduced against and supported as the built-in
@@ -580,11 +600,13 @@ Support ownership follows the composition:
   support promise made by the extended profile. OpenClaw does not certify an
   arbitrary downstream composition merely because it inherits a built-in.
 
-A namespaced profile is therefore still an operator's own profile, but it is
-never a from-scratch replacement for core readiness. In v1, requiring
-`extends` is intentional: a completely independent profile with no built-in
-baseline would weaken the support and compatibility promise this RFC is meant
-to create.
+A namespaced profile is therefore still an operator's own profile. Requiring
+`extends` in v1 gives the first implementation a known release-tested baseline.
+A later revision may allow an operator profile to compose its own provider set
+without extending a standard profile. Such a profile would be operator-owned
+and would still be conjoined with universal Gateway lifecycle readiness; custom
+composition must never replace or bypass core startup, drain, channel, or
+event-loop readiness.
 
 Built-in profile names and condition names remain reserved. Operators configure
 the underlying OpenClaw settings; they do not redefine built-in semantics.
@@ -730,8 +752,8 @@ Putting the result into `ready`, `status`, and `health` is preferable to a
 special "hosted OpenClaw" command tree. "Hosted" is a runtime posture and support
 profile, not the primary CLI noun.
 
-Built-in profiles make the support promise concrete. Instead of one broad
-hosted-deployment claim, OpenClaw can say which built-in profiles it supports,
+Standard profiles make the support promise concrete. Instead of one broad
+hosted-deployment claim, OpenClaw can say which standard profiles it supports,
 which conditions are stable, and which release tests prove them. An operator
 profile preserves the tested baseline it inherits while clearly identifying
 the additional criteria whose support belongs to the operator or plugin owner.
