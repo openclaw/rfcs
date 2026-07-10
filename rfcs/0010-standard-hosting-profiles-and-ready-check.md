@@ -60,6 +60,28 @@ of debugging an unbounded hosted configuration, maintainers can ask for the
 selected profile and its stable condition result. Profiles complement maturity
 work by turning a support claim into executable release evidence.
 
+### Evidence From Existing Issues
+
+The proposal generalizes recurring operator failures already reported against
+OpenClaw. The issues ask for truthful readiness under additional runtime facts;
+they do not require each fact to introduce a new hosting profile.
+
+| Issue | Observed gap | Contract implication |
+| --- | --- | --- |
+| [openclaw#96084](https://github.com/openclaw/openclaw/issues/96084) | `/readyz` remains healthy when a PVC-backed workspace is full and writes fail with `ENOSPC`. | Workspace writability should be an observable status fact with a stable readiness condition. |
+| [openclaw#78136](https://github.com/openclaw/openclaw/issues/78136) | Docker health and readiness remain healthy while the command queue is draining and rejects model work. | Admission/drain state must participate in required readiness, not only process liveness. |
+| [openclaw#73652](https://github.com/openclaw/openclaw/issues/73652) | The Gateway accepts connections before internal startup is ready. | Readiness must represent the actual startup admission boundary. |
+| [openclaw#78954](https://github.com/openclaw/openclaw/issues/78954) | Channel/plugin sidecars can block reaching a usable core Gateway state. | Conditions need required versus advisory classification. |
+| [openclaw#43886](https://github.com/openclaw/openclaw/issues/43886) | A Docker Gateway configured for LAN still listens on loopback. | Container readiness must evaluate effective bind state rather than configured intent alone. |
+
+Other reports show the same need at additional projections: systemd can declare
+the service started before Gateway readiness
+([openclaw#66512](https://github.com/openclaw/openclaw/issues/66512)), and a
+channel can report healthy while retrying a fatal login error
+([openclaw#101083](https://github.com/openclaw/openclaw/issues/101083)). One
+canonical condition result lets HTTP probes, status, service managers, and
+future telemetry consume the same runtime truth.
+
 ## Goals
 
 - Define built-in hosting profiles for `local`, `container`, `reverse-proxy`,
@@ -106,6 +128,18 @@ prefer:
 1. Standard hosting profiles: named support contracts for the OpenClaw runtime.
 2. A canonical ready check: a host-facing pass/fail surface for the selected
    profile.
+
+These pieces compose but are separable. The canonical condition/result model
+is useful without adding any non-default profile. A generally required runtime
+invariant, such as accepting work rather than draining, can extend existing
+Gateway readiness. A new OpenClaw-owned fact, such as workspace writability,
+can add a criterion to the existing `local` contract inherited by the hosted
+profiles. Neither change requires defining a new profile.
+
+A new profile is justified only when OpenClaw wants to name and release-test a
+distinct support posture that selects a different composition or requirement
+class for existing criteria. Profiles organize readiness criteria into support
+contracts; they are not the extension mechanism for every readiness fix.
 
 OpenClaw should expose a standard hostee contract:
 
