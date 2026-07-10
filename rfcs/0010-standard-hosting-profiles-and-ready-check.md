@@ -180,9 +180,22 @@ as `hosting.criteria`, then custom profiles or host policy can reference those
 criteria as required or optional. For example, `acme.backup-ready` can be
 defined once and reused by `acme.managed` and `acme.node-cell`.
 
+Criteria declarations are desired contract, not observed state. They should
+carry stable identity and human-readable intent, while readiness output carries
+observed `status`, `reason`, and `message`. This keeps `openclaw.json` aligned
+with normal host systems: config/spec declares what must be true, runtime status
+reports whether it is true.
+
 Built-in profile names and built-in condition names remain reserved.
 Custom profiles extend built-in profiles and append criteria; they do not
 mutate the built-in definitions.
+
+Built-in profiles also should not encode host-specific numeric probe values.
+Intervals, retries, start periods, and timeouts belong in Docker, Compose,
+Kubernetes, systemd, Nomad, ECS, or another host manifest. OpenClaw can document
+recommended host manifests, and a later doctor/lint conformance pass can emit
+findings and fix recommendations when config does not match the selected
+profile, but `openclaw ready` should not depend on that optional repair path.
 
 ### OCC and AgentHarness alignment
 
