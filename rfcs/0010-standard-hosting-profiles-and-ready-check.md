@@ -150,7 +150,7 @@ profile selection
 -> ready/not-ready result
 ```
 
-Four constraints keep this narrow:
+Five constraints keep this narrow:
 
 1. A profile does not write, merge, or repair configuration.
 2. Operators may continue to configure every OpenClaw setting directly.
@@ -187,7 +187,7 @@ OpenClaw-owned evaluator that emits the runtime readiness condition.
 
 | Profile | Purpose | Built-in criteria | Status fields read | Emitted readiness signals |
 | --- | --- | --- | --- | --- |
-| `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.gateway-responding`, `openclaw.plugins-loaded` | config load, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`. Advisory: `PluginsLoaded`. |
+| `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.workspace-writable`, `openclaw.gateway-responding`, `openclaw.plugins-loaded` | config load, effective default workspace write evidence, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `WorkspaceWritable`, `GatewayResponding`. Advisory: `PluginsLoaded`. |
 | `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `openclaw.container-state-ready` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
 | `node-mode` | Gateway/controller for one or more controlled execution nodes. | `local` + node-mode `openclaw.*` criteria | pairing store, live node registry, paired command grants, `gateway.nodes.allowCommands` | Core signals plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady`. |
@@ -216,6 +216,7 @@ readiness result.
 | --- | --- | --- | --- |
 | `ProfileSelected` | Required | The runtime resolved and reports the selected built-in profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
 | `ConfigLoaded` | Required | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
+| `WorkspaceWritable` | Required for all built-in profiles | The running Gateway resolves the effective default-agent workspace and completes a write, flush, and cleanup probe. The probe is cached and coalesced so readiness polling does not cause unbounded filesystem work. Non-probing command fallbacks do not invent positive evidence. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `GatewayResponding` | Required | The running Gateway is evaluating its own readiness request, or the current status/health operation successfully probed that Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
 | `ContainerStateReady` | Required for `container` | The effective Gateway mode is `local` and the resolved listener host is not loopback. The port has already passed normal config validation. Config-only status reports `Unknown` when an `auto` bind has not been resolved. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
@@ -281,6 +282,7 @@ Readiness should use Kubernetes-style conditions:
 type HostingReadinessConditionType =
   | "ProfileSelected"
   | "ConfigLoaded"
+  | "WorkspaceWritable"
   | "GatewayResponding"
   | "PluginsLoaded"
   | "ContainerStateReady"
@@ -526,12 +528,13 @@ fork before upstream OpenClaw PRs are opened:
 | Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`cefbe89976`) |
 | Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`c423b77720`) |
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`0dc6c7184f`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`504310c0b9`) |
+| Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5678370063`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`a9f29c0b94`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
 branches and promoted into blocking package-acceptance release checks by the
-fourth branch:
+fifth branch:
 
 - PR 17 proves an unset profile defaults to `local`, `/readyz` returns 200, and
   required/advisory aggregation is stable.
@@ -543,18 +546,30 @@ fourth branch:
 - PR 19 starts a real node host and proves `node-mode` transitions from 503 to
   200 only after approved pairing, a correlated live target, an advertised
   approved command, and a connected control channel are all observed.
+- PR 22 adds `WorkspaceWritable` to every built-in profile without defining a
+  new profile or changing the HTTP probe implementation. Its Docker scenario
+  fills a workspace `tmpfs` to `ENOSPC`, expects 503 with
+  `WorkspaceStorageFull`, removes the fill file, and expects recovery to 200
+  without restarting OpenClaw.
 - PR 21 selects that packaged profile matrix in the non-advisory release
   workflow, preserving its targeted plan, log, timing, and summary artifacts.
 
 PR 21 validation confirms the release workflow selects `hosting-profiles`, the
 Docker planner resolves the lane with both package and functional-image
 requirements, and the existing 33 planner assertions remain green. Formatting,
-diff checks, and a full branch Codex review against PR 19 also passed with no
+diff checks, and a full branch Codex review against PR 22 also passed with no
 actionable findings.
 
-After the schema/projection audit, the final composed branch passed 193 focused
-profile, config-schema, Gateway-health, status, and node assertions, plus the
-release-workflow assertion and all 33 Docker planner assertions.
+The workspace-readiness composed branch passed 188 focused profile,
+Gateway-probe, health-state, status, node, and workspace assertions. PR 21's
+changed release-workflow assertion and all 33 Docker planner assertions also
+pass. The full package-acceptance test file retains five unrelated Windows
+executable-bit/shell fixture failures and 77 passing assertions.
+
+Actual execution of the new workspace `tmpfs` failure/recovery scenario remains
+pending because Docker Desktop was unavailable on the authoring host. The
+scenario, package-installed lane, and deterministic plan are implemented, but
+the draft stack does not claim a local or brokered runtime pass yet.
 
 The lane is the reproducible behavior proof for upstream review. A brokered
 Linux/Crabbox execution should be attached before the implementation PRs are
@@ -575,7 +590,10 @@ The proposal does not require one all-or-nothing implementation landing:
 2. Add explicit selection plus `container` and `reverse-proxy` predicates over
    effective runtime facts.
 3. Add `node-mode` using pairing and live node-registry evidence.
-4. Make the packaged profile matrix a blocking package-acceptance release gate.
+4. Add a generally applicable workspace-writability criterion to every
+   existing profile, proving that criteria can extend readiness without adding
+   a profile.
+5. Make the packaged profile matrix a blocking package-acceptance release gate.
 
 The first slice is independently useful because it creates one canonical,
 explainable result without introducing non-local hosting behavior. If the
