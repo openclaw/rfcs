@@ -1,5 +1,5 @@
 ---
-title: Readiness Providers and Hosting Profiles
+title: Readiness Conditions and Standard Hosting Profiles
 authors:
   - Gio
 created: 2026-07-09
@@ -9,17 +9,18 @@ issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
 ---
 
-# Proposal: Readiness Providers and Hosting Profiles
+# Proposal: Readiness Conditions and Standard Hosting Profiles
 
 ## Summary
 
-Add a canonical readiness-provider contract for publishing reusable runtime
-criteria and projecting one result through Gateway `/ready`, `/readyz`, health,
-and status. Standard hosting profiles compose those criteria into named,
-OpenClaw-owned, release-tested support contracts for running OpenClaw as a
-workload. The readiness-provider contract is independently useful without
-selecting a non-default profile, and profiles do not add a second config system,
-generate config, or replace existing Gateway readiness.
+Add a canonical readiness-condition model and project one result through
+Gateway `/ready`, `/readyz`, health, and status. Normalize existing fixed
+Gateway signals into core conditions, let plugins publish additional conditions
+through readiness providers, and let standard hosting profiles compose
+conditions into named, OpenClaw-owned, release-tested support contracts. The
+condition model is independently useful without selecting a non-default
+profile, and profiles do not add a second config system, generate config, or
+replace existing Gateway readiness.
 
 ## Motivation
 
