@@ -239,6 +239,10 @@ readiness result.
 
 | Condition | Requirement | True when | Stable non-ready reasons |
 | --- | --- | --- | --- |
+| `GatewayStartupComplete` | Required | Gateway startup dependencies and startup sidecars are no longer pending. | `GatewayStartupPending` |
+| `GatewayAcceptingWork` | Required | The Gateway is not draining and can admit new work. | `GatewayDraining` |
+| `ChannelRuntimeReady` | Required | No selected channel has an unsuppressed runtime-health failure under the existing channel readiness policy. | `ChannelRuntimeUnavailable` |
+| `EventLoopHealthy` | Advisory | The existing event-loop health observation is within its healthy threshold. It remains advisory unless a separate compatibility-reviewed change intentionally makes it gate readiness. | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
 | `ProfileSelected` | Required | The runtime resolved and reports the selected built-in or configured custom profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
 | `ConfigLoaded` | Required | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
 | `WorkspaceWritable` | Required for all built-in profiles | The running Gateway resolves the effective default-agent workspace and completes a write, flush, and cleanup probe. The probe is cached and coalesced so readiness polling does not cause unbounded filesystem work. Non-probing command fallbacks do not invent positive evidence. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
@@ -321,7 +325,11 @@ ergonomic surface, but it is not required for the first contract.
 Readiness should use Kubernetes-style conditions:
 
 ```ts
-type BuiltInHostingReadinessCriterionId =
+type CoreReadinessCriterionId =
+  | "GatewayStartupComplete"
+  | "GatewayAcceptingWork"
+  | "ChannelRuntimeReady"
+  | "EventLoopHealthy"
   | "ProfileSelected"
   | "ConfigLoaded"
   | "WorkspaceWritable"
@@ -335,7 +343,7 @@ type BuiltInHostingReadinessCriterionId =
   | "ControlChannelReady";
 
 type HostingReadinessConditionType =
-  | BuiltInHostingReadinessCriterionId
+  | CoreReadinessCriterionId
   | (string & {});
 
 type HostingReadinessCondition = {
@@ -387,12 +395,11 @@ namespaced by core as `plugin.<plugin-id>.<local-id>`.
 ```
 
 Hosts and tests should key on `type`, `status`, `requirement`, and `reason`.
-`failures` is the deduplicated union of existing Gateway lifecycle failure
-reasons and non-`True` required profile-condition reasons. This preserves
-existing channel/startup/drain/event-loop explanations even though those legacy
-checks are not duplicated as profile conditions. `advisories` is the set of
-non-`True` advisory profile reasons. `message` is for operators and should
-remain non-normative.
+`failures` is the deduplicated set of non-`True` required-condition reasons.
+`advisories` is the set of non-`True` advisory-condition reasons. Existing
+Gateway startup, drain, channel, and event-loop observations are projected into
+the same canonical condition model rather than remaining a permanent parallel
+readiness system. `message` is for operators and should remain non-normative.
 
 `conditions` has map semantics keyed by `type`; a built-in result contains at
 most one condition of each type, and consumers must not depend on array order.
@@ -435,13 +442,20 @@ type GatewayReadyHttpBody =
 ```
 
 For local or authenticated detailed `GET /ready` and `GET /readyz` requests,
-the canonical hosting fields are flattened once into this existing Gateway
-envelope. `ready` is the conjunction of Gateway lifecycle readiness and all
-required profile conditions. `failing` remains the legacy Gateway-oriented
-list; `failures` is the canonical deduplicated union described above. HTTP is
-`200` when `ready` is true and `503` otherwise. `HEAD` returns the same status
-without a body. Unauthenticated remote probes retain the redacted shape
-`{ "ready": boolean }` and do not disclose condition details.
+the canonical fields are flattened once into this existing Gateway envelope.
+`ready` is true only when every required core, profile, and selected provider
+condition is `True`. `failing` and `suppressed` remain compatibility projections
+of the normalized Gateway lifecycle/channel conditions; new consumers should
+use `conditions`, `failures`, and `advisories`. HTTP is `200` when `ready` is
+true and `503` otherwise. `HEAD` returns the same status without a body.
+Unauthenticated remote probes retain the redacted shape `{ "ready": boolean }`
+and do not disclose condition details.
+
+Normalization must preserve current behavior. Startup-pending, draining, and
+unsuppressed channel failures remain required and continue to make readiness
+false. Existing event-loop health is initially advisory because the current
+evaluator reports it diagnostically without changing `ready`. Changing that
+requirement class later requires compatibility review and release coverage.
 
 If readiness evaluation itself throws before it can produce the canonical
 object, the existing detailed fail-closed response is
@@ -672,7 +686,9 @@ patches, compaction events, or harness protocol frames.
 ### Implementation branches
 
 The initial implementation is being prepared as draft branches in the OpenClaw
-fork before upstream OpenClaw PRs are opened:
+fork before upstream OpenClaw PRs are opened. The first slice must be amended to
+normalize the existing Gateway startup, drain, channel, and event-loop outputs
+into core conditions before it is promoted upstream:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
@@ -741,8 +757,9 @@ live node registry.
 
 The proposal does not require one all-or-nothing implementation landing:
 
-1. Land the condition shape and default `local` projection into existing
-   readiness, health, and status surfaces.
+1. Land the condition shape, normalize existing Gateway startup, drain,
+   channel, and event-loop observations into core conditions, and add the
+   default `local` projection across readiness, health, and status surfaces.
 2. Add explicit selection plus `container` and `reverse-proxy` predicates over
    effective runtime facts.
 3. Add `node-mode` using pairing and live node-registry evidence.
