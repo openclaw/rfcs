@@ -33,6 +33,23 @@ cannot answer one higher-level question before routing traffic:
 Is this OpenClaw instance ready under the hosting profile it was started with?
 ```
 
+Today this readiness surface is a purpose-built, Gateway-owned evaluator over a
+fixed set of lifecycle signals. It is not a general readiness framework:
+plugins cannot register readiness callbacks, operators cannot enumerate or
+compose reusable criteria, and releases do not validate named hosting profiles.
+This RFC preserves the existing evaluator as an authoritative required input
+and adds a provider and composition contract around it:
+
+```text
+existing fixed Gateway readiness
++ standard-profile conditions
++ plugin-provider conditions
+-> canonical /ready and /readyz result
+```
+
+The proposal does not move existing lifecycle checks into plugins or permit a
+profile to weaken, replace, or bypass them.
+
 Without that contract, downstream hosts compensate with private startup checks,
 baked config, environment restore lists, persistence wrappers, and adapter-only
 readiness logic. That makes hosted OpenClaw harder to test upstream and harder
