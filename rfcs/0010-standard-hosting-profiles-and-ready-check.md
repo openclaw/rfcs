@@ -687,26 +687,27 @@ patches, compaction events, or harness protocol frames.
 ### Implementation branches
 
 The initial implementation is being prepared as draft branches in the OpenClaw
-fork before upstream OpenClaw PRs are opened. The first slice must be amended to
-normalize the existing Gateway startup, drain, channel, and event-loop outputs
-into core conditions before it is promoted upstream:
+fork before upstream OpenClaw PRs are opened. The first slice normalizes the
+existing Gateway startup, drain, channel, and event-loop outputs into core
+conditions before adding profile-specific conditions:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`cefbe89976`) |
-| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`c423b77720`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`0dc6c7184f`) |
-| Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5678370063`) |
-| Extensible readiness criteria | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`990ab4808c`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`8aa1abbcf9`) |
+| Core conditions and local profile | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`1bb6bfd5`) |
+| Standard profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`a7cba836`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`ca8ab296`) |
+| Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`781df835`) |
+| Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`a073f69e`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`f7362189`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
 branches and promoted into blocking package-acceptance release checks by the
 sixth branch:
 
-- PR 17 proves an unset profile defaults to `local`, `/readyz` returns 200, and
-  required/advisory aggregation is stable.
+- PR 17 normalizes startup, drain, channel, and event-loop observations into
+  core conditions, proves an unset profile defaults to `local`, and preserves
+  the legacy readiness fields while canonical aggregation drives HTTP status.
 - PR 18 proves a LAN-bound `container` profile returns 200 and a loopback-bound
   `container` profile returns 503 with `ContainerGatewayLoopback`. It also
   proves a configured trusted-proxy posture returns 200 for `reverse-proxy`
@@ -720,18 +721,18 @@ sixth branch:
   fills a workspace `tmpfs` to `ENOSPC`, expects 503 with
   `WorkspaceStorageFull`, removes the fill file, and expects recovery to 200
   without restarting OpenClaw.
-- PR 23 adds activation-scoped plugin criterion registration and additive
-  operator profiles while preserving built-in requirements and canonical
-  `/ready` projection.
+- PR 23 adds activation-scoped, self-describing, enumerable readiness providers
+  and additive operator profiles while preserving standard-profile requirements
+  and canonical `/ready` projection.
 - PR 21 selects that packaged profile matrix in the non-advisory release
   workflow, preserving its targeted plan, log, timing, and summary artifacts.
 
 PR 21 validation confirms the release workflow selects `hosting-profiles`, the
 Docker planner resolves the lane with both package and functional-image
-requirements, and the existing 33 planner assertions remain green. PR 23
-passes 99 focused plugin, config, CLI, status-contract, and readiness
-assertions. The full-facility exact-commit Codex review reports no actionable
-findings; two review attempts for the small CI-closeout commit timed out.
+requirements, and the existing 33 planner assertions remain green. After the
+condition/provider amendments, the focused provider-registry, provider
+evaluation, hosting config, Gateway readiness, and HTTP probe suites pass 121
+routed assertions. Earlier status-contract coverage remains part of the stack.
 
 The workspace-readiness composed branch passed 188 focused profile,
 Gateway-probe, health-state, status, node, and workspace assertions. PR 21's
