@@ -348,19 +348,26 @@ fork before upstream OpenClaw PRs are opened:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`bf44ae3b45`) |
-| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`cc43cc5a02`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`88d44534af`) |
+| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`f11b19d553`) |
+| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`87cf11e944`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`22bdbbd3c8`) |
 
-The remaining proof work should happen before upstream OpenClaw implementation
-PRs are filed:
+The stack includes one package-installed Docker conformance lane,
+`pnpm test:docker:hosting-profiles`, built incrementally across the three
+branches:
 
-- local Docker proof for default `local` readiness using Gateway `/ready`
-- local Docker proof for `container` using `OPENCLAW_HOSTING_PROFILE=container`
-  or `gateway run --hosting-profile container`, then asserting `/ready` reports
-  the selected `container` profile
-- local Docker proof for `node-mode` readiness behavior
-- Crabbox Linux/container proof when reviewer-grade platform evidence is needed
+- PR 17 proves an unset profile defaults to `local`, `/readyz` returns 200, and
+  required/advisory aggregation is stable.
+- PR 18 proves a LAN-bound `container` profile returns 200 and a loopback-bound
+  `container` profile returns 503 with `ContainerGatewayLoopback`.
+- PR 19 starts a real node host and proves `node-mode` transitions from 503 to
+  200 only after approved pairing, a correlated live target, an advertised
+  approved command, and a connected control channel are all observed.
+
+The lane is the reproducible behavior proof for upstream review. A brokered
+Linux/Crabbox execution should be attached before the implementation PRs are
+promoted upstream; the draft branches do not depend on Crabbox to define the
+contract.
 
 This first stack proves the core ready/result shape, explicit profile
 selection, built-in profile composition from reusable criteria, exact built-in
