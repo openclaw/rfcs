@@ -21,10 +21,11 @@ and Gateway health.
 
 ## Motivation
 
-OpenClaw can be hosted today, but it is not obvious which hosting models are
-turnkey, supportable, and release-validated. It also does not yet expose the
-small workload contract that container hosts and orchestrators expect. Hosts
-need to answer one question before routing traffic:
+OpenClaw can be hosted today and already exposes Gateway `/ready` and `/readyz`.
+Those probes cover Gateway startup, channel runtime health, drain state, and
+event-loop health. What they do not identify is the selected hosting model or
+the config/runtime predicates that make that model supportable. Hosts therefore
+cannot answer one higher-level question before routing traffic:
 
 ```text
 Is this OpenClaw instance ready under the hosting profile it was started with?
@@ -61,8 +62,10 @@ Hosts can prove which profile they are running.
   product-specific host concepts.
 - Keep the first implementation in core so readiness works without optional
   plugins.
-- Leave room for later namespaced plugin or driver readiness conditions without
-  letting operators redefine built-in profile semantics.
+- Define the exact truth predicates and stable non-ready reasons for every
+  built-in profile condition.
+- Reserve namespaced plugin or driver readiness conditions for a later contract
+  that defines trusted runtime evidence publication.
 - Leave room for later doctor/lint conformance findings that recommend fixes
   for config that does not match the selected built-in profile.
 
@@ -117,20 +120,41 @@ Profiles should be declarative compositions of reusable readiness criteria. A
 built-in profile references OpenClaw-owned `openclaw.*` criteria. Each criterion
 is a named rule over OpenClaw runtime status/config fields and has one
 OpenClaw-owned evaluator that emits the runtime readiness condition.
-Custom profiles can extend built-in profiles and append their own namespaced
-criteria without redefining the built-in support contract.
 
 | Profile | Purpose | Built-in criteria | Status fields read | Emitted readiness signals |
 | --- | --- | --- | --- | --- |
-| `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.gateway-responding`, `openclaw.workspace-usable`, `openclaw.plugins-loaded` | config load, Gateway reachability, workspace usability, plugin load status | `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`, `WorkspaceUsable`, `PluginsLoaded` |
-| `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `openclaw.container-state-ready` | Gateway mode/bind/port, workspace usability | Core signals plus `ContainerStateReady`. |
-| `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `container` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Container signals plus `TrustedProxyReady`. |
-| `managed` | Platform-hosted OpenClaw with managed lifecycle expectations. | `reverse-proxy` + `openclaw.managed-lifecycle-ready` | config load, workspace usability, host criteria declarations | Reverse-proxy signals plus `ManagedLifecycleReady`. |
-| `node-mode` | Platform-controlled execution node or cell readiness. | `local` + node-mode `openclaw.*` criteria | node pairing, target inventory, command approval, control channel, state/workspace status | Core signals plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady`, `StateReady`. |
+| `local` | Developer/local foreground process readiness. | `openclaw.config-loaded`, `openclaw.gateway-responding`, `openclaw.plugins-loaded` | config load, Gateway reachability, selected plugin activation status | `ProfileSelected`, `ConfigLoaded`, `GatewayResponding`, `PluginsLoaded` |
+| `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `openclaw.container-state-ready` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
+| `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
+| `managed` | Platform-hosted OpenClaw behind managed ingress. | `local` + `openclaw.trusted-proxy-ready` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. Existing Gateway readiness remains the lifecycle source of truth. |
+| `node-mode` | Gateway/controller for one or more controlled execution nodes. | `local` + node-mode `openclaw.*` criteria | pairing store, live node registry, paired command grants, `gateway.nodes.allowCommands` | Core signals plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady`. |
 
 `node-mode` must stay product-neutral. A controlled target can be a desktop,
 sandbox, VM, pod, browser, or another execution surface. OpenClaw should not
 assume one node maps to exactly one target.
+
+### Built-in truth predicates
+
+Profile readiness is composed with, and does not replace, the existing Gateway
+readiness result. Final `/ready` and `/readyz` readiness is true only when the
+existing startup/channel/drain/event-loop evaluation is ready and every
+condition listed for the selected profile is `True`. Both `False` and `Unknown`
+block profile readiness. A status surface that did not observe a required fact
+reports `Unknown`; it must not turn missing evidence into a positive readiness
+result.
+
+| Condition | True when | Stable non-ready reasons |
+| --- | --- | --- |
+| `ProfileSelected` | The runtime resolved and reports the selected built-in profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
+| `ConfigLoaded` | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
+| `GatewayResponding` | The running Gateway is evaluating its own readiness request. | `GatewayUnavailable`, `GatewayNotChecked` |
+| `PluginsLoaded` | The active plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not block. | `PluginLoadFailures`, `PluginStatusUnavailable` |
+| `ContainerStateReady` | The effective Gateway mode is `local` and the resolved listener host is not loopback. The port has already passed normal config validation. Config-only status reports `Unknown` when an `auto` bind has not been resolved. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
+| `TrustedProxyReady` | Auth mode is `trusted-proxy`, `trustedProxy.userHeader` is non-empty, and `gateway.trustedProxies` contains at least one address/CIDR. Loopback is valid for a same-host proxy. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
+| `NodePairingReady` | The pairing store is readable and contains at least one approved pairing. | `NodePairingUnavailable`, `NodePairingPending`, `NodePairingMissing` |
+| `ControlledTargetsReady` | The live Gateway node registry contains at least one connected node whose id is approved in the pairing store. Persisted pairing alone is insufficient. | `ControlledTargetsDisconnected` |
+| `CommandApprovalReady` | A connected paired node advertises at least one command that is granted by pairing or `gateway.nodes.allowCommands` and not removed by `gateway.nodes.denyCommands`. A deny-only list is not approval evidence. | `CommandApprovalMissing` |
+| `ControlChannelReady` | At least one connected node session is correlated to an approved pairing. Gateway HTTP responsiveness alone is insufficient. | `ControlChannelUnavailable` |
 
 ### Profile selection
 
@@ -178,31 +202,22 @@ Readiness should use Kubernetes-style conditions:
 Hosts and tests should key on `type`, `status`, and `reason`. `message` is for
 operators and should remain non-normative.
 
-### Extensibility
+### Future extensibility
 
 The first contract should keep built-in profile conditions stable and
 OpenClaw-owned. Operators should not be able to redefine what `local`,
 `container`, or `node-mode` means.
 
-Custom readiness should use the same reusable criteria model, not ad hoc
-profile redefinitions. Operators can declare namespaced criteria under a
-registry such as `hosting.criteria`, then custom profiles or host policy can
-reference those criteria as required or optional. For example,
-`acme.backup-ready` can be defined once and reused by `acme.managed` and
-`acme.node-cell`.
+This first RFC does not add custom profile or criterion config. A declaration
+without a trusted observed-state producer can never become ready and would be a
+sticky but unusable public contract. A later RFC may add namespaced criteria
+after it defines who may publish evidence, how evidence is scoped and expired,
+how plugins or drivers are authenticated, and how status and readiness consume
+the same fact without creating a parallel evidence model.
 
-Criteria declarations are desired contract, not observed state. They should
-carry stable identity and human-readable intent, while readiness output carries
-observed `status`, `reason`, and `message`. Built-in criteria evaluate the same
-runtime status/config facts that `status --json` and Gateway health already
-expose, plus any missing status fields added alongside the criterion. This keeps
-`openclaw.json` aligned with normal host systems: config/spec declares what must
-be true, runtime status reports whether it is true, and readiness is a
-projection over that status.
-
-Built-in profile names, built-in `openclaw.*` criterion names, and built-in
-condition names remain reserved. Custom profiles extend built-in profiles and
-append criteria; they do not mutate the built-in definitions.
+Built-in profile names, `openclaw.*` criterion names, and built-in condition
+names remain reserved. Operators configure the underlying OpenClaw settings;
+they do not redefine built-in profile semantics.
 
 Built-in profiles also should not encode host-specific numeric probe values.
 Intervals, retries, start periods, and timeouts belong in Docker, Compose,
@@ -238,9 +253,9 @@ fork before upstream OpenClaw PRs are opened:
 
 | Slice | Fork PR | Branch |
 | --- | --- | --- |
-| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`0c5aaa2b88`) |
-| Profile selection and reusable criteria | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`068bc0ced0`) |
-| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`7d51aee03a`) |
+| Ready surfaces | https://github.com/giodl73-repo/openclaw/pull/17 | `user/giodl/hosting-ready-local` (`63ad1aaa64`) |
+| Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`468b0f289d`) |
+| Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`464310eefa`) |
 
 The remaining proof work should happen before upstream OpenClaw implementation
 PRs are filed:
@@ -250,13 +265,12 @@ PRs are filed:
   or `gateway run --hosting-profile container`, then asserting `/ready` reports
   the selected `container` profile
 - local Docker proof for `node-mode` readiness behavior
-- local Docker proof for custom criteria/profile readiness behavior
 - Crabbox Linux/container proof when reviewer-grade platform evidence is needed
 
 This first stack proves the core ready/result shape, explicit profile
-selection, built-in profile composition from reusable criteria, built-in
-container/reverse-proxy/managed criteria over status fields, custom criteria
-declarations, and node-mode status-field rules.
+selection, built-in profile composition from reusable criteria, exact built-in
+container/reverse-proxy/managed predicates, and node-mode rules backed by the
+live node registry.
 
 ## Rationale
 
@@ -285,8 +299,8 @@ stable readiness conditions.
   release?
 - Which profile conditions should be release-blocking versus warning-only as
   `container`, `reverse-proxy`, and `managed` mature?
-- Should later plugin or driver hooks be able to publish criteria evidence into
-  the same `hosting.criteria` model, and what trust boundary should that use?
+- Should later plugin or driver hooks publish namespaced criteria evidence, and
+  what identity, scoping, freshness, and trust boundary should that require?
 - Should future profile conformance live in QA Lab, maturity scorecards, Docker
   E2E, or a dedicated profile conformance runner?
 - Which stable telemetry event names should accompany readiness transitions in a
