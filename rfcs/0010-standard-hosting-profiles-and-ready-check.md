@@ -318,9 +318,9 @@ readiness and status surfaces.
 
 The selected profile should be reported in `/ready`, `/readyz`, `status --json`,
 and Gateway health so hosts and release tests can assert that the running
-process selected the intended profile. A later optional CLI wrapper can add an
-`openclaw ready --expect-profile <profile>` assertion if maintainers want that
-ergonomic surface, but it is not required for the first contract.
+process selected the intended profile. The optional `openclaw ready` CLI
+wrapper projects that same live result for operators and scripts; it does not
+evaluate a second local readiness model.
 
 ### Ready result
 
@@ -728,6 +728,7 @@ conditions before adding profile-specific conditions:
 | Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5723f664`) |
 | Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`399cf745`) |
 | Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`cd643a42`) |
+| Canonical readiness CLI | https://github.com/giodl73-repo/openclaw/pull/27 | `user/giodl/hosting-ready-cli` (`08d09d31`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
@@ -755,6 +756,11 @@ sixth branch:
   and canonical `/ready` projection.
 - PR 21 selects that packaged profile matrix in the non-advisory release
   workflow, preserving its targeted plan, log, timing, and summary artifacts.
+- PR 27 adds `openclaw ready` as an optional operator convenience over the live
+  Gateway result. Human output lists every structured condition; `--json`
+  preserves the canonical successful result; and exit status fails closed for
+  required failures, unknowns, transport errors, or a missing readiness
+  contract. Advisory findings remain visible without changing exit success.
 
 PR 21 validation confirms the release workflow selects `hosting-profiles`, the
 Docker planner resolves the lane with both package and functional-image
@@ -835,9 +841,6 @@ stable readiness conditions.
 
 ## Unresolved questions
 
-- Should OpenClaw later add an `openclaw ready` CLI wrapper over the same
-  readiness result, or are HTTP `/ready` plus status/health enough for the first
-  release?
 - Which additional advisory conditions would improve supportability without
   weakening the meaning of required profile conformance?
 - Should non-plugin runtime drivers need a separate criterion registration
