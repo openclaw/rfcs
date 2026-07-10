@@ -582,8 +582,8 @@ fork before upstream OpenClaw PRs are opened:
 | Built-in profile selection and predicates | https://github.com/giodl73-repo/openclaw/pull/18 | `user/giodl/hosting-profile-selection` (`c423b77720`) |
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`0dc6c7184f`) |
 | Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5678370063`) |
-| Extensible readiness criteria | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`ead9dc570e`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`f10436a3bc`) |
+| Extensible readiness criteria | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`990ab4808c`) |
+| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`8aa1abbcf9`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
@@ -614,8 +614,9 @@ sixth branch:
 PR 21 validation confirms the release workflow selects `hosting-profiles`, the
 Docker planner resolves the lane with both package and functional-image
 requirements, and the existing 33 planner assertions remain green. PR 23
-passes 88 focused plugin, config, CLI, and readiness assertions; its final
-exact-commit Codex review reports no actionable findings.
+passes 99 focused plugin, config, CLI, status-contract, and readiness
+assertions. The full-facility exact-commit Codex review reports no actionable
+findings; two review attempts for the small CI-closeout commit timed out.
 
 The workspace-readiness composed branch passed 188 focused profile,
 Gateway-probe, health-state, status, node, and workspace assertions. PR 21's
