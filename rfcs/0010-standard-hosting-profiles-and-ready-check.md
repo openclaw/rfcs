@@ -263,6 +263,47 @@ readiness result.
 | `CommandApprovalReady` | Required for `node-mode` | A connected paired node advertises at least one command that is granted by pairing or `gateway.nodes.allowCommands` and not removed by `gateway.nodes.denyCommands`. A deny-only list is not approval evidence. | `CommandApprovalMissing` |
 | `ControlChannelReady` | Required for `node-mode` | At least one connected node session is correlated to an approved pairing. Gateway HTTP responsiveness alone is insufficient. | `ControlChannelUnavailable` |
 
+### Packaged profile evidence
+
+Release conformance produces immutable metadata; readiness consumes it. The
+minimum record is intentionally small:
+
+```ts
+type HostingProfileConformanceRecord = {
+  schemaVersion: 1;
+  artifact: {
+    openclawVersion: string;
+    packageIdentity: string;
+    digest: string;
+  };
+  profile: BuiltInHostingProfileId;
+  conditionContractVersion: number;
+  requiredConditionTypes: string[];
+  result: "passed" | "failed";
+  suiteIdentity: string;
+  completedAt: string;
+  provenance?: {
+    builder?: string;
+    sourceRevision?: string;
+    attestationRef?: string;
+  };
+};
+```
+
+The release process binds the record to the same immutable package/image
+identity reported by the runtime. OpenClaw validates the schema, digest,
+selected profile, condition-contract version, and result before emitting
+`SelectedProfileConformant=True`. Unknown fields are tolerated for forward
+compatibility, but unknown schema or condition-contract versions report
+`Unknown`, never success.
+
+The record contains no tenant, operator, secret, or runtime health data. Build
+signing and attestation may protect provenance, but this RFC does not prescribe
+one supply-chain system. A host that requires stronger provenance validates it
+before deployment and supplies the expected immutable artifact identity;
+readiness then proves only that the admitted artifact is the process now
+running.
+
 ### Profile selection
 
 OpenClaw should not require an explicit profile to run. If no profile is
