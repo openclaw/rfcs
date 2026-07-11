@@ -213,7 +213,7 @@ OpenClaw-owned evaluator that emits the runtime readiness condition.
 
 | Profile | Purpose | Built-in criteria | Status fields read | Emitted readiness signals |
 | --- | --- | --- | --- | --- |
-| `local` | Developer/local foreground process readiness. | `ConfigLoaded`, `WorkspaceWritable`, `GatewayResponding`, `PluginsLoaded` | config load, effective default workspace write evidence, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `WorkspaceWritable`, `GatewayResponding`. Advisory: `PluginsLoaded`. |
+| `local` | Developer/local foreground process readiness. | `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, `PluginsLoaded`, plus `RequiredPluginsActivated` when required activation is declared | effective runtime config and secrets snapshots, model-route resolution, default workspace write evidence, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, and any declared `RequiredPluginsActivated`. Advisory: general `PluginsLoaded`. |
 | `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `ContainerStateReady` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `TrustedProxyReady` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
 | `node-mode` | Gateway/controller for one or more controlled execution nodes. | `local` + `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` | pairing store, live node registry, paired command grants, `gateway.nodes.allowCommands` | Core signals plus the four node-mode conditions. |
@@ -246,7 +246,10 @@ readiness result.
 | `ChannelRuntimeSuppressed` | Advisory when present | One or more channel runtime failures are intentionally suppressed by the existing autostart/crash-loop policy. | `ChannelRuntimeSuppressed` |
 | `EventLoopHealthy` | Advisory | The existing event-loop health observation is within its healthy threshold. It remains advisory unless a separate compatibility-reviewed change intentionally makes it gate readiness. | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
 | `ProfileSelected` | Required | The runtime resolved and reports the selected built-in or configured custom profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
-| `ConfigLoaded` | Required | Runtime configuration loaded successfully. | `ConfigNotLoaded` |
+| `ConfigLoaded` | Required | The validated effective runtime configuration snapshot is installed after normal precedence and activation processing; parsing a source file alone is insufficient. | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
+| `RequiredPluginsActivated` | Required when a standard or operator profile declares required plugin/provider activation | Every declared required plugin/provider is present and activated without an activation error. General selected-plugin health remains advisory through `PluginsLoaded`. | `RequiredPluginMissing`, `RequiredPluginActivationFailed`, `RequiredPluginStatusUnavailable` |
+| `RequiredSecretsAvailable` | Required | Every secret declared startup-required by the selected profile or effective runtime route is available in the installed redacted secrets snapshot. Optional and lazy credentials do not block readiness. | `RequiredSecretMissing`, `RequiredSecretActivationFailed`, `RequiredSecretStatusUnavailable` |
+| `ModelRoutingResolved` | Required when the selected runtime role accepts agent work | The effective default or selected model route resolves to a configured provider after config and secret activation. Evaluation reads the startup snapshot and does not issue a model request. | `ModelRouteMissing`, `ModelProviderUnavailable`, `ModelRouteStatusUnavailable` |
 | `WorkspaceWritable` | Required for all built-in profiles | The running Gateway resolves the effective default-agent workspace and completes a write, flush, and cleanup probe. The probe is cached and coalesced so readiness polling does not cause unbounded filesystem work. Non-probing command fallbacks do not invent positive evidence. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `GatewayResponding` | Required | The running Gateway is evaluating its own readiness request, or the current status/health operation successfully probed that Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
@@ -335,6 +338,9 @@ type CoreReadinessCriterionId =
   | "EventLoopHealthy"
   | "ProfileSelected"
   | "ConfigLoaded"
+  | "RequiredPluginsActivated"
+  | "RequiredSecretsAvailable"
+  | "ModelRoutingResolved"
   | "WorkspaceWritable"
   | "GatewayResponding"
   | "PluginsLoaded"
@@ -624,7 +630,7 @@ not introduce unbounded readiness-path I/O.
 
 | Condition family | Code-owned bound |
 | --- | --- |
-| Startup, drain, Gateway response, config, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config snapshots. |
+| Startup, drain, Gateway response, effective config, required plugin activation, required secret availability, model-route resolution, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config/activation snapshots. Readiness does not reload plugins, resolve secrets, or call a model. |
 | Channel runtime | One finite pass over the current in-memory channel snapshot, cached for one second. |
 | Workspace writability | One-second hard timeout with five-second cache/coalescing. |
 | Node mode | Pairing reads have a one-second condition-level deadline and one-second cache; live sessions and command policy are finite in-memory passes. Timeout emits `NodePairingTimedOut` before the outer watchdog is needed. |
@@ -729,6 +735,30 @@ surfaces.
    topology, and node-mode evidence should use the same condition vocabulary.
    Legacy `failing`, `suppressed`, and `eventLoop` fields remain compatibility
    projections during migration.
+
+   The earlier Runtime Activation inventory is reconciled explicitly below.
+   These are startup facts needed to serve a normal request, not general policy
+   conformance checks:
+
+   | Activation observation | Readiness disposition |
+   | --- | --- |
+   | Effective configuration resolved | Strengthen `ConfigLoaded` so `True` means the validated effective runtime snapshot is installed, not merely that a source file parsed. Use `ConfigNotLoaded`, `ConfigInvalid`, or `EffectiveConfigUnavailable` when that cannot be established. |
+   | Hosting profile applied | Covered by required `ProfileSelected`; the reported profile is the effective value after flag, environment, config, and default precedence. |
+   | Required plugins activated | Keep general `PluginsLoaded` advisory for compatibility, but add required `RequiredPluginsActivated` when a standard or operator profile names a plugin/provider as required. Missing, failed, or unavailable required activation must block readiness. |
+   | Required secrets available | Add required `RequiredSecretsAvailable` over the installed startup secrets snapshot. It reports only redacted availability and stable reasons; it never exposes secret values. Optional or lazy credentials do not block readiness until a selected profile declares them startup-required. |
+   | Model routing resolved | Add required `ModelRoutingResolved` when the selected runtime role is expected to accept agent work. It proves that the effective default/selected model route resolves to a configured provider after config and secret activation; it does not perform a billable model request on every readiness poll. |
+
+   `RequiredPluginsActivated`, `RequiredSecretsAvailable`, and
+   `ModelRoutingResolved` must be implemented as bounded reads over activation
+   snapshots produced during normal startup. Readiness polling must not reload
+   plugins, resolve secrets again, contact a model, or mutate configuration.
+
+   Other early hosted-start candidates do not become universal core
+   conditions. Brokered egress may be a required provider condition in a
+   derived managed profile. A no-runtime-secrets rule is conformance, not a
+   liveness probe. Workspace restoration, single-writer ownership, checkpoint
+   publication, and durable-state freshness belong to Runtime Continuity unless
+   a specific profile requires a bounded readiness observation before serving.
 2. **Unify every projection.** `/ready`, `/readyz`, Gateway health, status, and
    the optional `openclaw ready` command must be projections of one canonical
    evaluation, with the same effective profile, condition identities,
@@ -853,7 +883,10 @@ contract.
 This first stack proves the core ready/result shape, explicit profile
 selection, built-in profile composition from reusable criteria, exact built-in
 container/reverse-proxy predicates, and node-mode rules backed by the
-live node registry.
+live node registry. It does not yet implement the newly reconciled
+`RequiredPluginsActivated`, `RequiredSecretsAvailable`, or
+`ModelRoutingResolved` activation conditions; those remain completion work
+before the standard-profile matrix can become a release support gate.
 
 ### Incremental adoption
 
