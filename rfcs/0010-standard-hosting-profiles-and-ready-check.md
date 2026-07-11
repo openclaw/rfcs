@@ -713,6 +713,71 @@ execution, runtime status fields, ready/not-ready projection.
 OCC should not be in the hot path for assistant deltas, tool events, approvals,
 patches, compaction events, or harness protocol frames.
 
+### Completion roadmap
+
+The first implementation stack establishes the contract, but it does not make
+the support promise complete by itself. The remaining work is grouped below so
+that readiness does not become another collection of partially overlapping
+surfaces.
+
+1. **Finish the canonical core conditions.** Existing Gateway startup, drain,
+   unsuppressed channel, and event-loop observations must be represented as
+   conditions rather than maintained as a second readiness model. Startup
+   validation that determines whether this process can serve belongs here as
+   readiness evidence; it does not require a separate ignition endpoint.
+   Config-loaded, Gateway-responsive, required-plugin, workspace, selected
+   topology, and node-mode evidence should use the same condition vocabulary.
+   Legacy `failing`, `suppressed`, and `eventLoop` fields remain compatibility
+   projections during migration.
+2. **Unify every projection.** `/ready`, `/readyz`, Gateway health, status, and
+   the optional `openclaw ready` command must be projections of one canonical
+   evaluation, with the same effective profile, condition identities,
+   requirement classes, reasons, and overall result. `/health` and `/healthz`
+   remain shallow liveness checks. Detailed output remains available only to
+   appropriately authenticated or local callers; unauthenticated probes keep a
+   compact result.
+3. **Complete the bounded provider facility.** Active providers must remain
+   activation-scoped, enumerable, self-describing, observational, and advisory
+   by default. Core owns concurrent evaluation, per-provider deadlines,
+   cancellation, invalid-result handling, cache/coalescing, and an independent
+   outer evaluation deadline so a plugin cannot stall `/ready` or `/readyz`.
+   Operators may promote a provider condition to required only through an
+   additive operator profile.
+4. **Prove the standard profiles as packaged workloads.** Run the Docker lane
+   against the package-installed release candidate for `local`, `container`,
+   `reverse-proxy`, and `node-mode`, including deterministic failure and
+   recovery cases. The current workspace-full and node-pairing scenarios must
+   be executed on Linux/container infrastructure, not only planned or unit
+   tested. Publish the profile id, OpenClaw artifact/version, condition set,
+   result, and test evidence so a host can distinguish a supported release from
+   an untested configuration.
+5. **Promote accepted profiles into release conformance.** Once maintainers
+   accept the condition and profile contracts and the packaged Docker proof is
+   reliable, make that matrix a blocking package-acceptance gate. A built-in
+   profile is a release-tested support promise, not merely a convenient bundle
+   of settings. Changes to required conditions or stable reasons require
+   compatibility review and release notes.
+6. **Add stable readiness transition evidence.** Emit bounded, redacted events
+   when the effective profile or overall readiness changes, including the
+   previous and current result and changed condition identities. Event naming,
+   initial observation, deduplication, restart behavior, and operation when no
+   caller polls readiness must be specified before telemetry becomes a stable
+   contract. OpenClaw owns event semantics; hosts own fleet sinks, dashboards,
+   alerts, and retention.
+7. **Add non-blocking operator guidance.** A later Doctor/lint pass may compare
+   the selected profile with effective config and host-facing recommendations,
+   report structured findings, and suggest safe fixes. Doctor, policy, and
+   optional plugins must never be dependencies of the core readiness path, and
+   built-in profiles must not absorb Docker-, Kubernetes-, or systemd-specific
+   retry counts and probe intervals.
+
+Readiness answers whether this runtime can accept and serve work now. It does
+not prove that the latest mutable state has been durably published. Drain,
+checkpoint publication, dirty/synced state, and a generation-fenced
+safe-to-destroy result belong to the separate Runtime Continuity and Safe
+Shutdown contract. A runtime may be ready but dirty, or not ready but already
+synced; neither surface should be made an alias for the other.
+
 ### Implementation branches
 
 The initial implementation is being prepared as draft branches in the OpenClaw
