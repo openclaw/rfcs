@@ -253,6 +253,7 @@ readiness result.
 | `ArtifactIdentityAvailable` | Advisory by default | The runtime can report a stable packaged artifact identity containing at least OpenClaw version and build/package identity. Source and development runs may report `Unknown` without becoming unready. | `ArtifactIdentityUnavailable`, `DevelopmentArtifact` |
 | `SelectedProfileConformant` | Advisory by default; operator profiles may promote it to required | Embedded release evidence is bound to the running artifact identity and records a passing packaged conformance result for the selected standard profile and condition-contract version. It does not rerun conformance at readiness time. | `ProfileConformanceMissing`, `ProfileConformanceFailed`, `ProfileConformanceStale`, `ProfileConformanceArtifactMismatch` |
 | `ExpectedArtifactMatched` | Required when the host supplies an expected artifact identity | The running artifact identity matches the immutable identity selected by the host for this deployment. Absence of a host expectation omits the condition. | `ExpectedArtifactMismatch`, `ExpectedArtifactNotVerifiable` |
+| `RequiredClawBusCapabilitiesAvailable` | Required when the selected standard or operator profile declares hosted duplex capabilities | The active generation-bound ClawBus peer negotiated every required canonical OpenClaw family/provider ID and version. It reads the live negotiated session snapshot and does not probe the remote service on every readiness call. | `ClawBusUnavailable`, `ClawBusGenerationMismatch`, `ClawBusCapabilityMissing`, `ClawBusStatusUnavailable` |
 | `WorkspaceWritable` | Required for all built-in profiles | The running Gateway resolves the effective default-agent workspace and completes a write, flush, and cleanup probe. The probe is cached and coalesced so readiness polling does not cause unbounded filesystem work. Non-probing command fallbacks do not invent positive evidence. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `GatewayResponding` | Required | The running Gateway is evaluating its own readiness request, or the current status/health operation successfully probed that Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
@@ -388,6 +389,7 @@ type CoreReadinessCriterionId =
   | "ArtifactIdentityAvailable"
   | "SelectedProfileConformant"
   | "ExpectedArtifactMatched"
+  | "RequiredClawBusCapabilitiesAvailable"
   | "WorkspaceWritable"
   | "GatewayResponding"
   | "PluginsLoaded"
@@ -677,7 +679,7 @@ not introduce unbounded readiness-path I/O.
 
 | Condition family | Code-owned bound |
 | --- | --- |
-| Startup, drain, Gateway response, effective config, required plugin activation, required secret availability, model-route resolution, artifact identity, packaged profile conformance, expected-artifact match, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config/activation/build-metadata snapshots. Readiness does not reload plugins, resolve secrets, call a model, or rerun conformance tests. |
+| Startup, drain, Gateway response, effective config, required plugin activation, required secret availability, model-route resolution, artifact identity, packaged profile conformance, expected-artifact match, negotiated ClawBus capabilities, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config/activation/build-metadata/session snapshots. Readiness does not reload plugins, resolve secrets, call a model, probe host services, or rerun conformance tests. |
 | Channel runtime | One finite pass over the current in-memory channel snapshot, cached for one second. |
 | Workspace writability | One-second hard timeout with five-second cache/coalescing. |
 | Node mode | Pairing reads have a one-second condition-level deadline and one-second cache; live sessions and command policy are finite in-memory passes. Timeout emits `NodePairingTimedOut` before the outer watchdog is needed. |
