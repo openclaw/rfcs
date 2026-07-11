@@ -283,6 +283,26 @@ author's fork:
    timestamped, identifier-only runtime observations and accepted by the scoped
    node-operator projection.
 
+Three additional consumer drafts demonstrate how the same inventory can support
+enterprise and agent workflows without expanding the initial catalog contract:
+
+6. [Policy evidence projection](https://github.com/giodl73-repo/openclaw/pull/30):
+   deterministic records for policy and compliance collectors. The projection
+   preserves source and observation scope and explicitly identifies itself as
+   inventory evidence, not a signed attestation or policy decision.
+7. [Runtime inventory comparison](https://github.com/giodl73-repo/openclaw/pull/31):
+   an advisory comparison of two inventory snapshots, reporting added, removed,
+   changed, and scope-changed records. It describes OpenClaw-observed drift only;
+   it does not infer an external control-plane change or policy violation.
+8. [Bounded command search](https://github.com/giodl73-repo/openclaw/pull/32):
+   compact search results plus exact-record hydration for progressive disclosure.
+   Results are non-executable command metadata, are capped at 20 entries, and
+   avoid placing the complete command directory in every model prompt.
+
+These are optional follow-ups, not acceptance requirements for `commands list`
+or `commands inspect`. They consume the normalized inventory and add no command
+registry fields, dispatcher, execution path, policy engine, or new CLI namespace.
+
 The broader Option B remains preserved in fork drafts for comparison:
 
 1. [Catalog foundation](https://github.com/giodl73-repo/openclaw/pull/11).
