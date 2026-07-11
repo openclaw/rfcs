@@ -266,7 +266,7 @@ the deployment remained unchanged after collection.
 
 The recommended Option A implementation is available in
 [openclaw/openclaw#100960](https://github.com/openclaw/openclaw/pull/100960).
-The two initial review layers and two optional follow-ups are available on the
+The two initial review layers and three optional follow-ups are available on the
 author's fork:
 
 1. [Commands list](https://github.com/giodl73-repo/openclaw/pull/24): command-owned
@@ -278,6 +278,10 @@ author's fork:
 4. [Generated command reference](https://github.com/giodl73-repo/openclaw/pull/28):
    optional command-only docs generation and freshness guard, reviewed separately
    from the initial CLI.
+5. [Live paired-node commands](https://github.com/giodl73-repo/openclaw/pull/29):
+   optional `node.describe` collection for one connected paired node, labeled as
+   timestamped, identifier-only runtime observations and accepted by the scoped
+   node-operator projection.
 
 The broader Option B remains preserved in fork drafts for comparison:
 
@@ -340,9 +344,13 @@ This sequence intentionally avoids generated explanatory prose. Automation
 owns inventory, structural coverage, and freshness; maintainers continue to own
 behavioral guidance and compatibility commitments.
 
-The recommended drafts intentionally keep node commands in the object model as
-caller-supplied records. Connecting live paired-node inventory and reconciling
-the Gateway `commands.list` agent view are separate follow-up integrations.
+The initial recommended drafts keep node commands in the object model as
+caller-supplied records. The optional live-node draft connects one selected
+paired node through the existing Gateway `node.describe` method without adding a
+new node protocol. It fails when the node is disconnected and does not invent
+descriptions, argument schemas, or semantic effects that the node handshake does
+not provide. Reconciling the Gateway `commands.list` agent view remains a
+separate follow-up integration.
 
 The required OpenClaw `maintainer-discussion` thread must be created and linked
 before acceptance. The RFC remains in `draft` status until maintainers accept
