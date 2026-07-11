@@ -3,7 +3,7 @@ title: Command Catalog
 authors:
   - Gio
 created: 2026-07-04
-last_updated: 2026-07-10
+last_updated: 2026-07-11
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/32
