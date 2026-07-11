@@ -728,7 +728,7 @@ conditions before adding profile-specific conditions:
 | Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5723f664`) |
 | Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`399cf745`) |
 | Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`cd643a42`) |
-| Canonical readiness CLI | https://github.com/giodl73-repo/openclaw/pull/27 | `user/giodl/hosting-ready-cli` (`08d09d31`) |
+| Canonical readiness CLI | https://github.com/giodl73-repo/openclaw/pull/27 | `user/giodl/hosting-ready-cli` (`1064104a`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
