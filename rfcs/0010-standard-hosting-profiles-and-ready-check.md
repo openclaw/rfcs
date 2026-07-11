@@ -727,13 +727,11 @@ conditions before adding profile-specific conditions:
 | Node-mode readiness | https://github.com/giodl73-repo/openclaw/pull/19 | `user/giodl/hosting-node-mode-readiness` (`270f7a3d`) |
 | Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5723f664`) |
 | Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`399cf745`) |
-| Release conformance gate | https://github.com/giodl73-repo/openclaw/pull/21 | `user/giodl/hosting-profile-release-conformance` (`cd643a42`) |
-| Canonical readiness CLI | https://github.com/giodl73-repo/openclaw/pull/27 | `user/giodl/hosting-ready-cli` (`1064104a`) |
+| Canonical readiness CLI | https://github.com/giodl73-repo/openclaw/pull/27 | `user/giodl/hosting-ready-cli` (`fe4c51c1`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
-branches and promoted into blocking package-acceptance release checks by the
-sixth branch:
+branches but not yet promoted into blocking package-acceptance release checks:
 
 - PR 17 normalizes startup, drain, channel, and event-loop observations into
   core conditions, proves an unset profile defaults to `local`, and preserves
@@ -754,17 +752,14 @@ sixth branch:
 - PR 23 adds activation-scoped, self-describing, enumerable readiness providers
   and additive operator profiles while preserving standard-profile requirements
   and canonical `/ready` projection.
-- PR 21 selects that packaged profile matrix in the non-advisory release
-  workflow, preserving its targeted plan, log, timing, and summary artifacts.
 - PR 27 adds `openclaw ready` as an optional operator convenience over the live
   Gateway result. Human output lists every structured condition; `--json`
   preserves the canonical successful result; and exit status fails closed for
   required failures, unknowns, transport errors, or a missing readiness
   contract. Advisory findings remain visible without changing exit success.
 
-PR 21 validation confirms the release workflow selects `hosting-profiles`, the
-Docker planner resolves the lane with both package and functional-image
-requirements, and the existing 33 planner assertions remain green. After the
+The Docker planner resolves the lane with both package and functional-image
+requirements, and its existing 33 planner assertions remain green. After the
 condition/provider amendments, the latest focused provider-registry, provider
 evaluation, hosting config, Gateway readiness, node/workspace timeout, and
 status projection run passes 120 routed assertions. The corrected PR 17 health,
@@ -772,8 +767,13 @@ status, and legacy-condition run passes another 114 assertions.
 
 The workspace-readiness composed branch passed 188 focused profile,
 Gateway-probe, health-state, status, node, and workspace assertions. After the
-restack, PR 21's package-acceptance workflow file passes all 49 assertions and
-the Docker planner passes all 33 assertions on Linux.
+restack, the Docker planner passes all 33 assertions on Linux.
+
+Making this lane a blocking package-acceptance release gate is intentionally a
+follow-up after maintainers accept the contract and packaged Docker execution
+is proven. Draft fork PR 21 demonstrates that separate six-line workflow/docs
+change without coupling the initial implementation to a permanent release
+obligation.
 
 Actual execution of the new workspace `tmpfs` failure/recovery scenario remains
 pending because Docker Desktop was unavailable on the authoring host. The
@@ -805,7 +805,12 @@ The proposal does not require one all-or-nothing implementation landing:
    a profile.
 5. Add plugin criterion registration and additive operator profiles over the
    same canonical result.
-6. Make the packaged profile matrix a blocking package-acceptance release gate.
+6. Add the optional `openclaw ready` CLI projection over the canonical live
+   Gateway result.
+
+After contract acceptance and successful packaged Docker proof, a separate
+follow-up can make the profile matrix a blocking package-acceptance release
+gate.
 
 The first slice is independently useful because it creates one canonical,
 explainable result without introducing non-local hosting behavior. If the
