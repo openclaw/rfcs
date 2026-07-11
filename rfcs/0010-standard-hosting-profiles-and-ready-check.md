@@ -213,7 +213,7 @@ OpenClaw-owned evaluator that emits the runtime readiness condition.
 
 | Profile | Purpose | Built-in criteria | Status fields read | Emitted readiness signals |
 | --- | --- | --- | --- | --- |
-| `local` | Developer/local foreground process readiness. | `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, `PluginsLoaded`, plus `RequiredPluginsActivated` when required activation is declared | effective runtime config and secrets snapshots, model-route resolution, default workspace write evidence, Gateway reachability, selected plugin activation status | Required: `ProfileSelected`, `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, and any declared `RequiredPluginsActivated`. Advisory: general `PluginsLoaded`. |
+| `local` | Developer/local foreground process readiness. | `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, `PluginsLoaded`, release-evidence conditions, plus `RequiredPluginsActivated` when required activation is declared | effective runtime config and secrets snapshots, model-route resolution, default workspace write evidence, Gateway reachability, selected plugin activation status, packaged artifact identity/conformance metadata | Required: `ProfileSelected`, `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, and any declared `RequiredPluginsActivated`. Advisory by default: general `PluginsLoaded`, `ArtifactIdentityAvailable`, and `SelectedProfileConformant`. `ExpectedArtifactMatched` is required when a host supplies an expectation. |
 | `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `ContainerStateReady` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `TrustedProxyReady` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
 | `node-mode` | Gateway/controller for one or more controlled execution nodes. | `local` + `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` | pairing store, live node registry, paired command grants, `gateway.nodes.allowCommands` | Core signals plus the four node-mode conditions. |
@@ -250,6 +250,9 @@ readiness result.
 | `RequiredPluginsActivated` | Required when a standard or operator profile declares required plugin/provider activation | Every declared required plugin/provider is present and activated without an activation error. General selected-plugin health remains advisory through `PluginsLoaded`. | `RequiredPluginMissing`, `RequiredPluginActivationFailed`, `RequiredPluginStatusUnavailable` |
 | `RequiredSecretsAvailable` | Required | Every secret declared startup-required by the selected profile or effective runtime route is available in the installed redacted secrets snapshot. Optional and lazy credentials do not block readiness. | `RequiredSecretMissing`, `RequiredSecretActivationFailed`, `RequiredSecretStatusUnavailable` |
 | `ModelRoutingResolved` | Required when the selected runtime role accepts agent work | The effective default or selected model route resolves to a configured provider after config and secret activation. Evaluation reads the startup snapshot and does not issue a model request. | `ModelRouteMissing`, `ModelProviderUnavailable`, `ModelRouteStatusUnavailable` |
+| `ArtifactIdentityAvailable` | Advisory by default | The runtime can report a stable packaged artifact identity containing at least OpenClaw version and build/package identity. Source and development runs may report `Unknown` without becoming unready. | `ArtifactIdentityUnavailable`, `DevelopmentArtifact` |
+| `SelectedProfileConformant` | Advisory by default; operator profiles may promote it to required | Embedded release evidence is bound to the running artifact identity and records a passing packaged conformance result for the selected standard profile and condition-contract version. It does not rerun conformance at readiness time. | `ProfileConformanceMissing`, `ProfileConformanceFailed`, `ProfileConformanceStale`, `ProfileConformanceArtifactMismatch` |
+| `ExpectedArtifactMatched` | Required when the host supplies an expected artifact identity | The running artifact identity matches the immutable identity selected by the host for this deployment. Absence of a host expectation omits the condition. | `ExpectedArtifactMismatch`, `ExpectedArtifactNotVerifiable` |
 | `WorkspaceWritable` | Required for all built-in profiles | The running Gateway resolves the effective default-agent workspace and completes a write, flush, and cleanup probe. The probe is cached and coalesced so readiness polling does not cause unbounded filesystem work. Non-probing command fallbacks do not invent positive evidence. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `GatewayResponding` | Required | The running Gateway is evaluating its own readiness request, or the current status/health operation successfully probed that Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `PluginsLoaded` | Advisory | The Gateway-pinned plugin registry is available and every selected plugin has no activation error. Explicitly disabled plugins do not report an advisory. | `PluginLoadFailures`, `PluginStatusUnavailable` |
@@ -341,6 +344,9 @@ type CoreReadinessCriterionId =
   | "RequiredPluginsActivated"
   | "RequiredSecretsAvailable"
   | "ModelRoutingResolved"
+  | "ArtifactIdentityAvailable"
+  | "SelectedProfileConformant"
+  | "ExpectedArtifactMatched"
   | "WorkspaceWritable"
   | "GatewayResponding"
   | "PluginsLoaded"
@@ -630,7 +636,7 @@ not introduce unbounded readiness-path I/O.
 
 | Condition family | Code-owned bound |
 | --- | --- |
-| Startup, drain, Gateway response, effective config, required plugin activation, required secret availability, model-route resolution, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config/activation snapshots. Readiness does not reload plugins, resolve secrets, or call a model. |
+| Startup, drain, Gateway response, effective config, required plugin activation, required secret availability, model-route resolution, artifact identity, packaged profile conformance, expected-artifact match, profile, proxy, and event-loop conditions | Constant-time reads over existing runtime/config/activation/build-metadata snapshots. Readiness does not reload plugins, resolve secrets, call a model, or rerun conformance tests. |
 | Channel runtime | One finite pass over the current in-memory channel snapshot, cached for one second. |
 | Workspace writability | One-second hard timeout with five-second cache/coalescing. |
 | Node mode | Pairing reads have a one-second condition-level deadline and one-second cache; live sessions and command policy are finite in-memory passes. Timeout emits `NodePairingTimedOut` before the outer watchdog is needed. |
@@ -778,9 +784,15 @@ surfaces.
    `reverse-proxy`, and `node-mode`, including deterministic failure and
    recovery cases. The current workspace-full and node-pairing scenarios must
    be executed on Linux/container infrastructure, not only planned or unit
-   tested. Publish the profile id, OpenClaw artifact/version, condition set,
+   tested. Publish an artifact-bound conformance record containing the profile
+   id, OpenClaw artifact/version, condition-contract version, condition set,
    result, and test evidence so a host can distinguish a supported release from
-   an untested configuration.
+   an untested configuration. Package that bounded metadata with the release so
+   readiness can emit `ArtifactIdentityAvailable` and
+   `SelectedProfileConformant` without rerunning tests. A host may also supply
+   an immutable expected artifact identity; when present,
+   `ExpectedArtifactMatched` is required and prevents a different build from
+   becoming ready under the deployment's support claim.
 5. **Promote accepted profiles into release conformance.** Once maintainers
    accept the condition and profile contracts and the packaged Docker proof is
    reliable, make that matrix a blocking package-acceptance gate. A built-in
@@ -885,8 +897,9 @@ selection, built-in profile composition from reusable criteria, exact built-in
 container/reverse-proxy predicates, and node-mode rules backed by the
 live node registry. It does not yet implement the newly reconciled
 `RequiredPluginsActivated`, `RequiredSecretsAvailable`, or
-`ModelRoutingResolved` activation conditions; those remain completion work
-before the standard-profile matrix can become a release support gate.
+`ModelRoutingResolved` activation conditions, nor the artifact identity and
+profile-conformance conditions. Those remain completion work before the
+standard-profile matrix can become a release support gate.
 
 ### Incremental adoption
 
@@ -931,6 +944,13 @@ hosted-deployment claim, OpenClaw can say which standard profiles it supports,
 which conditions are stable, and which release tests prove them. An operator
 profile preserves the tested baseline it inherits while clearly identifying
 the additional criteria whose support belongs to the operator or plugin owner.
+
+Artifact and profile-conformance conditions keep that support promise on the
+same host-facing result. They are not a general compatibility, upgrade, or
+migration framework. Release jobs produce immutable evidence; readiness only
+checks that the running artifact, selected profile, and supplied host
+expectation match that evidence. Restore-version compatibility remains part of
+Runtime State Continuity.
 
 This is intentionally less powerful than a general profile or policy engine.
 Its value comes from OpenClaw owning a small number of built-in definitions and
