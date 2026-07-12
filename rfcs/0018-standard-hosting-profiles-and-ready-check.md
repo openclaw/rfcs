@@ -927,6 +927,7 @@ conditions before adding profile-specific conditions:
 | Workspace writability readiness | https://github.com/giodl73-repo/openclaw/pull/22 | `user/giodl/hosting-workspace-readiness` (`5723f664`) |
 | Readiness providers and operator profiles | https://github.com/giodl73-repo/openclaw/pull/23 | `user/giodl/hosting-readiness-registry` (`399cf745`) |
 | Canonical readiness CLI | https://github.com/giodl73-repo/openclaw/pull/27 | `user/giodl/hosting-ready-cli` (`fe4c51c1`) |
+| Runtime activation identity | https://github.com/giodl73-repo/openclaw/pull/42 | `user/giodl/hosting-runtime-activation` (`f4da151a2d1`) |
 
 The stack includes one package-installed Docker conformance lane,
 `pnpm test:docker:hosting-profiles`, built incrementally across the runtime
@@ -956,6 +957,11 @@ branches but not yet promoted into blocking package-acceptance release checks:
   preserves the canonical successful result; and exit status fails closed for
   required failures, unknowns, transport errors, or a missing readiness
   contract. Advisory findings remain visible without changing exit success.
+- PR 42 adds logical-runtime and process/container incarnation identity to the
+  live canonical result. Hosts may supply stable values through CLI or
+  environment; local runs remain zero-configuration, generated incarnations
+  survive in-process Gateway restarts, and invalid explicit identities fail
+  startup rather than silently falling back.
 
 The Docker planner resolves the lane with both package and functional-image
 requirements, and its existing 33 planner assertions remain green. After the
@@ -987,8 +993,8 @@ contract.
 This first stack proves the core ready/result shape, explicit profile
 selection, built-in profile composition from reusable criteria, exact built-in
 container/reverse-proxy predicates, and node-mode rules backed by the
-live node registry. It does not yet implement the newly reconciled
-`RuntimeActivationIdentified`, the activation summary,
+live node registry. PR 42 implements `RuntimeActivationIdentified` and the
+activation summary. The stack does not yet implement the newly reconciled
 `RequiredPluginsActivated`, `RequiredSecretsAvailable`, or
 `ModelRoutingResolved` activation conditions, nor the artifact identity and
 profile-conformance conditions. Those remain completion work before the
