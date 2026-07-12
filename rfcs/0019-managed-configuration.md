@@ -3,10 +3,10 @@ title: Managed Configuration
 authors:
   - Gio Lodi
 created: 2026-07-10
-last_updated: 2026-07-10
+last_updated: 2026-07-11
 status: draft
 issue:
-rfc_pr: https://github.com/giodl73-repo/rfcs/pull/1
+rfc_pr: https://github.com/giodl73-repo/rfcs/pull/4
 ---
 
 # Proposal: Managed Configuration
@@ -169,11 +169,15 @@ loading mechanism. Each source reference identifies one document, its immutable
 source identity, and an optional expected digest. Order is declared once; it is
 not inferred from filenames, environment discovery, or numeric priority.
 
-OpenClaw resolves includes, environment interpolation, and secret references
-independently within each source before authority admission. These mechanisms
-cannot read from, write to, or gain precedence over another layer. Every
-resolved layer must be a cloneable plain-object document. Ordinary schema,
-plugin-aware, and cross-field validation run against the composed candidate.
+OpenClaw resolves JSON5 and includes within each source before authority
+admission, using the ordinary include rules and the source's real location.
+Includes cannot read from, write to, or gain precedence over another layer.
+Environment substitution runs once after the ordered documents are composed,
+so an earlier layer may intentionally declare environment values referenced by
+a later layer without making substitution order-dependent. Every resolved
+layer must be a cloneable plain-object document. Ordinary schema, plugin-aware,
+secret-reference, and cross-field validation run against the composed
+candidate.
 
 The runtime reports source identities rather than host paths where paths would
 leak deployment details. A host can prove which inputs produced an effective
@@ -321,6 +325,35 @@ identity captured for that mutation. If either changed, the write fails with a
 structured conflict before persistence. This extends the existing write path;
 it does not introduce dynamic ownership transfer or a general reconciliation
 protocol.
+
+A descriptor with an expected content digest is immutable for that descriptor
+generation and therefore cannot also be writable. A successful persistence
+adapter returns the canonical committed bytes. Before publication, OpenClaw
+resolves the complete source chain again, requires the refreshed writable
+source to match those committed bytes, and recomposes from the refreshed
+sources. A concurrent non-target change is therefore included in the published
+candidate, while an intervening target write produces a structured conflict
+instead of publishing bytes that no longer match storage.
+
+```mermaid
+sequenceDiagram
+  participant C as Config client
+  participant O as OpenClaw
+  participant W as Writable source
+  participant R as Remaining sources
+  C->>O: write(target digest, chain identity, proposal)
+  O->>O: resolve + preflight complete chain
+  O->>W: CAS/atomic commit
+  W-->>O: canonical committed bytes
+  O->>R: resolve complete chain again
+  O->>W: resolve committed target again
+  alt target digest matches committed bytes
+    O->>O: recompose + validate refreshed chain
+    O-->>C: publish one candidate
+  else target changed after commit
+    O-->>C: structured conflict; publish nothing
+  end
+```
 
 ### Example deployment profiles
 
@@ -475,6 +508,10 @@ Release tests should cover:
   or comparator;
 - transactional reload and preservation of the previous effective generation;
 - stale operator-write rejection across managed-boundary rotation;
+- rejection of a digest-pinned writable descriptor;
+- complete-chain refresh when a non-target source changes during persistence;
+- intervening target-write rejection before publication;
+- canonical committed-byte reread before effective publication;
 - source digest mismatch and source-identity redaction;
 - semantic equivalence between direct effective config and composed managed
   plus operator inputs.
@@ -503,13 +540,23 @@ implement the complete RFC:
    reject writes that violate earlier authority, and expose redacted provenance
    and readiness findings. Reuse existing mutation and status surfaces rather
    than creating a management subsystem.
-5. **Lobster migration and deletion.** Prove effective-config equivalence for
+5. **Concrete local-file integration.** Resolve ordered JSON5/include sources,
+   use the ordinary primary OpenClaw config as the one writable source, persist
+   through existing snapshot/CAS/atomic-write APIs, and recompose canonical
+   committed bytes before publication. Environment substitution runs once
+   after the complete ordered composition.
+6. **Lobster migration and deletion.** Prove effective-config equivalence for
    the allowed-origins case, switch Lobster to the supported source seam, and
    delete its baked overlay writer, stale-value cleanup, and exact-blob tests.
 
 The exact-authority core can be reviewed independently, but RFC completion
 includes the bounded-authority PR. Comparator assignment remains closed,
 schema-owned, and justified field by field.
+
+Steps 1 through 5 complete the generic OpenClaw feature contract. Step 6 is an
+adoption and deletion gate for Lobster, intentionally dependent on an OpenClaw
+release that contains the capability; it is not additional core composition
+machinery.
 
 ### Host migration and deletion gate
 
