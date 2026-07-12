@@ -111,6 +111,9 @@ future telemetry consume the same runtime truth.
   health surfaces.
 - Add explicit profile selection through config, environment, and Gateway
   startup.
+- Let a hosting profile declare the minimal activation facts required for its
+  supported runtime shape, and report the resolved runtime activation identity
+  through readiness and status.
 - Keep OpenClaw generic: no Lobster, Scout, Microsoft, tenant, Teams, Kusto, or
   product-specific host concepts.
 - Keep the first implementation in core so readiness works without optional
@@ -132,6 +135,8 @@ future telemetry consume the same runtime truth.
 - Define the remote AgentHarness event protocol.
 - Standardize a host's storage backend, auth provider, telemetry sink, tenant
   routing, UI, deployment system, or worker-pool model.
+- Define an OCC-style instance resource, placement model, replica identity, or
+  tenant lifecycle API.
 - Put assistant deltas, tool frames, approvals, patches, compaction events, or
   harness protocol frames into the hosting contract.
 - Allow arbitrary operator-defined conditions to redefine built-in profile
@@ -166,6 +171,7 @@ OpenClaw should expose a standard hostee contract:
 
 ```text
 profile selection
++ validated runtime activation context
 + runtime status/config facts
 + readiness condition evaluation
 -> ready/not-ready result
@@ -182,6 +188,14 @@ Five constraints keep this narrow:
    required. Policy and doctor may consume the result but are not dependencies.
 5. Only required conditions affect the binary ready result. Advisory conditions
    remain visible without turning a useful diagnostic into an outage.
+
+The runtime activation context is the small entry point into this contract. It
+identifies this activation and references the configuration, host integration,
+and restore inputs selected by the launcher. It does not duplicate those
+systems' data. Each referenced owner validates and activates its own input,
+publishes its own status evidence, and contributes readiness conditions. The
+profile only declares which activation facts and resulting conditions are
+required for the named support posture.
 
 The contract is not a parallel hosted config tree. Existing OpenClaw config
 continues to own Gateway, proxy, plugin, model, session, node, and state
@@ -213,7 +227,7 @@ OpenClaw-owned evaluator that emits the runtime readiness condition.
 
 | Profile | Purpose | Built-in criteria | Status fields read | Emitted readiness signals |
 | --- | --- | --- | --- | --- |
-| `local` | Developer/local foreground process readiness. | `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, `PluginsLoaded`, release-evidence conditions, plus `RequiredPluginsActivated` when required activation is declared | effective runtime config and secrets snapshots, model-route resolution, default workspace write evidence, Gateway reachability, selected plugin activation status, packaged artifact identity/conformance metadata | Required: `ProfileSelected`, `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, and any declared `RequiredPluginsActivated`. Advisory by default: general `PluginsLoaded`, `ArtifactIdentityAvailable`, and `SelectedProfileConformant`. `ExpectedArtifactMatched` is required when a host supplies an expectation. |
+| `local` | Developer/local foreground process readiness. | `RuntimeActivationIdentified`, `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, `PluginsLoaded`, release-evidence conditions, plus `RequiredPluginsActivated` when required activation is declared | resolved runtime/incarnation identity, effective runtime config and secrets snapshots, model-route resolution, default workspace write evidence, Gateway reachability, selected plugin activation status, packaged artifact identity/conformance metadata | Required: `ProfileSelected`, `RuntimeActivationIdentified`, `ConfigLoaded`, `RequiredSecretsAvailable`, `ModelRoutingResolved`, `WorkspaceWritable`, `GatewayResponding`, and any declared `RequiredPluginsActivated`. Advisory by default: general `PluginsLoaded`, `ArtifactIdentityAvailable`, and `SelectedProfileConformant`. `ExpectedArtifactMatched` is required when a host supplies an expectation. |
 | `container` | One OpenClaw service hosted by Docker, Compose, or a similar supervisor. | `local` + `ContainerStateReady` | effective Gateway mode, resolved bind host, and port | Core signals plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway running behind a trusted reverse proxy. | `local` + `TrustedProxyReady` | Gateway trusted-proxy auth config | Core signals plus `TrustedProxyReady`. |
 | `node-mode` | Gateway/controller for one or more controlled execution nodes. | `local` + `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` | pairing store, live node registry, paired command grants, `gateway.nodes.allowCommands` | Core signals plus the four node-mode conditions. |
@@ -246,6 +260,7 @@ readiness result.
 | `ChannelRuntimeSuppressed` | Advisory when present | One or more channel runtime failures are intentionally suppressed by the existing autostart/crash-loop policy. | `ChannelRuntimeSuppressed` |
 | `EventLoopHealthy` | Advisory | The existing event-loop health observation is within its healthy threshold. It remains advisory unless a separate compatibility-reviewed change intentionally makes it gate readiness. | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
 | `ProfileSelected` | Required | The runtime resolved and reports the selected built-in or configured custom profile. The default is `local`. | None; invalid explicit values fail selection before startup. |
+| `RuntimeActivationIdentified` | Required | The runtime has resolved non-empty logical-runtime and unique-incarnation identities. OpenClaw-generated local defaults satisfy this condition when the launcher supplies neither value. | `RuntimeIdentityInvalid`, `IncarnationIdentityInvalid`, `ActivationIdentityUnavailable` |
 | `ConfigLoaded` | Required | The validated effective runtime configuration snapshot is installed after normal precedence and activation processing; parsing a source file alone is insufficient. | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
 | `RequiredPluginsActivated` | Required when a standard or operator profile declares required plugin/provider activation | Every declared required plugin/provider is present and activated without an activation error. General selected-plugin health remains advisory through `PluginsLoaded`. | `RequiredPluginMissing`, `RequiredPluginActivationFailed`, `RequiredPluginStatusUnavailable` |
 | `RequiredSecretsAvailable` | Required | Every secret declared startup-required by the selected profile or effective runtime route is available in the installed redacted secrets snapshot. Optional and lazy credentials do not block readiness. | `RequiredSecretMissing`, `RequiredSecretActivationFailed`, `RequiredSecretStatusUnavailable` |
@@ -331,6 +346,11 @@ type OperatorHostingProfile = {
   advisoryCriteria?: string[];
 };
 
+type RuntimeActivationIdentity = {
+  runtimeId: string;
+  incarnationId: string;
+};
+
 type HostingConfig = {
   profile?: string;
   profiles?: Record<string, OperatorHostingProfile>;
@@ -348,6 +368,22 @@ segments. A selected custom profile must exist in `hosting.profiles`. Each
 custom profile extends exactly one built-in profile and can only add criteria;
 it cannot remove or demote inherited requirements. A criterion cannot be both
 required and advisory in the same profile.
+
+The runtime activation identity is startup metadata, not another OpenClaw
+config document. `runtimeId` identifies the logical runtime across restarts;
+`incarnationId` identifies one process or container execution. A launcher may
+supply stable values through startup arguments, environment, or a mounted
+activation descriptor. OpenClaw generates local defaults when they are absent,
+so existing installations and the `local` profile remain zero-configuration.
+
+Configuration sources, host-bundle selection, and restore selection stay in
+their owning contracts rather than being copied into this identity. Those
+owners publish the effective config generation, selected bundle identity and
+version, and restored state generation after successful activation. Their
+readiness providers contribute the corresponding conditions, and a profile may
+promote those conditions to required. This avoids a circular config-source
+reference and prevents Hosting Profiles from becoming a second configuration,
+integration, or continuity system.
 
 The environment variable and startup flag accept built-in ids or a namespaced
 custom id. Runtime resolution validates a custom id against the loaded config.
@@ -370,6 +406,12 @@ process selected the intended profile. The optional `openclaw ready` CLI
 wrapper projects that same live result for operators and scripts; it does not
 evaluate a second local readiness model.
 
+Those surfaces should also report a redacted activation summary containing the
+runtime id, incarnation id, effective config generation, selected host-bundle
+identity/version, and restored state generation when available. They must not
+echo source contents, credentials, or host-private metadata. This makes the
+ready result attributable to the exact activation being supervised.
+
 ### Ready result
 
 Readiness should use Kubernetes-style conditions:
@@ -382,6 +424,7 @@ type CoreReadinessCriterionId =
   | "ChannelRuntimeSuppressed"
   | "EventLoopHealthy"
   | "ProfileSelected"
+  | "RuntimeActivationIdentified"
   | "ConfigLoaded"
   | "RequiredPluginsActivated"
   | "RequiredSecretsAvailable"
@@ -414,6 +457,7 @@ type HostingReadinessCondition = {
 
 type HostingReadinessResult = {
   profile: string;
+  activation: RuntimeActivationIdentity;
   ready: boolean;
   conditions: HostingReadinessCondition[];
   failures: string[];
@@ -430,6 +474,10 @@ namespaced by core as `plugin.<plugin-id>.<local-id>`.
 ```jsonc
 {
   "profile": "container",
+  "activation": {
+    "runtimeId": "tenant-42/scout-primary",
+    "incarnationId": "pod-7f9c"
+  },
   "ready": false,
   "conditions": [
     {
@@ -791,6 +839,7 @@ surfaces.
 
    | Activation observation | Readiness disposition |
    | --- | --- |
+   | Runtime activation identified | Add required `RuntimeActivationIdentified` over the resolved logical-runtime and unique-incarnation ids. OpenClaw-generated defaults preserve zero-configuration local behavior; host-supplied values make readiness attributable across restarts and replicas. |
    | Effective configuration resolved | Strengthen `ConfigLoaded` so `True` means the validated effective runtime snapshot is installed, not merely that a source file parsed. Use `ConfigNotLoaded`, `ConfigInvalid`, or `EffectiveConfigUnavailable` when that cannot be established. |
    | Hosting profile applied | Covered by required `ProfileSelected`; the reported profile is the effective value after flag, environment, config, and default precedence. |
    | Required plugins activated | Keep general `PluginsLoaded` advisory for compatibility, but add required `RequiredPluginsActivated` when a standard or operator profile names a plugin/provider as required. Missing, failed, or unavailable required activation must block readiness. |
@@ -939,6 +988,7 @@ This first stack proves the core ready/result shape, explicit profile
 selection, built-in profile composition from reusable criteria, exact built-in
 container/reverse-proxy predicates, and node-mode rules backed by the
 live node registry. It does not yet implement the newly reconciled
+`RuntimeActivationIdentified`, the activation summary,
 `RequiredPluginsActivated`, `RequiredSecretsAvailable`, or
 `ModelRoutingResolved` activation conditions, nor the artifact identity and
 profile-conformance conditions. Those remain completion work before the
@@ -961,6 +1011,9 @@ The proposal does not require one all-or-nothing implementation landing:
    same canonical result.
 6. Add the optional `openclaw ready` CLI projection over the canonical live
    Gateway result.
+7. Add runtime/incarnation identity resolution, the required
+   `RuntimeActivationIdentified` condition, and the redacted activation summary
+   shared by readiness, health, and status.
 
 After contract acceptance and successful packaged Docker proof, a separate
 follow-up can make the profile matrix a blocking package-acceptance release
