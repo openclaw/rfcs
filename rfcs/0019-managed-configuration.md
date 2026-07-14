@@ -367,6 +367,9 @@ Evidence available during RFC review:
 - 61 focused OpenClaw tests cover recursive composition, exact conflicts,
   bounded tool policies, config loading, immutable write ownership, and early
   agent-mutation rejection;
+- a foreground lifecycle proof demonstrates successful three-layer startup,
+  composed config reads, rejected runtime mutation, rejected conflicting
+  startup, and no canonical config write;
 - final Codex review reported no actionable correctness regression.
 
 The broad prototype was useful evidence, not the proposed V1. It showed that
@@ -389,9 +392,9 @@ contract in one reviewable change:
 - immutable server lifecycle;
 - focused tests and user documentation.
 
-Before moving from draft, it must have green upstream CI and a recorded
-foreground Gateway proof showing successful three-layer startup, rejected
-conflict startup, and rejected runtime mutation.
+The implementation PR records a foreground Gateway proof showing successful
+three-layer startup, composed reads, rejected conflict startup, and rejected
+runtime mutation. Before moving from draft, it must have green upstream CI.
 
 ### PR 2: Lobster adoption and deletion
 
