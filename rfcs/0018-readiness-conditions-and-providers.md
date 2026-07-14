@@ -350,7 +350,7 @@ runtime activation identity, or a release support matrix.
 
 ### Implementation plan
 
-The draft implementation will be restacked into a readiness-only series:
+The draft implementation is restacked into a readiness-only series:
 
 | Slice | Draft PR | Intended scope |
 | --- | --- | --- |
@@ -362,6 +362,10 @@ The draft implementation will be restacked into a readiness-only series:
 Profile selection, node-mode composition, activation identity, and packaged
 profile release conformance move to the Standard Hosting Profiles RFC and its
 separate implementation stack.
+
+The earlier consolidated draft remains useful behavior evidence, but it is not
+the proposed landing shape. The slices above can land without accepting profile
+names, profile selection, runtime activation identity, or release conformance.
 
 ## Rationale
 
