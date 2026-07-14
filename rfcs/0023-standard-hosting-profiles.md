@@ -402,18 +402,24 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 ### Implementation plan
 
 After the readiness-only stack is established, the profile implementation is a
-separate series:
+single dependent series in
+[giodl73-repo/openclaw#94](https://github.com/giodl73-repo/openclaw/pull/94).
+It is based on the exact head of the readiness implementation in
+[openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
+and contains four profile-only commits:
 
-| Slice | Draft PR | Intended scope |
+| Commit | Review slice | Intended scope |
 | --- | --- | --- |
-| Standard profile selection | [PR 18](https://github.com/giodl73-repo/openclaw/pull/18) | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
-| Node-mode profile | [PR 19](https://github.com/giodl73-repo/openclaw/pull/19) | Add product-neutral node pairing, target, approval, and control-channel conditions. |
-| Runtime activation identity | [PR 42](https://github.com/giodl73-repo/openclaw/pull/42) | Attribute profile results to logical runtime and incarnation IDs. |
-| Packaged release conformance | [PR 21](https://github.com/giodl73-repo/openclaw/pull/21) | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
+| `63596d964b7` | [PR 18](https://github.com/giodl73-repo/openclaw/pull/18) | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
+| `a68829096d1` | [PR 19](https://github.com/giodl73-repo/openclaw/pull/19) | Add product-neutral node pairing, target, approval, and control-channel conditions. |
+| `11322a977f6` | [PR 42](https://github.com/giodl73-repo/openclaw/pull/42) | Attribute profile results to logical runtime and incarnation IDs. |
+| `2f8defb707c` | [PR 21](https://github.com/giodl73-repo/openclaw/pull/21) | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
 
-The fork PRs are now restacked into independent readiness and profile review
-series. The existing consolidated implementation remains historical behavior
-evidence rather than the proposed landing shape.
+PR 94 is the proposed implementation shape. The four smaller fork PRs expose
+the same commits as review aids; they are not alternative landing requests.
+The profile implementation remains fork-only until RFC 0018 and its readiness
+implementation land. It can then be rebased onto upstream `main` and promoted
+as one OpenClaw implementation PR without duplicating readiness commits.
 
 ## Rationale
 
