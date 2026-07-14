@@ -338,8 +338,10 @@ The initial profile matrix must execute package-installed scenarios for:
 - node-mode unpaired failure and paired/approved recovery; and
 - workspace-full failure and recovery without restart.
 
-Making this matrix release-blocking is a separate governance change after the
-profile contract and repeatable packaged proof are accepted.
+Making this matrix release-blocking is a governance decision attached to
+accepting the profile contract. The draft conformance PR demonstrates the
+blocking package-acceptance wiring so reviewers can evaluate the complete
+support promise; it should not land ahead of the profile contract.
 
 ### Support ownership and compatibility
 
@@ -407,10 +409,11 @@ separate series:
 | Standard profile selection | [PR 18](https://github.com/giodl73-repo/openclaw/pull/18) | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
 | Node-mode profile | [PR 19](https://github.com/giodl73-repo/openclaw/pull/19) | Add product-neutral node pairing, target, approval, and control-channel conditions. |
 | Runtime activation identity | [PR 42](https://github.com/giodl73-repo/openclaw/pull/42) | Attribute profile results to logical runtime and incarnation IDs. |
-| Packaged release conformance | [PR 21](https://github.com/giodl73-repo/openclaw/pull/21) | Demonstrate the profile matrix; make it blocking only after acceptance. |
+| Packaged release conformance | [PR 21](https://github.com/giodl73-repo/openclaw/pull/21) | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
 
-The existing consolidated implementation remains evidence while these fork PRs
-are restacked into independent readiness and profile review series.
+The fork PRs are now restacked into independent readiness and profile review
+series. The existing consolidated implementation remains historical behavior
+evidence rather than the proposed landing shape.
 
 ## Rationale
 
