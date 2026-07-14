@@ -149,6 +149,7 @@ justifies them.
 | `ChannelRuntimeReady` | Required | No selected channel has an unsuppressed runtime-health failure under existing channel policy. | `ChannelRuntimeUnavailable` |
 | `ChannelRuntimeSuppressed` | Advisory when present | A channel runtime failure is intentionally suppressed by existing autostart/crash-loop policy. | `ChannelRuntimeSuppressed` |
 | `EventLoopHealthy` | Advisory initially | Existing event-loop health is within its healthy threshold. | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
+| `ReadinessEvaluationComplete` | Required when emitted | The bounded canonical evaluation completed. This failure-only guard condition is emitted when the evaluator cannot produce its normal condition set. | `ReadinessEvaluationTimedOut`, `ReadinessEvaluationFailed` |
 | `GatewayResponding` | Required when observed remotely | The current operation successfully reached the live Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `ConfigLoaded` | Required | The validated effective runtime config snapshot is installed. | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
 | `WorkspaceWritable` | Required or advisory when selected | The effective workspace passes a bounded write, flush, and cleanup probe. It is not a new universal blocker by default. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
@@ -283,7 +284,14 @@ The initial implementation uses layered bounds:
 
 A timeout becomes `Unknown` with a stable reason. A required timeout returns
 `503`; an advisory timeout remains visible without blocking. The outer watchdog
-fails closed rather than allowing `/ready` or `/readyz` to hang.
+fails closed with a required `ReadinessEvaluationComplete=Unknown` condition
+rather than allowing `/ready`, `/readyz`, health, or status to hang or reject.
+Unexpected error details are not copied into the public result.
+
+Core retains ownership of a provider invocation after its deadline. If a
+provider ignores cancellation and remains pending, later readiness polls reuse
+the stable timeout result and do not start another invocation. A new invocation
+may begin only after the original callback settles and the result cache expires.
 
 In-process timers cannot interrupt synchronous JavaScript that blocks the event
 loop. Providers therefore may not perform blocking synchronous I/O. Process or
