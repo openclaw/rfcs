@@ -403,7 +403,7 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
-[giodl73-repo/openclaw#94](https://github.com/giodl73-repo/openclaw/pull/94).
+[openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
 It is based on the exact head of the readiness implementation in
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
 and contains four profile-only commits:
@@ -415,11 +415,13 @@ and contains four profile-only commits:
 | `11322a977f6` | [PR 42](https://github.com/giodl73-repo/openclaw/pull/42) | Attribute profile results to logical runtime and incarnation IDs. |
 | `2f8defb707c` | [PR 21](https://github.com/giodl73-repo/openclaw/pull/21) | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
 
-PR 94 is the proposed implementation shape. The four smaller fork PRs expose
-the same commits as review aids; they are not alternative landing requests.
-The profile implementation remains fork-only until RFC 0018 and its readiness
-implementation land. It can then be rebased onto upstream `main` and promoted
-as one OpenClaw implementation PR without duplicating readiness commits.
+PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
+its aggregate GitHub diff includes the readiness dependency followed by the
+four profile commits. After PR 104018 lands, the same PR naturally reduces to
+the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
+preserves that profile-only comparison view in the meantime. The four smaller
+fork PRs expose the same profile commits as review aids; they are not
+alternative landing requests.
 
 ## Rationale
 
