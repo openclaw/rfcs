@@ -44,6 +44,24 @@ section. The values already belong in the ordinary OpenClaw schema. What is
 missing is a generic way to compose multiple ordinary documents while
 preserving declared order and rejecting conflicts.
 
+### Why OpenClaw owns composition semantics
+
+OpenClaw must own the merge semantics because OpenClaw owns the configuration
+schema, plugin-aware validation, tool-policy interpretation, runtime snapshot,
+and mutation boundary. Authority and monotonic-tightening decisions depend on
+those semantics; a launcher cannot reproduce them reliably without becoming a
+second OpenClaw configuration implementation.
+
+Hosts remain responsible for materializing values and declaring source order.
+OpenClaw is responsible for resolving, composing, validating, and enforcing
+those sources. This boundary keeps deployment vocabulary outside core while
+ensuring every host receives the same conflict and security behavior.
+
+`$include` remains appropriate for structuring one authored configuration
+document. It does not preserve authority between independent sources, enforce
+monotonic policy bounds, or make the resulting runtime immutable. External
+flattening also erases source boundaries before OpenClaw can enforce them.
+
 ## Goals
 
 - Accept any positive number of explicitly ordered config documents.
@@ -196,15 +214,18 @@ When layered mode is active:
 - config hot reload is disabled;
 - config-mutating RPCs are rejected;
 - agent create, update, and delete are rejected before workspace side effects;
-- process-wide config persistence paths reject writes;
+- config persistence targeting the layered Gateway's canonical path rejects
+  writes;
 - a source change takes effect only after Gateway restart.
 
 Read surfaces use the composed snapshot where they would otherwise reread the
 canonical config file.
 
-The write guard is owned by the Gateway server lifecycle and supports
-overlapping owners in one process. Closing one layered server removes only its
-own guard.
+The write guard is owned by the Gateway server lifecycle and scoped to the
+canonical config path. Overlapping owners for that path compose safely, while
+an unrelated config path remains writable. Closing one layered server removes
+only its own guard. Pathless mutation preflights resolve to the canonical path
+so plugin or repair side effects cannot occur before persistence is rejected.
 
 This read-only boundary avoids partial write semantics and keeps V1 small. A
 future writable-layer design would need explicit source ownership, conflict
@@ -364,12 +385,15 @@ Evidence available during RFC review:
   https://github.com/openclaw/openclaw/pull/107026
 - a Lobster fork adapter materializes Scout, tenant, and operator documents and
   passes them as repeated flags;
-- 61 focused OpenClaw tests cover recursive composition, exact conflicts,
+- 63 focused OpenClaw tests cover recursive composition, exact conflicts,
   bounded tool policies, config loading, immutable write ownership, and early
   agent-mutation rejection;
 - a foreground lifecycle proof demonstrates successful three-layer startup,
   composed config reads, rejected runtime mutation, rejected conflicting
   startup, and no canonical config write;
+- fresh-state and existing-state Gateway proofs demonstrate that layered startup
+  neither creates a missing canonical config nor changes an existing canonical
+  config or its legacy metadata;
 - final Codex review reported no actionable correctness regression.
 
 The broad prototype was useful evidence, not the proposed V1. It showed that
