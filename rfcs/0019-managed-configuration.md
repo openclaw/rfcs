@@ -85,6 +85,8 @@ flattening also erases source boundaries before OpenClaw can enforce them.
 - A per-path provenance or explanation API in V1.
 - Secret delivery, identity, state synchronization, or plugin installation.
 - Moving canonical settings into a parallel hosted-config schema.
+- Multi-tenant isolation inside one Gateway. Mutually untrusted tenants still
+  require separate Gateway processes and state boundaries.
 
 ## Interface
 
@@ -366,6 +368,56 @@ This lets Lobster materialize three source files without teaching OpenClaw
 about Scout, tenants, or operators. After an OpenClaw release contains the
 feature, Lobster can remove the baked effective-config overlay and its
 stale-value cleanup.
+
+## Fleet and multi-tenant hosting
+
+Managed configuration complements OpenClaw Fleet's cell isolation model. Fleet
+continues to run one complete Gateway cell per tenant trust boundary, with
+separate state, credentials, workspace, network, and Gateway token. Layers do
+not turn one shared Gateway into a tenant authorization boundary.
+
+For each cell, the host can reuse one shared baseline and append only the
+documents applicable to that tenant and cell:
+
+```mermaid
+flowchart LR
+  G[Shared global baseline] --> A[Compose Acme cell]
+  TA[Acme tenant config] --> A
+  OA[Acme operator config] --> A
+  A --> CA[Acme Gateway cell]
+
+  G --> B[Compose Contoso cell]
+  TB[Contoso tenant config] --> B
+  OB[Contoso operator config] --> B
+  B --> CB[Contoso Gateway cell]
+```
+
+Conceptually, Fleet or another host supervisor starts each isolated cell with
+its own ordered arguments:
+
+```text
+Acme:    global.json5, tenant-acme.json5, operator-acme.json5
+Contoso: global.json5, tenant-contoso.json5, operator-contoso.json5
+```
+
+The global document can establish security and operational boundaries. The
+tenant document can add that cell's URLs, private-network settings, channel or
+provider configuration, and other tenant facts. An optional operator document
+can add local choices or tighten bounded policy. OpenClaw applies the same
+generic composition rules independently inside each cell.
+
+The V1 Gateway feature does not add or change Fleet commands. A later Fleet
+integration only needs to mount the applicable documents into each cell, pass
+the repeated `--config-layer` arguments, and replace or restart the cell when
+those inputs change. Cells that rely on interactive in-cell configuration
+should continue using ordinary mutable config instead of opting into layered
+mode.
+
+This preserves the ownership boundary: Fleet owns cell lifecycle, isolation,
+mounts, source materialization, and source order; the Gateway owns config
+resolution, composition, validation, authority, and runtime enforcement. A
+host must not place multiple mutually untrusted tenant documents into one
+Gateway stack.
 
 ## Evidence
 
