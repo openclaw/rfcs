@@ -6,7 +6,7 @@ created: 2026-07-14
 last_updated: 2026-07-14
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/giodl73-repo/rfcs/pull/7
 ---
 
 # Proposal: Standard Hosting Profiles
