@@ -3,615 +3,469 @@ title: Managed Configuration
 authors:
   - Gio Lodi
 created: 2026-07-10
-last_updated: 2026-07-11
+last_updated: 2026-07-13
 status: draft
 issue:
-rfc_pr: https://github.com/giodl73-repo/rfcs/pull/4
+rfc_pr: https://github.com/openclaw/rfcs/pull/34
 ---
 
 # Proposal: Managed Configuration
 
 ## Summary
 
-Add a core configuration-authority model that recursively composes an ordered
-list of named configuration layers through the existing OpenClaw schema.
-OpenClaw rejects conflicts or attempts to weaken authority established by an
-earlier layer and produces one effective configuration with inspectable
-provenance. A host-managed document plus an operator document is one deployment
-profile of this generic model, not a pair of roles hard-coded into the engine.
+Add an opt-in way to start OpenClaw from an ordered list of ordinary
+configuration documents.
+
+Each document is parsed and validated through OpenClaw's existing configuration
+pipeline. OpenClaw then folds the documents in declared order. The first layer
+to declare an exact path controls it; later layers may omit it or repeat the
+same value, but may not replace it. A small closed set of fields can use
+OpenClaw-owned monotonic rules instead.
+
+The first version is deliberately startup-only and read-only. It does not add a
+configuration control plane, layer roles, write routing, live reload, or a
+provenance API.
 
 ## Motivation
 
-OpenClaw currently has one ordinary configuration authority. A hosting platform
-that must enforce deployment posture while preserving operator customization
-therefore has to generate config fragments, project environment variables,
-rewrite files in a particular order, remove stale generated values, and keep
-custom logic synchronized with OpenClaw's schema.
+Lobster currently needs to combine three kinds of OpenClaw configuration:
 
-The missing distinction is not a new `hosting` config section. It is authority
-over fields in the existing configuration schema:
+- Scout-wide security and Gateway defaults;
+- tenant-specific URLs and private-network facts;
+- operator-local customization.
 
-```text
-OpenClaw defaults
-  + host-managed configuration
-  + operator configuration
-  -> admission and cross-field validation
-  -> effective configuration
-  -> runtime
-```
+Without an upstream composition seam, Lobster must bake those inputs into one
+config file and maintain overlay application, stale-value cleanup, and
+OpenClaw-specific validation behavior outside OpenClaw. OpenClaw sees only the
+result and cannot reject a later overlay that weakens an earlier boundary.
 
-Without an upstream contract, hosts silently overwrite operator values or carry
-private strictness logic. Operators cannot reliably explain why a value is
-effective, and support teams cannot reproduce the deployment from declared
-inputs. Repeated host patches then track OpenClaw config internals instead of a
-stable composition contract.
-
-Managed Configuration also gives OCC a clean future boundary: OCC can compile
-admitted desired state into a managed document while OpenClaw remains the owner
-of schema validation, field semantics, and effective runtime configuration.
+The problem is not unique to Lobster and does not require a new `hosting`
+section. The values already belong in the ordinary OpenClaw schema. What is
+missing is a generic way to compose multiple ordinary documents while
+preserving declared order and rejecting conflicts.
 
 ## Goals
 
-- Load an ordered list of named layers using the normal OpenClaw configuration
-  schema.
-- Let presence in an earlier layer declare authority over that field for every
-  later layer.
-- Reject conflicts with structured findings instead of silently overwriting.
-- Support exact authority for every schema field.
-- Support a small closed set of OpenClaw-defined bounded strictness rules.
-- Run normal cross-field validation against the composed effective config.
-- Expose redacted effective values, provenance, control mode, and stable config
-  identity for diagnostics and conformance.
-- Associate mutability with a layer source rather than a built-in role, and
-  prevent writes from bypassing earlier authority.
-- Make unsafe startup composition failures visible through status/readiness.
-- Allow hosts to replace private config writers with a release-tested contract.
+- Accept any positive number of explicitly ordered config documents.
+- Keep layer names descriptive, with no built-in host, tenant, or operator roles.
+- Apply the same operation recursively for every layer.
+- Reuse JSON5, include, environment, schema, and plugin validation behavior.
+- Reject exact conflicts instead of silently choosing a winner.
+- Permit only proven tightening for the initial bounded tool-policy fields.
+- Publish one effective startup snapshot to existing runtime consumers.
+- Make the layered runtime immutable for its lifetime.
+- Leave ordinary single-config startup unchanged and unaware of the feature.
+- Give Lobster a supported seam that can replace baked overlay generation.
 
-## Non-Goals
+## Non-goals
 
-- A new top-level `hosting` section containing copies of existing settings.
-- Numeric priorities, implicit source discovery, or dynamic layer reordering.
-- A policy expression language or host-defined comparison functions.
-- Silent managed-value precedence.
-- Dynamic OCC reconciliation in the first version.
-- Secret delivery, trusted identity, lifecycle, state synchronization, or
-  plugin installation.
-- Depending on the optional Policy plugin for runtime correctness.
-- Making every field support a monotonic "stricter" relationship.
+- Implicit source discovery or numeric priorities.
+- A fixed two-stage managed/operator model.
+- Host-defined comparators or a policy expression language.
+- Writable layers or routing config mutations back to source documents.
+- Live layer reload, rollback generations, or transactional reconciliation.
+- A per-path provenance or explanation API in V1.
+- Secret delivery, identity, state synchronization, or plugin installation.
+- Moving canonical settings into a parallel hosted-config schema.
 
-## Proposal
+## Interface
 
-### Layers and recursive composition
+The Gateway CLI accepts a repeatable option:
 
-The input is an ordered list of layer descriptors from strongest to weakest:
-
-```text
-layer[0] -> layer[1] -> ... -> layer[n]
+```bash
+openclaw gateway run \
+  --config-layer global=./global.json5 \
+  --config-layer tenant=./tenant.json5 \
+  --config-layer operator=./operator.json5
 ```
 
-Each descriptor has a stable layer identity, an opaque source reference, and an
-explicit `read-only` or `read-write` access capability. Resolution returns one
-document using the existing OpenClaw schema plus a stable redacted source
-identity. Names such as
-`platform`, `tenant`, `team`, and `operator` are diagnostic labels supplied by a
-deployment; they have no special semantics in core.
-
-Independent sources may resolve concurrently, but composition always retains
-the descriptor array's declared order. Empty or duplicate layer identities fail
-before source I/O. Failure to resolve any source rejects the complete candidate;
-OpenClaw does not silently omit the failed layer.
-
-Composition applies one operation repeatedly:
+The syntax is:
 
 ```text
-state[0] = empty authority state
+--config-layer <id=path>
+```
+
+Order is the command-line declaration order. IDs must be non-empty and unique,
+but otherwise have no semantics. The examples use deployment vocabulary only
+to make the source of each document understandable.
+
+When no `--config-layer` option is present, OpenClaw follows its existing
+single-config path with no behavior change.
+
+Layered startup is incompatible with `--dev`, because dev startup creates and
+mutates configuration.
+
+## Composition model
+
+Each source is an ordinary sparse OpenClaw config document. For each source,
+OpenClaw:
+
+1. reads JSON5;
+2. resolves includes using the normal include roots and the source file location;
+3. resolves environment references;
+4. requires a plain-object root;
+5. rejects bootstrap-owned `meta` and `env` root keys.
+
+After every source resolves, OpenClaw folds them in declared order:
+
+```text
+state[0] = empty
 state[i + 1] = compose(state[i], layer[i])
-effective = materializeWithDefaults(state[layerCount])
+effective = validate(state[layerCount])
 ```
 
 ```mermaid
 flowchart LR
-  A[Ordered source descriptors] --> B[Resolve every source]
-  B --> C[Admit cloneable sparse documents]
-  C --> D[Recursive exact-authority fold]
-  D --> E[Validate effective configuration]
-  E --> F[Normalize and materialize defaults]
-  F --> G[Publish one runtime snapshot]
-  B -. any failure .-> X[Reject complete candidate]
-  C -. any failure .-> X
-  D -. conflict .-> X
-  E -. schema or cross-field failure .-> X
+  A[Ordered id=path arguments] --> B[Resolve each ordinary config document]
+  B --> C[Recursive authority fold]
+  C --> D[Validate schema and plugins]
+  D --> E[Publish one startup snapshot]
+  B -. parse or include failure .-> X[Reject startup]
+  C -. authority conflict .-> X
+  D -. invalid config .-> X
 ```
 
 ```mermaid
 flowchart TD
-  S0[Empty authority state] --> L0[Compose layer 0]
+  S0[Empty state] --> L0[Compose layer 0]
   L0 --> S1[Authority state 1]
   S1 --> L1[Compose layer 1]
   L1 --> S2[Authority state 2]
   S2 --> LN[Repeat for layer n]
-  LN --> SE[Composed sparse source]
+  LN --> E[Effective sparse source]
 ```
 
-For each leaf, the first declaring layer establishes its schema-defined control
-rule. Every later layer may omit the leaf, repeat the same authored exact
-value, or tighten a bounded value. It may not replace an exact value or weaken a
-bounded value. A leaf omitted by every layer receives its ordinary OpenClaw
-default after composition.
+Objects compose recursively. Declaring one child does not claim unrelated
+siblings. Arrays are whole-field values unless the field has a built-in bounded
+rule. Empty objects preserve ownership of that object boundary.
 
-Authority compares authored source values before schema normalization. Two
-different accepted representations remain different exact claims even if the
-ordinary schema would later normalize them to the same runtime value. This
-keeps admission recursive and context-free: a layer cannot acquire a different
-meaning merely because another layer supplies a cross-field dependency.
+The composed source is validated once through the ordinary OpenClaw schema and
+plugin-aware validator. Gateway, plugins, tools, and other consumers receive
+the normal runtime config shape; they do not implement layer-specific logic.
 
-Schema normalization, defaults, plugin-aware validation, and runtime-derived
-values apply only after the complete fold. They therefore never create
-authority claims. Cross-field rules see the composed effective candidate rather
-than an incomplete sparse layer.
+## Authority rules
 
-Arrays are whole-field values unless a specific built-in bounded rule applies.
-Objects are traversed according to the normal schema; declaring one child does
-not implicitly claim unrelated siblings.
+### Exact ownership
 
-Absence means that a layer makes no declaration for the path. Removing a path
-from a writable layer relinquishes that layer's claim when the chain is
-recomputed. `null` is a declared value only where the schema accepts it; it is
-not a generic deletion marker.
+Exact ownership is the default.
 
-Empty objects declare no leaves and canonicalize away without individual
-warnings. A layer with no declarations is valid, allowing staged or temporarily
-empty sources, but inspection and status report one `NoDeclaredValues`
-advisory for that layer.
+The earliest layer declaring a path owns that path. A later layer may:
 
-The ordered layer list is selected at process startup through one explicit core
-loading mechanism. Each source reference identifies one document, its immutable
-source identity, and an optional expected digest. Order is declared once; it is
-not inferred from filenames, environment discovery, or numeric priority.
+- omit the path;
+- repeat the same authored value.
 
-OpenClaw resolves JSON5 and includes within each source before authority
-admission, using the ordinary include rules and the source's real location.
-Includes cannot read from, write to, or gain precedence over another layer.
-Environment substitution runs once after the ordered documents are composed,
-so an earlier layer may intentionally declare environment values referenced by
-a later layer without making substitution order-dependent. Every resolved
-layer must be a cloneable plain-object document. Ordinary schema, plugin-aware,
-secret-reference, and cross-field validation run against the composed
-candidate.
-
-The runtime reports source identities rather than host paths where paths would
-leak deployment details. A host can prove which inputs produced an effective
-snapshot without making its filesystem layout part of the contract.
-
-### Authority rules
-
-#### Exact authority
-
-A later layer must omit the field or provide the same authored value. A
-different value is an admission error.
+A later layer may not provide a different value. OpenClaw rejects the complete
+candidate with a `ControlledByEarlierLayer` finding.
 
 ```json
 {
-  "path": "gateway.auth.mode",
   "reason": "ControlledByEarlierLayer",
-  "controllingLayer": "platform",
-  "controllingValue": "trusted-proxy",
-  "conflictingLayer": "operator",
-  "conflictingValue": "token",
-  "control": "exact"
+  "layer": "operator",
+  "path": "gateway.controlUi.allowedOrigins",
+  "controllingLayer": "tenant"
 }
 ```
 
-Exact authority is the default and works for every schema field without adding
-field-specific policy logic.
+There is no silent managed-wins or last-writer-wins behavior.
 
-Equal exact declarations are accepted. Provenance records each declaring layer
-while the earliest remaining declaration stays controlling. Removing or
-reordering a layer recomputes the complete chain from source documents; derived
-authority state is not persisted as another configuration source.
+### Bounded tool policy
 
-#### Bounded authority
+V1 has two built-in bounded paths:
 
-OpenClaw may mark a small closed set of fields with a monotonic comparator. A
-later layer may preserve or tighten the inherited boundary but cannot weaken
-it. Comparator composition must be associative so the same operation can be
-applied recursively across any number of layers.
-
-Initial comparator classes are:
-
-| Comparator | Composition rule |
+| Path | Rule |
 | --- | --- |
-| Allow-set ceiling | Operator set must be a subset of the managed set |
-| Deny-set floor | Operator set must be a superset of the managed set |
-| Maximum limit | Operator value must be equal or lower |
-| Minimum requirement | Operator value must be equal or stricter |
-| Required protection | Operator cannot disable it |
-| Disabled risky capability | Operator cannot re-enable it |
+| `tools.allow` | A later layer may only narrow the effective allow policy |
+| `tools.deny` | A later layer may only broaden the effective deny policy |
 
-Comparator assignment and ordering are owned by the OpenClaw schema. Layers
-cannot attach a comparator to an arbitrary field or redefine "stricter."
-Each comparator must be deterministic, idempotent, and associative over its
-supported domain so recursive composition does not depend on fold grouping.
+The comparison uses OpenClaw's runtime tool-policy semantics, including groups,
+wildcards, and the meaning of an empty allow list. Ambiguous
+expression-to-expression comparisons fail closed unless containment is proven.
 
-### Effective configuration
+A weakening attempt produces `WouldWeakenEarlierLayer`.
 
-Composition happens once before runtime consumers observe configuration:
+No other field receives a comparator in V1. Additional comparators require
+field-specific semantics, tests, and demonstrated demand.
 
-```text
-resolve each source independently
-  -> sparse-document admission
-  -> authority admission
-  -> effective composition
-  -> existing schema, plugin-aware, and cross-field validation
-  -> existing runtime materialization
-  -> immutable runtime snapshot
-```
+## Runtime lifecycle
 
-Gateway, plugins, tools, sessions, and state modules consume the same effective
-snapshot. They do not independently merge managed and operator values.
+Layered configuration is a startup input, not a second live config store.
 
-The effective result reports two identities: an effective-content identity for
-the normalized, redacted effective configuration, and an authority-chain
-identity for the ordered authored claims and control metadata. Source delivery
-identities are separate diagnostic metadata. Secret values are never included
-in diagnostic output or hashes in a way that exposes plaintext.
+When layered mode is active:
 
-### Findings and provenance
+- the composed snapshot is reused for the server lifetime;
+- config hot reload is disabled;
+- config-mutating RPCs are rejected;
+- agent create, update, and delete are rejected before workspace side effects;
+- process-wide config persistence paths reject writes;
+- a source change takes effect only after Gateway restart.
 
-Validation returns structured findings suitable for CLI, status, doctor, admin
-UI, and automation:
+Read surfaces use the composed snapshot where they would otherwise reread the
+canonical config file.
 
-```json
+The write guard is owned by the Gateway server lifecycle and supports
+overlapping owners in one process. Closing one layered server removes only its
+own guard.
+
+This read-only boundary avoids partial write semantics and keeps V1 small. A
+future writable-layer design would need explicit source ownership, conflict
+detection, atomic persistence, reload, and recovery guarantees and is not
+implied by this RFC.
+
+## Lobster example
+
+The following is a realistic three-file Scout deployment. The names are not
+special to OpenClaw.
+
+### 1. Scout global config
+
+```json5
+// scout-global.json5
 {
-  "valid": false,
-  "findings": [
-    {
-      "path": "tools.exec.ask",
-      "reason": "WeakerThanManagedRequirement",
-      "managedValue": "always",
-      "operatorValue": "never",
-      "control": "minimum-requirement"
-    }
-  ]
+  gateway: {
+    mode: "local",
+    auth: {
+      mode: "trusted-proxy",
+      trustedProxy: {
+        userHeader: "x-scout-user",
+        requiredHeaders: ["x-scout-tenant"],
+      },
+    },
+    controlUi: {
+      dangerouslyAllowHostHeaderOriginFallback: false,
+      allowInsecureAuth: false,
+      dangerouslyDisableDeviceAuth: false,
+    },
+  },
+  tools: {
+    deny: ["exec"],
+  },
 }
 ```
 
-Effective inspection reports provenance without exposing secrets:
+### 2. Tenant network config
 
-```json
+```json5
+// tenant-network.json5
 {
-  "path": "tools.alsoAllow",
-  "value": ["read", "sessions_list"],
-  "authority": "operator",
-  "managedBoundary": ["read", "sessions_list", "exec"],
-  "control": "allow-set-ceiling"
+  gateway: {
+    bind: "tailnet",
+    trustedProxies: ["100.96.0.0/12"],
+    tailscale: {
+      mode: "serve",
+      serviceName: "svc:openclaw-acme",
+    },
+    controlUi: {
+      allowedOrigins: ["https://openclaw.acme.internal"],
+    },
+  },
+  tools: {
+    deny: ["exec", "web"],
+  },
 }
 ```
 
-At minimum, OpenClaw should support machine-readable operations equivalent to:
+### 3. Operator config
 
-- validate managed plus operator inputs;
-- inspect the effective configuration;
-- explain one path's value, authority, and comparator;
-- report the effective configuration identity through status.
-
-Exact command names and loading flags should follow existing config CLI and
-Gateway conventions during implementation.
-
-### Mutation behavior
-
-Mutation APIs target one explicitly writable layer, including a middle layer. A
-write that would violate authority inherited from an earlier layer fails before
-persistence; a valid declaration may establish authority over later layers.
-Read-only layers are not writable through normal config APIs, regardless of
-label.
-
-Config reload follows the existing hot-reload/restart classification after a
-complete effective candidate passes admission and cross-field validation.
-OpenClaw publishes one runtime snapshot; a failed reload leaves the previous
-snapshot active and does not partially activate the candidate. At startup,
-failure remains visible and prevents readiness when the runtime cannot safely
-operate under the declared host boundary.
-
-Layer resolution and admission invoke snapshot publication exactly once with a
-complete source/runtime candidate. Source resolution, sparse-document admission,
-authority, or effective-validation failure does not invoke the publisher.
-Atomic preflight and publication remain owned by the existing runtime snapshot
-boundary; the layer engine does not own snapshot globals or reload actions.
-
-Layer writes use the existing config mutation preflight and conflict model. The
-write must be validated against the target source and authority-chain
-identity captured for that mutation. If either changed, the write fails with a
-structured conflict before persistence. This extends the existing write path;
-it does not introduce dynamic ownership transfer or a general reconciliation
-protocol.
-
-A descriptor with an expected content digest is immutable for that descriptor
-generation and therefore cannot also be writable. A successful persistence
-adapter returns the canonical committed bytes. Before publication, OpenClaw
-resolves the complete source chain again, requires the refreshed writable
-source to match those committed bytes, and recomposes from the refreshed
-sources. A concurrent non-target change is therefore included in the published
-candidate, while an intervening target write produces a structured conflict
-instead of publishing bytes that no longer match storage.
-
-```mermaid
-sequenceDiagram
-  participant C as Config client
-  participant O as OpenClaw
-  participant W as Writable source
-  participant R as Remaining sources
-  C->>O: write(target digest, chain identity, proposal)
-  O->>O: resolve + preflight complete chain
-  O->>W: CAS/atomic commit
-  W-->>O: canonical committed bytes
-  O->>R: resolve complete chain again
-  O->>W: resolve committed target again
-  alt target digest matches committed bytes
-    O->>O: recompose + validate refreshed chain
-    O-->>C: publish one candidate
-  else target changed after commit
-    O-->>C: structured conflict; publish nothing
-  end
+```json5
+// operator.json5
+{
+  gateway: {
+    controlUi: {
+      enabled: true,
+    },
+  },
+  logging: {
+    level: "info",
+  },
+}
 ```
 
-### Example deployment profiles
+Lobster starts OpenClaw with the three explicit sources:
 
-A local personal installation can use one writable layer. A simple hosted
-deployment can use two layers. A control plane can use more:
-
-```text
-platform -> tenant -> agent/team -> operator
-```
-
-These are profiles of the same ordered recursive model. Core does not assign
-special behavior to any name or require a fixed layer count.
-
-### Lobster usage case: Scout, tenant, and operator config
-
-A realistic Lobster deployment uses three layers. The names describe this
-deployment; core still treats them as generic ordered sources.
-
-The Scout global layer establishes fleet-wide Gateway security posture:
-
-```yaml
-id: scout-global
-access: read-only
-config:
-  gateway:
-    mode: local
-    auth:
-      mode: trusted-proxy
-      trustedProxy:
-        userHeader: x-scout-user
-        requiredHeaders:
-          - x-scout-tenant
-    controlUi:
-      dangerouslyAllowHostHeaderOriginFallback: false
-      allowInsecureAuth: false
-      dangerouslyDisableDeviceAuth: false
-```
-
-The tenant layer supplies private-network facts that differ per deployment,
-including its Tailnet exposure, trusted proxy range, and tenant URL:
-
-```yaml
-id: tenant-network
-access: read-only
-config:
-  gateway:
-    bind: tailnet
-    trustedProxies:
-      - 100.96.0.0/12
-    tailscale:
-      mode: serve
-      serviceName: svc:openclaw-acme
-    controlUi:
-      allowedOrigins:
-        - https://openclaw.acme.internal
-```
-
-The operator layer remains writable for ordinary customization:
-
-```yaml
-id: operator
-access: read-write
-config:
-  gateway:
-    controlUi:
-      enabled: true
-  logging:
-    level: info
+```bash
+openclaw gateway run \
+  --config-layer scout=./scout-global.json5 \
+  --config-layer tenant=./tenant-network.json5 \
+  --config-layer operator=./operator.json5
 ```
 
 ```mermaid
 flowchart LR
-  S[Scout global<br/>security baseline] --> F[Recursive fold]
+  S[Scout global<br/>security baseline] --> F[Ordered recursive fold]
   T[Tenant network<br/>URL, proxy, Tailnet] --> F
-  O[Operator<br/>ordinary customization] --> F
-  F --> V[Effective validation]
-  V --> R[One ordinary OpenClaw runtime config]
+  O[Operator<br/>local customization] --> F
+  F --> V[OpenClaw validation]
+  V --> R[One immutable runtime config]
 ```
 
-OpenClaw publishes the same ordinary runtime shape that an unmanaged
-installation would consume:
+The effective runtime shape is the same ordinary config shape OpenClaw already
+consumes:
 
-```yaml
-gateway:
-  mode: local
-  bind: tailnet
-  auth:
-    mode: trusted-proxy
-    trustedProxy:
-      userHeader: x-scout-user
-      requiredHeaders:
-        - x-scout-tenant
-  trustedProxies:
-    - 100.96.0.0/12
-  tailscale:
-    mode: serve
-    serviceName: svc:openclaw-acme
-  controlUi:
-    enabled: true
-    allowedOrigins:
-      - https://openclaw.acme.internal
-    dangerouslyAllowHostHeaderOriginFallback: false
-    allowInsecureAuth: false
-    dangerouslyDisableDeviceAuth: false
-logging:
-  level: info
-```
-
-No Gateway, Control UI, logging, or plugin consumer needs to know that three
-sources produced the document. Provenance retains the distinction for
-inspection and write preflight.
-
-If the operator later attempts to replace the tenant URL, OpenClaw rejects the
-write before persistence:
-
-```json
+```json5
 {
-  "path": "gateway.controlUi.allowedOrigins",
-  "reason": "ControlledByEarlierLayer",
-  "controllingLayer": "tenant-network",
-  "controllingValue": ["https://openclaw.acme.internal"],
-  "conflictingLayer": "operator",
-  "conflictingValue": ["https://example.invalid"]
+  gateway: {
+    mode: "local",
+    bind: "tailnet",
+    auth: {
+      mode: "trusted-proxy",
+      trustedProxy: {
+        userHeader: "x-scout-user",
+        requiredHeaders: ["x-scout-tenant"],
+      },
+    },
+    trustedProxies: ["100.96.0.0/12"],
+    tailscale: {
+      mode: "serve",
+      serviceName: "svc:openclaw-acme",
+    },
+    controlUi: {
+      enabled: true,
+      allowedOrigins: ["https://openclaw.acme.internal"],
+      dangerouslyAllowHostHeaderOriginFallback: false,
+      allowInsecureAuth: false,
+      dangerouslyDisableDeviceAuth: false,
+    },
+  },
+  tools: {
+    deny: ["exec", "web"],
+  },
+  logging: {
+    level: "info",
+  },
 }
 ```
 
-The same rule protects Scout global security posture and tenant-private network
-facts without hard-coding Scout, tenant, or operator as engine roles. This
-replaces Lobster-specific fragment generation and stale-value cleanup while
-preserving the existing runtime config API.
+If the operator document also declares a different
+`gateway.controlUi.allowedOrigins`, startup is rejected because the tenant
+layer declared that exact path first. If it removes `web` from
+`tools.deny`, startup is rejected because that would weaken the inherited
+deny floor.
 
+This lets Lobster materialize three source files without teaching OpenClaw
+about Scout, tenants, or operators. After an OpenClaw release contains the
+feature, Lobster can remove the baked effective-config overlay and its
+stale-value cleanup.
 
-### Policy plugin relationship
+## Evidence
 
-Core owns composition, authority metadata, comparators, findings, and startup
-enforcement. The optional Policy plugin may reuse the comparator and finding
-machinery for diagnostics, repair suggestions, or conformance checks, but core
-must not depend on that plugin.
+The design was developed through the FACES loop:
 
-### Conformance
+- frame the host problem and deletion target;
+- audit the existing OpenClaw config and lifecycle boundaries;
+- compare recursive and layered patterns inside OpenClaw;
+- evaluate the contract with maintainer, security, host, operator, and testing
+  roles;
+- build a broad fork prototype, then reduce it to the smallest supported slice.
 
-Release tests should cover:
+Evidence available during RFC review:
 
-- exact conflicts across representative scalar, object, and array fields;
-- every supported bounded comparator and authored-representation edge case;
-- source immutability and operator write rejection;
-- redaction and stable effective identity;
-- cross-field validation after composition;
-- reload/restart behavior;
-- invalid-startup readiness/status behavior;
-- compatibility when a newer managed document references an unsupported field
-  or comparator;
-- transactional reload and preservation of the previous effective generation;
-- stale operator-write rejection across managed-boundary rotation;
-- rejection of a digest-pinned writable descriptor;
-- complete-chain refresh when a non-target source changes during persistence;
-- intervening target-write rejection before publication;
-- canonical committed-byte reread before effective publication;
-- source digest mismatch and source-identity redaction;
-- semantic equivalence between direct effective config and composed managed
-  plus operator inputs.
+- broad fork prototype: https://github.com/giodl73-repo/openclaw/pull/33
+- simplified upstream draft implementation:
+  https://github.com/openclaw/openclaw/pull/107026
+- a Lobster fork adapter materializes Scout, tenant, and operator documents and
+  passes them as repeated flags;
+- 61 focused OpenClaw tests cover recursive composition, exact conflicts,
+  bounded tool policies, config loading, immutable write ownership, and early
+  agent-mutation rejection;
+- final Codex review reported no actionable correctness regression.
 
-Hosting Profiles may declare Managed Configuration as an optional capability,
-but profiles do not own its semantics.
+The broad prototype was useful evidence, not the proposed V1. It showed that
+writable layers, provenance, reload, and rollback substantially expand the
+contract. Those features were removed from the upstream implementation rather
+than carried as speculative framework.
 
-### Implementation sequence
+## Delivery plan
 
-The RFC is delivered as small, independently reviewable PRs. No PR needs to
-implement the complete RFC:
+### PR 1: OpenClaw V1
 
-1. **Exact-authority core.** Add the pure recursive fold, authored-value conflict
-   findings, provenance, effective validation, and focused tests. No startup,
-   persistence, or existing config behavior changes.
-2. **Bounded-authority registry and first field set.** Add the schema-owned
-   comparator registry and the first closed set of real fields using the
-   allow-set ceiling, deny-set floor, numeric-minimum, or numeric-maximum
-   classes. The PR must include at least one demonstrated deployment use; it is
-   not an empty comparator framework.
-3. **Opt-in loading and activation.** Add one explicit ordered-source seam to the
-   existing config I/O path and publish one effective snapshot through the
-   existing activation boundary. With no source list, OpenClaw follows its
-   current single-config path and users cannot observe the feature.
-4. **Writes and inspection.** Route writes to an explicitly writable source,
-   reject writes that violate earlier authority, and expose redacted provenance
-   and readiness findings. Reuse existing mutation and status surfaces rather
-   than creating a management subsystem.
-5. **Concrete local-file integration.** Resolve ordered JSON5/include sources,
-   use the ordinary primary OpenClaw config as the one writable source, persist
-   through existing snapshot/CAS/atomic-write APIs, and recompose canonical
-   committed bytes before publication. Environment substitution runs once
-   after the complete ordered composition.
-6. **Lobster migration and deletion.** Prove effective-config equivalence for
-   the allowed-origins case, switch Lobster to the supported source seam, and
-   delete its baked overlay writer, stale-value cleanup, and exact-blob tests.
+The implementation draft at
+https://github.com/openclaw/openclaw/pull/107026 delivers the complete V1
+contract in one reviewable change:
 
-The exact-authority core can be reviewed independently, but RFC completion
-includes the bounded-authority PR. Comparator assignment remains closed,
-schema-owned, and justified field by field.
+- pure recursive composition;
+- exact ownership and bounded tool-policy checks;
+- repeatable Gateway CLI loading;
+- ordinary config and plugin validation;
+- immutable server lifecycle;
+- focused tests and user documentation.
 
-Steps 1 through 5 complete the generic OpenClaw feature contract. Step 6 is an
-adoption and deletion gate for Lobster, intentionally dependent on an OpenClaw
-release that contains the capability; it is not additional core composition
-machinery.
+Before moving from draft, it must have green upstream CI and a recorded
+foreground Gateway proof showing successful three-layer startup, rejected
+conflict startup, and rejected runtime mutation.
 
-### Host migration and deletion gate
+### PR 2: Lobster adoption and deletion
 
-The feature succeeds only when a host can remove private config machinery. For
-each migration, conformance compares the old generated effective config with
-the OpenClaw-composed effective snapshot over representative deployments, then
-proves conflict, reload, and operator-write behavior. Once a minimum OpenClaw
-release passes that proof, the host removes the corresponding fragment
-generator, environment projection, stale-value cleanup, and exact config-blob
-tests. Temporary dual generation is diagnostic only and must have an owner,
-expiry release, and removal change.
+After an OpenClaw release contains PR 1, Lobster can:
+
+- materialize the three ordinary documents;
+- launch OpenClaw with repeated `--config-layer` flags;
+- compare the resulting effective config with representative existing
+  deployments;
+- remove the baked overlay writer, stale-value cleanup, and exact generated-blob
+  tests.
+
+The Lobster PR should depend on the released OpenClaw version, not an
+unpublished branch. No upstream Lobster PR is required before that release.
+
+## Conformance
+
+V1 acceptance requires:
+
+- no-flag startup remains behaviorally unchanged;
+- one or more layers compose in declared order;
+- duplicate or malformed descriptors fail;
+- JSON5, includes, env references, schema, and plugin validation work;
+- exact conflicts fail before readiness;
+- tool-policy tightening succeeds and weakening fails closed;
+- the Gateway uses the composed snapshot for reads;
+- reload is disabled for layered mode;
+- config and agent config mutations fail before persistence or workspace side
+  effects;
+- closing layered runtimes releases only their own write guards;
+- documentation shows the generic model and the Lobster three-file example.
 
 ## Rationale
 
-### Why not generated overlays?
+### Why an opt-in CLI seam?
 
-Generated overlays express precedence, not authority. They silently overwrite
-conflicts and require every host to reproduce OpenClaw normalization and
-cross-field validation behavior.
+It is explicit, easy for hosts to generate, invisible to ordinary users, and
+does not add a second persistent config format.
 
-### Why not a new hosted config section?
+### Why reject conflicts?
 
-The controlled settings already have canonical homes. Copying them into a
-hosting section creates two schemas and forces runtime modules to understand
-hosting. Authority metadata composes existing fields without changing their
-semantic owner.
+Silent precedence hides operator intent and can weaken deployment posture.
+Rejecting the whole candidate makes the boundary visible and keeps the last
+running configuration unchanged.
 
-### Why reject instead of managed-wins?
+### Why only two bounded fields?
 
-Silent precedence hides operator intent and configuration drift. Structured
-admission makes the conflict actionable and preserves one explainable effective
-state.
+Exact ownership is generic. Monotonic comparison is field-specific. The two
+tool-policy fields already have runtime semantics OpenClaw can reuse and test.
+Adding an empty comparator framework would increase surface area without
+delivering behavior.
 
-### Why keep comparators closed?
+### Why startup-only and read-only?
 
-Arbitrary host comparators become a policy language and make conformance
-impossible. OpenClaw can safely promise monotonic composition only where it owns
-the field and ordering.
+Write-through and reload require source selection, concurrency, recovery, and
+partial-failure semantics. Hosts can solve the immediate overlay problem by
+regenerating source files and restarting. The smaller lifecycle is easier to
+reason about and ship.
 
 ### Why core rather than a plugin?
 
-Configuration authority must apply before optional plugins and runtime modules
-activate. A plugin cannot safely be the enforcement dependency for its own
-loading configuration or for Gateway startup.
+Composition and authority must run before plugin-aware validation and plugin
+activation. A plugin cannot safely enforce the configuration that controls its
+own loading.
 
-## Unresolved questions
+## Future work
 
-- Which existing OpenClaw config loading API and CLI commands should expose the
-  ordered layer list?
-- Which fields, if any, should receive bounded comparators in the first release?
-- How should schema evolution report a managed field that is unknown to an
-  older OpenClaw release?
-- Which redacted provenance fields belong in `status` versus a dedicated config
-  inspection call?
-- What storage and ownership guidance should hosts follow for durable operator
-  configuration across container replacement?
-- Which existing runtime override paths are defaults, trusted activation
-  inputs, or potential authority-chain bypasses?
+The following require separate evidence and design review:
+
+- redacted per-path provenance and explanation;
+- writable source routing;
+- live reload with atomic candidate publication;
+- rollback generations;
+- additional field-specific bounded comparators;
+- non-file source adapters.
+
+None is required for Lobster to replace its baked startup overlays.
