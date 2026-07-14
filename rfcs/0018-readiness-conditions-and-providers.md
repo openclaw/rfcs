@@ -358,7 +358,14 @@ runtime activation identity, or a release support matrix.
 
 ### Implementation plan
 
-The draft implementation is restacked into a readiness-only series:
+The primary implementation for this RFC is
+[openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
+It is one upstream draft PR with four ordered commits, exact-head tests, and
+package-installed Docker proof. Reviewers should use that PR for the proposed
+landing shape and current validation state.
+
+The fork PRs below expose the same four commits as optional smaller review
+slices. They are supporting review aids, not alternative landing PRs:
 
 | Slice | Draft PR | Intended scope |
 | --- | --- | --- |
