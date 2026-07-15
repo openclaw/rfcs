@@ -3,7 +3,7 @@ title: Standard Hosting Profiles
 authors:
   - Gio
 created: 2026-07-14
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/37
@@ -59,7 +59,8 @@ standard catalog.
 
 - Define `local`, `container`, `reverse-proxy`, and `node-mode` as standard
   OpenClaw support profiles.
-- Make selection optional and preserve zero-configuration local behavior.
+- Make selection opt-in so an upgrade preserves the existing unprofiled
+  readiness baseline.
 - Select profiles through config, environment, or Gateway startup arguments
   with explicit precedence.
 - Compose profiles from reusable canonical readiness conditions.
@@ -118,7 +119,7 @@ RFC 0023 profile use:
 
 | Profile | Runtime posture | Additional required conditions |
 | --- | --- | --- |
-| `local` | Default local or foreground Gateway | Valid effective config, writable workspace, Gateway response, and required activation facts. |
+| `local` | Explicit local or foreground Gateway posture | Valid effective config, writable workspace, Gateway response, and required activation facts. |
 | `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady`. |
 | `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady`. Loopback remains valid for a same-host proxy. |
 | `node-mode` | Gateway controlling one or more execution targets | `local` plus pairing, connected target, command approval, and control-channel conditions. |
@@ -159,8 +160,10 @@ declare when they are required for the supported posture.
 
 ### Selection and precedence
 
-Profile selection is optional. When no value is supplied, OpenClaw resolves
-`local` so existing installations remain zero-configuration.
+Profile selection is optional and opt-in. When no value is supplied, OpenClaw
+does not select a profile. Existing installations retain the universal
+readiness baseline from RFC 0018 and do not silently acquire profile-specific
+required conditions during an upgrade.
 
 Selection precedence is:
 
@@ -168,7 +171,6 @@ Selection precedence is:
 gateway startup argument
 > OPENCLAW_HOSTING_PROFILE
 > openclaw.json
-> local default
 ```
 
 Example:
@@ -188,10 +190,11 @@ OPENCLAW_HOSTING_PROFILE=container openclaw gateway run
 openclaw gateway run --hosting-profile container
 ```
 
-The effective profile, selection source, and condition result are reported by
-readiness, health, and status. Hosts may assert an expected profile when
-probing, but expectation is an assertion over the running result, not another
-selection source.
+When selected, the effective profile, selection source, and condition result
+are reported by readiness, health, and status. An unprofiled runtime omits
+`ProfileSelected` and profile-only requirements. Hosts may assert an expected
+profile when probing, but expectation is an assertion over the running result,
+not another selection source.
 
 Profiles validate effective runtime state. They do not generate or repair the
 underlying Gateway, proxy, plugin, model, node, or storage config.
@@ -215,7 +218,7 @@ owned by other contracts:
 type RuntimeActivationSummary = {
   runtimeId: string;
   incarnationId: string;
-  profile: string;
+  profile?: string;
   configGeneration?: string;
   hostIntegrationGeneration?: string;
   restoreGeneration?: string;
@@ -332,7 +335,7 @@ deployment's support claim.
 
 The initial profile matrix must execute package-installed scenarios for:
 
-- local readiness;
+- unchanged unprofiled readiness and explicit local-profile readiness;
 - container success and loopback failure;
 - reverse-proxy success and missing-auth failure;
 - node-mode unpaired failure and paired/approved recovery; and
@@ -404,23 +407,24 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `89d8607aab9f` from
+It is based on readiness head `17b34f792d8` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains seven profile-only commits:
+and contains eight profile-only commits:
 
 | Commit | Intended scope |
 | --- | --- |
-| `44c0f163489` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
-| `d1a47217be6` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
-| `057ad938451` | Attribute profile results to logical runtime and incarnation IDs. |
-| `ee942d3989a` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
-| `02602feb858` | Validate profile startup inputs before destructive lifecycle actions. |
-| `1448fb9c749` | Prove writable host-provisioned workspace behavior and storage recovery. |
-| `a416b9b9192` | Prove the existing node approval flow transitions node-mode to ready. |
+| `642bed18093` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
+| `b9121934a7f` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
+| `2b10b218279` | Attribute profile results to logical runtime and incarnation IDs. |
+| `81f787820da` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
+| `05bbe94f8d5` | Validate profile startup inputs before destructive lifecycle actions. |
+| `ab612666315` | Prove writable host-provisioned workspace behavior and storage recovery. |
+| `630684819c8` | Prove the existing node approval flow transitions node-mode to ready. |
+| `f54affa3983` | Make profile activation explicit and prove unprofiled upgrade compatibility. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
-seven profile commits. After PR 104018 lands, the same PR naturally reduces to
+eight profile commits. After PR 104018 lands, the same PR naturally reduces to
 the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
 preserves that profile-only comparison view in the meantime. Fork PRs
 [#18](https://github.com/giodl73-repo/openclaw/pull/18),
@@ -431,7 +435,9 @@ slices as review aids; they are not alternative landing requests.
 
 The exact-head package-installed Docker matrix passes all four profiles plus
 listener, trusted-proxy, node-approval, workspace-full, and recovery cases.
-The proof image is `sha256:e87c9e0651d60b6b58262b6ee271f89d0bee060fd2761d0da1525aca60fd6337`.
+The proof begins with an unprofiled package that remains `200` without
+`ProfileSelected` or `WorkspaceWritable`, then exercises each explicit profile.
+The proof image is `sha256:20d507b613b346e1165add88234eb00390ea6d1b086970dd3589dd3f41654175`.
 
 ## Rationale
 
@@ -452,8 +458,6 @@ and release cost rather than debating the underlying readiness API again.
 
 ## Unresolved questions
 
-- Should `local` be an explicit reported default or should no selection report
-  an unprofiled runtime until the operator opts in?
 - Should operator profiles be part of the first implementation or follow after
   the standard catalog proves stable?
 - Which activation references are required in V1 beyond runtime and
