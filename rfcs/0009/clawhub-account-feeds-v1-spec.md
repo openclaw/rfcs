@@ -1,290 +1,251 @@
 # ClawHub Account Feeds v1 Addendum Specification
 
-This document is the implementer-facing account-feed addendum for RFC 0009
-hosted feeds. It builds on the core feed specification and the signed-feed trust
-addendum.
+This document defines the ClawHub account and publisher discovery-feed contract
+associated with RFC 0009.
 
 Status: draft addendum, tied to RFC 0009.
+
+The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are normative.
 
 ## Scope
 
 This addendum defines:
 
-- ClawHub account and publisher feed identity;
-- account-feed metadata;
-- account feed entries for plugins and skills;
-- the boundary between following and install authority;
-- user-facing account feed discovery states;
-- downstream registry consumption of ClawHub account-feed facts;
-- diagnostics and provenance requirements.
+- stable account and publisher feed identity;
+- the strict account-feed document and entry shapes;
+- bounded pagination and refresh semantics;
+- the boundary between following, discovery, trust, and installation;
+- downstream registry provenance and diagnostics.
 
-This addendum does not define:
+It does not define an installable catalog entry, package candidate, signed
+account-feed payload type, notification transport, organization approval,
+artifact trust, or security-scanning implementation.
 
-- the core feed document shape;
-- signed envelope mechanics;
-- package artifact trust;
-- security scanning implementation;
-- self-service claim workflows;
-- organization-admin approval workflows;
-- notification delivery protocols beyond feed/follow semantics.
+## Relationship To Hosted Catalog Feeds
 
-## Model
+An account feed is a ClawHub discovery projection. It is not the Hosted Feed v1
+install catalog defined by `hosted-feed-v1-spec.md`.
 
-ClawHub can publish feeds for stable account or publisher identities. These
-feeds let OpenClaw and downstream registries discover the packages associated
-with a publisher without treating account following as a security or install
-grant.
+Account-feed entries identify public skills and plugins associated with an
+account or publisher. A client that wants to install one of those entries MUST
+resolve it through an accepted install catalog or another explicit package
+resolver and MUST still apply source, integrity, scan, approval, and runtime
+policy checks.
 
-An account feed is still a normal hosted feed. It should use the core v1 feed
-shape for entries and the signed-feed trust addendum for authenticity. The
-account-feed addendum defines the feed identity and metadata conventions around
-that core payload.
+This distinction allows users to follow people and organizations without
+turning social discovery into install authority.
 
-## Identity
+## Wire Contract
 
-Account feeds must use stable ClawHub identity, not mutable display names.
+The normative v1 schema is the generated `AccountFeedSchema` in the ClawHub
+`clawhub-schema` package. The schema is strict. Conforming publishers MUST NOT
+add unknown fields to a v1 document or entry.
 
-Recommended feed ids:
-
-```text
-clawhub-account:<account-id>
-clawhub-publisher:<publisher-id>
-clawhub-org:<organization-id>
-```
-
-Display handles, names, avatars, bios, and URLs are metadata. They may change
-without changing feed identity.
-
-## Feed Metadata
-
-Account feeds should carry bounded account metadata in `metadata`.
+## Feed Document
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "clawhub-publisher:openclaw",
+  "feedId": "clawhub.publisher.publishers:01JEXAMPLE",
+  "scope": "publisher",
+  "accountId": "users:01JEXAMPLE",
+  "publisherId": "publishers:01JEXAMPLE",
+  "handle": "openclaw",
+  "displayName": "OpenClaw",
   "generatedAt": "2026-07-15T00:00:00.000Z",
   "sequence": 17,
-  "expiresAt": "2026-07-22T00:00:00.000Z",
-  "metadata": {
-    "kind": "clawhubPublisherFeed",
-    "publisherId": "openclaw",
-    "handle": "openclaw",
-    "displayName": "OpenClaw",
-    "profileUrl": "https://clawhub.ai/creators/openclaw",
-    "officialState": "official"
-  },
-  "entries": []
+  "entries": [],
+  "nextCursor": null
 }
 ```
-
-Recommended metadata fields:
 
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
-| `kind` | string | Yes | `clawhubAccountFeed`, `clawhubPublisherFeed`, or `clawhubOrganizationFeed`. |
-| `accountId` | string | Conditional | Stable account id for account feeds. |
-| `publisherId` | string | Conditional | Stable publisher id for publisher feeds. |
-| `organizationId` | string | Conditional | Stable organization id for organization feeds. |
-| `handle` | string | Optional | Current display handle. |
-| `displayName` | string | Optional | Current display name. |
-| `profileUrl` | string | Optional | Human-facing ClawHub profile URL. |
-| `claimState` | string | Optional | Publisher claim state when known. |
-| `officialState` | string | Optional | ClawHub official-state fact when known. |
-| `restrictionState` | string | Optional | Suspended, restricted, or normal state when known. |
+| `schemaVersion` | integer | Yes | MUST be `1`. |
+| `feedId` | string | Yes | Stable feed identity. |
+| `scope` | string | Yes | `account` or `publisher`. |
+| `accountId` | string or null | Yes | Stable account id when applicable. |
+| `publisherId` | string or null | Yes | Stable publisher id when applicable. |
+| `handle` | string or null | Yes | Current mutable public handle. |
+| `displayName` | string | Yes | Current public display name. |
+| `generatedAt` | RFC 3339 string | Yes | Projection generation time. |
+| `sequence` | non-negative safe integer | Yes | Monotonic revision for this `feedId`. |
+| `entries` | array | Yes | Ordered public discovery entries. |
+| `nextCursor` | string or null | Yes | Opaque continuation cursor. |
 
-Metadata fields are facts from ClawHub. They do not by themselves grant install
-authority.
+An account-scoped feed MUST have a non-null `accountId`. A publisher-scoped
+feed MUST have a non-null `publisherId`. The other identity may be present when
+ClawHub has a public relationship between them.
 
-## Entry Requirements
+Feed ids use stable opaque ids, not mutable handles:
 
-Entries in account feeds must use the core feed entry shape. Account-feed
-entries should preserve the account or publisher provenance in bounded metadata:
+```text
+clawhub.account.<stable-id>
+clawhub.publisher.<stable-id>
+```
+
+Changing a handle or display name MUST NOT change `feedId`.
+
+## Entry Object
+
+Every account-feed entry has exactly these fields:
+
+| Field | Type | Required | Semantics |
+| --- | --- | --- | --- |
+| `kind` | string | Yes | `skill` or `plugin`. |
+| `id` | string | Yes | Stable ClawHub object or package identity. |
+| `name` | string | Yes | Current package name or slug. |
+| `displayName` | string | Yes | User-facing title. |
+| `summary` | string or null | Yes | Bounded public summary. |
+| `url` | string | Yes | Absolute HTTPS URL or origin-relative URL-reference for the canonical public ClawHub page. |
+| `updatedAt` | number | Yes | Finite, non-negative Unix epoch time in milliseconds used for ordering. |
+
+Example:
 
 ```json
 {
-  "type": "plugin",
-  "id": "acpx",
-  "title": "ACP-X",
-  "version": "1.2.3",
-  "state": "available",
-  "publisher": {
-    "id": "openclaw",
-    "trust": "official"
-  },
-  "metadata": {
-    "clawhub": {
-      "publisherId": "openclaw",
-      "packageId": "acpx",
-      "packageUrl": "https://clawhub.ai/packages/acpx"
-    }
-  },
-  "install": {
-    "candidates": [
-      {
-        "sourceRef": "public-clawhub",
-        "package": "acpx",
-        "version": "1.2.3",
-        "integrity": "sha512-..."
-      }
-    ]
-  }
+  "kind": "plugin",
+  "id": "packages:01JEXAMPLE",
+  "name": "@openclaw/acpx",
+  "displayName": "ACP-X",
+  "summary": "ACP integration for OpenClaw.",
+  "url": "https://clawhub.ai/plugins/@openclaw/acpx",
+  "updatedAt": 1784073600000
 }
 ```
 
-Account feeds may include plugins, skills, or both. Clients must not route a
-skill through the plugin installer merely because both appear in one account
-feed.
+An entry intentionally has no install candidate, artifact URL, integrity claim,
+trust label, approval state, or scan result. Those facts have separate owners.
+
+Clients MUST resolve an origin-relative `url` against the origin of the account
+feed request, not against an unrelated configured catalog origin. Publishers
+MUST order entries by descending `updatedAt` and MUST use a stable identity
+tie-breaker when timestamps are equal.
+
+## Pagination And Sequence
+
+Account feeds are bounded projections. `nextCursor` is opaque and MUST NOT be
+constructed or interpreted by clients. A client follows `nextCursor` until it
+is null or until a local page/entry bound is reached.
+
+The sequence identifies the logical feed revision, not an individual page.
+Every page for one coherent revision SHOULD report the same `feedId`,
+`generatedAt`, and `sequence`. A publisher MUST NOT derive sequence from the
+newest visible entry timestamp because deletion or demotion could make it
+decrease.
+
+Cursor errors SHOULD return a bounded client error rather than silently
+restarting at the first page. ClawHub MUST bound page size, scan work, response
+size, and cursor lifetime.
+
+## Public API
+
+The initial ClawHub routes are:
+
+```text
+GET /api/v1/accounts/{accountId}
+GET /api/v1/accounts/{accountId}/feed
+GET /api/v1/publishers/{publisherId}
+GET /api/v1/publishers/{publisherId}/feed
+```
+
+Detail routes expose public identity and profile facts. Feed routes expose the
+strict discovery projection above. APIs SHOULD distinguish missing, non-public,
+restricted, suspended, and temporarily unavailable identities without exposing
+private moderation evidence.
 
 ## Following Semantics
 
-Following a ClawHub account, publisher, or organization is a discovery and
-notification preference. It means:
+Following is a reversible user preference. It MAY:
 
-- show the followed identity in the user's followed-publisher list;
-- optionally include matching entries in discovery filters;
-- optionally notify the user when the publisher adds or updates packages;
-- preserve provenance so the user can see why an entry appeared.
+- include the identity in a followed-publisher list;
+- include matching entries in discovery filters;
+- produce bounded update notifications;
+- explain why an entry appeared.
 
-Following does not mean:
+Following MUST NOT mean that:
 
-- the publisher is official;
-- the package is OpenClaw-reviewed;
-- the package passed security scanning;
-- the package is locally approved;
-- the package is organization-approved;
-- the package is installable;
-- the package bypasses source-profile, artifact-integrity, or policy checks.
+- the publisher is official, reviewed, or trusted;
+- an entry passed security scanning;
+- an entry is locally or organization approved;
+- an entry is installable;
+- source, integrity, or runtime policy checks may be bypassed.
 
-Clients should label followed-account results as followed or from a followed
-publisher, not as trusted or approved.
+UI and APIs MUST use follow/following language rather than trust or approval
+language.
 
-## Claim, Official, And Scan State
+## Privacy And Abuse Controls
 
-ClawHub may expose publisher facts such as claim state, official state,
-restriction state, scan state, or registry review state. These facts should be
-explicit fields or metadata; clients and downstream registries must not infer
-them from following state.
+Follower lists are private by default. Publishing an account feed MUST NOT
+reveal who follows it.
 
-Recommended separation:
+Follow and unfollow operations SHOULD be authenticated, reversible, idempotent,
+rate-limited, and separately mutable from notification preferences. Systems
+SHOULD suppress self-follow notifications and make blocked, deleted, private,
+or suspended identities explicit rather than representing them as successful
+empty feeds.
 
-| Fact | Meaning |
-| --- | --- |
-| `claimState` | Whether the publisher identity is claimed or claimable. |
-| `officialState` | Whether ClawHub marks the publisher as official. |
-| `restrictionState` | Whether the publisher is restricted, suspended, or normal. |
-| `scanState` | Whether a package has scan metadata, if ClawHub exposes it. |
-| `registryReviewState` | Whether a downstream registry has reflected review state. |
-| `followState` | Whether the current user follows the publisher. |
+## Trust And Signing Boundary
 
-Each fact has a separate source of authority. Clients should show labels and
-diagnostics that preserve the distinction.
+The signed-feed trust v1 addendum currently defines only the catalog payload
+type `openclaw.official-external-plugin-catalog-feed.v1`. It MUST NOT be reused
+for account-feed bytes.
 
-## Follow Privacy And Abuse Controls
-
-Follow state is user-specific preference data. ClawHub should treat follower
-lists as private by default unless a user or organization explicitly publishes a
-public list. Account-feed publication must not expose who follows an account.
-
-Follow and unfollow operations should be reversible, idempotent, and bounded.
-Implementations should rate-limit follow changes, suppress self-follow
-notifications, and provide a way to mute or disable notifications without
-unfollowing the publisher.
-
-Blocked, suspended, deleted, or private publishers should not silently remain in
-normal followed-discovery results. Clients should show an actionable status such
-as unavailable, restricted, or private rather than treating the feed as a
-successful empty feed.
+Signed account feeds require a separately specified payload type, expected
+identity binding, test vectors, and client implementation. Until that lands,
+HTTPS transport and ClawHub origin identify the API source, but account-feed
+content still grants discovery only and never install authority.
 
 ## Downstream Registry Consumption
 
-Downstream registries can consume ClawHub account feeds as source input. They
-may subset, block, pin, scan, or re-publish account-feed entries into their own
-effective feeds.
+A downstream registry MAY consume account feeds as discovery input, then
+resolve selected entries through an install catalog and apply its own review,
+scan, allow-list, block-list, and organization policy.
 
-When a downstream registry emits an effective feed, it should preserve bounded
-provenance:
+Derived records SHOULD preserve:
 
-- ClawHub feed id;
-- ClawHub feed sequence or checksum;
-- ClawHub publisher id;
-- ClawHub package id;
-- selected version or revision;
-- downstream policy state.
+- account `feedId`, sequence, and cursor or page checksum;
+- account and publisher ids when present;
+- entry kind and stable id;
+- the separately resolved catalog feed id, sequence, package version, source
+  reference, and integrity value;
+- downstream policy state and decision time.
 
-Downstream registries should not treat account following as approval. They must
-run their own review, scan, allow-list, block-list, or organization policy before
-calling an entry approved.
+Following state MUST NOT be translated into approval.
 
-## Discovery And UI Requirements
+## Diagnostics
 
-Clients and ClawHub surfaces should make account-feed state explainable:
+ClawHub and clients SHOULD distinguish:
 
-- profile pages should show package entries without implying install approval;
-- follow buttons should say follow or following, not trust;
-- official labels should be separate from scan or review labels;
-- unavailable, blocked, or restricted publishers should have actionable status;
-- discovery results should say when an entry appears because of a followed
-  publisher.
+- malformed account feed;
+- missing, private, restricted, suspended, or deleted identity;
+- invalid or expired cursor;
+- bounded-scan or page-limit exhaustion;
+- follow and unfollow outcomes;
+- discovery results included because of a follow;
+- catalog resolution failure for a discovered entry.
 
-Empty or restricted account feeds should be explicit. A missing account feed,
-private feed, deleted publisher, or blocked publisher should not silently look
-like an empty successful feed.
+Diagnostics MUST NOT expose tokens, private profile data, moderation evidence,
+unbounded URLs, package payload bytes, or private follower identities.
 
-## API Shape
+## ClawHub Conformance
 
-The exact ClawHub HTTP routes can evolve, but account feed APIs should preserve
-these capabilities:
+A v1 account-feed publisher:
 
-```text
-GET /v1/feeds/accounts/{accountId}
-GET /v1/feeds/publishers/{publisherId}
-GET /v1/feeds/organizations/{organizationId}
-POST /v1/publisher-follows
-DELETE /v1/publisher-follows/{publisherId}
-GET /v1/publisher-follows
-```
+- emits the strict schema above using stable opaque identity;
+- keeps mutable presentation values separate from feed identity;
+- paginates deterministically with monotonic revision semantics;
+- exposes public discovery facts only;
+- keeps following separate from official, scan, approval, and install state;
+- distinguishes unavailable identity states from successful empty feeds.
 
-Feed routes should return hosted feed payloads or signed envelopes. Follow
-routes are user-specific application APIs and should not be confused with the
-feed payload itself.
+## Client Conformance
 
-## Diagnostics And Audit
+A v1 client:
 
-Clients and ClawHub should emit bounded diagnostics for:
-
-- account-feed fetch result;
-- account-feed verification result;
-- missing, private, deleted, restricted, or blocked publisher state;
-- follow and unfollow actions;
-- discovery results sourced from followed publishers;
-- downstream registry import of account-feed entries.
-
-Diagnostics must not include raw tokens, private profile data, unbounded URLs,
-prompt contents, tool arguments, package payload bytes, or raw user identifiers
-unless the local deployment explicitly permits them.
-
-## Publisher Checklist
-
-ClawHub account-feed publication is compatible with this addendum when it:
-
-- uses stable account, publisher, or organization ids;
-- keeps mutable display fields in metadata;
-- signs account feeds through the ClawHub platform feed-signing path;
-- preserves entry provenance for publisher and package identity;
-- separates follow, official, scan, registry review, and install state;
-- makes empty, private, restricted, and blocked feed states distinguishable.
-
-## Client Checklist
-
-An OpenClaw client is compatible with this addendum when it:
-
-- treats account feeds as discovery input, not install authority;
-- verifies ClawHub-hosted account feeds according to the signed-feed trust
-  addendum when configured;
-- preserves followed-publisher provenance in discovery results;
-- keeps source-profile and artifact-integrity checks on the install path;
-- displays follow state separately from official, scan, review, or approval
-  state;
-- produces bounded diagnostics for account-feed failures and followed-publisher
-  discovery.
+- treats account entries as discovery references only;
+- preserves account and publisher provenance;
+- uses opaque bounded pagination;
+- resolves installation through a separate accepted catalog path;
+- displays follow state separately from trust, scan, review, and approval;
+- provides bounded diagnostics for feed, follow, and catalog-resolution errors.
