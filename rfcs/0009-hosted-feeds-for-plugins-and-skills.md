@@ -136,11 +136,14 @@ points are:
 The first feed version should preserve those semantics while moving the catalog
 source from bundled-only JSON to hosted JSON with bundled fallback.
 
-The implementer-facing v1 contract is captured in
-[`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md). This RFC remains
-the design rationale and rollout plan; the sidecar spec is the concise schema,
-example, verification, refresh, and conformance reference for feed publishers
-and OpenClaw clients.
+The implementer-facing v1 core contract is captured in
+[`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md). Trust and account
+feed addenda are captured separately in
+[`0009/signed-feed-trust-v1-spec.md`](0009/signed-feed-trust-v1-spec.md) and
+[`0009/clawhub-account-feeds-v1-spec.md`](0009/clawhub-account-feeds-v1-spec.md).
+This RFC remains the design rationale and rollout plan; the sidecar specs are
+the concise schema, example, verification, refresh, and conformance references
+for feed publishers and OpenClaw clients.
 
 ### Feed document
 
