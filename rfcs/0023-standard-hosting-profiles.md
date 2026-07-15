@@ -404,24 +404,34 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on the exact head of the readiness implementation in
+It is based on readiness head `89d8607aab9f` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains four profile-only commits:
+and contains seven profile-only commits:
 
-| Commit | Review slice | Intended scope |
-| --- | --- | --- |
-| `63596d964b7` | [PR 18](https://github.com/giodl73-repo/openclaw/pull/18) | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
-| `a68829096d1` | [PR 19](https://github.com/giodl73-repo/openclaw/pull/19) | Add product-neutral node pairing, target, approval, and control-channel conditions. |
-| `11322a977f6` | [PR 42](https://github.com/giodl73-repo/openclaw/pull/42) | Attribute profile results to logical runtime and incarnation IDs. |
-| `2f8defb707c` | [PR 21](https://github.com/giodl73-repo/openclaw/pull/21) | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
+| Commit | Intended scope |
+| --- | --- |
+| `44c0f163489` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
+| `d1a47217be6` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
+| `057ad938451` | Attribute profile results to logical runtime and incarnation IDs. |
+| `ee942d3989a` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
+| `02602feb858` | Validate profile startup inputs before destructive lifecycle actions. |
+| `1448fb9c749` | Prove writable host-provisioned workspace behavior and storage recovery. |
+| `a416b9b9192` | Prove the existing node approval flow transitions node-mode to ready. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
-four profile commits. After PR 104018 lands, the same PR naturally reduces to
+seven profile commits. After PR 104018 lands, the same PR naturally reduces to
 the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
-preserves that profile-only comparison view in the meantime. The four smaller
-fork PRs expose the same profile commits as review aids; they are not
-alternative landing requests.
+preserves that profile-only comparison view in the meantime. Fork PRs
+[#18](https://github.com/giodl73-repo/openclaw/pull/18),
+[#19](https://github.com/giodl73-repo/openclaw/pull/19),
+[#42](https://github.com/giodl73-repo/openclaw/pull/42), and
+[#21](https://github.com/giodl73-repo/openclaw/pull/21) expose the major design
+slices as review aids; they are not alternative landing requests.
+
+The exact-head package-installed Docker matrix passes all four profiles plus
+listener, trusted-proxy, node-approval, workspace-full, and recovery cases.
+The proof image is `sha256:e87c9e0651d60b6b58262b6ee271f89d0bee060fd2761d0da1525aca60fd6337`.
 
 ## Rationale
 
