@@ -361,8 +361,9 @@ runtime activation identity, or a release support matrix.
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
 It is one upstream draft PR with four ordered commits at exact head
-`89d8607aab9f`, exact-head tests, and package-installed Docker proof. The final
-package proves `/ready` and `/readyz` transition `200 -> 503 -> 200` for a
+`17b34f792d8`, rebased onto OpenClaw `main` at `4e78d91c0f9`, with exact-head
+tests and package-installed Docker proof. The final package proves `/ready` and
+`/readyz` transition `200 -> 503 -> 200` for a
 selected workspace failure and recovery, `/healthz` remains live, and
 `openclaw ready --json` exits `0 -> 1 -> 0` with the same canonical condition.
 A published-package upgrade lane also proves that existing installations do
