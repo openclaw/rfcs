@@ -136,6 +136,12 @@ points are:
 The first feed version should preserve those semantics while moving the catalog
 source from bundled-only JSON to hosted JSON with bundled fallback.
 
+The implementer-facing v1 contract is captured in
+[`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md). This RFC remains
+the design rationale and rollout plan; the sidecar spec is the concise schema,
+example, verification, refresh, and conformance reference for feed publishers
+and OpenClaw clients.
+
 ### Feed document
 
 A feed document should be a deterministic JSON document with a schema version,
