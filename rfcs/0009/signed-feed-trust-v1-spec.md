@@ -199,6 +199,14 @@ The official ClawHub feed uses a dedicated ClawHub feed-signing identity:
 Bundling a public key is source-controlled trust distribution. It is not secret
 storage and it does not put the private key in the OpenClaw release.
 
+The same dedicated ClawHub feed-signing identity MAY sign multiple
+ClawHub-operated feed classes, including public catalog, account, named,
+organization, and composed feeds. Each feed class MUST define its own versioned
+payload type, expected identity binding, schema, and verifier before clients
+accept it. Sharing the platform feed-signing key does not permit one payload
+type or feed identity to be replayed as another, and it does not grant access,
+approval, or install authority.
+
 ## Rotation And Revocation
 
 Signed Feed v1 does not define an in-band key-rotation document. Rotation uses

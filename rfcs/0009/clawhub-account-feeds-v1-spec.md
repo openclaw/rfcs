@@ -192,9 +192,13 @@ type `openclaw.official-external-plugin-catalog-feed.v1`. It MUST NOT be reused
 for account-feed bytes.
 
 Signed account feeds require a separately specified payload type, expected
-identity binding, test vectors, and client implementation. Until that lands,
-HTTPS transport and ClawHub origin identify the API source, but account-feed
-content still grants discovery only and never install authority.
+identity binding, test vectors, and client implementation. That future payload
+type MAY use the same dedicated ClawHub platform feed-signing key and bundled
+public trust anchor as other ClawHub-operated feeds; it MUST remain distinct
+from the catalog payload type and bind the stable account or publisher
+`feedId`. Until that lands, HTTPS transport and ClawHub origin identify the API
+source, but account-feed content still grants discovery only and never install
+authority.
 
 ## Downstream Registry Consumption
 
