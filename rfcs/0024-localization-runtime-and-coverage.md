@@ -399,10 +399,11 @@ Security-sensitive copy requires human review for each release-complete locale.
 Machine-generated translation can seed drafts but cannot alone mark the
 security surface complete.
 
-Security catalogs reject bidirectional embedding/override controls. Renderers
-use Unicode isolation around literal commands, IDs, paths, and decision tokens
-when surrounding text is right-to-left. Legitimate script characters are not
-rewritten or removed.
+Security catalogs reject translator-authored Unicode bidirectional controls,
+including direction marks, embeddings, overrides, isolates, and deprecated
+formatting controls. Renderers own the minimum Unicode isolation around literal
+commands, IDs, paths, numbers, and decision tokens when surrounding text is
+right-to-left. Legitimate script characters are not rewritten or removed.
 
 ### Catalog ownership
 

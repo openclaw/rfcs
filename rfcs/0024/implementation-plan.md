@@ -150,7 +150,7 @@ behavior rather than product-owned interface text.
     exist;
   - non-English host-locale fixtures;
   - first explicit locale/surface maturity promotions;
-  - packaged `catalogRevision` and deployment drift diagnostics.
+  - per-artifact `catalogRevision` and deployment drift diagnostics.
 - Proof:
   - intentionally missing key;
   - placeholder mismatch;

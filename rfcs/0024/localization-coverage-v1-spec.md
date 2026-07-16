@@ -12,52 +12,85 @@ implementation decision, but the data model is:
 
 ```yaml
 version: 1
-catalogRevision: <content hash or source revision>
+manifestRevision: <manifest content hash>
+sourceLocale: en
 locales:
   en:
     aliases: [en-US, en-GB]
     direction: ltr
-    maturity: source
   zh-CN:
     aliases: [zh-Hans]
     direction: ltr
-    maturity: supported
+  sv:
+    aliases: [sv-SE]
+    direction: ltr
 surfaces:
   control-ui:
     owner: ui
+    artifactId: control-ui-web
+    catalogRevision: <catalog content hash>
     source: ui/src/i18n/locales/en.ts
     catalogs: ui/src/i18n/locales
-    requiredChecks:
-      - key-parity
-      - placeholder-parity
-      - fallback-report
+    contentClasses: [general]
+    locales:
+      en:
+        maturity: source
+      zh-CN:
+        maturity: complete
+        languageOwner: <owner>
+      sv:
+        maturity: unsupported
   runtime:
     owner: core
+    artifactId: openclaw-runtime
+    catalogRevision: <catalog content hash>
     source: src/localization/locales/en.ts
     catalogs: src/localization/locales
-    requiredChecks:
-      - key-parity
-      - placeholder-parity
-      - safety-review
+    contentClasses: [safety, security, recovery]
+    locales:
+      en:
+        maturity: source
+      zh-CN:
+        maturity: partial
+        languageOwner: <owner>
+      sv:
+        maturity: unsupported
 ```
 
-The checked-in schema must validate locale IDs, aliases, paths, owners, and
-check names.
+The checked-in schema must validate locale IDs, aliases, paths, owners,
+artifact IDs, per-artifact catalog revisions, content classes, and maturity
+states. Every surface must contain one state row for every registered locale.
+Missing rows are schema errors rather than implicit `unsupported` states.
 
-`requiredChecks` uses the closed v1 set:
+`contentClasses` uses this closed v1 set:
 
 ```text
-key-parity
-placeholder-parity
-fallback-report
-namespace-ownership
-safety-review
-generated-artifact-parity
-hardcoded-string-report
-locale-state-isolation
+general
+safety
+security
+authentication
+authorization
+destructive-action
+privacy
+recovery
+generated
 ```
 
-New check identities require a schema change rather than an ad hoc string.
+Checks are derived from maturity and content class, not selected by each
+surface:
+
+- every `complete` pair requires key parity, placeholder parity, fallback
+  reporting, namespace ownership, and locale-state isolation;
+- `generated` content additionally requires generated-artifact parity;
+- `safety`, `security`, `authentication`, `authorization`,
+  `destructive-action`, `privacy`, and `recovery` content additionally requires
+  human-review attestation for that locale and revision; and
+- a migrated surface cannot become `complete` while its owned source directory
+  has unresolved blocking hardcoded-string findings.
+
+The schema rejects a manifest that omits any derived requirement. New content
+classes or check identities require a schema change rather than an ad hoc
+string.
 
 ## Surface Set
 
@@ -72,10 +105,11 @@ The initial product report covers:
 - skill metadata;
 - Android;
 - Apple platforms;
-- documentation; and
-- generated-content features with explicit language support.
+- documentation.
 
 Surfaces can have different catalogs and supported locale sets.
+Generated-content language is post-v1 and is not part of this initial coverage
+report or the product-localization completeness claim.
 
 ## Initial Locale Baseline
 
@@ -298,15 +332,18 @@ The report distinguishes:
 
 ## Deployment Drift
 
-Packaged artifacts expose their `catalogRevision` through local status and
-diagnostic output. Operators can compare a running deployment's product
-revision and catalog revision with the release manifest that certified it.
+Each packaged artifact exposes its `artifactId` and `catalogRevision` through
+local status and diagnostic output. An artifact that bundles multiple
+localization surfaces exposes the revision for each bundled surface. Operators
+compare those values with the matching surface entries in the release manifest
+that certified them.
 
 The runtime does not fetch catalogs or coverage state from the network. A
 catalog revision mismatch within one immutable package is a packaging failure.
 Different fleet members may run different releases, but fleet tooling can
-report their declared locale maturity and catalog revision without inspecting
-translated text.
+report their declared locale maturity and per-artifact catalog revisions
+without inspecting translated text. A catalog change in documentation or a
+native app does not create false drift for an unchanged runtime artifact.
 
 ## Contribution Workflow
 

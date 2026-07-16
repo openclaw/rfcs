@@ -29,6 +29,7 @@ type LocaleRegistration = {
   fallback: readonly string[];
   direction: "ltr" | "rtl";
   englishName: string;
+  inferredLanguageDefault?: boolean;
 };
 ```
 
@@ -41,10 +42,32 @@ Requirements:
 - Existing accepted values remain aliases until a separately documented
   breaking-change process removes them.
 - Unknown explicit values fail validation.
-- Unknown inferred platform values fall back without failing startup.
+- At most one locale per base language is the inferred language default.
+- Unknown inferred platform values use the deterministic matching algorithm
+  below and fall back without failing startup.
 
 For Chinese, v1 keeps `zh-CN` and `zh-TW` canonical and accepts `zh-Hans` and
-`zh-Hant` as aliases. Canonical-ID renaming is deferred.
+`zh-Hant` as aliases. The registry also maps `zh-HK`, `zh-MO`, and
+`zh-Hant-*` inference to `zh-TW`, and `zh`, `zh-CN`, `zh-SG`, and
+`zh-Hans-*` inference to `zh-CN`. Canonical-ID renaming is deferred.
+
+Inferred browser and operating-system locale matching:
+
+1. Normalize case and separators and remove Unicode extensions and private-use
+   subtags.
+2. Match an exact canonical ID or alias.
+3. Apply registered script or region inference rules such as the Chinese rules
+   above.
+4. Progressively truncate subtags to find a registered language-level locale,
+   so `fr-CA` can select `fr`.
+5. Use the one registered inferred language default, so `ja` can select
+   `ja-JP` and `pt-PT` can preserve the existing `pt-BR` product fallback.
+6. Fall back to English.
+
+The registry validates that this algorithm produces at most one result for
+every accepted alias and language default. Explicit stored preferences and
+configuration values do not use approximate matching: they must be a canonical
+ID or registered alias.
 
 ## Localization Context
 
@@ -103,13 +126,15 @@ are serialized from this type:
 ```ts
 function projectGatewayMessage(message: LocalizedMessage): {
   message: string;
-  messageKey: string;
+  messageKey?: string;
   messageParams?: Readonly<Record<string, MessageParam>>;
 };
 ```
 
 Descriptor construction, catalog validation, and Gateway projection use one
-shared validator.
+shared validator. The projection includes `messageKey` and `messageParams` only
+for recognized, validated localizable errors. Unknown or intentionally
+English-only errors project only `message`.
 
 Requirements:
 
@@ -146,10 +171,13 @@ The following values are always literal:
 Renderers escape literal values for their target format. Translators cannot
 modify them or place executable tokens in translation resources.
 
-Security-sensitive catalogs reject Unicode bidirectional embedding and
-override controls. Renderers isolate literal LTR commands, IDs, paths, and
-decision tokens when placed in RTL text. Normal Arabic, Persian, Hebrew, and
-other legitimate script characters remain valid.
+Security-sensitive catalogs reject every translator-authored Unicode
+`Bidi_Control` code point: U+061C, U+200E-U+200F, U+202A-U+202E, and
+U+2066-U+2069. They also reject deprecated bidirectional formatting controls
+U+206A-U+206F. Renderers, not catalogs, insert the minimum required isolation
+controls around escaped literal commands, IDs, paths, numbers, and decision
+tokens. Normal Arabic, Persian, Hebrew, and other legitimate script characters
+remain valid.
 
 ## Rich And Safety Output
 
