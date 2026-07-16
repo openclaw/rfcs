@@ -77,6 +77,28 @@ The initial product report covers:
 
 Surfaces can have different catalogs and supported locale sets.
 
+## Initial Locale Set
+
+V1 registers this exact product set:
+
+```text
+en, zh-CN, zh-TW, pt-BR, de, es, ja-JP, ko, fr, hi, ar, it, tr, uk,
+id, pl, th, vi, nl, fa, ru
+```
+
+`en` is the source locale. The other 20 are translation targets. Registration
+does not imply that every surface is complete on day one; the manifest records
+the maturity of every locale/surface pair.
+
+The product-level phrase "fully localized" is valid only when every
+product-owned surface is `complete` for all 21 locales. Surface-specific claims
+remain valid when they name the surface and satisfy its complete-state rules.
+
+The manifest and report must handle at least 50 locale variants without schema
+or algorithm changes. Pseudo-locales may be registered for expansion,
+truncation, interpolation, bidirectional, and mirrored-layout testing, but they
+are test assets and are not advertised as user languages.
+
 ## Maturity States
 
 Each locale/surface pair has one state:

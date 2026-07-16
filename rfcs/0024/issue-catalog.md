@@ -8,22 +8,22 @@ precedent, and duplicate history.
 
 ## Active Contract Issues
 
-| Issue | Surface | Current gap | RFC owner | Planned slice |
+| Issue | Surface | Current gap | RFC owner | Planned PR |
 | --- | --- | --- | --- | --- |
 | [#28303](https://github.com/openclaw/openclaw/issues/28303) | Locale identity | `zh-CN`/`zh-TW` public IDs do not express script semantics; migration is unresolved. | Locale registry | 1 |
 | [#90608](https://github.com/openclaw/openclaw/issues/90608) | Locale preference | Browser inference can select an unwanted locale; explicit choice/default needs precedence. | Locale context | 1 |
-| [#81253](https://github.com/openclaw/openclaw/issues/81253) | Exec approvals | Safety prompt labels and guidance are hardcoded English. | Runtime messages | 3 |
-| [#79458](https://github.com/openclaw/openclaw/issues/79458) | Command metadata | Slash-command descriptions lack one locale-keyed contract. | Metadata | 6 |
-| [#55239](https://github.com/openclaw/openclaw/issues/55239) | Telegram | Native command menu descriptions remain English. | Metadata projection | 6 |
-| [#89971](https://github.com/openclaw/openclaw/issues/89971) | Skills | Skill display names and descriptions are raw English metadata. | Metadata | 7 |
-| [#79223](https://github.com/openclaw/openclaw/issues/79223) | Dreaming | Dream Diary generated prose has no explicit language input. | Content language | 8 |
-| [#101314](https://github.com/openclaw/openclaw/issues/101314) | Dreaming | Journal headings and status labels are hardcoded English. | Runtime messages + content language | 8 |
-| [#53345](https://github.com/openclaw/openclaw/issues/53345) | Agent content | Korean UI is present, but agent response-language consistency is a separate unresolved behavior. | Content language | 8 |
-| [#78038](https://github.com/openclaw/openclaw/issues/78038) | Control UI | Specific zh-CN strings are untranslated or inaccurate. | Coverage/quality | 9 |
-| [#88570](https://github.com/openclaw/openclaw/issues/88570) | Product-wide | CLI, runtime errors, channel notices, UI pages, and coverage reporting remain incomplete. | Umbrella coverage | All |
-| [#107851](https://github.com/openclaw/openclaw/issues/107851) | Control UI | `tabs.chat` is missing in non-English bundles. | Coverage/quality | 9 |
-| [#105266](https://github.com/openclaw/openclaw/issues/105266) | Test infrastructure | Locale-rendering tests can observe stale/split localization state. | Coverage infrastructure | 2 |
-| [#106576](https://github.com/openclaw/openclaw/issues/106576) | Localized hosts | Sandbox behavior matches English `stderr` prose. | Locale robustness | 10 |
+| [#81253](https://github.com/openclaw/openclaw/issues/81253) | Exec approvals | Safety prompt labels and guidance are hardcoded English. | Runtime messages | 2 |
+| [#79458](https://github.com/openclaw/openclaw/issues/79458) | Command metadata | Slash-command descriptions lack one locale-keyed contract. | Metadata | 4 |
+| [#55239](https://github.com/openclaw/openclaw/issues/55239) | Telegram | Native command menu descriptions remain English. | Metadata projection | 4 |
+| [#89971](https://github.com/openclaw/openclaw/issues/89971) | Skills | Skill display names and descriptions are raw English metadata. | Metadata | 4 |
+| [#79223](https://github.com/openclaw/openclaw/issues/79223) | Dreaming | Dream Diary generated prose has no explicit language input. | Content language | Post-v1 |
+| [#101314](https://github.com/openclaw/openclaw/issues/101314) | Dreaming | Journal headings and status labels are hardcoded English. | Runtime messages + content language | Post-v1 |
+| [#53345](https://github.com/openclaw/openclaw/issues/53345) | Agent content | Korean UI is present, but agent response-language consistency is a separate unresolved behavior. | Content language | Post-v1 |
+| [#78038](https://github.com/openclaw/openclaw/issues/78038) | Control UI | Specific zh-CN strings are untranslated or inaccurate. | Coverage/quality | 5 |
+| [#88570](https://github.com/openclaw/openclaw/issues/88570) | Product-wide | CLI, runtime errors, channel notices, UI pages, and coverage reporting remain incomplete. | Umbrella coverage | 1-5 |
+| [#107851](https://github.com/openclaw/openclaw/issues/107851) | Control UI | `tabs.chat` is missing in non-English bundles. | Coverage/quality | 5 |
+| [#105266](https://github.com/openclaw/openclaw/issues/105266) | Test infrastructure | Locale-rendering tests can observe stale/split localization state. | Coverage infrastructure | 1 |
+| [#106576](https://github.com/openclaw/openclaw/issues/106576) | Localized hosts | Sandbox behavior matches English `stderr` prose. | Locale robustness | 5 |
 
 ## Historical Runtime And Architecture Evidence
 
@@ -65,4 +65,3 @@ precedent, and duplicate history.
 - Do not treat translation-quality issues as proof that the underlying runtime
   contract is absent.
 - Do not treat a locale file as proof of complete product localization.
-

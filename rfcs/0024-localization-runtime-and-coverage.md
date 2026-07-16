@@ -99,9 +99,50 @@ Broad earlier requests were often closed as duplicate, superseded, or too
 general. That history argues for one RFC and issue-to-slice map instead of more
 independent language requests.
 
+### Target locales
+
+RFC 0024 v1 targets the 21 locales already shipped by the Control UI:
+
+```text
+en
+zh-CN
+zh-TW
+pt-BR
+de
+es
+ja-JP
+ko
+fr
+hi
+ar
+it
+tr
+uk
+id
+pl
+th
+vi
+nl
+fa
+ru
+```
+
+English is the source locale and the other 20 are translation targets. Every
+locale is registered from PR 1, but completeness remains measured per surface:
+a locale can be complete for Control UI and partial for CLI or runtime until
+those surfaces land. OpenClaw must not claim full 21-locale product coverage
+until every product-owned surface is complete for every target locale.
+
+The contract is not limited to 21 locales. Locale registration, catalogs,
+coverage reporting, and generated artifacts must remain practical at 50 or
+more locale variants, including pseudo-locales used for expansion and
+right-to-left testing. New release locales require a manifest entry, fallback,
+direction, validation, and an explicit initial maturity state.
+
 ## Goals
 
 - Define one BCP 47-compatible locale identity and alias contract.
+- Make the existing 21-locale OpenClaw set the concrete v1 coverage target.
 - Define deterministic locale-resolution precedence for UI, CLI, channel, and
   server-rendered messages.
 - Define structured user-facing message descriptors with stable keys, typed
