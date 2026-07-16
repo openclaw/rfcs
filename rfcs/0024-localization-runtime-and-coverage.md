@@ -101,7 +101,8 @@ independent language requests.
 
 ### Target locales
 
-RFC 0024 v1 starts with the 21 locales already shipped by the Control UI:
+RFC 0024 v1 starts with the union of existing shipped product locales: the 21
+Control UI locales plus Swedish, which already has a native-app catalog:
 
 ```text
 en
@@ -125,12 +126,14 @@ vi
 nl
 fa
 ru
+sv
 ```
 
-English is the source locale and the other 20 are translation targets. Every
-locale is registered from PR 1, but completeness remains measured per surface:
-a locale can be complete for Control UI and partial for CLI or runtime until
-those surfaces land. OpenClaw must not claim full 21-locale product coverage
+English is the source locale and the other 21 are translation targets. Every
+locale is registered from PR 1, but completeness remains measured per surface.
+For example, Swedish begins with native-app coverage and remains unsupported on
+other surfaces until their catalogs exist. OpenClaw must not claim full
+22-locale product coverage
 until every product-owned surface is complete for every target locale.
 
 This is a baseline, not a claim of comprehensive world-language coverage. It
@@ -154,7 +157,7 @@ A representative fixture or pseudo-locale is not a supported-language claim.
 New user-visible locales still require demand, language ownership, and review
 capacity.
 
-The contract is not limited to 21 locales, but RFC 0024 does not adopt an
+The contract is not limited to 22 locales, but RFC 0024 does not adopt an
 external product's language list or set a locale-count goal. OpenClaw adds a
 release locale when it has user demand, catalog ownership, review capacity,
 fallback behavior, direction and formatting support, and an explicit initial
@@ -202,7 +205,7 @@ Model-generated output does not establish completeness by itself:
 ## Goals
 
 - Define one BCP 47-compatible locale identity and alias contract.
-- Make the existing 21-locale OpenClaw set the concrete v1 baseline.
+- Make the existing 22-locale OpenClaw union the concrete v1 baseline.
 - Define product-wide localization depth across OpenClaw's user journey.
 - Define deterministic locale-resolution precedence for UI, CLI, channel, and
   server-rendered messages.

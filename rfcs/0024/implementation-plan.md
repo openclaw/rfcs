@@ -14,7 +14,7 @@ behavior rather than product-owned interface text.
 - Owners: core runtime, Control UI, CLI
 - Includes:
   - shared locale registry, aliases, fallback chains, and direction;
-  - registration of the existing 21-locale OpenClaw product set;
+  - registration of the existing 22-locale OpenClaw product union;
   - locale-driven document language and direction at UI rendering boundaries;
   - `zh-CN` and `zh-TW` canonical IDs with `zh-Hans` and `zh-Hant` aliases;
   - normalized existing Control UI and wizard locale resolution;
@@ -207,7 +207,7 @@ quality contract after their migrated surfaces exist.
 RFC 0024 v1 is complete when:
 
 - the shared locale, descriptor, fallback, and coverage contracts are shipped;
-- all 21 existing product locales are registered and reported;
+- all 22 existing product locales are registered and reported;
 - Gateway errors and channel safety messages localize through stable
   descriptors;
 - CLI human output is localized without destabilizing structured output;
@@ -217,4 +217,4 @@ RFC 0024 v1 is complete when:
 - missing translations fall back safely to English;
 - release artifacts publish an honest localization coverage report; and
 - OpenClaw does not claim full product localization until every product-owned
-  surface is complete for all 21 locales.
+  surface is complete for all 22 locales.

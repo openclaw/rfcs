@@ -83,15 +83,17 @@ V1 registers this exact existing product set:
 
 ```text
 en, zh-CN, zh-TW, pt-BR, de, es, ja-JP, ko, fr, hi, ar, it, tr, uk,
-id, pl, th, vi, nl, fa, ru
+id, pl, th, vi, nl, fa, ru, sv
 ```
 
-`en` is the source locale. The other 20 are translation targets. Registration
+`en` is the source locale. The other 21 are translation targets. Registration
 does not imply that every surface is complete on day one; the manifest records
-the maturity of every locale/surface pair.
+the maturity of every locale/surface pair. Swedish is included because it
+already ships in the native-app localization inventory, even though Control UI
+and documentation do not currently support it.
 
 The product-level phrase "fully localized" is valid only when every
-product-owned surface is `complete` for all 21 locales. Surface-specific claims
+product-owned surface is `complete` for all 22 locales. Surface-specific claims
 remain valid when they name the surface and satisfy its complete-state rules.
 
 The locale set is OpenClaw-owned. V1 does not inherit a translation service,
