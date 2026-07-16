@@ -90,6 +90,12 @@ standard catalog.
 
 ## Proposal
 
+The implementer-facing v1 contract is captured in
+[`0023/hosting-profile-v1-spec.md`](0023/hosting-profile-v1-spec.md). This RFC
+remains the design rationale, support argument, and rollout plan; the sidecar is
+the concise profile catalog, selection, activation, extension, projection, and
+conformance reference for OpenClaw runtime and release implementations.
+
 ### Dependency on canonical readiness
 
 This RFC assumes the contract proposed by Readiness Conditions and Providers:
@@ -117,12 +123,12 @@ RFC 0023 profile use:
 
 ### Standard profile catalog
 
-| Profile | Runtime posture | Additional required conditions |
+| Profile | Runtime posture | Additional required condition types |
 | --- | --- | --- |
-| `local` | Explicit local or foreground Gateway posture | Valid effective config, writable workspace, Gateway response, and required activation facts. |
-| `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady`. |
-| `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady`. Loopback remains valid for a same-host proxy. |
-| `node-mode` | Gateway controlling one or more execution targets | `local` plus pairing, connected target, command approval, and control-channel conditions. |
+| `local` | Explicit local or foreground Gateway posture | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable` |
+| `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady` |
+| `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady`; loopback remains valid for a same-host proxy |
+| `node-mode` | Gateway controlling one or more execution targets | `local` plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` |
 
 A profile names runtime posture, not packaging. Docker behind an identity proxy
 selects `reverse-proxy`; Docker with a directly reachable listener selects
@@ -143,7 +149,7 @@ contract and existing OpenClaw runtime owners.
 | `ProfileSelected` | All | Selection precedence resolves to a valid standard or configured operator profile. | Invalid explicit values fail startup validation. |
 | `RuntimeActivationIdentified` | All | Non-empty logical-runtime and unique-incarnation identities are resolved. | `RuntimeIdentityInvalid`, `IncarnationIdentityInvalid`, `ActivationIdentityUnavailable` |
 | `ContainerStateReady` | `container` | Effective Gateway mode is local and resolved listener host is not loopback. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
-| `TrustedProxyReady` | `reverse-proxy` | Auth mode is `trusted-proxy`, a user header is configured, and at least one trusted source is present. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing` |
+| `TrustedProxyReady` | `reverse-proxy` | Auth mode is `trusted-proxy`, a user header and trusted source are configured, and active ingress honors asserted identity only from validated trusted sources. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing`, `TrustedProxyIngressUnsafe` |
 | `NodePairingReady` | `node-mode` | Pairing state is readable and contains an approved pairing. | `NodePairingUnavailable`, `NodePairingTimedOut`, `NodePairingPending`, `NodePairingMissing` |
 | `ControlledTargetsReady` | `node-mode` | At least one connected target is correlated to an approved pairing. | `ControlledTargetsDisconnected` |
 | `CommandApprovalReady` | `node-mode` | A connected paired target advertises a command permitted by effective grants. | `CommandApprovalMissing` |
@@ -151,7 +157,9 @@ contract and existing OpenClaw runtime owners.
 
 `node-mode` stays product-neutral. A target may be a desktop, sandbox, VM, pod,
 browser, or another execution surface. OpenClaw does not assume one node maps to
-exactly one product or tenant.
+exactly one product or tenant. One correlated approved pairing, connected
+target, effective command grant, and live session must satisfy all four
+conditions; independent targets cannot satisfy different rows.
 
 Common runtime conditions such as `ConfigLoaded`, `WorkspaceWritable`,
 `GatewayResponding`, and conditionally required plugin, secret, or model-route
@@ -306,6 +314,7 @@ Conformance produces an immutable record bound to the exact package or image:
 ```ts
 type HostingProfileConformanceRecord = {
   schemaVersion: 1;
+  profileContractVersion: 1;
   artifact: {
     openclawVersion: string;
     packageIdentity: string;
@@ -330,7 +339,8 @@ but it reads packaged metadata; it never reruns release tests. Source and
 development runs may report conformance as advisory `Unknown`.
 
 If a host supplies an immutable expected artifact identity, mismatch is a
-required readiness failure. This prevents a different build from satisfying a
+required `ArtifactIdentityMatches=False` readiness failure with reason
+`ArtifactIdentityMismatch`. This prevents a different build from satisfying a
 deployment's support claim.
 
 The initial profile matrix must execute package-installed scenarios for:
