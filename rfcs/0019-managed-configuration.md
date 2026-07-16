@@ -26,6 +26,9 @@ The first version is deliberately startup-only and read-only. It does not add a
 configuration control plane, layer roles, write routing, live reload, or a
 provenance API.
 
+The implementer-facing v1 contract is defined in
+[Managed Configuration v1 Core Specification](0019/managed-configuration-v1-spec.md).
+
 ## Motivation
 
 Lobster currently needs to combine three kinds of OpenClaw configuration:
