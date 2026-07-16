@@ -67,7 +67,7 @@ Envelope fields:
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
 | `schemaVersion` | integer | Yes | MUST be `1`. |
-| `payloadType` | string | Yes | MUST be `openclaw.official-external-plugin-catalog-feed.v1`. |
+| `payloadType` | string | Yes | MUST equal the exact type selected by the concrete feed contract and representation. The baseline catalog type is `openclaw.official-external-plugin-catalog-feed.v1`. |
 | `payload` | string | Yes | Base64 or unpadded base64url encoding of the exact UTF-8 feed bytes. |
 | `signatures` | array | Yes | Between 1 and 16 signature records. |
 
@@ -95,7 +95,7 @@ PAE("DSSEv1", T, P) =
   SP || decimal(byte_length(P)) || SP || P
 ```
 
-For the required payload type this is equivalent to:
+For a selected payload type this is equivalent to:
 
 ```text
 "DSSEv1 " + utf8ByteLength(payloadType) + " " + payloadType +
@@ -149,19 +149,28 @@ OpenClaw configuration.
 Before accepting a signed refresh, a client MUST:
 
 1. Parse and validate the bounded envelope.
-2. Require the supported `schemaVersion` and exact `payloadType`.
+2. Require the supported `schemaVersion` and the exact `payloadType` selected by
+   the concrete feed contract and requested representation.
 3. Decode `payload` and each candidate signature.
 4. Construct the exact DSSE PAE bytes above.
 5. Resolve signature key ids only against the selected profile's trusted keys.
 6. Count only valid signatures from distinct trusted public key material.
 7. Require the configured threshold.
-8. Parse the decoded payload as Hosted Feed v1.
-9. Require payload `id` to equal the profile's expected `feedId`.
+8. Dispatch only to the schema validator registered for that exact payload
+   type. The baseline catalog type parses as Hosted Feed v1; distribution
+   addendum types parse as their strict root, query, or change schema.
+9. Require the payload's `id` or `feedId`, as defined by that schema, to equal
+   the selected profile or endpoint's expected feed identity.
 10. Apply schema, source-profile, expiry, and monotonic sequence checks.
 
 Failure at any step MUST reject the new payload. A client MUST NOT retry the
 same bytes as unsigned content or silently replace the configured signed profile
 with an unsigned feed.
+
+Supporting the envelope does not make every payload type acceptable. A client
+MUST maintain an explicit allowlist from endpoint or operation to exact payload
+type and validator. It MUST NOT select a validator from untrusted payload
+contents or treat an unknown but validly signed type as a catalog.
 
 ## Snapshots And Rollback Protection
 

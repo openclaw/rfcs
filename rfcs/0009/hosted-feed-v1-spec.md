@@ -18,9 +18,14 @@ This specification defines:
 - entry state, refresh, validation, and fallback behavior;
 - publisher and client conformance requirements.
 
-It does not define signed envelopes, account following, account-feed discovery,
+It does not define signed envelopes, publisher following, publisher-feed discovery,
 organization approval, artifact signing, malware scanning, or runtime policy.
 Those are separate contracts.
+
+Large-feed sharding, signed server-side queries, and incremental change
+projections are defined in `hosted-feed-distribution-v1-spec.md`. A publisher
+MUST NOT truncate this atomic document to remain within a local limit; it must
+fail publication or expose the scalable representation.
 
 ## Wire Contract
 
@@ -65,9 +70,15 @@ Example:
 }
 ```
 
-Publishers MUST increment `sequence` when publishing a new accepted revision.
+Publishers MUST increment `sequence` by exactly one when publishing a new
+accepted revision.
 Deleting or demoting an entry MUST NOT make the sequence decrease. Republished
 bytes at the same sequence MUST be identical.
+
+The atomic document is intentionally not cursor-paginated. Pagination without a
+pinned revision can combine different catalog states and cannot be accepted as
+one signed snapshot. Large complete feeds use a signed root plus immutable
+shards; interactive search and changed-since retrieval use signed projections.
 
 ## Entry Object
 
@@ -274,6 +285,12 @@ Clients SHOULD:
 7. Reject signed rollback attempts with a lower sequence.
 8. Use the last accepted snapshot during transient failures.
 9. Report expired or stale content without silently granting new authority.
+
+If a complete atomic feed exceeds configured limits, clients SHOULD discover a
+sharded root representation when the selected profile supports it. Clients MAY
+use signed query projections for interactive discovery and signed change
+projections for incremental refresh, but MUST NOT mistake either for possession
+of a complete snapshot.
 
 Search and install rendering MUST consume accepted local state rather than
 performing an unbounded request-time refresh.
