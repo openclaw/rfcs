@@ -77,9 +77,9 @@ The initial product report covers:
 
 Surfaces can have different catalogs and supported locale sets.
 
-## Initial Locale Set
+## Initial Locale Baseline
 
-V1 registers this exact product set:
+V1 registers this exact existing product set:
 
 ```text
 en, zh-CN, zh-TW, pt-BR, de, es, ja-JP, ko, fr, hi, ar, it, tr, uk,
@@ -98,6 +98,10 @@ The locale set is OpenClaw-owned. V1 does not inherit a translation service,
 vendor, downstream product, or enterprise language-set target. New release
 locales require user demand, catalog and reviewer ownership, fallback and
 formatting support, and an explicit initial maturity state.
+
+The initial set is not a comprehensive language-coverage claim. The coverage
+report must expose language, script, direction, and regional gaps so future
+locale additions can be prioritized by OpenClaw users and maintainers.
 
 Pseudo-locales may be registered for expansion, truncation, interpolation,
 bidirectional, and mirrored-layout testing, but they are test assets and are
@@ -118,6 +122,25 @@ The product report groups required surfaces by user experience:
 Every product-owned surface must appear in the manifest even when its current
 state is `unsupported`. A locale cannot become product-complete by omitting an
 untranslated surface from the report.
+
+## Translation Provenance And Review
+
+Model-assisted translation is allowed only as a catalog-authoring step.
+Deterministic product messages must never depend on a runtime model call.
+
+Generated text remains `partial` or `experimental` until the surface satisfies
+its review policy. A `complete` locale/surface pair requires:
+
+- checked-in catalog output and reproducible revision identity;
+- source, glossary, workflow, and generator provenance when generated;
+- key, placeholder, fallback, and generated-artifact parity;
+- a named language owner;
+- full human review of safety, security, authentication, authorization,
+  destructive-action, privacy, and recovery messages; and
+- documented linguistic review or sampling for lower-risk copy.
+
+Translation automation may accelerate coverage, but it cannot self-attest
+quality or promote a maturity state.
 
 ## Maturity States
 

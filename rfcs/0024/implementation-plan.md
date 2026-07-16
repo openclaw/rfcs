@@ -15,6 +15,7 @@ behavior rather than product-owned interface text.
 - Includes:
   - shared locale registry, aliases, fallback chains, and direction;
   - registration of the existing 21-locale OpenClaw product set;
+  - locale-driven document language and direction at UI rendering boundaries;
   - `zh-CN` and `zh-TW` canonical IDs with `zh-Hans` and `zh-Hant` aliases;
   - normalized existing Control UI and wizard locale resolution;
   - immutable localization context with provenance;
@@ -30,6 +31,7 @@ behavior rather than product-owned interface text.
   - perform no runtime catalog I/O or network access.
 - Proof:
   - locale alias and precedence matrix;
+  - Arabic and Persian document `lang`/`dir` behavior;
   - one accepted descriptor and one missing-key fallback;
   - invalid placeholder and namespace failures;
   - concurrent locale changes and catalog replacement;
@@ -139,6 +141,7 @@ behavior rather than product-owned interface text.
   - blocking key, placeholder, namespace, generated-artifact, and safety-review
     checks for complete surfaces;
   - fallback and untranslated-English reporting;
+  - pseudo-locale expansion and right-to-left layout fixtures;
   - owner and `reviewBy` boundary for every remaining advisory migration;
   - removal of English OS/dependency prose matching where structured signals
     exist;
@@ -207,6 +210,7 @@ RFC 0024 v1 is complete when:
 - CLI human output is localized without destabilizing structured output;
 - command and skill metadata use one locale-aware contract;
 - runtime behavior does not depend on English host prose;
+- right-to-left locales set direction and isolate literal commands and IDs;
 - missing translations fall back safely to English;
 - release artifacts publish an honest localization coverage report; and
 - OpenClaw does not claim full product localization until every product-owned
