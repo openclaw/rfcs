@@ -107,6 +107,30 @@ Pseudo-locales may be registered for expansion, truncation, interpolation,
 bidirectional, and mirrored-layout testing, but they are test assets and are
 not advertised as user languages.
 
+## Representative Conformance
+
+Release locales and engineering fixtures serve different purposes. The
+conformance matrix must cover:
+
+| Dimension | V1 representative |
+| --- | --- |
+| Long Latin expansion | German and an expanded pseudo-locale |
+| Cyrillic and plural variation | Russian or Ukrainian |
+| Simplified and Traditional Han | `zh-CN` and `zh-TW` |
+| Japanese segmentation | `ja-JP` |
+| Hangul | `ko` |
+| Indic shaping | `hi`, plus a Bengali or Tamil fixture |
+| Unspaced Southeast Asian text | `th`, plus a Khmer or Myanmar fixture |
+| Right-to-left Arabic-derived script | `ar` and `fa` |
+| Right-to-left non-Arabic script | a Hebrew fixture |
+| Ethiopic shaping | an Amharic fixture |
+| Bidirectional literal isolation | mirrored pseudo-locale with commands, IDs, paths, and numbers |
+
+Fixtures that are not release locales contain bounded test text rather than a
+product catalog. They must never appear in language selectors or coverage
+claims. Promoting one to a release locale requires normal catalog ownership,
+fallback, review, and maturity rules.
+
 ## Required Product Depth
 
 The product report groups required surfaces by user experience:

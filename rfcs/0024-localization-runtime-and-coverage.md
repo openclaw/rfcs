@@ -141,6 +141,19 @@ languages through Arabic and Persian. It does not yet cover several major
 language communities, including Bengali, Urdu, Tamil, Telugu, Malay, Filipino,
 Hebrew, or Swahili.
 
+Engineering coverage is broader than the release-locale list. The conformance
+suite must exercise representative direction, script, shaping, segmentation,
+plural, expansion, and interpolation behavior. The initial set already covers
+Latin, Cyrillic, Arabic-derived scripts, Simplified and Traditional Han,
+Japanese, Hangul, Devanagari, and Thai. Additional fixtures should cover Hebrew
+RTL behavior, another major Indic script, Khmer or Myanmar segmentation, and
+Ethiopic shaping even before OpenClaw has owned translations for those
+languages.
+
+A representative fixture or pseudo-locale is not a supported-language claim.
+New user-visible locales still require demand, language ownership, and review
+capacity.
+
 The contract is not limited to 21 locales, but RFC 0024 does not adopt an
 external product's language list or set a locale-count goal. OpenClaw adds a
 release locale when it has user demand, catalog ownership, review capacity,

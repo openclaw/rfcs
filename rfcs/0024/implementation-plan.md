@@ -22,6 +22,7 @@ behavior rather than product-owned interface text.
   - one internal `LocalizedMessage` descriptor and English renderer;
   - shared key, placeholder, namespace, and fallback validation;
   - checked-in localization coverage manifest;
+  - representative script, direction, shaping, and segmentation matrix;
   - advisory hardcoded-string and locale-sensitive parsing inventory;
   - catalog revision identity and locale-state isolation fixes.
 - Compatibility:
@@ -32,6 +33,7 @@ behavior rather than product-owned interface text.
 - Proof:
   - locale alias and precedence matrix;
   - Arabic and Persian document `lang`/`dir` behavior;
+  - bounded Hebrew, additional Indic, Khmer or Myanmar, and Ethiopic fixtures;
   - one accepted descriptor and one missing-key fallback;
   - invalid placeholder and namespace failures;
   - concurrent locale changes and catalog replacement;
@@ -142,6 +144,7 @@ behavior rather than product-owned interface text.
     checks for complete surfaces;
   - fallback and untranslated-English reporting;
   - pseudo-locale expansion and right-to-left layout fixtures;
+  - representative conformance report separate from release-locale claims;
   - owner and `reviewBy` boundary for every remaining advisory migration;
   - removal of English OS/dependency prose matching where structured signals
     exist;
