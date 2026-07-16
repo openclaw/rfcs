@@ -6,7 +6,7 @@ created: 2026-07-16
 last_updated: 2026-07-16
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/42
 ---
 
 # Proposal: Localization Runtime and Product Coverage
@@ -462,4 +462,3 @@ needs a product-level report.
   localization-owned directory?
 - What human-review standard is required before approval, authentication, or
   destructive-operation text is marked complete?
-
