@@ -36,6 +36,7 @@ Those additions need one coherent contract. In particular, repair must not turn 
 - Reject unsupported policy fields instead of silently ignoring them.
 - Emit stable findings with attributable evidence and `oc://` references.
 - Produce deterministic policy, evidence, findings, and attestation hashes.
+- State the integrity boundary of those hashes without presenting them as signatures.
 - Compare a workspace policy against an authored baseline using shared strictness metadata.
 - Support stricter agent- and channel-scoped overlays.
 - Cover Gateway node-command deny posture without treating Policy as node authorization.
@@ -52,6 +53,8 @@ Those additions need one coherent contract. In particular, repair must not turn 
 - Automatically choosing credentials, model providers, sandbox backends, Gateway auth modes, or exec-approval posture.
 - Mirroring every OpenClaw configuration field into Policy.
 - Treating a clean config-level check as proof that no sensitive data exists.
+- Providing signed, tamper-proof, or fleet-wide audit storage.
+- Making `policy watch` a fail-closed runtime enforcement mechanism.
 
 ## Proposal
 
@@ -78,11 +81,15 @@ Policy evaluation produces:
 
 `policy check` is read-only. Its JSON findings include `policy.fixRecommendation` metadata so automation can distinguish automatic, review-required, manual, validate-only, and unsupported remediation classes without inferring them from prose.
 
+The hashes identify exact policy, evidence, and finding content. They are not signatures and do not make local files tamper-proof. An operator that needs durable audit assurance must store accepted hashes and check output in a trusted external control plane or evidence system.
+
 ### Compare baselines and watch accepted state
 
 `openclaw policy compare --baseline <file>` compares two authored policies. It does not inspect runtime state. The checked policy must contain every required baseline rule and be equal or stricter according to schema-owned metadata.
 
 `openclaw policy watch` repeatedly evaluates current evidence and reports when findings appear or the current attestation no longer matches `expectedAttestationHash`. `--once` provides the same drift check for CI and release gates.
+
+Watch is a per-workspace observer. It does not block runtime actions, replace supervisor monitoring, or provide fleet distribution by itself.
 
 The same strictness metadata owns:
 
@@ -148,6 +155,8 @@ Without that opt-in, `doctor --fix` reports a skipped repair and warning. Automa
 
 Scoped findings are skipped when a shared config mutation would affect targets outside the selected scope. Repair must not broaden policy, add capability, or guess an owner-specific value.
 
+Automatic repair returns a patched OpenClaw config through Doctor's normal repair path rather than writing config directly. Doctor remains responsible for the standard config-write, validation, backup, and post-repair detection flow.
+
 Review-required preview currently covers non-loopback Gateway bind and Gateway node-command deny additions. It returns structured effects and warnings but does not mutate config.
 
 ### Preserve one shared health signal
@@ -170,7 +179,7 @@ This design separates three kinds of authority:
 
 That separation keeps Policy useful to operators and auditors without adding a second control plane. Schema-owned strictness metadata avoids independent comparison implementations drifting apart. Explicit repair classes make remediation inspectable, while the narrow automatic-repair bar prevents a clean-looking result from hiding an unreviewed authority change.
 
-The Gateway, platform-operator, compliance, and simplicity reviews converge on the same boundary: Policy may observe broadly and explain precisely, but it should mutate only deterministic narrowing settings, remain removable as a plugin, and never add request-path latency by pretending conformance is runtime enforcement.
+Policy may observe broadly and explain precisely, but it mutates only deterministic narrowing settings, remains removable as a plugin, and adds no request-path enforcement latency.
 
 ## Unresolved questions
 

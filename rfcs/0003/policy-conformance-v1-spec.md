@@ -30,7 +30,8 @@ The keywords **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
 `--json` MUST emit the attestation, evidence, check counts, and findings.
 
-Each Policy JSON finding SHOULD include:
+Each registered Policy JSON finding MUST include `policy.fixRecommendation`.
+Optional recommendation fields remain omitted when they do not apply. Example:
 
 ```json
 {
@@ -66,6 +67,8 @@ The checked policy MUST be equal or stricter than the baseline for every baselin
 
 `--once` MUST perform one evaluation. Continuous mode SHOULD suppress duplicate unchanged reports.
 
+Watch MUST remain a per-workspace observer. It MUST NOT be represented as request-time enforcement or a fleet distribution mechanism.
+
 ## 3. Evidence and attestation
 
 Evidence MUST be:
@@ -83,6 +86,8 @@ The attestation MUST identify:
 - clean or dirty state.
 
 The stable attestation hash MUST exclude observation time. `checkedAt` MAY be included for audit chronology.
+
+Policy hashes are content identifiers, not signatures. Policy MUST NOT describe the local hash tuple as tamper-proof or independently authentic. Durable audit assurance MUST come from storing accepted hashes and reports in a trusted external system.
 
 Policy MUST NOT read raw secret values, arbitrary workspace files, logs, or per-agent credential stores.
 
@@ -178,6 +183,7 @@ Automatic repair MUST:
 - narrow existing product-managed config;
 - avoid choosing credentials, providers, sandbox backends, auth modes, or approval posture;
 - skip a scoped repair when the available mutation target is shared more broadly than the scope;
+- return patched config through the Doctor health contract instead of writing config directly;
 - return structured change summaries;
 - allow Doctor's post-repair detection to validate the result.
 
@@ -218,5 +224,6 @@ Classification as `reviewRequired` does not imply that a preview implementation 
 - Existing supported policy fields and finding ids SHOULD remain stable.
 - A renamed field SHOULD have a documented deprecation window.
 - Changes to strictness or attestation inputs MUST be treated as contract changes.
+- Changes to evidence canonicalization or hash inputs MUST be treated as attestation contract changes.
 - Policy checks MUST remain available through `doctor --lint`.
 - Disabling the Policy plugin MUST remove Policy evaluation without changing unrelated OpenClaw runtime behavior.
