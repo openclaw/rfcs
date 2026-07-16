@@ -67,9 +67,11 @@ Finding order MUST be deterministic. The lint runner MUST sort by severity, chec
 - call detection only;
 - never prompt;
 - never call repair;
-- never mutate config, files, services, processes, packages, or state;
+- never itself persist config, file, package, service, process, or state changes, except that it MAY start a configured `exec` SecretRef resolver when `--allow-exec` is present;
 - report check counts and findings;
 - exit `0`, `1`, or `2` according to the CLI contract.
+
+Read-only MUST mean Doctor does not apply repairs or persist config/state changes. Detection MAY perform bounded observation probes. It MUST NOT execute configured `exec` SecretRefs unless the operator explicitly supplies `--allow-exec`. When `--allow-exec` is present, the resolver process is trusted operator-configured code and its external side effects are outside Doctor's non-mutation guarantee.
 
 A thrown check error MUST become an error finding for that check rather than aborting the remaining inventory.
 
@@ -174,6 +176,8 @@ The plugin SDK health surface MUST expose:
 Core-internal selection policy MUST NOT become a plugin compatibility promise in version 1.
 
 Extension registration MUST NOT shadow a core id.
+
+Registration MUST be declarative. It MUST NOT perform health probes, invoke configured executables, or add work to normal Gateway request handling. Detection and repair MUST run only when a selected health flow invokes the check.
 
 ## 11. Future repair dry-run
 

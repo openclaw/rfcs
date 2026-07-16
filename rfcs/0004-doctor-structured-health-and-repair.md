@@ -34,6 +34,7 @@ Structured repair now has the core plumbing for diffs, effects, repair status, a
 - Preserve core Doctor contribution order and established interactive behavior.
 - Give every tracked legacy Doctor rule family a structured lint path.
 - Keep `doctor --lint` read-only, deterministic, and suitable for automation.
+- Make optional executable and live-probe behavior explicit rather than hiding it behind "read-only."
 - Distinguish the stable default lint set from the complete opt-in inventory.
 - Support exact selection with `--only` and exclusion with `--skip`.
 - Keep structured findings stable enough for CI, UI, and support tooling.
@@ -111,10 +112,12 @@ Unknown `--only` ids produce a structured `core/doctor/lint-selection` error fin
 
 - never prompts;
 - never invokes repair;
-- never rewrites config or state;
+- never persists config, file, package, service, process, or state changes, except that `--allow-exec` may start an explicitly authorized SecretRef resolver;
 - sorts findings deterministically;
 - applies the selected severity threshold to output and exit status;
 - exits `0` for no findings at the threshold, `1` for findings, and `2` for command/runtime failure.
+
+Read-only means Doctor does not apply repairs or persist config/state changes. Checks may perform bounded observation probes. Configured `exec` SecretRefs are not executed by default; `--allow-exec` is the explicit operator opt-in for checks that need to invoke those resolvers. Because a resolver is operator-configured executable code, its external side effects are outside Doctor's read-only guarantee and it must be treated as trusted code.
 
 `--all`, `--only`, `--skip`, and `--severity-min` are lint-only options.
 
@@ -173,13 +176,15 @@ Bundled extensions and plugins register checks through the shared health registr
 
 `openclaw/plugin-sdk/health` exposes the public finding, detection, and repair contract. Internal selection metadata such as `defaultEnabled` remains core-owned unless a future RFC explicitly makes opt-in selection a plugin contract.
 
+Registration must be declarative: it must not run probes or add work to normal Gateway request handling. Detection and repair run only when the selected Doctor or health flow invokes the check.
+
 ## Rationale
 
 The contribution-owned model preserves the behavior and ordering users already know while allowing automation to consume a stable contract. Moving every core check into a flat registry would simplify one implementation layer but weaken ownership and make core order easier to disturb.
 
 The default/all split is necessary because completeness and signal quality are different operator needs. CI should use a stable, low-noise default. Audits and migrations should be able to request the full inventory. Exact `--only` selection supports focused proof without changing global defaults.
 
-The Gateway-owner, operator, and simplicity reviews all reject a broad dry-run claim before plans are truthful. Repair preview is useful only when it accurately describes the same owner-local mutation that real repair would perform. Keeping dry-run as a future project prevents the RFC from turning available result fields into an unsupported product promise.
+Repair preview is useful only when it accurately describes the same owner-local mutation that real repair would perform. Keeping dry-run as a future project prevents the RFC from turning available result fields into an unsupported product promise.
 
 ## Unresolved questions
 
