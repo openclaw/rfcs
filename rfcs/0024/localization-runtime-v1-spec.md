@@ -18,6 +18,33 @@ This specification covers product-owned text rendered by:
 
 It does not replace native-app or documentation localization formats.
 
+## Kernel Boundary
+
+V1 provides one internal localization kernel consumed by browser and server
+adapters. It owns:
+
+- locale registry and resolution;
+- immutable localization context;
+- message and scalar parameter types;
+- catalog lookup and fallback;
+- validation primitives; and
+- literal bidirectional-isolation helpers.
+
+The kernel:
+
+- is browser-safe and server-safe;
+- performs no filesystem, network, environment, storage, translation-provider,
+  or model access;
+- has no process-global mutable locale;
+- accepts locale context explicitly;
+- performs no I/O during lookup or rendering; and
+- does not import Control UI, CLI, Gateway, channel, native-app, documentation,
+  or plugin implementations.
+
+Surface adapters own input discovery, persistence, catalog loading, output
+formatting, and wire projection. The kernel is internal in v1 and does not
+define a public plugin-provider API.
+
 ## Locale Registry
 
 Core owns a registry entry for every recognized locale:
@@ -41,7 +68,11 @@ Requirements:
 - English is always the final fallback.
 - Existing accepted values remain aliases until a separately documented
   breaking-change process removes them.
-- Unknown explicit values fail validation.
+- Unknown values in validated stored preferences, configuration fields,
+  request fields, and core/bundled package metadata fail validation.
+- External package localized metadata may use exact normalized BCP 47 tags
+  outside the product registry under the localized-metadata specification; it
+  does not extend runtime locale inference or product completeness.
 - At most one locale per base language is the inferred language default.
 - Unknown inferred platform values use the deterministic matching algorithm
   below and fall back without failing startup.
@@ -65,9 +96,13 @@ Inferred browser and operating-system locale matching:
 6. Fall back to English.
 
 The registry validates that this algorithm produces at most one result for
-every accepted alias and language default. Explicit stored preferences and
-configuration values do not use approximate matching: they must be a canonical
-ID or registered alias.
+every accepted alias and language default. Explicit stored preferences,
+configuration values, request fields, and core/bundled package metadata do not
+use approximate matching: they must be a canonical ID or registered alias.
+External package localized metadata follows its separate exact-BCP-47 rules.
+Browser, operating-system, and host process locale variables are inferred
+platform inputs and use the matching algorithm. `OPENCLAW_LOCALE` is the
+explicit process override described in CLI Resolution.
 
 ## Localization Context
 
@@ -247,8 +282,19 @@ OPENCLAW_LOCALE
 > English
 ```
 
-The runtime registry normalizes these values for all migrated CLI commands.
-An explicit CLI locale flag is not part of v1 unless separately approved.
+The runtime registry strips encoding/modifier suffixes and normalizes
+separators for every process locale value.
+
+`OPENCLAW_LOCALE` is an explicit override. It must resolve to a canonical ID or
+registered alias. An unsupported value emits a bounded diagnostic and falls
+directly to English for compatibility; it does not silently select
+`LC_ALL`/`LC_MESSAGES`/`LANG` and does not fail CLI startup.
+
+`LC_ALL`, `LC_MESSAGES`, and `LANG` are inferred host inputs. They use the
+deterministic inferred-matching algorithm, and an unsupported token continues
+to the next host source before English fallback. A persisted setting, config
+field, request field, or future explicit CLI flag remains strict. An explicit
+CLI locale flag is not part of v1 unless separately approved.
 
 Human output can be localized. Stable automation output must use an existing or
 new structured mode such as `--json`; scripts must not be expected to parse

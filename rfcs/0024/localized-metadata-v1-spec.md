@@ -29,7 +29,12 @@ type LocalizedText = {
 Rules:
 
 - `default` is required English.
-- Locale keys resolve through the shared locale registry.
+- Core and bundled metadata locale keys resolve through the shared product
+  locale registry.
+- External packages may additionally use normalized valid BCP 47 tags that are
+  not product locales. Those entries are package-owned, do not alter the core
+  registry or completeness claims, and are projected only to surfaces or
+  platforms that request and support the exact tag.
 - Alias keys are accepted at authoring time only if normalization produces one
   unambiguous canonical entry.
 - Two aliases that resolve to the same locale with different text are invalid.
@@ -43,16 +48,18 @@ Command identity remains:
 ```ts
 type LocalizedCommandMetadata = {
   name: string;
-  description: LocalizedText;
+  description: string | LocalizedText;
 };
 ```
 
-`name` is never translated. Platform adapters map `description.localizations`
-to native platform fields where supported.
+`name` is never translated. A plain string is the legacy English-only form.
+Platform adapters normalize either form internally and map
+`description.localizations` to native platform fields where supported.
 
 Existing command definitions with a plain English description remain valid and
 require no migration. They are interpreted as `default` with no
-`localizations`.
+`localizations`. Serializers preserve the plain-string form unless localized
+entries are added.
 
 Platform constraints are validated per adapter:
 
@@ -71,8 +78,8 @@ shape and locale projection rules.
 ```ts
 type LocalizedSkillMetadata = {
   id: string;
-  displayName: LocalizedText;
-  description: LocalizedText;
+  displayName?: string | LocalizedText;
+  description?: string | LocalizedText;
 };
 ```
 
@@ -82,12 +89,15 @@ Rules:
 - Localized display names are presentation only.
 - Core and bundled skills may ship reviewed catalogs in-tree.
 - External skills package their own metadata.
-- OpenClaw validates shape and locale IDs but does not certify translation
-  quality for third-party packages.
+- OpenClaw validates shape and BCP 47 locale syntax but does not certify
+  translation quality for third-party packages.
 - Search may index localized display text, but installation and policy continue
   to use stable IDs.
 - Every currently published skill with no localized fields remains valid with
   no required package or manifest change.
+- Existing plain-string display names and descriptions are interpreted as
+  English defaults and retain their legacy serialized shape until
+  localizations are added.
 
 ## Plugin Ownership
 
@@ -99,6 +109,13 @@ Namespace ownership is enforced by catalog validation and the blocking
 
 Metadata is activation-pinned with the plugin registry snapshot. Reload
 atomically replaces the plugin's metadata set.
+
+External runtime-message catalogs are not registered through arbitrary
+callbacks or translation-provider hooks. A future or owner-approved v1 Plugin
+SDK seam may accept a declarative package-owned catalog under the plugin's
+namespace, validate it before activation, and replace it atomically with the
+plugin snapshot. Without that owner-approved seam, v1 external localization is
+limited to the metadata defined in this specification.
 
 ## Security
 

@@ -13,6 +13,8 @@ behavior rather than product-owned interface text.
 - Issues: #28303, #90608, #105266
 - Owners: core runtime, Control UI, CLI
 - Includes:
+  - one dependency-light internal localization kernel shared by browser and
+    server adapters;
   - shared locale registry, aliases, fallback chains, and direction;
   - registration of the existing 22-locale OpenClaw product union;
   - locale-driven document language and direction at UI rendering boundaries;
@@ -20,6 +22,7 @@ behavior rather than product-owned interface text.
   - normalized existing Control UI and wizard locale resolution;
   - immutable localization context with provenance;
   - one internal `LocalizedMessage` descriptor and English renderer;
+  - Control UI and wizard locale-resolution adapters as production consumers;
   - shared key, placeholder, namespace, and fallback validation;
   - checked-in localization coverage manifest;
   - representative script, direction, shaping, and segmentation matrix;
@@ -40,7 +43,7 @@ behavior rather than product-owned interface text.
   - unchanged English onboarding and representative UI snapshots;
   - warmed rendering stays within the v1 performance budget.
 - Result:
-  - the shared contract exists;
+  - the shared kernel exists and has production consumers;
   - current localized surfaces use it without visible behavior changes;
   - coverage can report later migrations from the first PR.
 
@@ -115,6 +118,8 @@ behavior rather than product-owned interface text.
   - CLI, TUI, and Control UI projection from the same command metadata;
   - optional localized skill display names and descriptions;
   - bundled-skill catalogs and external-package validation;
+  - an owner-gated declarative external plugin catalog seam, or an explicit v1
+    decision to keep external support metadata-only;
   - localized search indexing while installs and policy use stable IDs.
 - Compatibility:
   - existing plain-English commands and all published skills remain valid;
@@ -139,7 +144,8 @@ behavior rather than product-owned interface text.
 - Owners: release, localization pipeline, affected runtime owners
 - Includes:
   - product-level coverage report across UI, native, docs, wizard, runtime,
-    CLI, command metadata, and skill metadata;
+    CLI, TUI, notifications, core/bundled command and skill metadata, and
+    per-adapter native command-menu projections;
   - blocking key, placeholder, namespace, generated-artifact, and safety-review
     checks for complete surfaces;
   - fallback and untranslated-English reporting;

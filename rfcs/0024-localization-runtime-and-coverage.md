@@ -173,7 +173,7 @@ OpenClaw localization follows the user journey rather than one frontend:
 | Discover and install | Documentation, installation guidance, first-run failures |
 | Configure and onboard | CLI wizard, channel and plugin setup, validation and recovery guidance |
 | Operate | CLI and TUI help/status, Control UI, native apps, configuration and task output |
-| Interact | Server-rendered channel messages, notifications, command menus, command and skill metadata |
+| Interact | Server-rendered channel messages, notifications, command menus, and core/bundled command and skill metadata |
 | Approve and recover | Approval prompts, Gateway errors, authentication failures, doctor and repair guidance |
 
 Logs, protocol codes, command tokens, config keys, paths, IDs, provider/model
@@ -271,9 +271,15 @@ V1 keeps `zh-CN` and `zh-TW` as canonical IDs and accepts `zh-Hans` and
 compatibility proposal with stored-preference, environment, config, and plugin
 metadata migration; it is not part of RFC 0024.
 
-An unknown explicit locale is an actionable validation error. An unsupported
-inferred platform locale falls back through its language and registered aliases
-to English.
+An unknown locale in a validated stored preference, config field, request
+field, or core/bundled package manifest is an actionable validation error.
+External package localized metadata may use exact valid BCP 47 tags under its
+package-owned rules without extending the product registry. Browser,
+operating-system, and host process locales are inferred inputs: they fall
+through language defaults and registered aliases without failing startup.
+`OPENCLAW_LOCALE` remains an explicit nonfatal override: an unsupported value
+produces a diagnostic and reviewed English fallback rather than silently using
+a lower-precedence host locale.
 
 ### Locale context and precedence
 
@@ -319,6 +325,48 @@ public surface and requires the owning maintainer's approval.
 `audience=operator` covers human-readable CLI status, health, recovery, and
 administrative guidance. Logs and machine-readable output are not localized by
 either audience.
+
+### Foundational localization kernel
+
+PR 1 introduces one small internal localization kernel at the lowest dependency
+layer shared by browser and server code. The exact package path is an
+implementation decision, but the kernel owns:
+
+- locale registration, normalization, aliases, inferred matching, fallback,
+  display names, and direction;
+- immutable `LocalizationContext`;
+- the `LocalizedMessage` and scalar parameter types;
+- catalog lookup and reviewed English fallback;
+- key, parameter, namespace, and catalog validation primitives; and
+- renderer-safe bidirectional isolation helpers for literal data.
+
+The kernel is synchronous after startup, browser-safe, server-safe, and free of
+filesystem, network, environment, storage, translation-provider, and model
+dependencies. It has no process-global current locale. Callers pass an
+immutable context into lookup or rendering.
+
+Surface adapters depend on the kernel:
+
+```text
+Control UI adapter
+CLI/runtime adapter
+Gateway wire projection
+channel message renderer
+command/skill metadata projection
+        |
+        v
+internal localization kernel
+```
+
+The dependency never points from the kernel back into a surface. Existing UI,
+native-app, documentation, and wizard catalogs remain surface-owned. PR 1
+proves the kernel through existing Control UI and wizard locale resolution plus
+one runtime English descriptor; it does not land a type-only framework.
+
+This is not a public localization-provider plugin API in v1. Translation
+providers remain build-time authoring tools. A public plugin seam is considered
+only when external package requirements cannot be met by namespaced catalogs
+and localized metadata.
 
 ### Structured localized messages
 
@@ -413,11 +461,23 @@ This RFC does not create a monolithic catalog:
 - Apple and Android continue to use native generated catalogs.
 - Docs continue to use the docs translation workflow and glossaries.
 - CLI and server-rendered runtime messages use core runtime catalogs.
-- Plugins and skills own namespaced catalogs or localized metadata packaged
-  with the artifact.
+- Bundled plugins may use namespaced runtime catalogs through an internal
+  activation adapter.
+- External plugins and skills may package localized display metadata.
 
 Shared infrastructure owns locale IDs, aliases, fallback, message descriptor
 validation, placeholder rules, and coverage reporting.
+
+The intended extension path lets external plugins package declarative,
+namespaced runtime catalogs that are validated and activation-pinned with the
+plugin snapshot. Plugins cannot override core or another plugin's namespace,
+register a translation provider, mutate global catalogs after activation, or
+make runtime model calls for deterministic product text.
+
+The exact public manifest field or Plugin SDK registration method is a new
+semi-public surface and requires explicit plugin-owner approval before PR 4
+ships it. If that approval is not available, v1 external support remains
+localized metadata only while bundled plugins prove the catalog mechanism.
 
 Catalog keys are namespaced by owner, for example:
 

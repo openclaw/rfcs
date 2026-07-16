@@ -24,6 +24,13 @@ locales:
   sv:
     aliases: [sv-SE]
     direction: ltr
+testFixtures:
+  pseudo-expanded:
+    kind: expansion
+    direction: ltr
+  pseudo-bidi:
+    kind: bidirectional
+    direction: rtl
 surfaces:
   control-ui:
     owner: ui
@@ -57,10 +64,12 @@ surfaces:
         maturity: unsupported
 ```
 
-The checked-in schema must validate locale IDs, aliases, paths, owners,
-artifact IDs, per-artifact catalog revisions, content classes, and maturity
-states. Every surface must contain one state row for every registered locale.
-Missing rows are schema errors rather than implicit `unsupported` states.
+The checked-in schema must validate locale IDs, aliases, test-fixture IDs,
+paths, owners, artifact IDs, per-artifact catalog revisions, content classes,
+and maturity states. Every surface must contain one state row for every
+registered release locale. Missing rows are schema errors rather than implicit
+`unsupported` states. Test fixtures are a separate set and never receive
+surface maturity rows.
 
 `contentClasses` uses this closed v1 set:
 
@@ -99,15 +108,21 @@ The initial product report covers:
 - Control UI;
 - CLI onboarding;
 - remaining CLI commands and help;
+- TUI human-readable output;
 - Gateway errors;
-- server-rendered channel messages;
-- command metadata;
-- skill metadata;
+- server-rendered channel messages and notifications;
+- core and bundled command metadata;
+- bundled channel command-menu projections, tracked separately for each
+  adapter such as Telegram and Discord;
+- core and bundled skill metadata;
 - Android;
 - Apple platforms;
 - documentation.
 
-Surfaces can have different catalogs and supported locale sets.
+Surfaces can have different catalogs and supported locale sets. A shared
+metadata catalog and each product-owned platform projection are separate
+coverage surfaces because platform limits, locale support, and reconcile
+behavior can independently reject or drop localized text.
 Generated-content language is post-v1 and is not part of this initial coverage
 report or the product-localization completeness claim.
 
@@ -139,9 +154,11 @@ The initial set is not a comprehensive language-coverage claim. The coverage
 report must expose language, script, direction, and regional gaps so future
 locale additions can be prioritized by OpenClaw users and maintainers.
 
-Pseudo-locales may be registered for expansion, truncation, interpolation,
-bidirectional, and mirrored-layout testing, but they are test assets and are
-not advertised as user languages.
+Pseudo-locales and bounded script fixtures are declared under
+`testFixtures`, not the release locale registry. They support expansion,
+truncation, interpolation, bidirectional, mirrored-layout, shaping, and
+segmentation testing. They never appear in language selectors, surface
+maturity rows, or product completeness calculations.
 
 ## Representative Conformance
 
@@ -176,12 +193,14 @@ The product report groups required surfaces by user experience:
 | Discover and install | Documentation, installation guidance, first-run failures |
 | Configure and onboard | CLI wizard, channel setup, plugin setup, validation and recovery guidance |
 | Operate | CLI and TUI help/status, Control UI, native apps, configuration and task output |
-| Interact | Server-rendered channel messages, notifications, native command menus, command and skill metadata |
+| Interact | Server-rendered channel messages, notifications, native command menus, and core/bundled command and skill metadata |
 | Approve and recover | Approval prompts, Gateway errors, authentication failures, doctor and repair guidance |
 
 Every product-owned surface must appear in the manifest even when its current
 state is `unsupported`. A locale cannot become product-complete by omitting an
-untranslated surface from the report.
+untranslated surface from the report. External plugin and skill metadata is
+reported separately when available and never blocks an OpenClaw product
+completeness claim.
 
 ## Translation Provenance And Review
 
