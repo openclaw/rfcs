@@ -94,10 +94,30 @@ The product-level phrase "fully localized" is valid only when every
 product-owned surface is `complete` for all 21 locales. Surface-specific claims
 remain valid when they name the surface and satisfy its complete-state rules.
 
-The manifest and report must handle at least 50 locale variants without schema
-or algorithm changes. Pseudo-locales may be registered for expansion,
-truncation, interpolation, bidirectional, and mirrored-layout testing, but they
-are test assets and are not advertised as user languages.
+The locale set is OpenClaw-owned. V1 does not inherit a translation service,
+vendor, downstream product, or enterprise language-set target. New release
+locales require user demand, catalog and reviewer ownership, fallback and
+formatting support, and an explicit initial maturity state.
+
+Pseudo-locales may be registered for expansion, truncation, interpolation,
+bidirectional, and mirrored-layout testing, but they are test assets and are
+not advertised as user languages.
+
+## Required Product Depth
+
+The product report groups required surfaces by user experience:
+
+| Experience | Surfaces |
+| --- | --- |
+| Discover and install | Documentation, installation guidance, first-run failures |
+| Configure and onboard | CLI wizard, channel setup, plugin setup, validation and recovery guidance |
+| Operate | CLI and TUI help/status, Control UI, native apps, configuration and task output |
+| Interact | Server-rendered channel messages, notifications, native command menus, command and skill metadata |
+| Approve and recover | Approval prompts, Gateway errors, authentication failures, doctor and repair guidance |
+
+Every product-owned surface must appear in the manifest even when its current
+state is `unsupported`. A locale cannot become product-complete by omitting an
+untranslated surface from the report.
 
 ## Maturity States
 

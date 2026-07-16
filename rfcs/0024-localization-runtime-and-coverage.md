@@ -133,16 +133,38 @@ a locale can be complete for Control UI and partial for CLI or runtime until
 those surfaces land. OpenClaw must not claim full 21-locale product coverage
 until every product-owned surface is complete for every target locale.
 
-The contract is not limited to 21 locales. Locale registration, catalogs,
-coverage reporting, and generated artifacts must remain practical at 50 or
-more locale variants, including pseudo-locales used for expansion and
-right-to-left testing. New release locales require a manifest entry, fallback,
-direction, validation, and an explicit initial maturity state.
+The contract is not limited to 21 locales, but RFC 0024 does not adopt an
+external product's language list or set a locale-count goal. OpenClaw adds a
+release locale when it has user demand, catalog ownership, review capacity,
+fallback behavior, direction and formatting support, and an explicit initial
+maturity state. Pseudo-locales remain useful test assets for expansion,
+interpolation, truncation, and right-to-left behavior.
+
+### Required localization depth
+
+OpenClaw localization follows the user journey rather than one frontend:
+
+| Experience | Required product-owned surfaces |
+| --- | --- |
+| Discover and install | Documentation, installation guidance, first-run failures |
+| Configure and onboard | CLI wizard, channel and plugin setup, validation and recovery guidance |
+| Operate | CLI and TUI help/status, Control UI, native apps, configuration and task output |
+| Interact | Server-rendered channel messages, notifications, command menus, command and skill metadata |
+| Approve and recover | Approval prompts, Gateway errors, authentication failures, doctor and repair guidance |
+
+Logs, protocol codes, command tokens, config keys, paths, IDs, provider/model
+names, upstream prose, and model-generated responses are not part of the
+product-localization completeness claim.
+
+A locale is product-complete only when all required product-owned surfaces are
+complete. OpenClaw should deepen coverage for the existing locale set before
+adding languages that are present only in one catalog.
 
 ## Goals
 
 - Define one BCP 47-compatible locale identity and alias contract.
 - Make the existing 21-locale OpenClaw set the concrete v1 coverage target.
+- Define product-wide localization depth across OpenClaw's user journey.
 - Define deterministic locale-resolution precedence for UI, CLI, channel, and
   server-rendered messages.
 - Define structured user-facing message descriptors with stable keys, typed
