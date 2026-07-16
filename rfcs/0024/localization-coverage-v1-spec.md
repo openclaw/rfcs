@@ -8,22 +8,13 @@ Status: draft, tied to RFC 0024.
 ## Coverage Manifest
 
 OpenClaw checks in one localization coverage manifest. The exact path is an
-implementation decision, but the data model is:
+implementation decision. This abbreviated example omits the other required
+release-locale rows:
 
 ```yaml
 version: 1
-manifestRevision: <manifest content hash>
-sourceLocale: en
-locales:
-  en:
-    aliases: [en-US, en-GB]
-    direction: ltr
-  zh-CN:
-    aliases: [zh-Hans]
-    direction: ltr
-  sv:
-    aliases: [sv-SE]
-    direction: ltr
+localeRegistry: <path to shared registry>
+registryRevision: <registry content hash>
 testFixtures:
   pseudo-expanded:
     kind: expansion
@@ -64,12 +55,18 @@ surfaces:
         maturity: unsupported
 ```
 
-The checked-in schema must validate locale IDs, aliases, test-fixture IDs,
-paths, owners, artifact IDs, per-artifact catalog revisions, content classes,
-and maturity states. Every surface must contain one state row for every
-registered release locale. Missing rows are schema errors rather than implicit
-`unsupported` states. Test fixtures are a separate set and never receive
-surface maturity rows.
+The coverage manifest references the shared locale registry rather than
+duplicating aliases, fallback, direction, or source-locale data. The checked-in
+schema must validate the registry reference and revision, locale state keys,
+test-fixture IDs, paths, owners, artifact IDs, per-artifact catalog revisions,
+content classes, and maturity states. Every surface must contain one state row
+for every release locale in the referenced registry. Missing rows are schema
+errors rather than implicit `unsupported` states. Test fixtures are a separate
+set and never receive surface maturity rows.
+
+`manifestRevision` is computed from the canonical checked-in manifest bytes and
+is not stored inside that manifest. Release reports, attestations, and packaged
+status expose the computed revision.
 
 `contentClasses` uses this closed v1 set:
 
@@ -89,7 +86,8 @@ Checks are derived from maturity and content class, not selected by each
 surface:
 
 - every `complete` pair requires key parity, placeholder parity, fallback
-  reporting, namespace ownership, and locale-state isolation;
+  reporting with zero untranslated fallback, namespace ownership, and
+  locale-state isolation;
 - `generated` content additionally requires generated-artifact parity;
 - `safety`, `security`, `authentication`, `authorization`,
   `destructive-action`, `privacy`, and `recovery` content additionally requires
@@ -107,8 +105,11 @@ The initial product report covers:
 
 - Control UI;
 - CLI onboarding;
+- channel and plugin setup flows;
 - remaining CLI commands and help;
 - TUI human-readable output;
+- core runtime messages, approvals, authentication, validation, and recovery
+  guidance;
 - Gateway errors;
 - server-rendered channel messages and notifications;
 - core and bundled command metadata;
@@ -144,6 +145,10 @@ and documentation do not currently support it.
 The product-level phrase "fully localized" is valid only when every
 product-owned surface is `complete` for all 22 locales. Surface-specific claims
 remain valid when they name the surface and satisfy its complete-state rules.
+Platform projections may instead be `platform-constrained` where an upstream
+API cannot represent a product locale. That state must be disclosed and blocks
+the unqualified phrase "fully localized," but it does not imply an OpenClaw
+catalog or adapter defect.
 
 The locale set is OpenClaw-owned. V1 does not inherit a translation service,
 vendor, downstream product, or enterprise language-set target. New release
@@ -231,10 +236,12 @@ Each locale/surface pair has one state:
 | `complete` | All required keys pass automated checks and required human review. |
 | `partial` | Catalog exists but has missing, fallback, or unreviewed content. |
 | `experimental` | Available for testing without a completeness claim. |
+| `platform-constrained` | OpenClaw catalog and adapter are complete, but the upstream platform cannot represent this locale; deterministic fallback is verified. |
 | `unsupported` | No shipped support. |
 
 `complete` is a release claim. It must not be inferred only from the presence of
-a locale file.
+a locale file. `platform-constrained` requires evidence of the platform locale
+limit, the selected fallback, and adapter reconcile behavior.
 
 ## Automated Checks
 
@@ -245,6 +252,8 @@ a locale file.
 - duplicate locale or alias detection;
 - source-key uniqueness;
 - key parity for declared complete catalogs;
+- zero untranslated English fallback for declared complete non-English
+  catalogs;
 - placeholder name and type parity;
 - deterministic generated artifacts;
 - invalid or forbidden markup;
@@ -255,7 +264,8 @@ a locale file.
 
 ### Advisory initially
 
-- untranslated English fallback in non-English catalogs;
+- untranslated English fallback in partial or experimental non-English
+  catalogs;
 - hardcoded user-facing strings;
 - unused keys;
 - inconsistent terminology;
@@ -317,6 +327,11 @@ review:
 
 The attestation is checked data. A normal approving commit without the required
 role, checklist, and reviewed source revision does not satisfy safety review.
+It also records `surface`, `locale`, `catalogRevision`, and `manifestRevision`.
+CI requires exact revision equality before promoting or retaining `complete`;
+a regenerated or cherry-picked catalog invalidates stale review evidence. If a
+release manifest is signed, the attestation hash is included in that signed
+manifest rather than creating a separate signing system.
 
 ## Report
 
@@ -342,20 +357,43 @@ The report distinguishes:
   surface at the release commit.
 - Partial and experimental locales remain selectable only when the UI clearly
   communicates their status or the project explicitly accepts fallback.
+- Platform-constrained projection rows do not block a qualified
+  "OpenClaw-owned localization complete" claim when every owned catalog and
+  adapter check passes, but the release report must name each constrained
+  platform/locale pair and must not claim that users see that locale natively.
+- Safety, security, authentication, authorization, destructive-action,
+  privacy, and recovery surfaces use one reviewed English message when the
+  locale/surface pair is not complete; key-level mixed-language fallback is
+  forbidden for those messages.
 - A missing translation must not block an unrelated runtime operation; it
   blocks only the completeness claim.
 - Locale infrastructure failures that can corrupt or drop catalogs are release
   blockers.
 - Invalid core catalogs block the owning build artifact. Invalid optional
   plugin catalogs do not block unrelated core artifacts.
+- A bad or partial generated wave is quarantined by catalog revision. Affected
+  locale/surface pairs are demoted to `partial` or `experimental`, their
+  `complete` claims are removed, and the last certified catalog or reviewed
+  English fallback remains active.
 
 ## Deployment Drift
 
-Each packaged artifact exposes its `artifactId` and `catalogRevision` through
-local status and diagnostic output. An artifact that bundles multiple
-localization surfaces exposes the revision for each bundled surface. Operators
-compare those values with the matching surface entries in the release manifest
-that certified them.
+Each packaged artifact exposes a machine-readable localization status:
+
+```yaml
+artifactId: openclaw-runtime
+artifactVersion: <version>
+buildRevision: <source revision>
+registryRevision: <locale registry revision>
+manifestRevision: <certifying manifest revision>
+catalogRevisions:
+  runtime: <catalog revision>
+  bundled-plugin.example: <catalog revision>
+```
+
+An artifact that bundles multiple localization surfaces exposes the revision
+for each bundled surface. Operators compare those values with matching entries
+in the release manifest that certified them.
 
 The runtime does not fetch catalogs or coverage state from the network. A
 catalog revision mismatch within one immutable package is a packaging failure.
@@ -389,7 +427,8 @@ The coverage system conforms to v1 when it can answer, at one commit:
 
 - which locales OpenClaw recognizes;
 - which surfaces each locale supports;
-- whether support is complete, partial, experimental, or absent;
+- whether support is complete, partial, experimental, platform-constrained, or
+  absent;
 - how many keys are missing or falling back;
 - whether safety text has required review;
 - which validation command proves the claim; and

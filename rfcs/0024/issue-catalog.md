@@ -17,7 +17,7 @@ precedent, and duplicate history.
 | [#55239](https://github.com/openclaw/openclaw/issues/55239) | Telegram | Native command menu descriptions remain English. | Metadata projection | 4 |
 | [#89971](https://github.com/openclaw/openclaw/issues/89971) | Skills | Skill display names and descriptions are raw English metadata. | Metadata | 4 |
 | [#79223](https://github.com/openclaw/openclaw/issues/79223) | Dreaming | Dream Diary generated prose has no explicit language input. | Content language | Post-v1 |
-| [#101314](https://github.com/openclaw/openclaw/issues/101314) | Dreaming | Journal headings and status labels are hardcoded English. | Runtime messages + content language | Post-v1 |
+| [#101314](https://github.com/openclaw/openclaw/issues/101314) | Dreaming | Journal headings and status labels are hardcoded English, while generated prose has separate language behavior. | Runtime messages + content language | 2 + Post-v1 |
 | [#53345](https://github.com/openclaw/openclaw/issues/53345) | Agent content | Korean UI is present, but agent response-language consistency is a separate unresolved behavior. | Content language | Post-v1 |
 | [#78038](https://github.com/openclaw/openclaw/issues/78038) | Control UI | Specific zh-CN strings are untranslated or inaccurate. | Coverage/quality | 5 |
 | [#88570](https://github.com/openclaw/openclaw/issues/88570) | Product-wide | CLI, runtime errors, channel notices, UI pages, and coverage reporting remain incomplete. | Umbrella coverage | 1-5 |

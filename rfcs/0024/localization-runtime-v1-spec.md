@@ -68,8 +68,10 @@ Requirements:
 - English is always the final fallback.
 - Existing accepted values remain aliases until a separately documented
   breaking-change process removes them.
-- Unknown values in validated stored preferences, configuration fields,
-  request fields, and core/bundled package metadata fail validation.
+- Unknown values in validated configuration fields, request fields, and
+  core/bundled package metadata fail validation.
+- A stale stored user preference is nonfatal: record a bounded finding, ignore
+  the value, continue precedence resolution, and expose a reset path.
 - External package localized metadata may use exact normalized BCP 47 tags
   outside the product registry under the localized-metadata specification; it
   does not extend runtime locale inference or product completeness.
@@ -139,6 +141,12 @@ channel identity.
 
 The resolved context is immutable for one rendering operation.
 
+Server-rendered channel messages use `explicit-recipient` only when an existing
+recipient/account preference or an owner-approved request field supplies a
+validated locale. If neither exists, they use reviewed English fallback. V1
+does not invent a shared channel preference store or infer locale from channel
+identity or message content.
+
 `audience=user` applies to interactive UI, chat, and approval text.
 `audience=operator` applies to human-readable CLI status, health, recovery, and
 administrative guidance. Logs and structured automation output are excluded.
@@ -153,6 +161,21 @@ type LocalizedMessage = {
   params?: Readonly<Record<string, MessageParam>>;
   fallback: string;
 };
+
+type CatalogMessage =
+  | string
+  | {
+      kind: "plural";
+      param: string;
+      cases: Partial<
+        Record<"zero" | "one" | "two" | "few" | "many" | "other", string>
+      > & { other: string };
+    }
+  | {
+      kind: "select";
+      param: string;
+      cases: Readonly<Record<string, string>> & { other: string };
+    };
 ```
 
 `LocalizedMessage` is the only internal message descriptor. Gateway wire fields
@@ -182,6 +205,45 @@ Requirements:
   error; they never become an empty string silently.
 - Unknown keys render `fallback`.
 - Missing locale entries follow the locale fallback chain, then `fallback`.
+
+V1 supports one top-level plural or select operation per catalog message:
+
+- plural parameters are numeric and use `Intl.PluralRules` cardinal categories
+  for the resolved locale;
+- select parameters are string or boolean scalar values;
+- `other` is required;
+- every case has the same placeholder names and types;
+- unsupported categories are validation errors;
+- nested plural/select expressions are deferred; and
+- the descriptor `fallback` is the already-rendered reviewed English result for
+  the current parameters.
+
+This bounded structure covers count- and state-sensitive runtime copy without
+requiring every surface to adopt one catalog file format or a full
+MessageFormat implementation.
+
+Each localizable Gateway error code declares an allowed parameter schema with
+parameter names, scalar types, and sensitivity classification. Projection
+rejects undeclared parameters and any parameter classified as secret or unsafe
+for the client boundary.
+
+## Catalog Snapshots
+
+Core and bundled-plugin catalogs activate as immutable snapshots:
+
+```ts
+type CatalogSnapshot = {
+  registryRevision: string;
+  catalogRevision: string;
+  catalogs: ReadonlyMap<string, unknown>;
+};
+```
+
+Each render or Gateway projection captures one snapshot before lookup and uses
+it for the entire operation. Validation completes before an atomic snapshot
+swap. Failed activation leaves the previous snapshot active. Plugin unload
+removes its namespace through the same atomic replacement and emits a bounded
+diagnostic with the rejected or removed revision.
 
 Catalog keys must describe meaning, not wording:
 
@@ -270,15 +332,23 @@ Before shipment, every supported Gateway client parser must be shown to ignore
 unknown optional fields or be updated. Strict parsers that reject
 `messageKey`/`messageParams` block the wire projection from shipping.
 
+The ship gate is a checked client matrix containing client/adapter name,
+supported version range, parser owner, unknown-field behavior, compatibility
+fixture, and result. Missing or failed rows block the optional wire fields.
+
 ## CLI Resolution
 
-The existing onboarding order remains valid:
+The existing onboarding source order remains valid:
 
 ```text
-OPENCLAW_LOCALE
+valid OPENCLAW_LOCALE
 > LC_ALL
 > LC_MESSAGES
 > LANG
+> English
+
+invalid OPENCLAW_LOCALE
+> diagnostic
 > English
 ```
 
@@ -312,6 +382,10 @@ localized tables or prose.
   operation solely because localization failed.
 - Missing safety translation: use reviewed English, not unreviewed machine
   translation.
+- A non-complete safety, security, authentication, authorization,
+  destructive-action, privacy, or recovery catalog renders the entire message
+  from one reviewed English snapshot; it never mixes translated and fallback
+  fragments.
 - Emergency rollback: remove the affected translation or key mapping and use
   the English fallback without changing codes, commands, or authorization
   behavior.
@@ -361,6 +435,8 @@ A runtime localization implementation conforms to v1 when:
 - locale and aliases resolve deterministically;
 - English fallback is always available;
 - descriptor rendering passes placeholder parity tests;
+- plural/select rendering passes English, Russian/Ukrainian, Polish, and Arabic
+  category fixtures;
 - old Gateway clients continue to receive usable English messages;
 - new clients localize known errors without branching on text;
 - approval rendering preserves action semantics in every locale; and

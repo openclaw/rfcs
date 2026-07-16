@@ -38,7 +38,11 @@ Rules:
 - Alias keys are accepted at authoring time only if normalization produces one
   unambiguous canonical entry.
 - Two aliases that resolve to the same locale with different text are invalid.
-- Missing locale text falls back through the locale chain to `default`.
+- Core/bundled metadata follows the product locale fallback chain.
+- External metadata matches an exact normalized tag, then progressively
+  truncates to an exact package-owned language key, then uses `default`.
+  Product language-default inference does not silently map unrelated regional
+  variants for an external package.
 - Empty localized strings are invalid.
 
 ## Commands
@@ -111,11 +115,16 @@ Metadata is activation-pinned with the plugin registry snapshot. Reload
 atomically replaces the plugin's metadata set.
 
 External runtime-message catalogs are not registered through arbitrary
-callbacks or translation-provider hooks. A future or owner-approved v1 Plugin
-SDK seam may accept a declarative package-owned catalog under the plugin's
-namespace, validate it before activation, and replace it atomically with the
-plugin snapshot. Without that owner-approved seam, v1 external localization is
-limited to the metadata defined in this specification.
+callbacks or translation-provider hooks. V1 external localization is limited
+to the metadata defined in this specification. A post-v1 Plugin SDK seam may
+accept a declarative package-owned catalog under the plugin's namespace,
+validate it before activation, and replace it atomically with the plugin
+snapshot.
+
+Before external packages serialize the object form, the plugin/package owner
+must define host capability or minimum-version negotiation. Unsupported hosts
+must either consume the legacy English string or reject installation with an
+actionable version requirement; they must not fail later during activation.
 
 ## Security
 

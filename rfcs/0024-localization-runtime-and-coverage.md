@@ -264,15 +264,18 @@ changing executable content.
 
 Locale identifiers follow BCP 47. OpenClaw maintains a central registry of
 supported locale IDs, aliases, display names, fallback chains, writing
-direction, and per-surface availability.
+direction. The coverage manifest is the sole source of per-surface availability
+and maturity.
 
 V1 keeps `zh-CN` and `zh-TW` as canonical IDs and accepts `zh-Hans` and
 `zh-Hant` as aliases. A future canonical-ID change requires a separate
 compatibility proposal with stored-preference, environment, config, and plugin
 metadata migration; it is not part of RFC 0024.
 
-An unknown locale in a validated stored preference, config field, request
-field, or core/bundled package manifest is an actionable validation error.
+An unknown locale in a validated config field, request field, or core/bundled
+package manifest is an actionable validation error. A stale stored user
+preference is nonfatal: the surface records a bounded finding, follows normal
+precedence, and exposes a reset path.
 External package localized metadata may use exact valid BCP 47 tags under its
 package-owned rules without extending the product registry. Browser,
 operating-system, and host process locales are inferred inputs: they fall
@@ -316,6 +319,13 @@ explicit user or recipient preference
 Each surface documents which inputs it can legitimately observe. A Gateway
 must not guess a channel recipient's locale from message text. A Control UI
 selection must not silently change the language of model-generated content.
+
+V1 server-rendered channel messages use a recipient locale only when the
+surface already has an explicit recipient/account preference or the request
+carries an owner-approved validated locale. Until an owner approves a new
+preference store, all other channel recipients receive reviewed English
+fallback. Locale is never inferred from message text, user name, phone number,
+channel identity, IP geography, or model output.
 
 The RFC introduces the context contract. Any new config key, request field,
 plugin field, or channel preference store remains a separately reviewable
@@ -474,10 +484,10 @@ plugin snapshot. Plugins cannot override core or another plugin's namespace,
 register a translation provider, mutate global catalogs after activation, or
 make runtime model calls for deterministic product text.
 
-The exact public manifest field or Plugin SDK registration method is a new
-semi-public surface and requires explicit plugin-owner approval before PR 4
-ships it. If that approval is not available, v1 external support remains
-localized metadata only while bundled plugins prove the catalog mechanism.
+That external runtime-catalog seam is post-v1. V1 external support is localized
+metadata only while bundled plugins prove the catalog mechanism. Any future
+public manifest field or Plugin SDK registration method is a new semi-public
+surface requiring explicit plugin-owner approval.
 
 Catalog keys are namespaced by owner, for example:
 
@@ -542,8 +552,8 @@ OpenClaw adds a checked-in localization coverage manifest describing:
 - key counts and fallback counts;
 - required validation commands; and
 - catalog revision identity; and
-- whether a locale/surface combination is `complete`, `partial`,
-  `experimental`, or `unsupported`.
+- whether a locale/surface combination is `source`, `complete`, `partial`,
+  `experimental`, `platform-constrained`, or `unsupported`.
 
 CI produces a localization report and enforces:
 
@@ -613,9 +623,9 @@ more valuable than forcing one file format.
 
 Project Fluent and Unicode MessageFormat demonstrate the value of separating
 message identity, variables, and language-specific rendering. OpenClaw v1 uses
-a smaller contract compatible with its current interpolation systems, while
-leaving room for plural, number, date, and selector formatting when a surface
-needs it.
+a smaller contract compatible with its current interpolation systems and adds
+one top-level structured plural or select operation. Nested selectors and
+general number/date formatting remain future extensions.
 
 ### Why BCP 47 aliases rather than renaming immediately
 

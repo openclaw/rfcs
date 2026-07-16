@@ -22,6 +22,7 @@ behavior rather than product-owned interface text.
   - normalized existing Control UI and wizard locale resolution;
   - immutable localization context with provenance;
   - one internal `LocalizedMessage` descriptor and English renderer;
+  - bounded top-level plural/select catalog entries using locale plural rules;
   - Control UI and wizard locale-resolution adapters as production consumers;
   - shared key, placeholder, namespace, and fallback validation;
   - checked-in localization coverage manifest;
@@ -38,7 +39,10 @@ behavior rather than product-owned interface text.
   - Arabic and Persian document `lang`/`dir` behavior;
   - bounded Hebrew, additional Indic, Khmer or Myanmar, and Ethiopic fixtures;
   - one accepted descriptor and one missing-key fallback;
+  - English, Russian/Ukrainian, Polish, and Arabic plural-category fixtures;
   - invalid placeholder and namespace failures;
+  - render-path denial of filesystem, network, environment, and storage access;
+  - parallel locale isolation with no process-global locale bleed;
   - concurrent locale changes and catalog replacement;
   - unchanged English onboarding and representative UI snapshots;
   - warmed rendering stays within the v1 performance budget.
@@ -50,16 +54,21 @@ behavior rather than product-owned interface text.
 ## PR 2: Runtime Safety Messages And Gateway Errors
 
 - Depends on: PR 1
-- Issues: #81253, historical #66056, umbrella #88570
+- Issues: #81253, deterministic-label portion of #101314, historical #66056,
+  umbrella #88570
 - Owners: Gateway protocol, channels, Control UI, security copy
 - Includes:
   - localized exec approval labels and explanatory prose;
+  - deterministic product-owned runtime labels, including Dreaming journal
+    headings and status text, without changing generated prose language;
   - renderer-owned literal commands, decisions, IDs, paths, and Markdown;
-  - recipient locale resolution at final server/channel rendering;
+  - recipient locale resolution from an existing explicit preference or
+    owner-approved request field, with reviewed English otherwise;
   - optional Gateway `messageKey` and `messageParams` projection;
   - bounded conversion of common stable Gateway errors;
   - Control UI localization of recognized errors with English fallback;
-  - structured safety-review attestation for the initial non-English locale.
+  - revision-bound safety-review attestation for the initial non-English
+    locale.
 - Compatibility:
   - retain Gateway `code` and English `message`;
   - inventory supported clients and update any strict parser before shipping;
@@ -71,19 +80,21 @@ behavior rather than product-owned interface text.
   - missing-key and emergency English fallback;
   - old-client and new-client Gateway fixtures;
   - unknown optional fields accepted by supported clients;
+  - checked supported-client/parser compatibility matrix;
   - identical approval semantics across every channel route;
   - RTL literal isolation and forbidden bidi-control checks.
 - Result:
   - the highest-risk runtime gap is solved end to end;
   - the descriptor and Gateway compatibility model are proven by real users.
 
-## PR 3: CLI Localization
+## PR 3: CLI And TUI Localization
 
 - Depends on: PR 1
 - Issue: #88570
 - Owners: CLI and command owners
 - Includes:
   - root help and shared option validation;
+  - TUI navigation, help, status, validation, and recovery text;
   - status, health, and recovery summaries;
   - sessions and cron human-readable output;
   - agents, channels, plugins, and skills human-readable output;
@@ -103,7 +114,7 @@ behavior rather than product-owned interface text.
   - missing catalog and renderer failure fallback;
   - hardcoded-string findings become blocking for migrated CLI directories.
 - Result:
-  - onboarding is no longer the only localized CLI experience;
+  - onboarding is no longer the only localized CLI/TUI experience;
   - automation remains stable while human output follows locale.
 
 ## PR 4: Localized Command, Channel, And Skill Metadata
@@ -118,8 +129,7 @@ behavior rather than product-owned interface text.
   - CLI, TUI, and Control UI projection from the same command metadata;
   - optional localized skill display names and descriptions;
   - bundled-skill catalogs and external-package validation;
-  - an owner-gated declarative external plugin catalog seam, or an explicit v1
-    decision to keep external support metadata-only;
+  - external localized metadata with host capability/version negotiation;
   - localized search indexing while installs and policy use stable IDs.
 - Compatibility:
   - existing plain-English commands and all published skills remain valid;
@@ -156,7 +166,7 @@ behavior rather than product-owned interface text.
     exist;
   - non-English host-locale fixtures;
   - first explicit locale/surface maturity promotions;
-  - per-artifact `catalogRevision` and deployment drift diagnostics.
+  - per-artifact localization status and deployment drift diagnostics.
 - Proof:
   - intentionally missing key;
   - placeholder mismatch;
@@ -164,7 +174,8 @@ behavior rather than product-owned interface text.
   - unreviewed safety string;
   - expired advisory that becomes blocking or removes the completeness claim;
   - same runtime result under English and non-English host locales;
-  - complete, partial, experimental, and unsupported report rows.
+  - complete, partial, experimental, platform-constrained, and unsupported
+    report rows.
 - Result:
   - OpenClaw can make honest release-level localization claims;
   - localized host behavior no longer depends on English prose;
@@ -172,11 +183,11 @@ behavior rather than product-owned interface text.
 
 ## Post-v1 Follow-Up: Generated Content Language
 
-- Issues: #79223, #101314, remaining portion of #53345
+- Issues: #79223, generated-content portion of #101314, remaining portion of
+  #53345
 - Reuses: PR 1 locale registry and PR 2 runtime labels
 - Includes:
   - explicit content-language input for Dreaming;
-  - localized deterministic journal headings and status labels;
   - model prompt language intent without rewriting existing content;
   - separation from Control UI locale and assistant default language.
 
@@ -188,7 +199,7 @@ runtime.
 ```text
 PR 1 core + coverage baseline
   -> PR 2 runtime safety + Gateway errors
-  -> PR 3 CLI
+  -> PR 3 CLI + TUI
   -> PR 4 command/channel/skill metadata
 
 PRs 2-4 -> PR 5 completeness gates + locale-safe runtime
@@ -216,7 +227,8 @@ RFC 0024 v1 is complete when:
 - all 22 existing product locales are registered and reported;
 - Gateway errors and channel safety messages localize through stable
   descriptors;
-- CLI human output is localized without destabilizing structured output;
+- CLI and TUI human output is localized without destabilizing structured
+  output;
 - command and skill metadata use one locale-aware contract;
 - runtime behavior does not depend on English host prose;
 - right-to-left locales set direction and isolate literal commands and IDs;
