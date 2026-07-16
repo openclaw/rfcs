@@ -3,7 +3,7 @@ title: Readiness Conditions and Providers
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -95,6 +95,12 @@ provider condition.
 - Standardize Docker, Kubernetes, or systemd probe intervals and retries.
 
 ## Proposal
+
+The implementer-facing v1 contract is captured in
+[`0018/readiness-v1-spec.md`](0018/readiness-v1-spec.md). This RFC remains the
+design rationale, compatibility argument, and rollout plan; the sidecar is the
+concise schema, provider-lifecycle, evaluation, projection, and conformance
+reference for OpenClaw runtime and plugin implementations.
 
 ### Canonical condition model
 
