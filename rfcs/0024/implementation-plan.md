@@ -89,9 +89,13 @@ avoids a repository-wide string extraction.
 - Proof:
   - old client fixture;
   - new localized client fixture;
+  - inventory of supported clients and proof that unknown optional fields are
+    accepted or the client is updated before shipment;
   - unknown-key fallback;
   - no client branching on translated text;
-  - protocol compatibility review.
+  - protocol compatibility review;
+  - emergency removal of one key mapping falls back to English without a
+    protocol or server rollback.
 - Owner confirmation:
   - Gateway protocol owner must approve the new optional fields.
 
@@ -155,11 +159,12 @@ avoids a repository-wide string extraction.
 - Owner confirmation:
   - required because manifest and plugin SDK fields are public surfaces.
 
-## Slice 8: Generated Content Language
+## Post-v1 Slice 8: Generated Content Language
 
 - Repo: `openclaw/openclaw`
 - Depends on: Slice 1; independent of runtime message rendering after that
 - Issues: #79223, #101314, remaining portion of #53345
+- V1 status: not required for RFC 0024 runtime acceptance
 - Work:
   - Define explicit content-language input for Dreaming.
   - Localize deterministic journal headings/status labels through runtime
@@ -189,7 +194,10 @@ avoids a repository-wide string extraction.
   - one placeholder mismatch;
   - one stale generated artifact;
   - one unreviewed safety string;
-  - complete/partial state transitions.
+  - complete/partial state transitions;
+  - every advisory migration finding has an owner and `reviewBy` boundary; and
+  - an expired advisory either becomes blocking or removes the completeness
+    claim.
 
 ## Slice 10: Locale-Safe Runtime Audit
 
@@ -229,12 +237,12 @@ avoids a repository-wide string extraction.
           -> CLI catalog
       -> command metadata
       -> skill metadata
-      -> generated content language
   -> coverage manifest/report
       -> completeness gates
       -> locale expansion
 
 locale-safe runtime audit can proceed independently
+generated content language follows as a post-v1 extension
 ```
 
 ## Cross-RFC Alignment
@@ -246,14 +254,12 @@ locale-safe runtime audit can proceed independently
 - Gateway protocol changes remain owned by OpenClaw Gateway maintainers.
 - Plugin and skill manifest changes remain owned by plugin/package maintainers.
 
-## Program Completion Criteria
+## V1 Acceptance Criteria
 
-The localization program is complete when:
+RFC 0024 v1 is implementable when:
 
 - every finite product-owned user-facing string is cataloged or explicitly
-  classified;
-- every shipped locale/surface pair has an honest maturity state;
-- complete locales pass automated parity and required human review;
+  classified for the migrated v1 surfaces;
 - Gateway errors and channel safety messages localize through stable
   descriptors;
 - CLI human output is localized without destabilizing structured output;
@@ -261,4 +267,3 @@ The localization program is complete when:
 - runtime behavior does not depend on English host prose;
 - missing translations fall back safely to English; and
 - release artifacts publish the localization coverage report.
-

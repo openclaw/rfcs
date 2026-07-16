@@ -43,8 +43,8 @@ Requirements:
 - Unknown explicit values fail validation.
 - Unknown inferred platform values fall back without failing startup.
 
-For Chinese, v1 must accept `zh-CN`, `zh-TW`, `zh-Hans`, and `zh-Hant`.
-Selection of canonical internal IDs remains an RFC acceptance decision.
+For Chinese, v1 keeps `zh-CN` and `zh-TW` canonical and accepts `zh-Hans` and
+`zh-Hant` as aliases. Canonical-ID renaming is deferred.
 
 ## Localization Context
 
@@ -81,6 +81,10 @@ channel identity.
 
 The resolved context is immutable for one rendering operation.
 
+`audience=user` applies to interactive UI, chat, and approval text.
+`audience=operator` applies to human-readable CLI status, health, recovery, and
+administrative guidance. Logs and structured automation output are excluded.
+
 ## Message Descriptor
 
 ```ts
@@ -92,6 +96,20 @@ type LocalizedMessage = {
   fallback: string;
 };
 ```
+
+`LocalizedMessage` is the only internal message descriptor. Gateway wire fields
+are serialized from this type:
+
+```ts
+function projectGatewayMessage(message: LocalizedMessage): {
+  message: string;
+  messageKey: string;
+  messageParams?: Readonly<Record<string, MessageParam>>;
+};
+```
+
+Descriptor construction, catalog validation, and Gateway projection use one
+shared validator.
 
 Requirements:
 
@@ -127,6 +145,11 @@ The following values are always literal:
 
 Renderers escape literal values for their target format. Translators cannot
 modify them or place executable tokens in translation resources.
+
+Security-sensitive catalogs reject Unicode bidirectional embedding and
+override controls. Renderers isolate literal LTR commands, IDs, paths, and
+decision tokens when placed in RTL text. Normal Arabic, Persian, Hebrew, and
+other legitimate script characters remain valid.
 
 ## Rich And Safety Output
 
@@ -180,6 +203,10 @@ Rules:
 Adding these optional fields requires Gateway protocol owner approval and
 compatibility tests for old and new clients.
 
+Before shipment, every supported Gateway client parser must be shown to ignore
+unknown optional fields or be updated. Strict parsers that reject
+`messageKey`/`messageParams` block the wire projection from shipping.
+
 ## CLI Resolution
 
 The existing onboarding order remains valid:
@@ -203,12 +230,17 @@ localized tables or prose.
 
 - Missing catalog: use English fallback and emit a bounded diagnostic.
 - Invalid catalog at build time: fail validation.
+- Invalid core catalog: fail only the artifact or package that owns that
+  catalog; do not silently publish a partial generated artifact.
 - Invalid optional plugin catalog: reject that catalog and retain plugin
   operation with default metadata where safe.
 - Renderer exception: use English fallback; do not fail the underlying
   operation solely because localization failed.
 - Missing safety translation: use reviewed English, not unreviewed machine
   translation.
+- Emergency rollback: remove the affected translation or key mapping and use
+  the English fallback without changing codes, commands, or authorization
+  behavior.
 
 ## Observability
 
@@ -219,9 +251,34 @@ Diagnostics may record:
 - locale source;
 - fallback depth;
 - catalog owner; and
+- catalog revision;
 - missing-key or invalid-parameter finding code.
 
 Diagnostics must not record sensitive parameter values by default.
+
+## Minimal Contribution Example
+
+Adding one CLI message requires:
+
+1. Declare the English source key and parameters:
+
+   ```ts
+   "cli.agent.messageFile.empty": "Message file is empty: {path}"
+   ```
+
+2. Replace the literal renderer call:
+
+   ```ts
+   renderLocalizedMessage(context, {
+     key: "cli.agent.messageFile.empty",
+     params: { path: messageFile },
+     fallback: `Message file is empty: ${messageFile}`,
+   });
+   ```
+
+3. Add locale entries with the same `{path}` placeholder.
+4. Run key, placeholder, fallback, and affected renderer tests.
+5. Leave `path` literal and escaped by the target renderer.
 
 ## Conformance
 
@@ -233,5 +290,9 @@ A runtime localization implementation conforms to v1 when:
 - old Gateway clients continue to receive usable English messages;
 - new clients localize known errors without branching on text;
 - approval rendering preserves action semantics in every locale; and
-- localization failure cannot crash the Gateway or authorize an action.
-
+- localization failure cannot crash the Gateway or authorize an action;
+- warmed catalog lookup and rendering of one message with at most 16 scalar
+  parameters performs no I/O or network access and stays below 5 ms p95 on the
+  localization benchmark lane; and
+- catalog replacement cannot split one in-flight rendering operation across
+  revisions.

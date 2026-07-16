@@ -29,7 +29,6 @@ Supporting material:
 - [Localized Metadata v1 specification](0024/localized-metadata-v1-spec.md)
 - [GitHub issue catalog](0024/issue-catalog.md)
 - [Implementation plan](0024/implementation-plan.md)
-- [Review findings](0024/review-findings.md)
 
 ## Motivation
 
@@ -115,9 +114,9 @@ independent language requests.
   translations to alter executable commands or decision tokens.
 - Define locale-keyed command and skill metadata that channels and UI surfaces
   can project.
-- Keep model-generated content language separate from product UI localization,
-  while defining how an explicit content-language preference can be passed to
-  features such as Dreaming.
+- Keep model-generated content language separate from product UI localization
+  so it can use the locale registry in a post-v1 extension without blocking the
+  runtime localization contract.
 - Define a checked-in surface/locale coverage manifest and CI checks for key
   parity, placeholders, untranslated fallback, and hardcoded product text.
 - Preserve the existing Control UI, native-app, docs, and onboarding pipelines
@@ -138,6 +137,7 @@ independent language requests.
 - Claim that machine translation alone is sufficient for safety, security, or
   high-quality release localization.
 - Complete every locale in one pull request.
+- Implement generated-content language selection in v1.
 
 ## Proposal
 
@@ -161,11 +161,10 @@ Locale identifiers follow BCP 47. OpenClaw maintains a central registry of
 supported locale IDs, aliases, display names, fallback chains, writing
 direction, and per-surface availability.
 
-Existing public IDs remain accepted. A future move from `zh-CN` and `zh-TW` to
-`zh-Hans` and `zh-Hant` must use aliases and stored-preference migration rather
-than a flag-day rename. Catalog lookup may use one canonical internal ID while
-configuration, environment variables, persisted UI state, and plugin metadata
-continue to accept documented aliases.
+V1 keeps `zh-CN` and `zh-TW` as canonical IDs and accepts `zh-Hans` and
+`zh-Hant` as aliases. A future canonical-ID change requires a separate
+compatibility proposal with stored-preference, environment, config, and plugin
+metadata migration; it is not part of RFC 0024.
 
 An unknown explicit locale is an actionable validation error. An unsupported
 inferred platform locale falls back through its language and registered aliases
@@ -211,6 +210,11 @@ The RFC introduces the context contract. Any new config key, request field,
 plugin field, or channel preference store remains a separately reviewable
 public surface and requires the owning maintainer's approval.
 
+`audience=user` covers end-user chat, approval, and interactive UI text.
+`audience=operator` covers human-readable CLI status, health, recovery, and
+administrative guidance. Logs and machine-readable output are not localized by
+either audience.
+
 ### Structured localized messages
 
 Known product-owned runtime messages use descriptors:
@@ -222,6 +226,10 @@ type LocalizedMessage = {
   fallback: string;
 };
 ```
+
+This is the single internal descriptor. Gateway `message`, `messageKey`, and
+`messageParams` fields are a compatibility wire projection of it, not a second
+message model. Both projections use the same key and parameter validator.
 
 The key is stable machine identity for catalog lookup, telemetry, tests, and
 coverage. `fallback` is reviewed English text for old clients, missing
@@ -286,6 +294,11 @@ Security-sensitive copy requires human review for each release-complete locale.
 Machine-generated translation can seed drafts but cannot alone mark the
 security surface complete.
 
+Security catalogs reject bidirectional embedding/override controls. Renderers
+use Unicode isolation around literal commands, IDs, paths, and decision tokens
+when surrounding text is right-to-left. Legitimate script characters are not
+rewritten or removed.
+
 ### Catalog ownership
 
 This RFC does not create a monolithic catalog:
@@ -332,7 +345,7 @@ description. Package IDs, folder names, invocation names, and tool identifiers
 remain unchanged. Unknown locale keys fail package validation or are excluded
 with an explicit finding; they are never silently treated as executable names.
 
-### Generated content language
+### Post-v1 generated content language
 
 Product localization and generated content language are related but distinct.
 Features such as Dreaming may accept an explicit content-language preference,
@@ -347,8 +360,9 @@ The first generated-content contract is:
 - no change to product UI locale; and
 - clear provenance in generated artifacts when language affects output.
 
-This allows Dreaming issues to proceed without coupling model behavior to the
-Control UI language selector.
+This contract is not required for v1 acceptance. It allows later Dreaming work
+to reuse locale identity without coupling model behavior to the Control UI
+language selector.
 
 ### Coverage manifest and release claims
 
@@ -361,6 +375,7 @@ OpenClaw adds a checked-in localization coverage manifest describing:
 - source and generated catalog paths;
 - key counts and fallback counts;
 - required validation commands; and
+- catalog revision identity; and
 - whether a locale/surface combination is `complete`, `partial`,
   `experimental`, or `unsupported`.
 
@@ -400,6 +415,12 @@ English remains the source and compatibility fallback. Existing locale IDs,
 environment variables, persisted preferences, Gateway error messages, command
 names, and plugin manifests remain valid until an explicit migration is
 accepted.
+
+Every migrated renderer retains an emergency English-fallback path. A bad
+translation can be removed or the affected key can fall back to English without
+changing error codes, action semantics, or the underlying operation. Invalid
+core catalogs fail the owning artifact build; invalid optional plugin catalogs
+are rejected without disabling unrelated core catalogs.
 
 ## Rationale
 
@@ -448,8 +469,6 @@ needs a product-level report.
 
 - Which owner approves the first public locale preference surface for
   server-rendered channel messages?
-- Should canonical Chinese locale IDs change to script-based IDs in v1, or
-  should v1 only add aliases and migration telemetry?
 - Which locales qualify as release-complete for the first runtime and CLI
   slices?
 - Should core runtime catalogs use the current dotted-key format or adopt a

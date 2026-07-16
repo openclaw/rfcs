@@ -50,6 +50,10 @@ type LocalizedCommandMetadata = {
 `name` is never translated. Platform adapters map `description.localizations`
 to native platform fields where supported.
 
+Existing command definitions with a plain English description remain valid and
+require no migration. They are interpreted as `default` with no
+`localizations`.
+
 Platform constraints are validated per adapter:
 
 - maximum length;
@@ -82,11 +86,16 @@ Rules:
   quality for third-party packages.
 - Search may index localized display text, but installation and policy continue
   to use stable IDs.
+- Every currently published skill with no localized fields remains valid with
+  no required package or manifest change.
 
 ## Plugin Ownership
 
 Plugins may register localized metadata only for capabilities they own. They
 cannot overwrite core or another plugin's keys.
+
+Namespace ownership is enforced by catalog validation and the blocking
+`namespace-ownership` coverage check.
 
 Metadata is activation-pinned with the plugin registry snapshot. Reload
 atomically replaces the plugin's metadata set.
@@ -110,4 +119,3 @@ A metadata implementation conforms when:
 - duplicate aliases are rejected;
 - localized metadata cannot alter execution or policy; and
 - one catalog can feed CLI, UI, and supported channel projections.
-

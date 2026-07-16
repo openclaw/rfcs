@@ -12,6 +12,7 @@ implementation decision, but the data model is:
 
 ```yaml
 version: 1
+catalogRevision: <content hash or source revision>
 locales:
   en:
     aliases: [en-US, en-GB]
@@ -42,6 +43,21 @@ surfaces:
 
 The checked-in schema must validate locale IDs, aliases, paths, owners, and
 check names.
+
+`requiredChecks` uses the closed v1 set:
+
+```text
+key-parity
+placeholder-parity
+fallback-report
+namespace-ownership
+safety-review
+generated-artifact-parity
+hardcoded-string-report
+locale-state-isolation
+```
+
+New check identities require a schema change rather than an ad hoc string.
 
 ## Surface Set
 
@@ -90,6 +106,8 @@ a locale file.
 - invalid or forbidden markup;
 - missing English source text; and
 - stale generated locale inventory.
+- catalog namespace ownership: core keys are core-owned and a plugin may write
+  only its own namespace.
 
 ### Advisory initially
 
@@ -104,6 +122,11 @@ a locale file.
 
 Advisory checks become blocking per migrated directory or surface, not
 repository-wide in one change.
+
+Every advisory migration entry records an owner and `reviewBy` release or date.
+Passing that boundary requires promotion to blocking, an explicit renewed
+deadline, or removal of the completeness claim. Advisory status cannot remain
+unowned and indefinite.
 
 ## Hardcoded String Inventory
 
@@ -142,8 +165,14 @@ beyond the repository's normal commit history:
 review:
   required: true
   status: reviewed
+  reviewerRole: security-localization-reviewer
   sourceRevision: <commit>
+  checklist: localization-safety-v1
+  attestationRevision: <commit>
 ```
+
+The attestation is checked data. A normal approving commit without the required
+role, checklist, and reviewed source revision does not satisfy safety review.
 
 ## Report
 
@@ -173,6 +202,20 @@ The report distinguishes:
   blocks only the completeness claim.
 - Locale infrastructure failures that can corrupt or drop catalogs are release
   blockers.
+- Invalid core catalogs block the owning build artifact. Invalid optional
+  plugin catalogs do not block unrelated core artifacts.
+
+## Deployment Drift
+
+Packaged artifacts expose their `catalogRevision` through local status and
+diagnostic output. Operators can compare a running deployment's product
+revision and catalog revision with the release manifest that certified it.
+
+The runtime does not fetch catalogs or coverage state from the network. A
+catalog revision mismatch within one immutable package is a packaging failure.
+Different fleet members may run different releases, but fleet tooling can
+report their declared locale maturity and catalog revision without inspecting
+translated text.
 
 ## Contribution Workflow
 
@@ -189,6 +232,10 @@ Every catalog documents:
 
 Generated updates use pull requests, not direct pushes to protected branches.
 
+Existing English-only commands, plugins, and skills remain valid contributors
+to the ecosystem. Localization fields are optional unless an artifact claims a
+specific locale/surface completeness state.
+
 ## Conformance
 
 The coverage system conforms to v1 when it can answer, at one commit:
@@ -200,4 +247,3 @@ The coverage system conforms to v1 when it can answer, at one commit:
 - whether safety text has required review;
 - which validation command proves the claim; and
 - which findings prevent promotion to complete.
-
