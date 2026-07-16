@@ -20,16 +20,17 @@ This addendum defines:
 - downstream registry provenance and diagnostics.
 
 It does not define a separate account feed, installable catalog entries,
-package candidates, a signed atomic publisher-feed document payload type,
-notification transport, organization approval, artifact trust, or security
-scanning.
+package candidates, notification transport, organization approval, artifact
+trust, or security scanning.
 
 Publisher feeds are the first rollout target for the reusable query and change
 contracts in `hosted-feed-distribution-v1-spec.md`. A publisher with hundreds of
 skills or plugins must remain discoverable without requiring one unbounded
 response.
 
-Signed publisher query pages use payload type
+Signed complete publisher snapshots use payload type
+`openclaw.clawhub-publisher-feed-snapshot.v1`. Signed publisher query pages use
+payload type
 `openclaw.clawhub-publisher-feed-query-results.v1`. Signed publisher change
 pages use `openclaw.clawhub-publisher-feed-changes.v1`. These payload types MUST
 NOT be accepted as install catalogs. A sharded complete publisher-feed root uses
@@ -165,6 +166,21 @@ ClawHub MUST require a full publisher-feed refresh. It MUST NOT silently return
 only the retained tail. These projections remain discovery data; installation
 still resolves entries through an accepted install catalog.
 
+### Signed Complete Snapshot
+
+`GET /api/v1/publishers/{publisherId}/feed/snapshot` returns a DSSE envelope
+whose payload type is `openclaw.clawhub-publisher-feed-snapshot.v1`. Its decoded
+payload is a strict complete publisher feed with exactly `schemaVersion`,
+`feedId`, `publisherId`, `handle`, `displayName`, `generatedAt`, `expiresAt`,
+`sequence`, and `entries`. It has no cursor and MUST NOT be truncated.
+
+The payload repeats the identity and entry bounds above, contains at most 400
+entries, and is at most 1 MiB. `expiresAt` is an RFC 3339 instant later than
+`generatedAt`. A client MUST verify the envelope, expected payload type,
+publisher-derived feed id, expiry, response bounds, and entry uniqueness before
+atomically replacing accepted state. This discovery snapshot does not grant
+install authority.
+
 ## Public API
 
 The initial publisher routes are:
@@ -172,6 +188,7 @@ The initial publisher routes are:
 ```text
 GET /api/v1/publishers/{publisherId}
 GET /api/v1/publishers/{publisherId}/feed
+GET /api/v1/publishers/{publisherId}/feed/snapshot
 ```
 
 ClawHub does not expose parallel `/accounts` feed routes. Publisher detail may
@@ -221,12 +238,13 @@ machine-readable API discovery, not a required profile-page control.
 
 ## Trust And Signing Boundary
 
-The atomic publisher-feed document does not yet have a signed payload type and
-MUST NOT reuse `openclaw.official-external-plugin-catalog-feed.v1`. Its complete
-sharded representation, plus signed query and change projections, use the
-distinct payload types defined above and the strict distribution-addendum
-schemas. Each requires expected publisher-feed identity binding, test vectors,
-and explicit client verifier registration.
+The atomic publisher-feed snapshot MUST use
+`openclaw.clawhub-publisher-feed-snapshot.v1` and MUST NOT reuse
+`openclaw.official-external-plugin-catalog-feed.v1`. Its complete sharded
+representation, plus signed query and change projections, use the distinct
+payload types defined above and the strict distribution-addendum schemas. Each
+requires expected publisher-feed identity binding, test vectors, and explicit
+client verifier registration.
 
 All publisher-feed representations MAY use the same dedicated ClawHub platform
 feed-signing key and bundled public trust anchor as other ClawHub-operated

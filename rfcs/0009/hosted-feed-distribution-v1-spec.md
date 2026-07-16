@@ -42,7 +42,8 @@ that requires complete offline state MUST accept an atomic or sharded snapshot.
 This addendum defines reusable representation shapes, not one universal signed
 payload type. Each concrete feed contract MUST assign a distinct versioned
 payload type to each representation it accepts. For example, ClawHub publisher
-feeds use `openclaw.clawhub-publisher-feed-query-results.v1` and
+feeds use `openclaw.clawhub-publisher-feed-snapshot.v1`,
+`openclaw.clawhub-publisher-feed-query-results.v1`, and
 `openclaw.clawhub-publisher-feed-changes.v1`. Its sharded root uses
 `openclaw.clawhub-publisher-feed-shard-root.v1`.
 
@@ -367,8 +368,8 @@ A conforming publisher:
 - pins every paginated operation to one immutable revision or range;
 - emits removal tombstones and explicit reset-required responses;
 - publishes immutable shards before the signed root;
-- signs each root, query page, and change page with the concrete feed contract's
-  distinct payload type.
+- signs each atomic snapshot, root, query page, and change page with the
+  concrete feed contract's distinct payload type.
 
 A conforming client:
 
