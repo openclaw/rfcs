@@ -45,18 +45,16 @@ signing identities even when the same secret-management system operates them.
 
 ## Signed Envelope
 
-The v1 envelope has this exact shape:
+The v1 envelope uses the standard DSSE JSON shape:
 
 ```json
 {
-  "schemaVersion": 1,
   "payloadType": "openclaw.official-external-plugin-catalog-feed.v1",
   "payload": "eyJzY2hlbWFWZXJzaW9uIjoxLC4uLn0",
   "signatures": [
     {
-      "keyId": "clawhub-feed-2026-q3",
-      "algorithm": "ed25519",
-      "signature": "base64url-signature"
+      "keyid": "clawhub-feed-2026-q3",
+      "sig": "base64url-signature"
     }
   ]
 }
@@ -66,7 +64,6 @@ Envelope fields:
 
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
-| `schemaVersion` | integer | Yes | MUST be `1`. |
 | `payloadType` | string | Yes | MUST equal the exact type selected by the concrete feed contract and representation. The baseline catalog type is `openclaw.official-external-plugin-catalog-feed.v1`. |
 | `payload` | string | Yes | Base64 or unpadded base64url encoding of the exact UTF-8 feed bytes. |
 | `signatures` | array | Yes | Between 1 and 16 signature records. |
@@ -75,12 +72,13 @@ Signature fields:
 
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
-| `keyId` | string | Yes | Non-empty configured publisher key id. |
-| `algorithm` | string | Yes | MUST be `ed25519`. |
-| `signature` | string | Yes | Base64url Ed25519 signature over the DSSE PAE bytes. |
+| `keyid` | string | Yes for Hosted Feed v1 | Non-empty configured publisher key id. DSSE permits omission, but this profile requires it to resolve an out-of-band trusted key. |
+| `sig` | string | Yes | Base64 or unpadded base64url Ed25519 signature over the DSSE PAE bytes. |
 
-Duplicate `keyId` values make the envelope invalid. Unknown fields MUST NOT be
-assigned trust meaning.
+Ed25519 is selected by the trusted feed profile; the envelope does not carry an
+algorithm field. Duplicate `keyid` values make the envelope invalid. Producers
+MAY add fields and consumers MUST ignore unrecognized envelope and signature
+fields, as required by DSSE. Unknown fields MUST NOT be assigned trust meaning.
 
 ## DSSE Pre-Authentication Encoding
 
@@ -149,8 +147,8 @@ OpenClaw configuration.
 Before accepting a signed refresh, a client MUST:
 
 1. Parse and validate the bounded envelope.
-2. Require the supported `schemaVersion` and the exact `payloadType` selected by
-   the concrete feed contract and requested representation.
+2. Require the exact `payloadType` selected by the concrete feed contract and
+   requested representation.
 3. Decode `payload` and each candidate signature.
 4. Construct the exact DSSE PAE bytes above.
 5. Resolve signature key ids only against the selected profile's trusted keys.
