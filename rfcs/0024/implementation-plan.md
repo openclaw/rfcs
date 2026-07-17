@@ -1,13 +1,43 @@
 # Localization Implementation Plan
 
-RFC 0024 should land through five owner-coherent OpenClaw PRs, not one PR per
-contract fragment. Each PR must leave the repository in a usable state and
-include the infrastructure required by its first production consumer.
+RFC 0024 has five owner-coherent implementation workstreams. A workstream may
+land as more than one stacked PR when a smaller renderer-owned slice provides a
+cleaner review and proof boundary. Each PR must leave the repository in a usable
+state and include the infrastructure required by its first production consumer.
+
+Stack PR numbers are publication order, not workstream identifiers. In
+particular, the CLI/TUI workstream is intentionally split across several
+bounded PRs rather than absorbing every command surface into one change.
 
 Generated-content language remains a post-v1 follow-up because it changes model
 behavior rather than product-owned interface text.
 
-## PR 1: Localization Core And Coverage Baseline
+## Evidence Stack As Of 2026-07-17
+
+| Slice | Owner-coherent renderer | State | Evidence |
+| --- | --- | --- | --- |
+| PR 1 | Core and coverage baseline | Open upstream PR | [openclaw/openclaw#109456](https://github.com/openclaw/openclaw/pull/109456) |
+| PR 2 | Runtime safety and Gateway compatibility prototype | Fork draft | [giodl73-repo/openclaw#116](https://github.com/giodl73-repo/openclaw/pull/116) |
+| PR 3 | CLI process locale and bounded command rendering | Fork draft | [giodl73-repo/openclaw#117](https://github.com/giodl73-repo/openclaw/pull/117) |
+| PR 4 | CLI updater dry-run, progress, result, recovery, and completion rendering | Fork draft | [giodl73-repo/openclaw#118](https://github.com/giodl73-repo/openclaw/pull/118) |
+| PR 5 | CLI updater managed-service lifecycle rendering | Local proof-complete branch | `user/giodl/localization-update-service` |
+
+The first five slices validate these cross-cutting rules:
+
+- capture one immutable locale context at the owning command/request entry and
+  pass it through nested renderers;
+- preserve exact reviewed English for compatibility callers;
+- keep human presentation separate from locale-invariant structured output;
+- classify parameters as literal data or product-owned presentation;
+- localize product-owned enum labels instead of interpolating raw values;
+- preserve commands, flags, paths, IDs, PIDs, versions, codes, and raw upstream
+  diagnostics;
+- add English, non-English, fallback, protected-literal, structured-output, and
+  mixed-language interpolation proof for each migrated renderer; and
+- stop at service, plugin, Gateway, recipient-locale, and safety-copy ownership
+  boundaries.
+
+## Workstream 1: Localization Core And Coverage Baseline
 
 - Depends on: accepted RFC 0024
 - Issues: #28303, #90608, #105266
@@ -51,9 +81,9 @@ behavior rather than product-owned interface text.
   - current localized surfaces use it without visible behavior changes;
   - coverage can report later migrations from the first PR.
 
-## PR 2: Runtime Safety Messages And Gateway Errors
+## Workstream 2: Runtime Safety Messages And Gateway Errors
 
-- Depends on: PR 1
+- Depends on: workstream 1
 - Issues: #81253, deterministic-label portion of #101314, historical #66056,
   umbrella #88570
 - Owners: Gateway protocol, channels, Control UI, security copy
@@ -93,9 +123,9 @@ behavior rather than product-owned interface text.
   - the highest-risk runtime gap is solved end to end;
   - the descriptor and Gateway compatibility model are proven by real users.
 
-## PR 3: CLI And TUI Localization
+## Workstream 3: CLI And TUI Localization
 
-- Depends on: PR 1
+- Depends on: workstream 1
 - Issue: #88570
 - Owners: CLI and command owners
 - Includes:
@@ -116,6 +146,12 @@ behavior rather than product-owned interface text.
 - Proof:
   - English and one non-English command snapshot matrix;
   - structured-output invariance;
+  - one immutable context for each command execution;
+  - catalog-backed presentation labels for modes, phases, statuses, and other
+    human-facing enum values;
+  - protected literal preservation for commands, flags, paths, IDs, PIDs,
+    versions, codes, and raw upstream diagnostics;
+  - mixed-language interpolation regressions;
   - no translated-text parsing;
   - missing catalog and renderer failure fallback;
   - hardcoded-string findings become blocking for migrated CLI directories.
@@ -123,9 +159,9 @@ behavior rather than product-owned interface text.
   - onboarding is no longer the only localized CLI/TUI experience;
   - automation remains stable while human output follows locale.
 
-## PR 4: Localized Command, Channel, And Skill Metadata
+## Workstream 4: Localized Command, Channel, And Skill Metadata
 
-- Depends on: PR 1; aligns with RFC 0017
+- Depends on: workstream 1; aligns with RFC 0017
 - Issues: #79458, #55239, #89971; landed precedent #56580
 - Owners: command catalog, channel adapters, plugin/package SDK
 - Includes:
@@ -153,9 +189,9 @@ behavior rather than product-owned interface text.
   - one metadata source feeds UI, CLI, TUI, Discord, and Telegram;
   - package authors can add translations without a forced migration.
 
-## PR 5: Completeness Gates And Locale-Safe Runtime
+## Workstream 5: Completeness Gates And Locale-Safe Runtime
 
-- Depends on: PRs 1-4
+- Depends on: workstreams 1-4
 - Issues: #78038, #88570, #107851, #106576 and later quality issues
 - Owners: release, localization pipeline, affected runtime owners
 - Includes:
@@ -191,7 +227,7 @@ behavior rather than product-owned interface text.
 
 - Issues: #79223, generated-content portion of #101314, remaining portion of
   #53345
-- Reuses: PR 1 locale registry and PR 2 runtime labels
+- Reuses: workstream 1 locale registry and workstream 2 runtime labels
 - Includes:
   - explicit content-language input for Dreaming;
   - model prompt language intent without rewriting existing content;
@@ -203,18 +239,19 @@ runtime.
 ## Dependency Shape
 
 ```text
-PR 1 core + coverage baseline
-  -> PR 2 runtime safety + Gateway errors
-  -> PR 3 CLI + TUI
-  -> PR 4 command/channel/skill metadata
+workstream 1 core + coverage baseline
+  -> workstream 2 runtime safety + Gateway errors
+  -> workstream 3 CLI + TUI
+  -> workstream 4 command/channel/skill metadata
 
-PRs 2-4 -> PR 5 completeness gates + locale-safe runtime
+workstreams 2-4 -> workstream 5 completeness gates + locale-safe runtime
 
-post-v1 generated content language reuses PR 1
+post-v1 generated content language reuses workstream 1
 ```
 
-PRs 2, 3, and 4 can proceed in parallel after PR 1. PR 5 closes the release and
-quality contract after their migrated surfaces exist.
+Workstreams 2, 3, and 4 can proceed in parallel after workstream 1.
+Workstream 5 closes the release and quality contract after their migrated
+surfaces exist.
 
 ## Cross-RFC Alignment
 

@@ -257,10 +257,26 @@ limit, the selected fallback, and adapter reconcile behavior.
 - placeholder name and type parity;
 - deterministic generated artifacts;
 - invalid or forbidden markup;
-- missing English source text; and
-- stale generated locale inventory.
+- missing English source text;
+- stale generated locale inventory; and
 - catalog namespace ownership: core keys are core-owned and a plugin may write
   only its own namespace.
+
+### Blocking for migrated renderers
+
+Once a renderer or directory is declared migrated, its checks additionally
+require:
+
+- exact reviewed English compatibility unless the change explicitly documents
+  an English-copy change;
+- one non-English rendering fixture;
+- protected-literal preservation for commands, flags, paths, IDs, PIDs,
+  versions, status/reason codes, and raw upstream diagnostics;
+- exact structured-output equality across English and one non-English locale;
+- catalog-backed labels or `select` cases for product-owned presentation enums;
+- a mixed-language interpolation fixture that rejects raw enum or English-label
+  leakage into translated prose; and
+- one immutable locale context across the complete rendering operation.
 
 ### Advisory initially
 
@@ -295,6 +311,8 @@ L10N005 placeholder mismatch
 L10N006 unknown locale or alias
 L10N007 untranslated fallback in complete locale
 L10N008 unsafe translator-owned markup or executable token
+L10N009 raw presentation enum or English label interpolated into translated prose
+L10N010 structured output changes when only locale changes
 ```
 
 Allowlist entries require:
@@ -347,7 +365,9 @@ The report distinguishes:
 - invalid;
 - unreviewed safety text;
 - stale generated output;
-- hardcoded literals; and
+- hardcoded literals;
+- mixed-language presentation interpolation;
+- locale-dependent structured-output drift; and
 - test infrastructure failure.
 
 ## Release Policy
@@ -412,6 +432,8 @@ Every catalog documents:
 - local validation command;
 - placeholder rules;
 - safety-review requirement;
+- parameter classification as literal data or product-owned presentation;
+- structured-output invariants;
 - how to add a locale; and
 - how to update an existing translation.
 
@@ -431,5 +453,8 @@ The coverage system conforms to v1 when it can answer, at one commit:
   absent;
 - how many keys are missing or falling back;
 - whether safety text has required review;
-- which validation command proves the claim; and
+- which validation command proves the claim;
+- whether migrated structured outputs are locale-invariant;
+- whether product-owned presentation labels are fully catalog-backed;
+- whether protected literals remain unchanged; and
 - which findings prevent promotion to complete.

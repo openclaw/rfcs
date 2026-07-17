@@ -3,7 +3,7 @@ title: Localization Runtime and Product Coverage
 authors:
   - Gio Della-Libera
 created: 2026-07-16
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/42
@@ -341,6 +341,13 @@ public surface and requires the owning maintainer's approval.
 administrative guidance. Logs and machine-readable output are not localized by
 either audience.
 
+One user-visible operation captures one immutable context at its owning surface
+entry point and passes that context through every nested renderer. A CLI command
+must not re-read process locale variables in each helper, and a request renderer
+must not change locale midway through one response. Compatibility defaults for
+shared helpers may resolve a context only when no owning entry point can inject
+one; production orchestration must inject the captured context.
+
 ### Foundational localization kernel
 
 PR 1 introduces one small internal localization kernel at the lowest dependency
@@ -405,6 +412,14 @@ coverage. `fallback` is reviewed English text for old clients, missing
 translations, diagnostics, and emergency recovery. Parameters are literal
 values; translators cannot introduce executable tokens or reinterpret
 parameter types.
+
+Not every enum-like value is literal product identity. Product-owned
+presentation categories such as install-kind labels, update-kind labels, status
+names, and other human classifications must use catalog-backed labels or a
+catalog `select`. Passing raw values such as `package` into otherwise translated
+prose creates mixed-language output and is non-conforming. Stable protocol
+codes, reason codes, command tokens, IDs, paths, versions, and raw upstream
+errors remain literal.
 
 Catalogs must validate:
 
@@ -574,7 +589,7 @@ OpenClaw adds a checked-in localization coverage manifest describing:
 - surface ownership;
 - source and generated catalog paths;
 - key counts and fallback counts;
-- required validation commands; and
+- required validation commands;
 - catalog revision identity; and
 - whether a locale/surface combination is `source`, `complete`, `partial`,
   `experimental`, `platform-constrained`, or `unsupported`.
@@ -605,11 +620,13 @@ coverage but reported by the same program because it breaks localized hosts.
 Migration is incremental:
 
 1. Add shared contracts without changing output.
-2. Give current English messages stable keys and descriptors.
-3. Localize one bounded renderer.
-4. Add optional protocol metadata.
-5. Migrate clients and surfaces.
-6. Raise coverage gates directory by directory.
+2. Capture one immutable locale context at the owning surface entry.
+3. Give current English messages stable keys and descriptors.
+4. Classify every parameter as literal data or product-owned presentation.
+5. Localize one bounded renderer without changing structured output.
+6. Add optional protocol metadata where the owner approves it.
+7. Migrate clients and surfaces.
+8. Raise coverage gates directory by directory.
 
 English remains the source and compatibility fallback. Existing locale IDs,
 environment variables, persisted preferences, Gateway error messages, command
@@ -621,6 +638,36 @@ translation can be removed or the affected key can fall back to English without
 changing error codes, action semantics, or the underlying operation. Invalid
 core catalogs fail the owning artifact build; invalid optional plugin catalogs
 are rejected without disabling unrelated core catalogs.
+
+### Implementation evidence and refinements
+
+The initial RFC 0024 implementation stack has validated the architecture across
+the shared kernel, runtime safety prototypes, process-scoped CLI rendering,
+updater presentation, and managed Gateway service lifecycle output.
+
+The evidence changed the implementation guidance in these concrete ways:
+
+- locale resolution occurs once per command or request and the immutable
+  context is threaded through nested rendering boundaries;
+- exact reviewed English remains the compatibility default for existing shared
+  callers while localized production entry points inject their context;
+- human presentation and structured automation payloads are separate
+  projections of the same operation, so localization cannot rewrite JSON
+  fields, status/reason codes, or stable arrays;
+- commands, flags, paths, IDs, PIDs, versions, stderr, and upstream error text
+  remain literal, while product-owned wrappers and labels are localized;
+- raw internal enums are not automatically literal: when they appear as human
+  labels, they require catalog-backed presentation names;
+- partial locale support remains reported as partial even when a migrated
+  command group has complete English and Simplified Chinese catalogs; and
+- service, plugin, Gateway, channel-recipient, and safety-copy ownership
+  boundaries remain separate slices rather than being hidden inside a broad
+  extraction change.
+
+Conformance tests for a migrated renderer therefore include exact English
+compatibility, one non-English rendering, protected-literal preservation,
+structured-output equality across locales, unsupported-locale fallback, and a
+mixed-language interpolation case for product-owned presentation labels.
 
 ## Rationale
 
@@ -675,8 +722,6 @@ needs a product-level report.
   MessageFormat-compatible syntax before pluralized messages are needed?
 - How should third-party plugin catalogs declare review quality and fallback
   without implying OpenClaw endorsement?
-- Which CLI outputs are presentation tables versus stable machine-readable
-  output that should instead gain or preserve `--json`?
 - Should the coverage manifest live at the repository root or under a
   localization-owned directory?
 - What human-review standard is required before approval, authentication, or

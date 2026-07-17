@@ -141,6 +141,13 @@ channel identity.
 
 The resolved context is immutable for one rendering operation.
 
+The owning surface entry resolves that context once and passes it through every
+nested renderer participating in the operation. Nested helpers must not
+re-read environment, browser, connection, or persisted locale inputs during the
+same command, request, or response. Shared helpers may provide a compatibility
+default for callers that cannot inject a context, but production orchestration
+must use the context captured at its entry boundary.
+
 Server-rendered channel messages use `explicit-recipient` only when an existing
 recipient/account preference or an owner-approved request field supplies a
 validated locale. If neither exists, they use reviewed English fallback. V1
@@ -215,6 +222,20 @@ Requirements:
   error; they never become an empty string silently.
 - Unknown keys render `fallback`.
 - Missing locale entries follow the locale fallback chain, then `fallback`.
+
+Parameters belong to one of two classes:
+
+1. **Literal data**: protocol codes, stable reasons, commands, flags, paths,
+   IDs, PIDs, versions, timestamps, user data, and raw upstream diagnostics.
+   These values remain unchanged and are escaped by the renderer.
+2. **Product-owned presentation**: human labels for modes, install kinds,
+   update kinds, statuses, phases, and similar classifications. These values
+   must use a catalog key or catalog `select`; a raw internal enum is not
+   conforming merely because it is stable in source code.
+
+A localized product-owned wrapper may contain a literal upstream error
+parameter. The wrapper is translated; the upstream detail is preserved for
+diagnosis. Translators must not parse or rewrite the detail.
 
 V1 supports one top-level plural or select operation per catalog message:
 
@@ -400,6 +421,12 @@ Human output can be localized. Stable automation output must use an existing or
 new structured mode such as `--json`; scripts must not be expected to parse
 localized tables or prose.
 
+Localization must not mutate an existing structured payload. If a command uses
+the same conceptual data for terminal and JSON output, it must build a separate
+localized presentation projection rather than replace stable JSON strings,
+arrays, status/reason values, or field semantics. Tests compare structured
+output across at least English and one non-English locale for exact equality.
+
 ## Failure Behavior
 
 - Missing catalog: use English fallback and emit a bounded diagnostic.
@@ -455,8 +482,10 @@ Adding one CLI message requires:
    ```
 
 3. Add locale entries with the same `{path}` placeholder.
-4. Run key, placeholder, fallback, and affected renderer tests.
-5. Leave `path` literal and escaped by the target renderer.
+4. Classify each parameter as literal data or product-owned presentation.
+5. Run key, placeholder, fallback, mixed-language, and affected renderer tests.
+6. Compare any structured output under English and one non-English locale.
+7. Leave `path` literal and escaped by the target renderer.
 
 ## Conformance
 
@@ -465,11 +494,18 @@ A runtime localization implementation conforms to v1 when:
 - locale and aliases resolve deterministically;
 - English fallback is always available;
 - descriptor rendering passes placeholder parity tests;
+- one operation uses one immutable context across all nested renderers;
+- product-owned presentation enums cannot appear as raw untranslated
+  interpolation values;
+- literal commands, flags, paths, IDs, PIDs, versions, and upstream diagnostics
+  remain unchanged in localized output;
+- structured automation output is exactly locale-invariant;
+- migrated renderers include a mixed-language interpolation regression fixture;
 - plural/select rendering passes English, Russian/Ukrainian, Polish, and Arabic
   category fixtures;
 - old Gateway clients continue to receive usable English messages;
 - new clients localize known errors without branching on text;
-- approval rendering preserves action semantics in every locale; and
+- approval rendering preserves action semantics in every locale;
 - localization failure cannot crash the Gateway or authorize an action;
 - warmed catalog lookup and rendering of one message with at most 16 scalar
   parameters performs no I/O or network access and stays below 5 ms p95 on the
