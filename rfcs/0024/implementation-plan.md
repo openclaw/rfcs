@@ -64,7 +64,8 @@ behavior rather than product-owned interface text.
   - renderer-owned literal commands, decisions, IDs, paths, and Markdown;
   - recipient locale resolution from an existing explicit preference or
     owner-approved request field, with reviewed English otherwise;
-  - optional Gateway `messageKey` and `messageParams` projection;
+  - optional Gateway `details.localization` projection containing a recognized
+    `messageKey` and bounded scalar `messageParams`;
   - bounded conversion of common stable Gateway errors;
   - Control UI localization of recognized errors with English fallback;
   - revision-bound safety-review attestation for the initial non-English
@@ -78,8 +79,13 @@ behavior rather than product-owned interface text.
   - current English approval snapshots unchanged;
   - one human-reviewed non-English approval fixture;
   - missing-key and emergency English fallback;
+  - incomplete safety catalogs collapse the whole presentation to one reviewed
+    English snapshot rather than mixing languages;
   - old-client and new-client Gateway fixtures;
   - unknown optional fields accepted by supported clients;
+  - producer and Control UI consume one reviewed Gateway message-key registry;
+  - duplicate Gateway localization projection is idempotent and never
+    overwrites existing metadata;
   - checked supported-client/parser compatibility matrix;
   - identical approval semantics across every channel route;
   - RTL literal isolation and forbidden bidi-control checks.

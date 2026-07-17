@@ -147,6 +147,12 @@ validated locale. If neither exists, they use reviewed English fallback. V1
 does not invent a shared channel preference store or infer locale from channel
 identity or message content.
 
+Gateway `ConnectParams.locale` is the existing explicit locale input for the
+connected client experience. A Control UI may use it for responses rendered
+back to that same connection. It is not evidence of a separate channel
+recipient's or approval reviewer's locale and must not be copied into
+server-rendered channel messages.
+
 `audience=user` applies to interactive UI, chat, and approval text.
 `audience=operator` applies to human-readable CLI status, health, recovery, and
 administrative guidance. Logs and structured automation output are excluded.
@@ -178,21 +184,25 @@ type CatalogMessage =
     };
 ```
 
-`LocalizedMessage` is the only internal message descriptor. Gateway wire fields
-are serialized from this type:
+`LocalizedMessage` is the only internal message descriptor. Gateway
+localization metadata is serialized from this type:
 
 ```ts
 function projectGatewayMessage(message: LocalizedMessage): {
   message: string;
-  messageKey?: string;
-  messageParams?: Readonly<Record<string, MessageParam>>;
+  details?: {
+    localization: {
+      messageKey: string;
+      messageParams?: Readonly<Record<string, MessageParam>>;
+    };
+  };
 };
 ```
 
 Descriptor construction, catalog validation, and Gateway projection use one
-shared validator. The projection includes `messageKey` and `messageParams` only
-for recognized, validated localizable errors. Unknown or intentionally
-English-only errors project only `message`.
+shared validator. The projection includes `details.localization` only for
+recognized, validated localizable errors. Unknown or intentionally English-only
+errors project only `message`.
 
 Requirements:
 
@@ -307,9 +317,13 @@ Known user-facing Gateway errors may use:
 type LocalizableErrorShape = {
   code: string;
   message: string;
-  messageKey?: string;
-  messageParams?: Record<string, MessageParam>;
-  details?: unknown;
+  details?: {
+    localization?: {
+      messageKey: string;
+      messageParams?: Record<string, MessageParam>;
+    };
+    [key: string]: unknown;
+  };
   retryable?: boolean;
   retryAfterMs?: number;
 };
@@ -319,22 +333,38 @@ Rules:
 
 - `code` and `message` remain required.
 - `message` remains the English compatibility fallback.
-- `messageKey` is optional and does not change protocol branching.
+- `details.localization` is optional and does not change protocol branching.
 - Clients localize only recognized keys.
 - Unknown keys or catalog failures show `message`.
 - Sensitive details cannot be promoted into `messageParams`.
 - Clients must not parse or compare translated output.
+- The producer and consumer use one reviewed key registry.
+- A descriptor has at most 16 scalar parameters; parameter names are non-empty
+  and at most 64 characters; string values are at most 4096 characters; and
+  numeric values are finite.
+- Every recognized key declares its allowed parameter names, types, and
+  sensitivity classification. Undeclared or sensitive parameters block the
+  metadata projection.
+- Projection never overwrites existing `details.localization`. Reapplying the
+  same reviewed conversion is idempotent.
 
-Adding these optional fields requires Gateway protocol owner approval and
-compatibility tests for old and new clients.
+Defining the optional `details.localization` convention requires Gateway
+protocol owner approval and compatibility tests for old and new clients.
 
-Before shipment, every supported Gateway client parser must be shown to ignore
-unknown optional fields or be updated. Strict parsers that reject
-`messageKey`/`messageParams` block the wire projection from shipping.
+The compatibility projection must remain inside the existing opaque `details`
+envelope. Supported strict validators reject additive top-level error fields,
+while runtime TypeScript guards, Swift `Codable`, Android JSON decoding, and the
+current strict schema accept additive data inside `details`.
 
 The ship gate is a checked client matrix containing client/adapter name,
 supported version range, parser owner, unknown-field behavior, compatibility
-fixture, and result. Missing or failed rows block the optional wire fields.
+fixture, and result. Missing or failed rows block the optional metadata
+projection.
+
+The initial reviewed conversion is approval-not-found only. Adding another
+error requires the stable code/detail match, English fallback, key registry,
+parameter schema, client catalog entry, and old/new-client fixture in the same
+owner-reviewed change.
 
 ## CLI Resolution
 

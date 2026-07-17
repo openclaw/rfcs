@@ -327,6 +327,11 @@ preference store, all other channel recipients receive reviewed English
 fallback. Locale is never inferred from message text, user name, phone number,
 channel identity, IP geography, or model output.
 
+The existing optional Gateway `ConnectParams.locale` belongs to the connected
+client experience. It can describe the Control UI connection that supplied it,
+but it does not establish the locale of a separate channel recipient or
+approval reviewer.
+
 The RFC introduces the context contract. Any new config key, request field,
 plugin field, or channel preference store remains a separately reviewable
 public surface and requires the owning maintainer's approval.
@@ -390,9 +395,10 @@ type LocalizedMessage = {
 };
 ```
 
-This is the single internal descriptor. Gateway `message`, `messageKey`, and
-`messageParams` fields are a compatibility wire projection of it, not a second
-message model. Both projections use the same key and parameter validator.
+This is the single internal descriptor. Gateway `message` plus optional
+`details.localization` metadata are a compatibility wire projection of it, not
+a second message model. Both projections use the same key and parameter
+validator.
 
 The key is stable machine identity for catalog lookup, telemetry, tests, and
 coverage. `fallback` is reviewed English text for old clients, missing
@@ -422,18 +428,31 @@ user-facing errors may add optional localization metadata:
 type ErrorShape = {
   code: string;
   message: string;
-  messageKey?: string;
-  messageParams?: Record<string, string | number | boolean>;
-  details?: unknown;
+  details?: {
+    localization?: {
+      messageKey: string;
+      messageParams?: Record<string, string | number | boolean>;
+    };
+    [key: string]: unknown;
+  };
   retryable?: boolean;
   retryAfterMs?: number;
 };
 ```
 
-Old clients continue to show `message`. New clients localize `messageKey` when
-they have a matching catalog and fall back to `message` otherwise. Clients must
-not branch on translated text. Server-rendered channel messages use the same
-descriptor with the recipient's resolved locale context.
+Localization metadata uses the existing opaque `details` envelope because
+supported strict validators reject additive top-level error fields. Old clients
+continue to show `message`. New clients localize recognized
+`details.localization.messageKey` values when they have a matching catalog and
+fall back to `message` otherwise. Clients must not branch on translated text.
+Server-rendered channel messages use the same descriptor with the recipient's
+resolved locale context.
+
+Producer and client share one reviewed message-key registry. Metadata is
+bounded to 16 flat scalar parameters, 64-character parameter names,
+4096-character string values, and finite numeric values. Each key declares an
+allowed parameter schema and sensitivity classification. Projection is
+idempotent and never overwrites existing localization metadata.
 
 Unknown exceptions remain sanitized English fallbacks. This RFC does not make
 arbitrary exception strings translatable.
@@ -452,6 +471,11 @@ The localized renderer must:
 - produce the current English output for English and fallback;
 - avoid locale-sensitive parsing of the rendered result; and
 - pass the same payload through all channel routes.
+
+If the selected safety catalog is missing, invalid, incomplete, or lacks the
+required human-review attestation, the renderer uses one reviewed English
+snapshot for the complete approval presentation. It does not mix translated
+labels with English fallback fragments.
 
 Security-sensitive copy requires human review for each release-complete locale.
 Machine-generated translation can seed drafts but cannot alone mark the
