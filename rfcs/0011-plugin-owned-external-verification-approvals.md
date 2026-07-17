@@ -3,7 +3,7 @@ title: Plugin-Owned External Verification for Approval Resolution
 authors:
   - Pablo Guardiola
 created: 2026-06-13
-last_updated: 2026-07-16
+last_updated: 2026-07-21
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/15
@@ -13,143 +13,157 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/15
 
 ## Summary
 
-Allow external plugins to add one narrow external verification step to OpenClaw
-approval prompts while core remains the approval owner for pending state,
-routing, denial, timeout, cancellation, and final tool continuation. A plugin
-may expose a structured verification command such as "Verify with World" and may
-resolve only its own pending approval after external proof succeeds, without
-adding arbitrary plugin-defined approval actions or verifier-specific code to
-OpenClaw core.
+Allow a plugin to require one external verification ceremony before a pending
+plugin approval can allow a protected action. OpenClaw stores the pending
+record, renders the prompt, handles denial and expiry, commits the first
+terminal decision, and resumes the blocked action. The plugin owns the verifier
+and attests only to the result of its ceremony. A host-bound SDK helper captures
+the plugin identity, binds the attempt to the originating run and user
+interaction, propagates cancellation, validates ownership and the offered
+decision, records verification lifecycle events, and applies a successful allow
+through OpenClaw's approval ledger. The proposal does not add arbitrary
+plugin-defined approval actions or verifier-specific code to core.
 
 ## Motivation
 
-Some plugins need to gate a tool call on an *external* verification ceremony
-that OpenClaw core should not own: a World ID proof, a hardware-key tap, a
-compliance broker, or a plugin-specific risk workflow.
+Some plugins need a user to complete an external ceremony that OpenClaw should
+not implement: a World proof, hardware-key confirmation, or an enterprise
+approval broker. The ceremony may require a QR code, browser handoff, device
+interaction, polling, or a signed callback.
 
-The concrete first user is the ClawHub AgentKit plugin:
+The first user is the external AgentKit plugin:
 
 - https://github.com/Guardiola31337/openclaw-agentkit
-- https://clawhub.ai/plugins/@guardiola31337/agentkit
+- https://clawhub.ai/guardiola31337/plugins/agentkit
 
-AgentKit protects configured OpenClaw tools with World-backed human
-verification. It should live outside core (the policy, verifier, and proof
-lifecycle are not generic OpenClaw behavior) but it needs a small host seam so
-the end user still gets a coherent OpenClaw HITL flow: core creates the pending
-approval, the user picks verify or deny, the plugin runs the proof, and core
-continues the blocked tool call once the plugin reports success.
-
-This RFC proposes that seam: one external-verification route on a plugin
-approval plus an ownership-checked resolver. It deliberately avoids the two
-shapes maintainers have already rejected (bundling the verifier in core, and
-exposing arbitrary plugin-defined approval actions) both covered in
-[Rationale and Alternatives](#rationale-and-alternatives).
+AgentKit protects configured tools with World-backed human verification. It
+belongs in ClawHub, but it needs a narrow host seam so the user sees one coherent
+OpenClaw approval flow: OpenClaw creates the approval, the user chooses external
+verification or denial, AgentKit validates the proof, and OpenClaw resumes the
+original tool call after a successful plugin attestation.
 
 ## Goals
 
-- Keep OpenClaw core as the owner of pending approval state, normal denial,
-  timeout behavior, cancellation, routing, and final tool continuation.
-- Let a plugin request one structured external verification route for a pending
-  approval.
-- Let a plugin resolve only approvals that originated from that same plugin and
-  only with decisions that were explicitly exposed for external verification.
-- Preserve the existing `before_tool_call.requireApproval` gate as the public
-  plugin entry point.
-- Keep approval clients simple. They may render the external verification route
-  as command text, and they do not need generic plugin-defined buttons.
-- Compose cleanly with auto review by making external proof a distinct decision
-  source, not an auto-review bypass.
-- Provide a real ClawHub reference implementation through AgentKit so future
-  plugin authors can copy the pattern.
-- Make the proposal narrow enough to review and land independently of any
-  richer approval-presentation follow-up.
+- Keep one canonical OpenClaw approval record and terminal transition.
+- Preserve `before_tool_call.requireApproval` as the plugin-facing gate.
+- Let one plugin attach one structured external verification route to an
+  approval it owns.
+- Derive plugin identity from host registration, never from request payloads.
+- Bind each approval and attempt to the originating run and each dispatch to a
+  stable host-derived interaction identity.
+- Make denial, cancellation, and expiry authoritative over late proof results.
+- Stop verifier work and challenge presentation when an attempt becomes
+  terminal.
+- Reuse OpenClaw's canonical allow decisions and default external verification
+  to `allow-once`.
+- Record verification attempts without storing proof payloads or private user
+  identifiers.
+- Work through text commands without requiring generic plugin-defined buttons.
+- Provide AgentKit as a real reference implementation and proof path.
 
 ## Non-Goals
 
-- Adding World ID, AgentKit, or any other verifier to OpenClaw core.
-- Reintroducing arbitrary plugin approval action arrays.
-- Giving plugins generic control over approval prompt rendering.
-- Letting plugins resolve approvals created by other plugins or by core exec
-  approval flows.
-- Letting auto review approve an external-proof-required approval without the
-  external proof.
-- Changing default OpenClaw safety behavior. This proposal is additive and only
-  applies when a plugin explicitly requests external verification.
+- Adding World, AgentKit, or verifier-specific logic to OpenClaw core.
+- Adding arbitrary plugin-defined action arrays or callback payloads.
+- Letting a plugin resolve another plugin's approval or a core exec approval.
+- Composing multiple external verifier plugins on one approval in v1.
+- Supporting verification ceremonies that outlive the approval deadline.
+- Letting auto review satisfy an external proof requirement.
+- Defining plugin-specific grant duration or persistence policy in core.
 
 ## Proposal
 
-### Approval ownership model
+### Ownership boundary
 
-The model has four decision sources, each with a different owner:
+OpenClaw owns:
 
-| Decision source | Owner | Purpose |
+- approval creation, identity, and immutable request context
+- the durable pending and terminal record
+- approval routing and canonical presentation
+- normal denial, cancellation, and expiry
+- the first terminal decision through the canonical approval ledger
+- resuming or blocking the original tool call
+- verification attempt audit events
+- run-bound cancellation and replay-safe interaction dispatch
+
+The plugin owns:
+
+- verifier configuration and secrets
+- challenge, QR, link, polling, or callback behavior
+- proof validation
+- user-facing verifier progress
+- plugin-scoped grants for future plugin hook calls
+
+OpenClaw does not verify the third-party proof. It accepts an attestation from an
+installed plugin that is already trusted to execute in process. Ownership checks
+prevent one plugin from resolving another plugin's approval; they do not make a
+malicious installed plugin honest.
+
+### Approval state and decision composition
+
+Every required gate must allow the action, and any denial wins:
+
+1. Host policy and earlier hooks must permit the request to reach this approval.
+2. The approval must still be pending.
+3. A user may deny through the normal OpenClaw path at any time.
+4. Choosing an external route starts verification; it is not itself an allow.
+5. The owning plugin may attest success only for the pending approval and the
+   external allow decision the user selected.
+6. OpenClaw commits that allow through the same canonical first-answer-wins
+   transition used by other approval surfaces.
+
+The resulting state rules are:
+
+| Current state | Event | Result |
 | --- | --- | --- |
-| Deterministic policy | OpenClaw core and host policy | Fast allow or deny for known command/tool policy |
-| Auto review | OpenClaw approval system | Optional low-risk exec approval review |
-| Human operator | OpenClaw approval system | Manual allow or deny through TUI, Control UI, or channels |
-| External verifier | Plugin | Proof ceremony that OpenClaw should not own |
+| Pending | Normal OpenClaw deny | Denied; tool remains blocked |
+| Pending | Approval timeout | Expired; tool remains blocked |
+| Pending | Originating run cancellation | Approval and active attempt are cancelled; tool remains blocked |
+| Pending | External attempt starts | Remains pending; attempt is recorded |
+| Pending | External attempt fails or is superseded by retry | Remains pending; user may retry or deny |
+| Pending | Owning plugin attests success | Canonical ledger attempts the offered allow |
+| Any terminal state | Any later event or proof | No state change |
 
-External verification is an additional approval route for plugin-owned
-approvals. It is not a replacement for host policy. It is not a new universal
-approval UI system.
+Any deny, cancellation, expiry, or competing terminal decision therefore wins
+over a late proof callback. A failed verification attempt does not silently
+allow or automatically deny; it remains auditable while the approval stays
+pending until the user retries, denies, or the host deadline is reached.
 
-```mermaid
-flowchart TB
-  A[Agent requests protected tool] --> B{OpenClaw policy and plugin hooks}
-  B -->|deterministic allow| C[Tool runs]
-  B -->|plugin requires approval| D[OpenClaw creates pending plugin approval]
-  D --> E[OpenClaw renders normal approval prompt]
-  E --> F{Operator choice}
-  F -->|deny| G[OpenClaw blocks tool call]
-  F -->|external verify once or session| H[Plugin starts external proof]
-  H --> I[Verifier proof succeeds]
-  I --> J[Plugin calls resolveVerified]
-  J --> K[OpenClaw checks approval owner and decision]
-  K --> C
-```
+External-verification approvals are valid only when the private hook path has a
+non-empty host-derived `runId`. The plugin cannot supply or override it. The
+Gateway creates and indexes the approval under the same run-lifecycle
+serialization used for cancellation. If abort commits before approval creation,
+creation fails because the run is no longer active. If creation commits first,
+the abort observes and cancels it. Run cancellation and external completion are
+serialized against that same approval/attempt state: if cancellation commits
+first, the attempt is cancelled and a later proof cannot allow or authorize a
+grant; if the allow commits first while the run is active, normal run-abort
+semantics apply afterward. Aborting one run does not cancel a different run's
+approval, even in the same session.
 
-### Decision composition
+Current OpenClaw hook composition selects one `requireApproval` owner. V1 follows
+that model and permits exactly one `externalResolution` owner per approval.
+Multi-plugin verifier composition requires a separate design.
 
-Approval resolution is deny-wins and composes with strict AND semantics across
-the approval path. A protected tool may continue only when every required owner
-has either allowed the request or stayed out of the path:
+### Plugin request contract
 
-1. core policy must not deny the tool call
-2. auto review must not deny the tool call, when auto review participates
-3. the human operator must not deny the pending approval
-4. the external verifier must succeed, when the approval requested
-   `externalResolution`
-5. the pending approval must still be pending, not cancelled, expired, timed
-   out, or already resolved differently
-
-Any denial, timeout, cancellation, policy block, or failed proof is terminal for
-that approval. A later external proof success must not override an earlier deny
-or expired approval. `plugin.approval.resolveVerified` therefore checks the
-current approval state at resolution time rather than treating proof success as
-authority by itself.
-
-### Plugin entry points
-
-The plugin-facing API remains the existing `before_tool_call` hook with
-`requireApproval`.
+The public entry point remains `before_tool_call.requireApproval`:
 
 ```ts
-api.on("before_tool_call", async (_event, ctx) => {
-  if (ctx.toolName !== "exec") {
+api.on("before_tool_call", async (event) => {
+  if (event.toolName !== "exec") {
     return;
   }
 
   return {
     requireApproval: {
       title: "World proof required for exec",
-      description:
-        "Verify with World before `exec` runs in this session. Use the verification commands below.",
+      description: "Verify with World before exec runs in this session.",
       severity: "warning",
       timeoutMs: 600_000,
       allowedDecisions: ["deny"],
       externalResolution: {
         label: "Verify with World",
-        commandTemplate: "/agentkit approve {id} {decision}",
         decisions: ["allow-once", "allow-always"],
       },
     },
@@ -157,295 +171,373 @@ api.on("before_tool_call", async (_event, ctx) => {
 });
 ```
 
-The important split is:
-
-- The approval owner plugin id is derived from the plugin hook/runtime context.
-  It is not caller-provided in the approval request payload, command payload, or
-  verified resolver payload.
-- `allowedDecisions` remains core-owned and controls normal OpenClaw approval
-  decisions.
-- `externalResolution` describes a single plugin-owned verification route.
-- When `externalResolution` is present, normal `allow-once` and `allow-always`
-  must not be accepted through the generic core resolver unless they are also
-  part of the core-owned `allowedDecisions`.
-- The external route may expose only the allow-style subset of OpenClaw's
-  existing approval decision enum. In the current implementation that is
-  `allow-once` and `allow-always`; if the active approval API exposes a
-  session-scoped decision such as `allow-session`, the session trust option must
-  use that existing decision rather than introducing a verifier-specific alias.
-- Core keeps `deny` as the normal rejection path.
-
-The external route is deliberately a command template, not arbitrary actions:
+The generic shape is:
 
 ```ts
-type PluginApprovalExternalResolutionTemplate = {
+type PluginApprovalExternalResolution = {
   label: string;
-  commandTemplate: string; // must include {id} and {decision}
-  // Defaults to ["allow-once"] when omitted.
-  decisions?: Array<"allow-once" | "allow-always" | "allow-session">;
+  decisions?: ApprovalAllowDecision[]; // defaults to ["allow-once"]
 };
 ```
-
-`allow-session` is valid only when it is part of the host's active approval
-decision enum. The implementation should expose one canonical reusable/session
-trust decision, not both `allow-always` and `allow-session` as competing labels.
-
-Approval surfaces can render this as text:
-
-```text
-Verify with World:
-/agentkit approve plugin:<approval-id> allow-once
-/agentkit approve plugin:<approval-id> allow-always
-
-Deny:
-/approve plugin:<approval-id> deny
-```
-
-Native clients may improve presentation later, but this RFC does not require
-them to add a plugin-defined button contract.
-
-### General plugin contract
-
-This proposal is not AgentKit-specific. Any plugin can rely on the same
-architecture if it can express its approval ceremony as:
-
-1. a `before_tool_call` or plugin-owned operation that needs approval
-2. one external verification route
-3. one or more allow-style external decisions
-4. a plugin command, CLI command, or session action that runs the proof ceremony
-5. a verified resolver call after proof succeeds
-
-The host contract is:
-
-```ts
-return {
-  requireApproval: {
-    title: "<short approval title>",
-    description: "<bounded human-readable reason>",
-    severity: "info" | "warning" | "critical",
-    allowedDecisions: ["deny"],
-    externalResolution: {
-      label: "<verification name>",
-      commandTemplate: "/<plugin-command> approve {id} {decision}",
-      decisions: ["allow-once", "allow-always"],
-    },
-  },
-};
-```
-
-The plugin owns everything behind that command template. OpenClaw does not need
-to know whether the proof is World ID, a hardware key, an enterprise approval
-broker, a ticketing workflow, or a risk-scoring system.
-
-Examples:
-
-| Plugin type | External route | Plugin-owned proof |
-| --- | --- | --- |
-| AgentKit identity plugin | `Verify with World` | World App QR/link and verifier callback |
-| Hardware-key plugin | `Confirm with security key` | WebAuthn or local hardware-key ceremony |
-| Enterprise approval plugin | `Request manager approval` | Company approval broker or policy service |
-| Ticket approval plugin | `Approve in ticket` | Jira/Linear/GitHub issue state transition |
-| Risk-scoring plugin | `Run risk review` | Remote risk workflow before the operation continues |
-
-This is intentionally restrictive at the host layer. The extensibility point is
-the plugin command and proof workflow, not arbitrary OpenClaw-rendered UI. That
-keeps the core contract stable while letting plugins build domain-specific
-verification flows outside core.
-
-### Verified resolver
-
-After the external proof succeeds, the plugin calls a dedicated resolver:
-
-```ts
-await resolveVerifiedPluginApprovalOverGateway({
-  approvalId,
-  decision: "allow-once",
-});
-```
-
-The Gateway method is conceptually:
-
-```text
-plugin.approval.resolveVerified
-```
-
-Required checks:
-
-1. The caller has the required operator approval runtime authority.
-2. The approval exists and is still pending.
-3. The approval has a `pluginId`.
-4. The caller's plugin identity matches the pending approval's `pluginId`.
-5. The approval has `externalResolution`.
-6. The requested decision is one of the decisions exposed by that
-   `externalResolution`.
-7. The requested decision is an allow-style decision, not `deny`.
-
-This gives maintainers the actual security boundary they asked for:
-
-> plugin X may resolve pending approval Y only if Y belongs to plugin X and Y
-> explicitly offered that external verification decision.
-
-The plugin identity used in step 4 must come from the authenticated plugin
-runtime/session-action context or an equivalent host-owned install/runtime
-record. It must not come from the resolver request body. This prevents a plugin
-or command caller from claiming another plugin id.
-
-v1 uses approval-specific operator authority (`operator.approvals`) plus the
-ownership and decision checks above. Existing admin clients may satisfy the
-method through `operator.admin`, but external plugin SDK helpers must request
-and use only the approval-specific authority, and they must not require a general
-admin-scoped Gateway client merely to submit one proof-backed approval
-resolution. If the approval overhaul later introduces a narrower
-approval-runtime scope, the resolver can adopt it without changing the approval
-payload contract.
-
-### Rendering contract
-
-Approval clients should treat `externalResolution` as advisory presentation for
-a plugin command:
-
-- TUI and Control UI can show a title such as "Verify with World".
-- Text channels can render the command lines.
-- Existing `/approve ... deny` still works for rejection.
-- Clients that do not understand the field can still show the approval text and
-  deny command, but they do not provide a complete external-verification flow.
-- Interactive clients may turn the command template into a local choice
-  selector, such as Verify once, Verify and trust for session, and Deny, but the
-  protocol remains one external route plus command text. The approval payload
-  does not carry arbitrary plugin-defined button actions.
-
-This is compatible with the approval markdown direction in
-openclaw/rfcs#4. The external verification route is content in the canonical
-approval prompt, not a separate per-channel action model.
-
-### Version and capability gate
-
-Older OpenClaw hosts and clients that do not understand `externalResolution`
-cannot provide the full flow. At best they can render the normal approval text
-and the core-owned deny path; they cannot reliably show or route the external
-verification decision.
-
-Plugins that depend on external verification must therefore declare a minimum
-OpenClaw version or host capability for this approval format and must not
-register the protected-tool hook when the host does not support it. The failure
-mode should be explicit during plugin load or configuration, for example:
-
-```text
-AgentKit HITL requires OpenClaw support for plugin external approval
-verification. Upgrade OpenClaw before enabling this protection.
-```
-
-The exact capability name or minimum version can be chosen in the implementation
-PR, but the compatibility rule is part of this RFC: no silent registration of an
-external-verification plugin against a host that can only offer denial.
-
-### Interaction with auto review
-
-External verification is a separate decision source from auto review, and the
-two lanes do not overlap.
-
-The external-verification requirement is set by the **plugin** when the approval
-is created (`requireApproval.externalResolution` in `before_tool_call`). Auto
-review does not set it, clear it, or move an approval into or out of the
-external-verification lane, so **no change to auto review is required for this
-boundary**.
-
-Within its existing role, auto review may still:
-
-- classify whether the underlying command or tool call is risky
-- recommend denial or escalate to a human operator
-- treat the approval as escalation context, since a pending `externalResolution`
-  approval already records that it requires external proof
-
-Auto review may **not** issue the external allow decision or otherwise satisfy
-the proof. Only the owning plugin can resolve an `externalResolution` approval,
-through `plugin.approval.resolveVerified`, after its external proof succeeds.
-
-This preserves the host safety posture: policy runs first, auto review stays
-bounded and read-only with respect to the external lane, uncertain cases still
-reach a human, and external proof is supplied by the plugin that owns it.
-
-### Plugin-owned grants and auto approvals
-
-Some external verification plugins may want a "trust for session" option after
-proof succeeds. AgentKit is one example: a user can verify once for the blocked
-action or verify and trust AgentKit approvals for the current session.
-
-That grant is plugin-owned policy, not a new core auto-approval lane.
-
-External verification should use OpenClaw's existing approval decision
-semantics. In current OpenClaw, a one-time external allow maps to `allow-once`
-and a reusable external allow maps to the existing durable/session-scoped allow
-decision offered by the host. If the approval overhaul represents that as
-`allow-session`, plugins should use `allow-session`; if the active implementation
-continues to represent it as `allow-always` with plugin-scoped session metadata,
-plugins should use `allow-always`. The RFC does not introduce a new
-verifier-specific trust decision.
-
-Core treats that reusable allow decision as resolution of the current pending
-approval. The plugin may observe it and store a plugin-scoped grant for future
-plugin hook calls, but the grant must stay within the plugin's declared scope
-and documentation.
 
 Rules:
 
-- Auto review cannot create plugin-owned external verification grants.
-- A plugin-owned grant cannot bypass host exec policy.
-- A plugin-owned grant cannot resolve an already pending core approval.
-- The plugin must define the grant scope, such as session or agent, and its
-  expiration.
-- The plugin must make future skips explainable in logs or status text, such as
-  "allowed exec via allow-always session grant".
+- Core stamps the approval owner from the registered hook. `pluginId` is not an
+  input to the hook result or external-resolution request.
+- Core stamps a non-empty `runId` from the active tool run. A plugin cannot
+  supply it, and core fails closed if the private hook path cannot provide it.
+- Core creates an external-verification approval through an in-process/private
+  host service that preserves that stamped owner. The existing public
+  caller-identified `plugin.approval.request` path must reject
+  `externalResolution`.
+- `externalResolution` contains one label and a non-empty subset of the host's
+  canonical allow decisions.
+- An omitted `decisions` field defaults to `["allow-once"]`.
+- `deny` is never part of `externalResolution`; core always owns the normal deny
+  path.
+- When `externalResolution` is present, core normalizes an omitted
+  `allowedDecisions` to `["deny"]` and rejects any allow decision in that field.
+  External allow decisions and generic allow decisions cannot overlap.
+- The owning plugin's external-resolution helper is the only allow path for
+  these approvals.
+- Core renders a canonical external-approval command for text clients and routes
+  it through the approval control lane. Plugins do not define command syntax or
+  callback payloads.
 
-This keeps "verify and trust for session" user-friendly without turning it into
-a hidden global permission mode.
+This lets a plugin expose verification without letting it redefine the approval
+UI or bypass the normal deny path.
 
-### Audit and observability
+### Canonical decision vocabulary
 
-OpenClaw should record enough metadata to explain what happened without storing
-third-party proof payloads or private user identifiers.
+External verification reuses the allow-style subset of the canonical approval
+enum in the target OpenClaw version. It does not introduce verifier-specific
+aliases.
 
-Useful audit fields:
+The relevant meanings are:
 
-- approval id
-- plugin id
+| Decision | Meaning |
+| --- | --- |
+| `allow-once` | Allow only the current pending action |
+| `allow-session` | Allow the current action and use the host's session semantics, when supported by the canonical enum |
+| `allow-always` | Allow the current action and expose the existing reusable decision to the owning plugin |
+
+At the time of this RFC, generic plugin approvals on OpenClaw `main` expose
+`allow-once` and `allow-always`, not `allow-session`. The implementation PR must
+reuse the canonical enum on its target `main`; this RFC does not add a parallel
+decision enum. If that enum exposes `allow-session`, plugins offering session
+trust should use it. Otherwise a plugin may map `allow-always` to a narrower
+plugin-owned session grant, but it must label and document that behavior and may
+not turn it into global host permission.
+
+The host validates the selected decision against both its active canonical enum
+and the approval's `externalResolution.decisions`.
+
+### Host-bound external verification API
+
+The plugin registers one verifier handler through an SDK surface bound to the
+plugin registration rather than a general Gateway client:
+
+```ts
+api.approvals.onExternalVerification(async (attempt) => {
+  const challenge = await createExternalChallenge(attempt.context, {
+    signal: attempt.signal,
+  });
+  await attempt.present({ message: renderChallenge(challenge) });
+  void monitorExternalVerification(attempt, challenge);
+});
+
+async function monitorExternalVerification(attempt, challenge) {
+  let proof: { ok: boolean };
+  try {
+    proof = await waitForExternalProof(challenge, {
+      signal: attempt.signal,
+    });
+  } catch {
+    if (attempt.signal.aborted) {
+      return;
+    }
+    proof = { ok: false };
+  }
+  const completion = await api.approvals.completeExternalVerification({
+    attemptId: attempt.id,
+    outcome: proof.ok ? "succeeded" : "failed",
+  });
+
+  if (proof.ok) {
+    const decision = attempt.context.decision;
+    if (
+      completion.approval.status === "allowed" &&
+      completion.approval.decision === decision &&
+      completion.grantAuthorization
+    ) {
+      await upsertPluginGrant(
+        completion.grantAuthorization,
+        completion.approval,
+      );
+    }
+  }
+}
+```
+
+The exact method names may change during implementation, but the authority and
+state contract are normative:
+
+- `api.approvals` is a plugin-scoped facade created with the registered plugin
+  record; it is not part of the process-global `api.runtime` object. The helper
+  captures the plugin id from that registration closure.
+- The verifier handler is invoked only by OpenClaw's canonical approval control
+  dispatcher, never by `before_tool_call` or an ordinary queued plugin command.
+- The dispatcher authenticates the reviewer, resolves the exact pending approval
+  and selected external decision, and checks ownership and expiry before invoking
+  the plugin.
+- The dispatcher derives a stable `interactionId` from its authenticated action
+  envelope, scoped to the approval and decision. For text commands it includes
+  the channel, account, conversation, message identity, and parsed command
+  occurrence. For native clients, core issues one identity per canonical action
+  generation and reuses it across delivery routes, clients, and transport
+  retries. The plugin cannot supply or override it.
+- A single-use internal dispatch capability binds the registered plugin
+  instance, approval id, run id, selected decision, interaction id, and, for a
+  retry generation, the expected active attempt id. Core consumes it while
+  creating or finding the attempt. The plugin never receives it as
+  caller-editable authority.
+- Replaying the same scoped interaction id returns the existing attempt or its
+  recorded terminal result and cannot invoke the handler again. Core retains
+  this mapping for the approval lifetime.
+- A native action carries host-issued `start` or `retry` intent. Core issues a
+  `start` generation while no attempt is active and a distinct `retry`
+  generation while an attempt is active. Only selecting that `retry` generation
+  while its expected attempt is still active cancels that attempt and creates a
+  fresh one. Core validates and replaces under one serialized transition. If the
+  expected attempt is no longer active, core records a stale-action result and
+  returns the current presentation without invoking the plugin or cancelling the
+  newer attempt. A double click, second-client click, or transport redelivery
+  reuses its existing identity and cannot become a retry accidentally.
+- After a non-successful attempt leaves the approval pending, core issues a fresh
+  `start` generation. For text commands, redelivery of one message is a replay;
+  a newly sent command is explicit user retry intent and receives a new
+  interaction id.
+- Core issues the attempt id and passes the immutable attempt context to the
+  owning plugin's registered handler.
+- The attempt exposes an `AbortSignal`. Core aborts it exactly once when the
+  attempt is replaced, denied, expired, cancelled with its run, closed by a
+  competing resolution, or terminated during graceful Gateway shutdown.
+- The attempt exposes a presentation sink bound to the approval action's delivery
+  route. It accepts bounded Markdown text only: no actions, callback payloads, or
+  caller-selected targets. It remains valid only while the attempt is active;
+  after cancellation or another terminal transition it rejects further output
+  as attempt-closed. The plugin uses it to publish the verifier challenge before
+  returning from the control action.
+- The handler starts any longer polling or callback work in plugin-owned runtime
+  and returns after publishing the challenge. That work must observe the signal
+  and release timers, polling, and subscriptions when aborted. The approval
+  remains pending; the approval control lane is not held open for the external
+  ceremony.
+- Completion accepts only that attempt id and outcome. The host derives the
+  plugin, approval, and decision from the registered facade and stored attempt,
+  then rechecks ownership, pending state, and expiry.
+- A successful completion records the end event and attempts the allow through
+  the canonical approval ledger atomically.
+- A non-successful completion records the end event without allowing the
+  operation.
+- A terminal approval transition closes any active attempt. Replaying a
+  completion returns the recorded result and cannot reopen terminal state.
+
+If an ingress cannot provide a stable authenticated interaction identity, it
+cannot dispatch external verification in v1 and fails closed. Redelivery of one
+text message retains its message identity; sending the command again receives a
+new identity and is a retry. A callback that cannot be stopped after abort may
+still reach the plugin, but completion returns the recorded terminal result and
+cannot emit presentation, allow the action, or authorize a grant.
+The interaction identity belongs only to the external control dispatch; this RFC
+does not add it to ordinary `approval.resolve` calls.
+
+Completion returns the canonical result rather than a transport-only success:
+
+```ts
+type ExternalVerificationCompletionResult = {
+  applied: boolean;
+  approval: ApprovalSnapshot;
+  attempt: ExternalVerificationAttemptSnapshot;
+  grantAuthorization?: {
+    id: string;
+    issuedAtMs: number;
+    approvalId: string;
+    attemptId: string;
+    decision: ApprovalAllowDecision;
+  };
+};
+```
+
+`applied` is true only when this plugin's matching allow decision won the
+first-answer transition during that invocation; a replay returns `applied:
+false`. When the matching plugin, attempt, and reusable decision are the
+canonical winner, the host also returns the same stable `grantAuthorization` on
+the first response and later replay/recovery reads. A late callback that loses
+to denial, expiry, cancellation, or another decision receives no grant
+authorization and cannot authorize a future grant.
+
+The plugin upserts a reusable grant by `grantAuthorization.id`. Its grant time
+is anchored to `issuedAtMs`, not the retry time, and replay must not extend its
+expiry. Session grants also bind to the immutable session lifecycle identity in
+the approval context. Revoked, expired, consumed, or reset-session grant ids must
+remain non-reissuable through a tombstone or equivalent plugin-owned state.
+
+In v1, `api.approvals` calls an in-process host approval service. It is available
+only through the API object created for a registered native plugin and does not
+cross a public Gateway RPC. `operator.approvals` authorizes operator devices and
+approval runtimes; it does not authenticate plugin identity and is therefore not
+enough to call this service. External callbacks return through the owning
+plugin's registered route or service, which then completes its stored attempt in
+process. A future out-of-process plugin runtime would need a separate host-issued,
+plugin-bound principal and is outside this RFC.
+
+External plugins must not need `operator.admin`, and an arbitrary
+approval-scoped Gateway caller cannot access the plugin-bound service.
+
+The typed selector and text fallback both enter the same approval control lane,
+which remains available while the originating agent run is blocked. Text
+fallback does not embed a secret token: the canonical approval command dispatcher
+authenticates the actor and creates the internal single-use dispatch capability.
+The attempt presentation is delivered back through that same approval route, so
+the QR or link does not queue behind the blocked run. Completion requires the
+plugin-bound facade and host-issued attempt id, but not a second operator
+interaction.
+
+This is an external attestation, not core proof verification. An implementation
+may call the operation `resolveExternal` or `completeExternalVerification`; it
+should avoid implying that OpenClaw independently validated the third-party
+proof.
+
+### Attempt lifecycle and audit
+
+Verification attempts are append-only audit events associated with the canonical
+approval record. Each attempt records:
+
+- approval id and host-derived plugin id
+- host-derived run id and an opaque scoped interaction id, not the raw callback
+  or message payload
+- host-issued attempt id
+- selected decision
+- verifier label
+- start and end timestamps
+- outcome: `succeeded`, `failed`, `cancelled`, or `timed-out`
+- sanitized error class when useful
+- terminal resolution source and resolver plugin id when success wins
+
+Retries create distinct attempts. At most one attempt is active for an approval
+at a time; starting a retry first ends the previous active attempt as cancelled.
+The approval owner service serializes attempt creation, completion, and
+cancellation. When the approval becomes terminal, the same transition atomically
+closes any active attempt: denial or competing resolution cancels it, expiry
+times it out, and run or graceful-shutdown cancellation cancels it. Before
+releasing that transition, core aborts the attempt signal and invalidates its
+presentation sink; it publishes lifecycle events only from committed state. A
+later callback receives that recorded result and cannot mutate either the
+attempt or approval.
+
+An unexpected process exit cannot notify an in-memory `AbortSignal`. During
+startup, core therefore reconciles any orphaned external approval and attempt to
+the durable `gateway-restart` cancellation state before accepting approval
+dispatch or completion. Late callbacks then receive the recorded terminal result
+and cannot resume work or authorize a grant. Graceful shutdown and startup
+recovery are separate test cases.
+
+Core does not store proof payloads, nullifiers, wallet identifiers, verifier
+secrets, broker credentials, or verifier-specific personal data. A plugin may
+keep verifier diagnostics in plugin-owned storage subject to its own privacy
+contract.
+
+### Approval context binding
+
+The host returns an immutable approval snapshot when an attempt starts. It
+contains the context needed to prevent proof substitution:
+
+- approval id and plugin id
+- host-issued attempt id
+- originating run id
 - tool name and tool call id when available
 - agent id and session key when available
-- decision
-- decision source: `core`, `human`, `auto-review`, or `plugin-verified`
-- external verifier label
-- opaque verifier request id when the plugin provides one
-- verification lifecycle timestamps and state:
-  - `verificationStartedAt`
-  - `verificationEndedAt`
-  - `verificationOutcome` such as `succeeded`, `failed`, `cancelled`, or
-    `timed-out`
-- timestamps for approval creation, resolution, and expiration
+- session lifecycle identity when available
+- selected decision
+- approval expiry
 
-The plugin may keep verifier-specific logs or proof references in plugin-owned
-storage. Core should not need to store World proof payloads, nullifiers, wallet
-data, or verifier secrets.
+The plugin must bind its challenge to that snapshot and must not reuse a proof
+created for a different approval, attempt, run, tool call, decision, or expired
+request. In particular, proof from a cancelled attempt cannot satisfy a retry.
+Core keeps interaction identity private; the plugin binds proof to the resulting
+host-issued attempt. Core cannot validate a verifier-specific signature, but it
+rechecks the canonical approval id, owner, run, decision, active attempt, and
+expiry before accepting the plugin's attestation.
 
-## AgentKit Reference Implementation
+### Rendering and compatibility
 
-AgentKit is the motivating ClawHub plugin:
+Core projects the external route into the canonical approval presentation:
 
-- https://github.com/Guardiola31337/openclaw-agentkit
-- https://clawhub.ai/plugins/@guardiola31337/agentkit
+```text
+Verify with World
+Verify once: /approve plugin:<id> external allow-once
+Verify and trust for session: /approve plugin:<id> external allow-always
 
-It should use only public plugin entry points:
+Deny: /approve plugin:<id> deny
+```
 
-- `before_tool_call` returns `requireApproval.externalResolution` for protected
-  tools.
-- An AgentKit command or session action runs the verifier flow for
-  `/agentkit approve <id> <decision>`.
-- `plugin.approval.list` reads the pending approval before starting proof.
-- `plugin.approval.resolve` remains the normal denial path.
-- `plugin.approval.resolveVerified` submits the proof-backed allow decision.
-- The Gateway helper uses approval-specific operator authority, not a broad
-  admin client.
+Clients that understand `externalResolution` may render a local selector with
+Verify once, Verify and trust for session, and Deny. They do not execute an
+arbitrary plugin callback; the selected external option dispatches a typed
+canonical approval action through the out-of-band approval control lane.
+That action carries a core-issued interaction identity and `start` or `retry`
+intent. Core issues action generations; clients do not invent retry identity or
+intent.
 
-The end-user flow is:
+Compatibility has two separate gates:
+
+1. **Host capability.** A plugin that requires this contract declares the
+   minimum OpenClaw version or checks a named host capability before registering
+   the protected hook. On an unsupported host it fails during plugin load or
+   configuration rather than registering a deny-only approval.
+2. **Client presentation.** A plugin cannot know every client or channel that may
+   later receive an approval. The supporting host therefore includes its
+   canonical external-approval command in fallback text. Older clients may show
+   that text plus Deny, or Deny only if they cannot display the new projection.
+   Approval commands must use the same out-of-band control dispatch as native
+   approval callbacks so they cannot queue behind the blocked run. Clients that
+   cannot provide that route fail closed.
+
+Rich selector support is a client enhancement, not a correctness requirement.
+No channel must implement generic plugin-defined actions.
+
+### Interaction with auto review
+
+The plugin sets `externalResolution` when it creates the approval. Auto review
+does not add, remove, or satisfy that requirement, so this RFC requires no
+change to auto-review policy.
+
+Auto review may classify risk, deny, or escalate through its existing contract.
+It may not issue the plugin's external allow or fabricate a successful attempt.
+If auto review or any other authorized surface records a terminal denial first,
+the canonical ledger rejects a later external success.
+
+### Plugin-owned future grants
+
+An external allow resolves the current approval. Future calls are skipped only
+when the owning plugin separately implements a documented grant.
+
+Such a grant must:
+
+- be created only after a successful external allow decision that permits reuse
+- include the actual tool and the configured session, agent, or narrower scope
+- have a documented expiry or lifecycle boundary
+- remain owned by the plugin
+- be persisted through supported plugin storage APIs
+- make later skips visible in logs or status output
+- never bypass host exec policy or resolve an already pending core approval
+
+For AgentKit, Verify and trust for session creates a grant keyed by the pending
+approval snapshot, including the protected tool name and session. If that
+context cannot be recovered, AgentKit must not persist the grant.
+
+## AgentKit Reference Flow
 
 ```mermaid
 sequenceDiagram
@@ -460,364 +552,264 @@ sequenceDiagram
   TUI->>Core: Agent selects protected tool
   Core->>Plugin: before_tool_call
   Plugin-->>Core: requireApproval with externalResolution
-  Core-->>TUI: Approval prompt with Verify once, Verify and trust for session, Deny
-  User->>TUI: Choose Verify once or Verify and trust for session
-  TUI->>Plugin: /agentkit approve <id> <decision>
+  Core-->>TUI: Verify once / trust for session / Deny
+  User->>TUI: Choose external verification
+  TUI->>Core: Dispatch approval action with interaction identity
+  Core->>Core: Bind reviewer, approval, run, decision, and interaction
+  Core->>Plugin: Invoke verifier with host-issued attempt and AbortSignal
   Plugin-->>TUI: Show World QR and link
   User->>World: Scan and confirm
   World-->>Plugin: Proof confirmed
-  Plugin->>Core: plugin.approval.resolveVerified(id, decision)
-  Core->>Core: Check plugin owner and decision
-  Core->>Tool: Continue original tool call
+  Plugin->>Core: Complete attempt with successful attestation
+  Core->>Core: Canonical first-answer-wins transition
+  Core->>Tool: Resume original tool call
   Tool-->>User: Agent continues with result
-  opt Verify and trust for session was selected
-    User->>TUI: Ask for another protected tool in same session
-    Core->>Plugin: before_tool_call
-    Plugin-->>Core: Session grant covers this plugin approval
-    Core->>Tool: Continue without another AgentKit proof
-  end
 ```
 
-The reference implementation should also document one important correctness
-rule for plugin-owned session grants: a grant is keyed from the pending approval
-snapshot, including the actual protected tool name. If the verifier command
-cannot recover that context, it must not persist a grant for an `unknown` tool.
+The same contract supports a hardware-key plugin or a bounded enterprise broker
+that completes within the OpenClaw approval deadline. Long-running ticket or
+manager workflows that may take hours require a separate durable workflow
+design; v1 does not claim to support them.
 
-## Security Model
+## Security Properties
 
-### Core responsibilities
-
-Core owns:
-
-- pending approval ids
-- request expiration
-- cancellation
-- timeout behavior
-- normal denial
-- route selection
-- final blocked-tool continuation
-- validation that a verified resolver can only resolve an approval owned by the
-  same plugin
-
-### Plugin responsibilities
-
-The plugin owns:
-
-- verifier configuration
-- verifier secrets
-- QR/link generation
-- polling or callback handling
-- proof validation
-- plugin-scoped grant persistence, if it offers "trust for session" or "trust
-  for agent"
-- user-facing verifier status messages
-
-### Invariants
-
-- External verification never grants a plugin a general approval capability.
-- A plugin cannot resolve another plugin's approval.
-- A plugin cannot resolve host exec approvals.
-- A plugin cannot use `resolveVerified` for a decision the approval did not
-  expose.
-- A normal user denial path stays available through OpenClaw.
-- The external verifier cannot override a core denial, timeout, or cancellation.
-- The external verifier cannot skip OpenClaw's host policy.
-
-## Design Pressure Test / FAQ
-
-This proposal should be rejected or revised if it fails any of these tests.
-
-| Concern | Expected answer                                                                                                                                                                                                                       | Revise if |
-| --- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| --- |
-| Is this custom actions by another name? | No. `externalResolution` is one verifier label, one command template, allow-style decisions only, and no plugin callback payloads or native button contract.                                                                          | Clients need to understand arbitrary plugin action rendering. |
-| Does this weaken exec approvals? | No. Verified resolution unblocks only the plugin approval that requested external proof. It cannot add exec allowlists, override safe-bin policy, or skip a separate exec approval.                                                   | The plugin can affect host exec policy outside its pending approval. |
-| Does this give plugins broad admin authority? | No. v1 uses `operator.approvals` plus plugin ownership and exposed-decision checks, and `operator.admin` may satisfy the method only for existing admin clients. External plugin SDK helpers must not require a general admin client. | The SDK helper exposes or requires broad admin authority for external plugins. |
-| Does this create hidden auto-approval? | No. A reusable/session allow decision may let the plugin store a scoped grant for future plugin hooks, but it is not a global host auto-approval mode.                                                                                 | A plugin-owned grant becomes global, indefinite, or not explainable. |
-| Does every client need new UI? | No. The minimum renderer is text commands such as `/agentkit approve plugin:<id> allow-once` and `/approve plugin:<id> deny`.                                                                                                         | Correctness requires new per-channel custom action handling. |
-| Does core store verifier proof? | No. Core stores approval metadata and, optionally, an opaque verifier request id. The plugin owns proof payloads, secrets, nullifiers, broker URLs, polling state, and verifier logs.                                                 | Core needs World, wallet, proof-format, or verifier-specific fields. |
-| Is AgentKit the only plausible user? | No. The same host seam fits hardware-key approval plugins, enterprise approval brokers, compliance or ticket approvals, identity or presence proof, and risk-scoring workflows.                                                       | The API mentions World, AgentKit, wallets, or a specific proof format in core. |
-
-## Compatibility
-
-This proposal is additive.
-
-- Existing plugin approval requests without `externalResolution` behave as they
-  do today.
-- Approval clients that understand `externalResolution` can render external
-  verification as command text or richer local UI.
-- Plugins that require external verification must declare a minimum OpenClaw
-  version or host capability and must not register the protected hook on hosts
-  that do not support this field.
-- Existing `/approve <id> deny` remains the rejection path.
-- Existing plugin approval routing remains separate from exec approval routing.
-- No bundled plugin id, World-specific behavior, or AgentKit default is added to
-  core.
-
-The only new SDK/API surface is generic:
-
-- one external verification command template on plugin approval requests
-- one ownership-checked verified resolver
+- Host-derived identity prevents a caller from claiming another plugin id.
+- External-verification approvals can be created only by the private
+  host-stamped hook path; the public caller-identified request path rejects the
+  field.
+- The SDK helper can affect only pending approvals owned by that plugin.
+- Starting also requires an operator dispatch authorized for that approval;
+  plugin identity alone cannot start or replace an attempt.
+- The dispatch capability is single-use and binds the exact approval and decision
+  selected by the operator, the originating run, and a stable scoped interaction
+  identity. A retry generation also binds the expected active attempt.
+- Re-delivery of one interaction is idempotent. Replacing an active attempt
+  requires either a newly submitted authenticated text command or a core-issued
+  native retry generation.
+- External choices use the approval control lane and cannot deadlock behind the
+  blocked agent run.
+- Challenge presentation is text-only, dispatch-bound, and cannot redirect output
+  to a plugin-selected target.
+- Attempt cancellation aborts plugin work and permanently closes its presentation
+  sink, preventing stale progress or challenge output.
+- The selected decision must have been offered for external resolution.
+- The plugin cannot use the external helper for `deny` or for core exec
+  approvals.
+- Generic allow decisions are unavailable whenever external verification is
+  required.
+- All successful allows use the canonical approval ledger and first-answer-wins
+  transition.
+- A late proof cannot override denial, cancellation, expiry, or another terminal
+  decision.
+- Run cancellation and completion are serialized; proof cannot allow or create a
+  reusable grant after its originating run has been cancelled.
+- Approval creation shares that run-lifecycle serialization, so an abort cannot
+  miss an approval created by an in-flight hook.
+- Reusable grants require the stable authorization of the winning attempt and
+  replay cannot recreate or extend expired, revoked, or reset-session trust.
+- The verifier challenge is bound to the immutable approval context.
+- A verifier challenge is bound to the attempt id, so proof from an earlier
+  cancelled attempt cannot satisfy a retry.
+- Proof data stays outside core.
+- Unsupported hosts do not register the protected hook; unsupported clients fail
+  closed.
+- Installed-plugin trust is explicit: the host validates ownership and state,
+  not the truth of a third-party proof.
 
 ## Validation and Acceptance Criteria
 
-Approval changes are security- and regression-sensitive, so implementation PRs
-need both host-contract tests and a real plugin proof.
+RFC acceptance establishes the contract. Runtime proof is required for the
+implementation PR and reference plugin release; an RFC document alone cannot
+prove behavior that is not yet present on OpenClaw `main`.
 
-### Reference implementation
+### Host contract tests
 
-AgentKit should be the reference implementation rather than a synthetic-only
-sample. It is a real ClawHub plugin with real external verification behavior,
-and it exercises the exact surfaces proposed by the RFC.
+The OpenClaw implementation must prove:
 
-The AgentKit repo should keep:
+- hook results cannot supply or override the owner plugin id
+- the private creation path preserves the stamped owner and the public
+  `plugin.approval.request` path rejects `externalResolution`
+- approval creation and run cancellation cover both commit orders: creation
+  rejects after an earlier abort, while a later abort observes and cancels the
+  created approval
+- omitted external decisions default to `["allow-once"]`
+- only canonical allow decisions can be offered externally
+- external approvals normalize generic decisions to `["deny"]` and reject any
+  generic/external allow overlap
+- normal Deny remains available and terminal
+- the approval control dispatcher authenticates the reviewer and binds the exact
+  approval, plugin, originating run, selected decision, and stable scoped
+  interaction id before invoking the verifier
+- wrong-target, wrong-run, and wrong-decision substitution fail
+- redelivery with the same interaction id returns the existing attempt without
+  invoking the handler again, while replacement requires a newly submitted text
+  command or core-issued native retry generation
+- native actions and text commands preserve the same interaction identity on
+  transport redelivery, and an ingress without a stable identity fails closed
+- stale native actions, double clicks, and concurrent clicks from another client
+  cannot replace an active attempt; selecting a core-issued retry generation can
+  replace only the expected active attempt in the same serialized transition
+- non-approvers and background plugin calls cannot start or replace an attempt
+- `api.approvals` is available only through the registered plugin's in-process
+  API and arbitrary `operator.approvals` callers cannot claim plugin identity
+- typed selectors and text-channel fallback can dispatch while the originating
+  agent run is blocked
+- the verifier challenge is delivered to the action's approval surface before
+  the control action returns, while the approval remains pending
+- normal generic allow cannot bypass an external-only decision
+- success is committed through the canonical ledger
+- deny, expiry, run cancellation, graceful shutdown, startup recovery, and
+  competing resolution win races against late success when their transition
+  commits first
+- cancellation of run A closes only run A's approval and attempt when runs A and
+  B have pending approvals in the same session
+- completion-versus-run-abort race tests cover both commit orders and prove that
+  a proof cannot authorize a grant after run cancellation wins
+- retries create separate audit attempts and replay is idempotent
+- retry, denial, expiry, run cancellation, graceful shutdown, and competing
+  resolution abort the attempt signal exactly once and reject later presentation
+- startup recovery cancels orphaned durable approval/attempt state before serving
+  dispatch or completion, without claiming to signal work from the dead process
+- completion returns the canonical winner and a late success cannot create a
+  reusable grant
+- grant persistence is idempotent by the stable authorization id, keeps the
+  original grant timestamp, and cannot recreate trust after expiry, revocation,
+  consumption, or session reset
+- proof payloads are not persisted in core
+- unsupported hosts reject plugin registration explicitly
+- canonical text rendering remains usable without custom client actions
 
-- a mocked plugin-level HITL test for fast iteration
-- a real local OpenClaw Gateway end-to-end test
-- a manual TUI demo script for recording the final user experience
-- documentation showing how another plugin can copy the pattern
+### AgentKit automated proof
 
-A smaller fixture plugin inside OpenClaw tests is still useful, but only as a
-host-contract test. It should not replace the AgentKit end-to-end proof.
+AgentKit must run against an OpenClaw checkout containing the implementation and
+prove:
 
-### Host API tests
+1. Deny blocks the protected tool.
+2. Verify once shows the World route and resumes exactly one protected action
+   after proof.
+3. Verify and trust for session resumes the action and creates only the intended
+   session/tool grant.
+4. A later matching action uses the grant without another AgentKit prompt.
+5. A different session, tool, expired grant, or unknown tool does not reuse it.
+6. Multiple pending approvals remain isolated by approval id.
+7. Failed verification can retry without allowing the action.
+8. A proof callback arriving after denial or expiry cannot resume the tool.
+9. Proof generated for attempt A is rejected if presented to retry attempt B.
+10. Replaying a successful completion does not duplicate, extend, or recreate a
+   reusable grant.
+11. Aborting the originating run stops verifier polling, closes challenge
+    presentation, and prevents a late callback from allowing or creating a
+    grant.
+12. Redelivery of one approval action reuses its attempt; a newly submitted retry
+    cancels that attempt and starts one new attempt.
+13. Abort-before-creation rejects the approval, while create-before-abort cancels
+    it; concurrent runs in one session remain isolated.
+14. Native double clicks, stale actions, and second-client clicks are replays;
+    only a core-issued retry generation bound to the current active attempt can
+    replace it. An unused retry for attempt A cannot replace later attempt B.
+15. Graceful shutdown aborts live plugin work, while crash/startup recovery
+    cancels orphaned durable state before accepting a late callback.
 
-The OpenClaw PR that implements this RFC should prove:
+The plugin should retain fast mocked tests, a real local Gateway integration
+test, and a manual TUI runner.
 
-- `before_tool_call.requireApproval.externalResolution` creates a pending plugin
-  approval with the expected owner and decisions.
-- the approval owner plugin id is derived from host/plugin runtime context and
-  cannot be overridden by a caller-provided payload field.
-- omitted `externalResolution.decisions` defaults to `["allow-once"]`.
-- normal `deny` still resolves through core approval controls.
-- normal allow decisions are rejected when the approval requires external
-  verification and those decisions are not in `allowedDecisions`.
-- any deny, timeout, cancellation, expired approval, failed proof, or resolved
-  state wins over a later verified allow attempt.
-- `plugin.approval.resolveVerified` rejects missing, expired, already resolved,
-  wrong-plugin, wrong-decision, and no-`externalResolution` approvals.
-- `plugin.approval.resolveVerified` allows only the originating plugin to
-  resolve an offered external allow decision.
-- verification start and end lifecycle metadata can be reported to OpenClaw
-  without storing verifier proof payloads.
-- TUI, Control UI, and text/channel renderers include the verifier command text
-  without requiring custom action support.
-- plugin load/configuration fails explicitly when the host lacks the minimum
-  external-resolution version or capability.
-- SDK API baselines expose only the narrow generic types.
+### User-perspective artifact
 
-### AgentKit end-to-end proof
+Before the implementation lands, attach a redacted terminal capture or short
+recording showing:
 
-The AgentKit proof should run against an OpenClaw checkout that includes the
-host API and verify:
+- a protected tool prompt
+- Verify once, Verify and trust for session, and Deny
+- the World QR/link
+- successful continuation after a scan
+- session grant reuse
+- a separate denial that leaves the tool blocked
 
-1. Install/load AgentKit as an external plugin.
-2. Start a real local OpenClaw Gateway.
-3. Trigger a protected tool through `before_tool_call`.
-4. Observe a pending approval with:
-   - core-owned deny
-   - "Verify with World" external route
-   - `allow-once` and the host's reusable/session trust decision
-5. Deny one request through the normal core resolver and confirm the tool call
-   stays blocked.
-6. Resolve another request through `plugin.approval.resolveVerified` and confirm
-   the original tool call continues.
-7. Resolve a request through the reusable/session trust decision, then trigger
-   another protected tool in the same session and confirm AgentKit logs a
-   scoped session grant instead of creating a new approval prompt.
-8. Run a manual TUI flow where the user sees:
-   - Verify once
-   - Verify and trust for session
-   - Deny
-   - World QR/link
-   - successful continuation after scan
-
-The AgentKit plugin should publish proof from:
-
-- `pnpm test:hitl` covers the plugin HITL logic, including deny, verify once,
-  verify and trust for session, repeated approval ids, transient verifier fetch
-  retries, and the no-`unknown`-tool grant invariant.
-- `pnpm test:openclaw-hitl` builds the plugin, starts a real local OpenClaw
-  Gateway, loads AgentKit as an external plugin, and proves deny, allow-once,
-  reusable/session trust, and a trusted follow-up protected call.
-
-### Manual demo artifact
-
-For maintainer review, attach a short user-perspective demo:
-
-1. launch OpenClaw TUI
-2. ask the agent to use a protected tool
-3. show the approval prompt
-4. choose Verify once
-5. show the World QR/link
-6. scan and confirm
-7. show the agent continuing after verified approval
-8. ask for another protected tool
-9. choose Verify and trust for session
-10. scan and confirm
-11. ask for one more protected tool in the same session
-12. show that AgentKit allows it through the session grant without another
-    approval prompt
-
-The same proof set should also include a quick deny check, either in the
-recording or in automated output, to show that normal OpenClaw denial remains
-available and blocks the protected call.
-
-The demo should be evidence attached to the AgentKit plugin PR or RFC
-discussion, not committed into the OpenClaw source tree.
+The artifact belongs on the RFC or implementation discussion, not in the
+OpenClaw source tree.
 
 ## Implementation Plan
 
-### Phase 1: RFC and maintainer alignment
+### Phase 1: RFC agreement
 
-Open an RFC in openclaw/rfcs that asks maintainers to agree on four specific
-points:
+Agree on the ownership boundary, canonical-ledger integration, decision
+semantics, capability gate, and audit lifecycle described here.
 
-1. External verification belongs in plugins, not bundled core integrations.
-2. The host API should be one narrow `externalResolution` command template, not
-   arbitrary plugin-defined approval actions.
-3. The sensitive capability is an ownership-checked verified resolver, not a
-   UI button surface.
-4. Auto review may classify or escalate these approvals, but it must not satisfy
-   an external proof requirement.
+### Phase 2: Minimal OpenClaw host API
 
-### Phase 2: Minimal host API PR
+Implement:
 
-Land the narrow host API equivalent to the current #82434 shape:
+- `requireApproval.externalResolution`
+- host-derived approval ownership and originating-run binding
+- run-lifecycle serialization for approval creation and cancellation
+- a private host-stamped creation path that rejects this field on the existing
+  public caller-identified request method
+- the `allow-once` default and canonical decision validation
+- canonical text presentation, an out-of-band approval control action with a
+  stable interaction identity and explicit retry intent, plus optional richer
+  client projection
+- host capability/version gating
+- a plugin-bound verifier handler and completion helper
+- an attempt cancellation signal and a dispatch-bound, text-only verifier
+  presentation sink that closes with the attempt
+- an in-process-only v1 service boundary for those helpers
+- canonical-ledger resolution and plugin resolver attribution
+- append-only attempt audit events
+- focused Gateway, SDK, TUI, Control UI, and channel fallback tests
 
-- `externalResolution` on plugin approval requests
-- plugin owner identity derived from host-owned runtime context, not a
-  caller-provided request field
-- default external decisions of `["allow-once"]` when omitted
-- protocol/schema/view-model support for that field
-- minimum version or capability signaling so plugins can refuse to register on
-  hosts that cannot render or route external verification
-- text rendering for TUI, Control UI, and approval-capable channels
-- `plugin.approval.resolveVerified`
-- plugin ownership checks
-- deny-wins state checks before accepting a verified allow
-- verification start/end audit metadata
-- approval-specific authorization for verified resolution, without requiring
-  external plugins to hold a general admin-scoped Gateway client
-- SDK types and docs
-- focused tests for gateway, SDK rendering, Control UI parsing, and affected
-  channel text output
+Do not add arbitrary actions, verifier-specific fields, or bundled AgentKit code.
 
-This phase should not include:
+### Phase 3: AgentKit update and release
 
-- arbitrary approval actions
-- bundled AgentKit code
-- World-specific core code
+Update AgentKit to use the accepted SDK helpers, supported plugin storage, and
+the final host capability. Run the automated and manual proof matrix, publish the
+plugin to ClawHub, and link the evidence from the implementation PR.
 
-### Phase 3: AgentKit plugin release path
-
-Update and publish the ClawHub AgentKit plugin against the accepted host API:
-
-- use `externalResolution` instead of custom approval actions
-- keep normal core denial
-- resolve verified allow decisions through the host resolver
-- keep proof payloads and verifier state plugin-owned
-- maintain local Gateway end-to-end proof
-- document the setup as the example implementation
-
----
-
-## Rationale and Alternatives
+## Rationale
 
 ### Bundle AgentKit in core
 
-Rejected. Maintainers explicitly want plugins out of core where current or
-small generic plugin seams are enough. AgentKit is a good ClawHub plugin because
-the policy, verifier, World configuration, and proof lifecycle are not generic
-OpenClaw behavior.
+Rejected. The verifier, World configuration, proof lifecycle, and grant policy
+are plugin concerns. Core needs only the generic approval boundary.
 
-### Keep arbitrary plugin approval actions
+### Expose arbitrary plugin approval actions
 
-Rejected. This was the shape in #82431 and it broadened the contract too much.
-It required Gateway schemas, approval payloads, native channel renderers, the
-Web UI, and plugin SDK consumers to understand plugin-defined actions. For
-AgentKit, the actual need is narrower: show a verifier command and let the
-plugin prove the result.
+Rejected. That would require every Gateway client and channel to understand
+plugin-defined controls and callback payloads. One external route plus command
+text satisfies the use case with a much smaller compatibility surface.
 
 ### Put the verifier command only in the description
 
-Possible but weaker. It avoids a new field, but it makes the verifier route
-unstructured:
+Rejected. Prose alone cannot validate which allow decisions were offered,
+identify external-verification approvals, or support consistent presentation
+without text scraping.
 
-- clients cannot label it consistently
-- docs cannot describe the external allow decisions
-- tests must scrape prose
-- host code cannot distinguish external proof-required approvals from normal
-  approval prose
-- the verified resolver cannot easily validate that a decision was intentionally
-  exposed for external verification
+### Let plugins call the normal resolver
 
-The proposed `externalResolution` field keeps the shape narrow while preserving
-machine-checkable intent.
-
-### Let plugins use the normal resolver for allow decisions
-
-Rejected. The normal resolver is the human/core approval path. A proof-backed
-allow should be distinguishable from a human click or `/approve allow-once`.
-The dedicated verified resolver gives core a specific place to enforce plugin
-ownership and record the decision source.
+Rejected. A general approval-scoped caller has no plugin identity, and a normal
+allow is indistinguishable from a plugin attestation. The bound helper provides
+ownership, audit attribution, and external-decision validation while still using
+the same canonical terminal transition internally.
 
 ### Let auto review satisfy external verification
 
-Rejected. Auto review may judge the command risk, but it cannot complete a
-World proof, hardware key ceremony, or plugin-owned compliance workflow. If an
-approval requires external proof, the owning plugin must supply that proof.
+Rejected. Auto review can assess risk but cannot complete a plugin-owned proof
+ceremony. It may deny or escalate, but only the owning plugin may attest external
+success.
 
-## Resolved Decisions
+## Unresolved Questions
 
-These were the open questions during drafting. The answers below are the RFC's
-recommendation, and maintainers can amend any of them during review.
+Two implementation details remain intentionally open without changing the
+security or state contract:
 
-1. **Plugin identity.** The approval owner plugin id is host-derived from the
-   plugin runtime or session-action context. `requireApproval` and
-   `resolveVerified` do not accept a caller-provided plugin id as authority.
-2. **Resolver authority.** v1 uses the existing approval-specific operator
-   authority (`operator.approvals`) plus the ownership and exposed-decision
-   checks in [Verified resolver](#verified-resolver). External plugins must not
-   need `operator.admin`. If the approval overhaul later introduces a narrower
-   approval-runtime scope, the resolver adopts it without a contract change.
-3. **Approval composition.** Approval resolution is strict AND and deny-wins.
-   Any deny, timeout, cancellation, expired approval, failed proof, or already
-   resolved different decision blocks a later verified allow.
-4. **Decision vocabulary and default.** `externalResolution.decisions` uses the
-   allow-style subset of OpenClaw's existing approval decision enum; it defaults
-   to `["allow-once"]` when omitted. If the active approval API exposes
-   `allow-session`, the session-trust option uses that existing decision instead
-   of adding a verifier-specific alias.
-5. **Reusable/session trust.** Core does not standardize a single duration. Core
-   treats the reusable/session allow decision only as resolution of the current
-   pending approval; any future "trust for session" behavior is plugin-owned
-   policy. A plugin that offers it must declare the grant scope and expiration,
-   and must make later skips explainable in logs or status text.
-6. **Client and host compatibility.** Plugins that require external
-   verification must declare a minimum OpenClaw version or host capability and
-   must not register the protected hook on unsupported hosts. Unsupported older
-   clients can only provide the deny path and are not a complete verification
-   experience.
-7. **Presentation surface.** v1 ships command templates only. A typed
-   presentation field for native clients is a possible additive follow-up if
-   maintainers later want richer UI; it is not required and does not block this
-   host API.
-8. **Audit fields.** The fields in
-   [Audit and observability](#audit-and-observability) are the v1 baseline,
-   including verification start/end timestamps and outcome. Maintainers may add
-   fields during implementation, but core stores approval metadata only — never
-   third-party proof payloads or private identifiers.
-9. **Auto review scope.** Auto review may recommend denial or escalate to a
-   human, and may read that an approval requires external verification as
-   escalation context. It may not issue the external allow decision or satisfy
-   the proof, and it requires no change for this boundary (see
-   [Interaction with auto review](#interaction-with-auto-review)).
-10. **Channel rollout.** The first PR must guarantee that approval surfaces
-    which understand `externalResolution` render the verifier command path
-    without custom actions. It does not require every channel to add custom
-    verification UI; native clients can enrich presentation incrementally.
+1. Will `allow-session` be part of the canonical plugin approval enum before the
+   implementation lands? If yes, external verification uses it directly. If
+   not, AgentKit keeps the documented `allow-always` to session-grant mapping.
+2. What final SDK method names and host capability key best fit the approval
+   runtime after the current approval overhaul? They must preserve the
+   host-bound identity and lifecycle semantics above.
 
-## Prior Work and References
+## References
 
 - Original in-core AgentKit prototype:
   https://github.com/openclaw/openclaw/pull/78583
@@ -825,13 +817,11 @@ recommendation, and maintainers can amend any of them during review.
   https://github.com/openclaw/openclaw/pull/82431
 - Revert of the broad custom-action PR:
   https://github.com/openclaw/openclaw/pull/87419
-- Narrow external verification host API PR:
+- Earlier external verification host API PR:
   https://github.com/openclaw/openclaw/pull/82434
-- Local approval runtime-token support that superseded #82752:
-  https://github.com/openclaw/openclaw/pull/83433
 - AgentKit ClawHub plugin:
   https://github.com/Guardiola31337/openclaw-agentkit
-- ClawHub AgentKit package:
-  https://clawhub.ai/plugins/@guardiola31337/agentkit
-- Approval prompt markdown RFC:
+- ClawHub package:
+  https://clawhub.ai/guardiola31337/plugins/agentkit
+- Approval prompt Markdown RFC:
   https://github.com/openclaw/rfcs/pull/4
