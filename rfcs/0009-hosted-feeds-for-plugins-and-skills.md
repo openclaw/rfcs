@@ -505,9 +505,10 @@ install. The trust layers stay separate:
 
 Following a publisher is therefore a social-discovery signal. ClawHub should
 show new work from followed publishers in a pull-based activity timeline rather
-than send one notification for every publication. OpenClaw or Control UI may
-generate notifications for followed-publisher updates that affect content
-installed locally, because ClawHub does not know an instance's lockfile.
+than send one notification for every publication. First-class alerts should use
+explicit item watches and a durable account inbox anchored to signed feed
+revisions. OpenClaw may offer to synchronize installed-item watches, but only
+with an explicit account setting because that discloses local inventory.
 Following must not make a package official, bypass security scans or approval,
 or allow a feed to introduce new source profiles or credentials.
 
@@ -551,10 +552,13 @@ ClawHub product stack:
    following lists; keep private mute or notification preferences separate.
 3. Activity timeline: show new or updated public skills and plugins from
    followed publishers without generating one alert per publication.
-4. Profile and discovery surfaces: expose publisher profile pages, followed
+4. Item watches and account inbox: add explicit item-scoped subscriptions,
+   durable cross-device read state, coalescing, and delivery hints that point
+   back to signed feed revisions without performing updates.
+5. Profile and discovery surfaces: expose publisher profile pages, followed
    publisher lists, and search filters such as "people I follow" or "new from
    followed publishers".
-5. Registry and scan bridge: expose the subset of ClawHub publisher and feed state
+6. Registry and scan bridge: expose the subset of ClawHub publisher and feed state
    that downstream registries can consume, while preserving their own scans,
    approval workflows, and registry-inclusion decisions.
 
@@ -568,13 +572,17 @@ collapsing the trust gates:
 2. Publisher activity timeline: expose a bounded timeline of new or updated
    public skills and plugins from followed publishers. Do not create ClawHub
    alerts for every publication.
-3. Machine-readable feed discovery: expose canonical publisher feed URLs through
+3. Item watches and notification inbox: expose authenticated item watches and a
+   durable account inbox with idempotent acknowledgement, private preferences,
+   bounded delivery, and signed-revision references. Push and channel delivery
+   wake clients but do not authorize updates.
+4. Machine-readable feed discovery: expose canonical publisher feed URLs through
    APIs. A visible profile-page feed control is optional; OpenClaw should offer
    a handle-based command such as `openclaw publisher follow <handle>`.
-4. Registry submission workflow: let eligible ClawHub publisher entries be
+5. Registry submission workflow: let eligible ClawHub publisher entries be
    idempotently queued, retried, withdrawn, or resubmitted for downstream
    registry review and scanning while keeping submission separate from approval.
-5. Reflected registry and scan state: persist and display downstream review,
+6. Reflected registry and scan state: persist and display downstream review,
    scan, inclusion, and local approval states, including status history, only
    when those systems report them back to ClawHub.
 

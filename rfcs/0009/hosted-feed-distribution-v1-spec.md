@@ -369,6 +369,52 @@ root. It MUST satisfy the selected feed profile's origin policy before any
 request is made. Clients MUST NOT forward credentials across origins and MUST
 verify this response before changing accepted state.
 
+## Watches And Notifications
+
+Notifications are a first-class consumption capability built on signed feed
+changes. They are not a substitute for the signed change or snapshot
+representations and do not add install authority.
+
+A feed service MAY expose authenticated subscriptions for a feed, publisher,
+or stable item identity. Item watches are the baseline alerting scope. A
+publisher or whole-feed subscription SHOULD populate a pull-based timeline or
+bounded digest by default rather than emit one alert per changed item.
+
+An account-capable service SHOULD provide a durable notification inbox with:
+
+- stable event ids and idempotent acknowledgement;
+- the feed id, representation class, item identity, and observed feed sequence;
+- a bounded reason such as `updated`, `removed`, `blocked`, or
+  `security-state-changed`;
+- created, read, and dismissal state suitable for multiple clients;
+- a reference sufficient to retrieve the signed change range or current signed
+  snapshot that produced the event.
+
+Inbox and subscription state are account data, not signed feed content. A push,
+email, webhook, or channel delivery is only a wake-up hint. Before presenting
+an actionable update, a client MUST retrieve and verify the referenced signed
+feed state, confirm the expected feed and item identity, and apply local policy.
+Rejected, expired, rolled-back, or incomplete feed state MUST NOT produce an
+actionable item update.
+
+Services MUST deduplicate retries and SHOULD coalesce repeated updates to the
+same item. They MUST bound fanout, retention, page size, and delivery retries.
+Removal, blocked-state, and security-state events SHOULD remain distinguishable
+from ordinary version or metadata updates. A baseline sync MUST NOT report every
+existing item as newly published, and a reset-required refresh SHOULD compare
+the newly accepted complete snapshot with the prior accepted snapshot when one
+is available.
+
+Explicit server-side watches may sync across devices. A client MAY derive
+watches from locally installed content, but sending installed-item identities
+to a service requires an explicit account setting because it discloses local
+inventory. Subscription, mute, delivery-channel, and read state MUST remain
+private even when publisher follows are public.
+
+A notification MUST NOT install, update, enable, remove, approve, or otherwise
+activate content. Any such action uses the normal install or update path and
+re-evaluates artifact integrity, trust, and policy.
+
 ## Access Control
 
 For private publisher, named, organization, or composed feeds, the publisher

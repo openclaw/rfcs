@@ -16,12 +16,13 @@ This addendum defines:
 - the strict publisher-feed document and entry shapes;
 - bounded pagination and refresh semantics;
 - public publisher-follow discovery;
+- item-watch and durable notification-inbox semantics;
 - the boundary between following, discovery, trust, and installation;
 - downstream registry provenance and diagnostics.
 
 It does not define a separate account feed, installable catalog entries,
-package candidates, notification transport, organization approval, artifact
-trust, or security scanning.
+package candidates, concrete push or channel transports, organization
+approval, artifact trust, or security scanning.
 
 Publisher feeds are the first rollout target for the reusable query and change
 contracts in `hosted-feed-distribution-v1-spec.md`. A publisher with hundreds of
@@ -216,9 +217,20 @@ ClawHub SHOULD prefer a timeline over per-publication notification fanout. A
 high-volume publisher can publish hundreds of entries, and following that
 publisher does not imply that every publish deserves an alert.
 
-OpenClaw or Control UI MAY generate local notifications for followed-publisher
-updates that affect content actually installed by that OpenClaw instance. That
-filter depends on local install state and is not owned by ClawHub.
+ClawHub SHOULD separately support authenticated item watches and a durable
+account notification inbox using the distribution addendum's watch contract.
+An item watch is explicit alert intent and may synchronize across OpenClaw,
+Control UI, and ClawHub clients. Following a publisher MUST NOT automatically
+create one item alert per publication.
+
+OpenClaw MAY offer to watch installed content and synchronize those watches to
+the account inbox. That synchronization requires an explicit account setting
+because it discloses installed-item identities. Without it, OpenClaw may keep
+installed-item watches local while still consuming explicit account watches.
+
+Inbox delivery is a hint. OpenClaw or Control UI MUST verify the referenced
+signed publisher or catalog change before presenting an actionable update, and
+an alert MUST NOT install, update, enable, approve, or remove content.
 
 Following MUST NOT mean that a publisher is official, reviewed, trusted,
 scanned, approved, or installable. UI and APIs MUST use follow/following
@@ -289,4 +301,5 @@ A client:
 - resolves entries through an accepted catalog before installation;
 - stores stable publisher ids rather than mutable handles;
 - bounds pagination and reports unavailable or malformed state;
-- keeps local installed-content notifications separate from ClawHub following.
+- keeps item-watch alerts separate from ClawHub publisher following;
+- verifies referenced signed feed state before presenting actionable alerts.
