@@ -136,18 +136,22 @@ points are:
 The first feed version should preserve those semantics while moving the catalog
 source from bundled-only JSON to hosted JSON with bundled fallback.
 
-The implementer-facing v1 core contract is captured in
-[`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md). Trust and
-publisher-feed addenda are captured separately in
-[`0009/signed-feed-trust-v1-spec.md`](0009/signed-feed-trust-v1-spec.md) and
-[`0009/clawhub-account-feeds-v1-spec.md`](0009/clawhub-account-feeds-v1-spec.md)
-(publisher feeds; the historical filename is retained while the addendum is
-under review). Scalable snapshots, signed queries, and changed-since retrieval
-are defined in
-[`0009/hosted-feed-distribution-v1-spec.md`](0009/hosted-feed-distribution-v1-spec.md).
-This RFC remains the design rationale and rollout plan; the sidecar specs are
-the concise schema, example, verification, refresh, and conformance references
-for feed publishers and OpenClaw clients.
+This RFC contains the rationale and rollout plan. Implementers should use the
+sidecar specification matching their task:
+
+- [`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md) defines the
+  strict atomic install-catalog document and baseline client behavior.
+- [`0009/signed-feed-trust-v1-spec.md`](0009/signed-feed-trust-v1-spec.md)
+  defines DSSE transport, trusted public keys, verification, and rotation.
+- [`0009/clawhub-account-feeds-v1-spec.md`](0009/clawhub-account-feeds-v1-spec.md)
+  defines publisher discovery feeds. The historical filename is retained for
+  link stability; the contract does not define a separate account identity.
+- [`0009/hosted-feed-distribution-v1-spec.md`](0009/hosted-feed-distribution-v1-spec.md)
+  defines sharded snapshots, signed queries, changed-since retrieval, and
+  client-first watches.
+
+An install-catalog producer starts with the core and trust specs. A publisher
+feed producer or consumer also uses the publisher and distribution specs.
 
 ### Feed document
 

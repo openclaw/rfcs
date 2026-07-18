@@ -387,6 +387,13 @@ verifying and atomically accepting the corresponding signed change range or
 snapshot. The first accepted baseline MUST NOT report every existing item as a
 new change. A client that was offline catches up on its next verified refresh.
 
+Clients MUST NOT issue one network refresh per watched item. One bounded source
+refresh SHOULD fan out locally across all watches bound to that accepted feed
+state. Automatic refresh MUST bound concurrency, use backoff and jitter after
+failures, and avoid overlapping runs for the same source. An unavailable watched
+source MUST NOT block runtime readiness or discard the last accepted state;
+clients report the failure and retry according to the source lifecycle policy.
+
 A feed service MAY expose authenticated watch synchronization or a durable
 notification inbox for cross-device and offline delivery. If it does, the inbox
 SHOULD provide:

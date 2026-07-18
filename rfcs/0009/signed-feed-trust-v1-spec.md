@@ -80,6 +80,15 @@ algorithm field. Duplicate `keyid` values make the envelope invalid. Producers
 MAY add fields and consumers MUST ignore unrecognized envelope and signature
 fields, as required by DSSE. Unknown fields MUST NOT be assigned trust meaning.
 
+Signed HTTP responses MUST use `Content-Type: application/vnd.dsse+json`.
+After parsing optional media-type parameters, clients MUST reject another media
+type on an operation that requires a signed envelope. A producer SHOULD
+calculate `ETag` over the exact envelope bytes.
+`Last-Modified` MUST NOT be the sole validator for a signed representation:
+signing-key rotation can change envelope bytes without changing the stored
+payload publication time. After a `304 Not Modified`, a client MUST still
+reverify its retained envelope under the current trust policy before use.
+
 ## DSSE Pre-Authentication Encoding
 
 Signatures MUST be calculated over the DSSE v1 pre-authentication encoding of

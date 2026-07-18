@@ -190,15 +190,30 @@ The initial publisher routes are:
 GET /api/v1/publishers/{publisherId}
 GET /api/v1/publishers/{publisherId}/feed
 GET /api/v1/publishers/{publisherId}/feed/snapshot
+GET /api/v1/publishers/{publisherId}/feed/query?q=<text>&kind=<kind>&limit=<n>
+GET /api/v1/publishers/{publisherId}/feed/changes?fromSequence=<n>&limit=<n>
 ```
+
+The first query or change request carries its selectors and optional bounded
+limit. A continuation request carries only the opaque `cursor`; clients MUST
+NOT repeat or alter initial selectors alongside it. ClawHub MUST reject a
+cursor combined with initial selectors rather than guess which values win.
+
+The unsigned paginated `/feed` route is machine-readable public discovery, not
+signed synchronization state. It SHOULD use `Cache-Control: private, no-store`
+so a shared cache cannot bypass cursor freshness or publisher visibility. A
+signed-feed client follows `/feed/snapshot`, `/feed/query`, and
+`/feed/changes`; it MUST NOT upgrade the unsigned route into signed authority.
 
 ClawHub does not expose parallel `/accounts` feed routes. Publisher detail may
 include public profile facts and a canonical feed URL, but MUST NOT expose
 private owner, member, linked-user, moderation, or authentication records.
 
-APIs SHOULD distinguish missing, non-public, restricted, suspended, and
-temporarily unavailable publishers without exposing private moderation
-evidence.
+Public APIs SHOULD return the same not-found shape for missing, non-public,
+restricted, and suspended publishers. Operator-only diagnostics MAY distinguish
+those conditions. A producer that cannot prove a coherent complete revision or
+cannot sign a required projection MUST return a non-cacheable service-unavailable
+response; it MUST NOT return a truncated or unsigned substitute.
 
 ## Following And Timeline
 
@@ -285,6 +300,8 @@ limits, and catalog resolution failures.
 
 Diagnostics MUST NOT expose tokens, private profile or membership data,
 moderation evidence, package payload bytes, or private notification settings.
+Public diagnostics MUST NOT distinguish a nonexistent publisher from a hidden,
+restricted, or suspended publisher.
 
 ## Conformance
 
