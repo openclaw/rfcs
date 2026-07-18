@@ -5,7 +5,7 @@ authors:
   - Patrick
   - Gio
 created: 2026-06-18
-last_updated: 2026-07-08
+last_updated: 2026-07-18
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/19
@@ -483,6 +483,84 @@ hosted feed payload according to local configuration. Later PRs can consume that
 verified state when they wire trusted feed entries into install eligibility,
 search filtering, regional variants, or tenant-composed effective feeds.
 
+### Implementation status (July 2026)
+
+This status is informative rather than normative. Open PRs remain subject to
+review and may change without changing the v1 contract.
+
+- **Hosted catalog foundation (merged):** OpenClaw
+  [#95846](https://github.com/openclaw/openclaw/pull/95846),
+  [#95868](https://github.com/openclaw/openclaw/pull/95868),
+  [#95877](https://github.com/openclaw/openclaw/pull/95877),
+  [#95964](https://github.com/openclaw/openclaw/pull/95964),
+  [#95969](https://github.com/openclaw/openclaw/pull/95969),
+  [#95981](https://github.com/openclaw/openclaw/pull/95981),
+  [#96155](https://github.com/openclaw/openclaw/pull/96155),
+  [#96158](https://github.com/openclaw/openclaw/pull/96158), and
+  [#96194](https://github.com/openclaw/openclaw/pull/96194) provide hosted
+  fetch, durable fallback, source/config profiles, refresh, entries, and
+  bounded telemetry for the external plugin catalog.
+- **Signed-feed trust (merged):** OpenClaw
+  [#98299](https://github.com/openclaw/openclaw/pull/98299),
+  [#98316](https://github.com/openclaw/openclaw/pull/98316),
+  [#98338](https://github.com/openclaw/openclaw/pull/98338), and
+  [#98350](https://github.com/openclaw/openclaw/pull/98350) provide envelope
+  verification, trusted source-profile configuration, verified snapshot state,
+  rollback protection, and operator trust visibility.
+- **ClawHub signing and bootstrap trust (active):** ClawHub
+  [#3005](https://github.com/openclaw/clawhub/pull/3005) signs stored catalog
+  publications with a dedicated feed key. OpenClaw
+  [#101981](https://github.com/openclaw/openclaw/pull/101981) binds the built-in
+  `clawhub-public` profile to the matching bundled or environment-provided
+  public trust anchor. OpenClaw
+  [#110037](https://github.com/openclaw/openclaw/pull/110037) aligns the client
+  with standard DSSE while retaining the shipped beta format as an isolated
+  compatibility path.
+- **ClawHub publisher discovery (active):** ClawHub
+  [#2948](https://github.com/openclaw/clawhub/pull/2948),
+  [#2949](https://github.com/openclaw/clawhub/pull/2949),
+  [#2950](https://github.com/openclaw/clawhub/pull/2950),
+  [#2951](https://github.com/openclaw/clawhub/pull/2951),
+  [#2953](https://github.com/openclaw/clawhub/pull/2953),
+  [#2957](https://github.com/openclaw/clawhub/pull/2957),
+  [#2958](https://github.com/openclaw/clawhub/pull/2958), and
+  [#2959](https://github.com/openclaw/clawhub/pull/2959) cover publisher feed
+  identity, public follows, state facts, discovery/profile surfaces, registry
+  export, a pull-based activity timeline, and machine-readable feed URLs.
+- **Signed publisher-feed distribution (active):** ClawHub
+  [#3116](https://github.com/openclaw/clawhub/pull/3116) and
+  [#3117](https://github.com/openclaw/clawhub/pull/3117) provide revisioned
+  publisher state plus signed snapshot, query, change, and reset projections.
+  The OpenClaw consumer stack is
+  [#109305](https://github.com/openclaw/openclaw/pull/109305),
+  [#109340](https://github.com/openclaw/openclaw/pull/109340),
+  [#109378](https://github.com/openclaw/openclaw/pull/109378),
+  [#109397](https://github.com/openclaw/openclaw/pull/109397),
+  [#109407](https://github.com/openclaw/openclaw/pull/109407),
+  [#109461](https://github.com/openclaw/openclaw/pull/109461),
+  [#109518](https://github.com/openclaw/openclaw/pull/109518), and
+  [#109584](https://github.com/openclaw/openclaw/pull/109584), covering strict
+  verification and transport, durable refresh/follows, gateway scheduling and
+  RPC, Control UI following, and signed-profile discovery.
+- **Main-catalog scale and incremental refresh (active):** ClawHub
+  [#3147](https://github.com/openclaw/clawhub/pull/3147),
+  [#3149](https://github.com/openclaw/clawhub/pull/3149),
+  [#3151](https://github.com/openclaw/clawhub/pull/3151),
+  [#3160](https://github.com/openclaw/clawhub/pull/3160), and
+  [#3163](https://github.com/openclaw/clawhub/pull/3163) define and produce
+  strict query/change/reset schemas, retained change history, signed delta and
+  query pages, and signed sharded snapshots. OpenClaw
+  [#110250](https://github.com/openclaw/openclaw/pull/110250) consumes complete
+  signed shard roots and immutable digest-addressed shards.
+- **Client-first item watches (active):** OpenClaw
+  [#110438](https://github.com/openclaw/openclaw/pull/110438) is the first
+  watch-series slice: durable local plugin watches, accepted per-watch
+  baselines, bounded update history, source isolation, and CLI read, dismiss,
+  and mute operations evaluated only after signed refresh. A bounded Control
+  UI updates surface is the next slice; optional local delivery is a later
+  slice. ClawHub [#3171](https://github.com/openclaw/clawhub/pull/3171) is a
+  parked server-hosted watch/inbox prototype, not a v1 dependency.
+
 ### ClawHub publisher feeds and following
 
 ClawHub can also publish publisher-backed feeds as a discovery feature.
@@ -535,13 +613,10 @@ status, Microsoft registry inclusion, tenant approval, security-scan results,
 and package artifact verification remain separate gates that later PRs must
 wire explicitly.
 
-Implementation update: the ClawHub publisher-feed discovery work in this RFC is
-now backed by the current ClawHub PR stack. The code-backed slices are
-`#2948`, `#2950`, `#2957`, `#2958`, and `#2959`: publisher feed model/API,
-public follow graph, follow controls and discovery, a publisher activity
-timeline, and machine-readable feed discovery. Those PRs keep the same boundary
-described above: following and discovery do not imply official status, registry
-inclusion, install eligibility, or security-scan bypass.
+The implementation-status section above tracks the current ClawHub publisher
+and OpenClaw consumer PRs. Those slices keep the same boundary described here:
+following and discovery do not imply official status, registry inclusion,
+install eligibility, or security-scan bypass.
 
 The likely PR stacks are:
 
@@ -608,7 +683,9 @@ OpenClaw trust and runtime stack:
 6. Local item watches: persist stable watch identities, accepted feed
    checkpoints, and local update history; evaluate changes only after signed
    feed verification, suppress baseline floods, and expose bounded CLI and
-   Control UI state without requiring a ClawHub account inbox.
+   Control UI state without requiring a ClawHub account inbox. OpenClaw
+   [#110438](https://github.com/openclaw/openclaw/pull/110438) implements the
+   durable store and CLI slice; the bounded Control UI surface follows.
 
 After both tracks land, a joint ecosystem phase can build on the verified
 publisher-feed foundation:
