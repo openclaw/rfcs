@@ -207,7 +207,7 @@ Bundling a public key is source-controlled trust distribution. It is not secret
 storage and it does not put the private key in the OpenClaw release.
 
 The same dedicated ClawHub feed-signing identity MAY sign multiple
-ClawHub-operated feed classes, including public catalog, account, named,
+ClawHub-operated feed classes, including public catalog, publisher, named,
 organization, and composed feeds. Each feed class MUST define its own versioned
 payload type, expected identity binding, schema, and verifier before clients
 accept it. Sharing the platform feed-signing key does not permit one payload

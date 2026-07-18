@@ -223,7 +223,7 @@ verified signed publisher or catalog changes. Following a publisher MUST NOT
 automatically create one item alert per publication.
 
 ClawHub MAY later synchronize authenticated item watches or provide a durable
-account inbox for cross-device and offline delivery. That hosted capability is
+hosted inbox for cross-device and offline delivery. That hosted capability is
 not required for publisher-feed v1. Synchronizing watches derived from installed
 content requires an explicit account setting because it discloses installed-item
 identities; without it, OpenClaw keeps installed-item watches local.

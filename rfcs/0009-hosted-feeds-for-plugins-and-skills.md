@@ -137,8 +137,8 @@ The first feed version should preserve those semantics while moving the catalog
 source from bundled-only JSON to hosted JSON with bundled fallback.
 
 The implementer-facing v1 core contract is captured in
-[`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md). Trust and account
-feed addenda are captured separately in
+[`0009/hosted-feed-v1-spec.md`](0009/hosted-feed-v1-spec.md). Trust and
+publisher-feed addenda are captured separately in
 [`0009/signed-feed-trust-v1-spec.md`](0009/signed-feed-trust-v1-spec.md) and
 [`0009/clawhub-account-feeds-v1-spec.md`](0009/clawhub-account-feeds-v1-spec.md)
 (publisher feeds; the historical filename is retained while the addendum is
@@ -515,37 +515,35 @@ review and may change without changing the v1 contract.
   public trust anchor. OpenClaw
   [#110037](https://github.com/openclaw/openclaw/pull/110037) aligns the client
   with standard DSSE while retaining the shipped beta format as an isolated
-  compatibility path.
-- **ClawHub publisher discovery (active):** ClawHub
-  [#2948](https://github.com/openclaw/clawhub/pull/2948),
+  compatibility path. OpenClaw
+  [#108342](https://github.com/openclaw/openclaw/pull/108342) preserves
+  monotonic rollback comparison across trusted-key rotation.
+- **Publisher-feed producer (active, first product lane):** ClawHub
+  [#2948](https://github.com/openclaw/clawhub/pull/2948) defines stable
+  publisher identity, coherent snapshots, and bounded pagination. ClawHub
+  [#3116](https://github.com/openclaw/clawhub/pull/3116) and
+  [#3117](https://github.com/openclaw/clawhub/pull/3117) add revisioned query
+  and change state plus signed snapshot, query, change, and reset routes.
+- **Optional ClawHub publisher discovery (active):** ClawHub
   [#2949](https://github.com/openclaw/clawhub/pull/2949),
   [#2950](https://github.com/openclaw/clawhub/pull/2950),
-  [#2951](https://github.com/openclaw/clawhub/pull/2951),
-  [#2953](https://github.com/openclaw/clawhub/pull/2953),
-  [#2957](https://github.com/openclaw/clawhub/pull/2957),
-  [#2958](https://github.com/openclaw/clawhub/pull/2958), and
-  [#2959](https://github.com/openclaw/clawhub/pull/2959) cover publisher feed
-  identity, public follows, state facts, discovery/profile surfaces, registry
-  export, a pull-based activity timeline, and machine-readable feed URLs.
-- **Signed publisher-feed distribution (active):** ClawHub
-  [#3116](https://github.com/openclaw/clawhub/pull/3116) and
-  [#3117](https://github.com/openclaw/clawhub/pull/3117) provide revisioned
-  publisher state plus signed snapshot, query, change, and reset projections.
-  The OpenClaw consumer stack is
+  and [#2958](https://github.com/openclaw/clawhub/pull/2958) cover publisher
+  state and labels, the public follow graph, follow controls, and a pull-based
+  activity timeline. This social lane is not required for signed publisher
+  feed consumption. ClawHub
+  [#2953](https://github.com/openclaw/clawhub/pull/2953) is parked until a
+  concrete registry-export consumer exists.
+- **Publisher-feed consumer (active):** The OpenClaw stack is
   [#109305](https://github.com/openclaw/openclaw/pull/109305),
   [#109340](https://github.com/openclaw/openclaw/pull/109340),
   [#109378](https://github.com/openclaw/openclaw/pull/109378),
   [#109397](https://github.com/openclaw/openclaw/pull/109397),
-  [#109407](https://github.com/openclaw/openclaw/pull/109407),
   [#109461](https://github.com/openclaw/openclaw/pull/109461),
-  [#109518](https://github.com/openclaw/openclaw/pull/109518), and
-  [#109584](https://github.com/openclaw/openclaw/pull/109584), covering strict
-  verification and transport, durable refresh/follows, gateway scheduling and
-  RPC, Control UI following, and signed-profile discovery.
+  and [#109584](https://github.com/openclaw/openclaw/pull/109584). Together they
+  cover strict verification and transport, durable refresh/follows, gateway
+  scheduling and RPC, Control UI following, and signed-profile discovery.
 - **Main-catalog scale and incremental refresh (active):** ClawHub
-  [#3147](https://github.com/openclaw/clawhub/pull/3147),
   [#3149](https://github.com/openclaw/clawhub/pull/3149),
-  [#3151](https://github.com/openclaw/clawhub/pull/3151),
   [#3160](https://github.com/openclaw/clawhub/pull/3160), and
   [#3163](https://github.com/openclaw/clawhub/pull/3163) define and produce
   strict query/change/reset schemas, retained change history, signed delta and
@@ -557,9 +555,10 @@ review and may change without changing the v1 contract.
   watch-series slice: durable local plugin watches, accepted per-watch
   baselines, bounded update history, source isolation, and CLI read, dismiss,
   and mute operations evaluated only after signed refresh. A bounded Control
-  UI updates surface is the next slice; optional local delivery is a later
-  slice. ClawHub [#3171](https://github.com/openclaw/clawhub/pull/3171) is a
-  parked server-hosted watch/inbox prototype, not a v1 dependency.
+  UI updates surface is deliberately not authored until this storage and CLI
+  boundary is accepted. ClawHub
+  [#3171](https://github.com/openclaw/clawhub/pull/3171) is a parked
+  server-hosted watch/inbox prototype, not a v1 dependency.
 
 ### ClawHub publisher feeds and following
 
@@ -585,7 +584,7 @@ Following a publisher is therefore a social-discovery signal. ClawHub should
 show new work from followed publishers in a pull-based activity timeline rather
 than send one notification for every publication. First-class alerts should
 start as local OpenClaw item watches anchored to verified signed feed revisions.
-ClawHub may later synchronize watches or host a durable account inbox for
+ClawHub may later synchronize watches or host a durable user inbox for
 cross-device and offline delivery. Synchronizing installed-item watches requires
 an explicit account setting because that discloses local inventory.
 Following must not make a package official, bypass security scans or approval,
@@ -596,17 +595,16 @@ ClawHub, ClawHub exposes publisher-feed discovery state, the registry selects
 the relevant subset, runs its own scans and approval checks, and publishes an
 approved effective feed for its clients.
 
-The publisher-feed work should move on two tracks:
+The publisher-feed work separates its required protocol/runtime path from
+optional ClawHub social discovery:
 
-1. ClawHub product track: define the publisher feed model, public follow graph,
-   timeline and profile surfaces, and discovery filters such as "people I
-   follow" or "new from followed publishers". This track owns the user
-   experience for following publishers and discovering new plugins or skills.
-2. OpenClaw trust and runtime track: verify ClawHub-authored feed envelopes,
-   record source-profile trust state, expose bounded CLI and diagnostics
-   visibility, and then consume verified publisher-feed state for discovery. This
-   track owns what the client can safely display, cache, refresh, and use for
-   search or notification surfaces.
+1. Core producer/consumer path: ClawHub defines coherent publisher projections;
+   OpenClaw verifies their envelopes, records source-profile trust, and exposes
+   bounded follow, refresh, diagnostics, and discovery state.
+2. Optional social path: ClawHub may add public follows, profile controls,
+   activity timelines, and discovery filters such as "people I follow" or
+   "new from followed publishers". This path does not block signed publisher
+   feed consumption.
 
 These tracks intentionally meet at discovery first. Install authority, official
 status, Microsoft registry inclusion, tenant approval, security-scan results,
@@ -618,77 +616,38 @@ and OpenClaw consumer PRs. Those slices keep the same boundary described here:
 following and discovery do not imply official status, registry inclusion,
 install eligibility, or security-scan bypass.
 
-The likely PR stacks are:
+The implementation is organized into independent merge lanes.
 
-ClawHub product stack:
+Publisher-feed core is the first product lane:
 
-1. Publisher-feed model and API: define stable publisher ids, publisher feed
-   URLs, deterministic continuation, and coherent feed revisions.
-2. Public follow graph: add follow and unfollow state plus public follower and
-   following lists; keep private mute or notification preferences separate.
-3. Activity timeline: show new or updated public skills and plugins from
-   followed publishers without generating one alert per publication.
-4. Optional account watch sync: after the local client model is proven, consider
-   explicit item-scoped subscriptions, durable cross-device read state,
-   coalescing, and delivery hints that point back to signed feed revisions
-   without performing updates.
-5. Profile and discovery surfaces: expose publisher profile pages, followed
-   publisher lists, and search filters such as "people I follow" or "new from
-   followed publishers".
-6. Registry and scan bridge: expose the subset of ClawHub publisher and feed state
-   that downstream registries can consume, while preserving their own scans,
-   approval workflows, and registry-inclusion decisions.
+1. ClawHub publisher identity, coherent snapshot, and bounded feed API.
+2. ClawHub durable revisions, query state, and changed-since state.
+3. ClawHub signed snapshot, query, change, and reset routes.
+4. OpenClaw verification, bounded transport, durable refresh, and local follow
+   CLI. Gateway automation and Control UI are a second publisher-feed wave.
 
-The next ClawHub implementation stack should build on those foundations without
-collapsing the trust gates:
+Main-catalog scale is the second product lane:
 
-1. Follow controls and followed-publisher discovery: add follow and unfollow
-   controls on publisher surfaces, followed-publisher lists, and search filters
-   such as "people I follow" or "new from followed publishers", with clear
-   reasons for why entries appear.
-2. Publisher activity timeline: expose a bounded timeline of new or updated
-   public skills and plugins from followed publishers. Do not create ClawHub
-   alerts for every publication.
-3. Optional account watch sync and notification inbox: defer authenticated watch
-   synchronization and a durable account inbox until the local OpenClaw watch
-   model validates cross-device demand. Any later delivery points to signed
-   revisions, remains private and bounded, and does not authorize updates.
-4. Machine-readable feed discovery: expose canonical publisher feed URLs through
-   APIs. A visible profile-page feed control is optional; OpenClaw should offer
-   a handle-based command such as `openclaw publisher follow <handle>`.
-5. Registry submission workflow: let eligible ClawHub publisher entries be
-   idempotently queued, retried, withdrawn, or resubmitted for downstream
-   registry review and scanning while keeping submission separate from approval.
-6. Reflected registry and scan state: persist and display downstream review,
-   scan, inclusion, and local approval states, including status history, only
-   when those systems report them back to ClawHub.
+1. Shared strict query/change/reset schemas and durable change history.
+2. Signed changed-since and indexed query routes.
+3. Signed sharded full snapshots.
+4. OpenClaw sharded-root and immutable-shard consumption.
 
-OpenClaw trust and runtime stack:
+Optional ClawHub social discovery remains independent:
 
-1. Feed envelope and verifier primitives: parse ClawHub-authored feed envelopes,
-   verify configured trust anchors, fail closed on invalid signatures, and keep
-   unsigned or failed-verification bodies inert.
-2. Source-profile trust config: define which ClawHub feed profiles and publisher
-   feed endpoints are locally trusted, including directly configured publisher
-   public keys and explicit unsigned opt-in behavior for self-hosted feeds.
-3. Refresh and snapshot trust state: persist verification result, sequence,
-   freshness, and fallback state with the cached feed snapshot without granting
-   install or search authority by persistence alone.
-4. CLI and operator visibility: show feed trust, source profile, publisher-feed,
-   stale, fallback, and verification-failure states in refresh, entries, and
-   diagnostics using bounded fields.
-5. Discovery consumption: add followed-publisher discovery
-   filters only after verified publisher-feed state exists, while keeping install
-   eligibility and package-source artifact verification on their existing gates.
-6. Local item watches: persist stable watch identities, accepted feed
-   checkpoints, and local update history; evaluate changes only after signed
-   feed verification, suppress baseline floods, and expose bounded CLI and
-   Control UI state without requiring a ClawHub account inbox. OpenClaw
-   [#110438](https://github.com/openclaw/openclaw/pull/110438) implements the
-   durable store and CLI slice; the bounded Control UI surface follows.
+1. Public publisher follow graph.
+2. Follow controls, publisher discovery, and pull-based activity timeline.
+3. Publisher state and labels. Registry export remains parked until a concrete
+   consumer exists.
 
-After both tracks land, a joint ecosystem phase can build on the verified
-publisher-feed foundation:
+Client-first item watches are a third, independent lane. OpenClaw
+[#110438](https://github.com/openclaw/openclaw/pull/110438) implements the
+durable local store and CLI boundary. A Control UI slice follows only after
+that boundary is accepted. Hosted synchronization and inbox delivery remain
+optional future work.
+
+After the publisher and catalog-scale lanes land, a joint ecosystem phase can
+build on the verified publisher-feed foundation:
 
 1. Install and policy integration: let verified feed and publisher
    state participate in install eligibility, tenant policy, allow lists, block
