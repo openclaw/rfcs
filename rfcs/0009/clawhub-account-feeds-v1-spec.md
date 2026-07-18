@@ -16,7 +16,7 @@ This addendum defines:
 - the strict publisher-feed document and entry shapes;
 - bounded pagination and refresh semantics;
 - public publisher-follow discovery;
-- item-watch and durable notification-inbox semantics;
+- local item-watch semantics and optional hosted synchronization;
 - the boundary between following, discovery, trust, and installation;
 - downstream registry provenance and diagnostics.
 
@@ -217,20 +217,21 @@ ClawHub SHOULD prefer a timeline over per-publication notification fanout. A
 high-volume publisher can publish hundreds of entries, and following that
 publisher does not imply that every publish deserves an alert.
 
-ClawHub SHOULD separately support authenticated item watches and a durable
-account notification inbox using the distribution addendum's watch contract.
-An item watch is explicit alert intent and may synchronize across OpenClaw,
-Control UI, and ClawHub clients. Following a publisher MUST NOT automatically
-create one item alert per publication.
+OpenClaw SHOULD support local item watches using the distribution addendum's
+watch contract. An item watch is explicit alert intent and is evaluated against
+verified signed publisher or catalog changes. Following a publisher MUST NOT
+automatically create one item alert per publication.
 
-OpenClaw MAY offer to watch installed content and synchronize those watches to
-the account inbox. That synchronization requires an explicit account setting
-because it discloses installed-item identities. Without it, OpenClaw may keep
-installed-item watches local while still consuming explicit account watches.
+ClawHub MAY later synchronize authenticated item watches or provide a durable
+account inbox for cross-device and offline delivery. That hosted capability is
+not required for publisher-feed v1. Synchronizing watches derived from installed
+content requires an explicit account setting because it discloses installed-item
+identities; without it, OpenClaw keeps installed-item watches local.
 
-Inbox delivery is a hint. OpenClaw or Control UI MUST verify the referenced
-signed publisher or catalog change before presenting an actionable update, and
-an alert MUST NOT install, update, enable, approve, or remove content.
+Hosted inbox delivery is a hint. OpenClaw or Control UI MUST verify the
+referenced signed publisher or catalog change before presenting an actionable
+update, and an alert MUST NOT install, update, enable, approve, or remove
+content.
 
 Following MUST NOT mean that a publisher is official, reviewed, trusted,
 scanned, approved, or installable. UI and APIs MUST use follow/following
@@ -301,5 +302,5 @@ A client:
 - resolves entries through an accepted catalog before installation;
 - stores stable publisher ids rather than mutable handles;
 - bounds pagination and reports unavailable or malformed state;
-- keeps item-watch alerts separate from ClawHub publisher following;
+- keeps local item-watch alerts separate from ClawHub publisher following;
 - verifies referenced signed feed state before presenting actionable alerts.

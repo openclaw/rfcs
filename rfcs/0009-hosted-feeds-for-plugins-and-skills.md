@@ -505,10 +505,11 @@ install. The trust layers stay separate:
 
 Following a publisher is therefore a social-discovery signal. ClawHub should
 show new work from followed publishers in a pull-based activity timeline rather
-than send one notification for every publication. First-class alerts should use
-explicit item watches and a durable account inbox anchored to signed feed
-revisions. OpenClaw may offer to synchronize installed-item watches, but only
-with an explicit account setting because that discloses local inventory.
+than send one notification for every publication. First-class alerts should
+start as local OpenClaw item watches anchored to verified signed feed revisions.
+ClawHub may later synchronize watches or host a durable account inbox for
+cross-device and offline delivery. Synchronizing installed-item watches requires
+an explicit account setting because that discloses local inventory.
 Following must not make a package official, bypass security scans or approval,
 or allow a feed to introduce new source profiles or credentials.
 
@@ -552,9 +553,10 @@ ClawHub product stack:
    following lists; keep private mute or notification preferences separate.
 3. Activity timeline: show new or updated public skills and plugins from
    followed publishers without generating one alert per publication.
-4. Item watches and account inbox: add explicit item-scoped subscriptions,
-   durable cross-device read state, coalescing, and delivery hints that point
-   back to signed feed revisions without performing updates.
+4. Optional account watch sync: after the local client model is proven, consider
+   explicit item-scoped subscriptions, durable cross-device read state,
+   coalescing, and delivery hints that point back to signed feed revisions
+   without performing updates.
 5. Profile and discovery surfaces: expose publisher profile pages, followed
    publisher lists, and search filters such as "people I follow" or "new from
    followed publishers".
@@ -572,10 +574,10 @@ collapsing the trust gates:
 2. Publisher activity timeline: expose a bounded timeline of new or updated
    public skills and plugins from followed publishers. Do not create ClawHub
    alerts for every publication.
-3. Item watches and notification inbox: expose authenticated item watches and a
-   durable account inbox with idempotent acknowledgement, private preferences,
-   bounded delivery, and signed-revision references. Push and channel delivery
-   wake clients but do not authorize updates.
+3. Optional account watch sync and notification inbox: defer authenticated watch
+   synchronization and a durable account inbox until the local OpenClaw watch
+   model validates cross-device demand. Any later delivery points to signed
+   revisions, remains private and bounded, and does not authorize updates.
 4. Machine-readable feed discovery: expose canonical publisher feed URLs through
    APIs. A visible profile-page feed control is optional; OpenClaw should offer
    a handle-based command such as `openclaw publisher follow <handle>`.
@@ -603,6 +605,10 @@ OpenClaw trust and runtime stack:
 5. Discovery consumption: add followed-publisher discovery
    filters only after verified publisher-feed state exists, while keeping install
    eligibility and package-source artifact verification on their existing gates.
+6. Local item watches: persist stable watch identities, accepted feed
+   checkpoints, and local update history; evaluate changes only after signed
+   feed verification, suppress baseline floods, and expose bounded CLI and
+   Control UI state without requiring a ClawHub account inbox.
 
 After both tracks land, a joint ecosystem phase can build on the verified
 publisher-feed foundation:
