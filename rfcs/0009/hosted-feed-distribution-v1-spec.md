@@ -54,9 +54,11 @@ representation types:
 - `openclaw.official-external-plugin-catalog-query-results.v1`;
 - `openclaw.official-external-plugin-catalog-changes.v1`.
 
-Other install catalogs, including a future skills catalog, MUST assign their
-own types. A verifier MUST reject a valid signature whose payload type does not
-match the selected feed class and representation.
+The official ClawHub skills catalog shard root uses
+`openclaw.official-skills-catalog-shard-root.v1`. Any query or change
+representations for that catalog, and all other install catalogs, MUST assign
+their own distinct types before use. A verifier MUST reject a valid signature
+whose payload type does not match the selected feed class and representation.
 
 This prevents a signed discovery projection from being replayed as an install
 catalog, or one feed operator's response from being interpreted under another
@@ -125,6 +127,11 @@ another transfer/content encoding. `entryCount` is exact. Publishers MUST serve
 the same decoded representation bytes for a shard URL regardless of negotiated
 HTTP encoding.
 
+Descriptor URLs MUST be unique within a root, and descriptor digests MUST be
+unique within a root. The sum of descriptor `entryCount` values MUST equal the
+root `entryCount`; the sum of descriptor `byteLength` values is the aggregate
+shard-set size used for the limit below.
+
 A shard document has exactly these fields:
 
 | Field | Type | Semantics |
@@ -151,6 +158,16 @@ They MUST NOT mutate bytes at a published shard URL. Clients MUST verify the
 signed root, enforce aggregate byte, shard, and entry limits, fetch every shard,
 verify lengths and digests, validate all entries, and atomically replace the
 prior root and shard set only after the entire snapshot succeeds.
+
+Shards are authenticated by their exact byte length and digest in the signed
+root and are not independently DSSE-signed. A client that persists a sharded
+snapshot MUST retain the exact accepted root payload and exact shard bytes, or
+an equivalent lossless representation. Before using that snapshot as fallback,
+it MUST reverify the root under the currently selected trust policy, reject an
+expired root using the current load time, and reverify every retained shard's
+length and digest before parsing or exposing entries. A partial or expired
+cached shard set MUST fail closed; it MUST NOT replace or extend the root's
+validity window.
 
 ## Signed Query Projection
 
@@ -376,5 +393,7 @@ A conforming client:
 - enforces per-response and aggregate bounds;
 - binds query and change continuations to the initial request and revision;
 - verifies all shard digests and all signed projection pages;
+- reverifies current root trust, expiry, and retained shard bytes before using
+  a cached sharded snapshot;
 - applies complete snapshots and complete change ranges atomically;
 - falls back to a full snapshot after an explicit retention gap.
