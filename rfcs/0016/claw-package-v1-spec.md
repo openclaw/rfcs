@@ -260,6 +260,8 @@ identity and integrity; workspace source, destination, and content digest; MCP
 transport, executable and literal arguments or remote URL, environment variable
 names, authentication mode, and tool filters; and cron schedule, timezone,
 session, message, and delivery behavior. Secret values must remain undisclosed.
+Any registry trust warning associated with a resolved package is part of that
+effect and must remain visible in both machine-readable and human preview.
 
 Capability escalation is classified consistently across owners. Adding
 executable package code, plugin or tool access, an MCP execution or network
@@ -289,7 +291,8 @@ ordinary package installer.
 Consent must bind to the exact package or development snapshot digest, final
 agent id, workspace, action set, and expected local owner state shown in the
 plan. Immediately before mutation, the client must rebuild or revalidate those
-inputs. A change to any consented digest, destination, package owner, owner
+inputs. Resolved dependency integrity, install identity, and trust warning are
+included in that binding. A change to any consented digest, destination, package owner, owner
 configuration value, scheduler record, or file-presence expectation invalidates
 consent and requires a new plan; the client must not silently apply a materially
 different plan.
@@ -358,10 +361,11 @@ A conforming add implementation must:
 - record successful external mutations as they occur;
 - report a partial result when owners cannot share one atomic transaction.
 
-On failure, add must stop later owners, compensate completed mutations in
-reverse order where the canonical owner supports safe compensation, and retain
-provenance for every uncertain or uncompensated result. It must not report a
-partially created agent as successfully added.
+On failure, add must stop later owners and compensate only work whose canonical
+owner can prove a safe inverse. Completed or uncertain external mutations remain
+in resumable provenance with a partial root status. A retry, doctor, or remove
+uses that current state; add must not report a partially created agent as
+successfully added.
 
 ## Update Semantics
 
@@ -387,7 +391,20 @@ direct owner requires a different version.
 
 Removing a package declaration during update releases that Claw's reference.
 It does not imply artifact uninstall during the update transaction. Irreversible
-or uncertain owner outcomes must be reported as partial.
+or uncertain owner outcomes must be retained in current provenance and reported
+as `status: partial`, including in structured CLI output.
+
+Before changing or removing a scheduler record, update and remove must read the
+live record through the scheduler owner and compare its owned definition with
+provenance. Operator-modified jobs are conflicts and must not be overwritten or
+deleted.
+
+## Resource Limits
+
+A consumer must reject a Claw manifest larger than 1 MiB and package metadata
+larger than 256 KiB before parsing. Reads must remain bounded if a file grows
+after an initial metadata check. Existing canonical extraction, workspace-file,
+aggregate-workspace, and plan-output limits continue to apply.
 
 ## Remove Semantics
 

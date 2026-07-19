@@ -427,6 +427,8 @@ A conforming consumer must:
   cron expressions, timezones, and uniqueness constraints;
 - ignore the Markdown body for runtime behavior;
 - preserve original bytes for integrity calculations;
+- reject a `CLAW.md` file larger than 1 MiB before parsing, including when it
+  grows during the read;
 - report unresolved environment and OAuth prerequisites without reading or
   persisting their values;
 - emit actionable diagnostics without exposing resolved secrets;

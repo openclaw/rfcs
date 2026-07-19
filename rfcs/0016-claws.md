@@ -281,7 +281,7 @@ The initial public shape is grouped by OpenClaw ownership boundary:
   "mcpServers": {
     "github-triage-github": {
       "command": "npx",
-      "args": ["-y", "@acme/github-mcp"],
+      "args": ["-y", "@acme/github-mcp@3.4.1"],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       },
@@ -413,7 +413,7 @@ defaults and agents:
     "servers": {
       "github-triage-github": {
         "command": "npx",
-        "args": ["-y", "@acme/github-mcp"],
+        "args": ["-y", "@acme/github-mcp@3.4.1"],
         "env": {
           "GITHUB_TOKEN": "${GITHUB_TOKEN}"
         }
@@ -603,7 +603,7 @@ resources by default; `--remove-unused`, repeatable `--remove-referenced`, and
 `--force-referenced` select stronger cleanup in both preview and mutation so
 the choice is included in the plan digest. `--yes` alone never broadens a plan.
 
-Add ordering is transactional where owner APIs permit it and compensating where
+Add ordering is transactional where owner APIs permit it and resumable where
 external installers or the scheduler cannot share one transaction:
 
 1. Validate package metadata and manifest.
@@ -617,10 +617,12 @@ external installers or the scheduler cannot share one transaction:
 9. Create agent-pinned cron jobs.
 10. Persist one complete apply record and per-resource provenance.
 
-Any failure stops later phases. Successfully created external resources are
-recorded immediately so doctor and remove can explain and clean a partial add.
-The result distinguishes complete, partial, and failed adds; it never reports a
-partial agent as successfully added.
+Any failure stops later phases. Pending provenance is written before external
+mutation and successful resources are recorded immediately. Safe local
+pre-commit work may be compensated, but a completed or uncertain owner mutation
+is retained for deterministic resume, doctor, or remove rather than hidden by a
+best-effort rollback. The result distinguishes complete, partial, and failed
+adds; it never reports a partial agent as successfully added.
 
 ### Provenance and local state
 
@@ -663,12 +665,18 @@ ids, exact package refs, and agent/root provenance compare-and-swap checks.
 Workspace checks include expected file presence as well as content. Before an
 external package installer runs, OpenClaw atomically replaces the expected
 package reference with a pending ownership claim; concurrent ownership changes
-abort before installation, and installer failure compensates the claim.
-Completed owners compensate in reverse order when a later owner fails. A
-thrown config or Gateway call has an uncertain commit outcome, and an installed
-package artifact cannot be assumed rolled back merely because its reference was
-restored. These cases return an explicit partial result rather than claiming
-cross-owner atomicity.
+abort before installation. Once the installer boundary is crossed, failure
+retains pending or failed provenance because the artifact outcome may be
+uncertain.
+Completed owners compensate in reverse order only when the canonical owner can
+prove the inverse operation is safe. A thrown config or Gateway call has an
+uncertain commit outcome, and an installed package artifact cannot be assumed
+rolled back merely because its reference was restored. Pending owner provenance
+and a partial root status are retained in these cases so status, doctor, and a
+retry can reconcile the actual state rather than claiming cross-owner atomicity.
+Removing a package declaration during update releases the Claw dependency edge;
+artifact uninstall is a separately planned remove operation, never an update
+side effect.
 
 Remove first produces a plan. Managed resources are selected for cleanup by
 default: it removes agent-pinned cron jobs, unchanged Claw-managed MCP
@@ -723,7 +731,7 @@ must share the schema and fixtures rather than maintain divergent validators.
 - Secrets and resolved environment values never enter plans or provenance.
 - MCP config writes use validated, concurrent-write-safe config APIs.
 - Cron jobs require explicit consent, visible cadence/action previews, stable
-  ownership, and disable/remove handles.
+  ownership, live-definition revalidation, and disable/remove handles.
 - Config mutation preserves `agents.defaults`, existing `agents.list[]` entries,
   channel bindings, and unrelated plugin/MCP settings.
 - Partial adds persist enough state for diagnosis and cleanup.
@@ -736,9 +744,14 @@ must share the schema and fixtures rather than maintain divergent validators.
   `--plan-integrity` binds the exact separately disclosed capability set as
   well as ordinary content reconciliation. Other hosts may require a separate
   dialog or aggregate those records before mutating multiple agents.
+- ClawHub trust warnings and resolved dependency identity are part of the
+  separately disclosed capability effect and plan integrity. The Claw CLI's
+  exact plan confirmation may acknowledge that warning; an internal
+  `acknowledge` parameter must not make the warning disappear from preview.
 - Claws do not introduce capability-specific resource quotas. Existing
-  canonical owner limits apply; bounded package, manifest, extraction, and plan
-  sizes remain parser and resource-safety policy.
+  canonical owner limits apply. Claw manifests are limited to 1 MiB and package
+  metadata to 256 KiB; extraction, managed workspace, and plan limits remain
+  parser and resource-safety policy.
 
 ## Rationale
 
@@ -895,8 +908,9 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 13. Status and doctor explain agent, workspace, package, MCP, cron, and managed
     file drift.
 14. Update changes only Claw-owned state, preserves local/operator edits,
-    revalidates owner state before mutation, compensates completed owners in
-    reverse order, and reports uncertain or irreversible outcomes as partial.
+    revalidates owner state before mutation, compensates only safely reversible
+    completed owners, retains uncertain provenance, and reports uncertain or
+    irreversible outcomes as partial.
 15. Remove uses canonical owner lifecycles, selects managed resources for
     cleanup, retains referenced resources by default, offers integrity-bound
     `remove-if-unused` and explicitly selected referenced cleanup, warns about
@@ -918,6 +932,11 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
   authoring/export representation or should export return to grouped JSON?
 - What exact default workspace naming rule should resolve cross-platform path
   and case-folding collisions?
+- Should ordinary `agents delete` eventually delegate attached-Claw recurring
+  work cleanup, or remain distinct from the provenance-aware `claws remove`
+  lifecycle?
+- Should a future audit/history feature retain removed Claw tombstones? V1 keeps
+  current ownership and incomplete recovery state only.
 - Which cron delivery modes are portable without embedding local channel
   bindings?
 - What package transports should mutating v1 support beyond ClawHub and local
