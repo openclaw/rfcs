@@ -43,7 +43,7 @@ cannot attest itself as reviewed.
 
 | PR | Primary scope | Cells | Completion result |
 | --- | --- | ---: | --- |
-| Completion A | Control UI, onboarding, channel/plugin setup, CLI, and TUI | 105 | Every operator-facing surface has complete target catalogs, zero fallback gaps, and script/RTL proof. |
+| Completion A | Control UI, onboarding, channel/plugin setup, CLI, and TUI | 105 | The existing AI generated-PR pipeline becomes a shared detect/refresh/enforce gate; every operator-facing surface has complete target catalogs, zero fallback gaps, and script/RTL proof. |
 | Completion B | Bounded user-facing runtime and Gateway errors | 42 | An owner-approved error inventory uses stable descriptors, translated edge rendering, and compatible English fallback. |
 | Completion C | Server-rendered channels, command metadata, Telegram/Discord menus, and skill metadata | 105 | Every channel and capability surface has explicit locale ownership, complete catalogs, and unchanged stable identity. |
 | Completion D | Android, Apple, and docs | 63 | Native quality blockers are cleared, artifacts are current, docs are verified, and Persian/Thai publishing has an explicit disposition. |
@@ -53,6 +53,24 @@ The terminal target is all 313 OpenClaw-controlled cells complete. `docs/fa`
 and `docs/th` must either gain an approved publishing path or remain the only
 two disclosed external platform constraints. An unqualified `fully-localized`
 claim requires all 315 cells to be complete.
+
+## Continuous Translation Maintenance
+
+Completion A generalizes the existing Control UI and native-app locale-refresh
+pattern rather than creating a new bot:
+
+- deterministic PR checks detect missing or stale target entries;
+- trusted `main`, scheduled, or manual workflows run approved translation
+  providers per locale;
+- workers publish isolated artifacts that are combined and validated once;
+- the generated-PR application opens or updates one reviewable branch;
+- registered surfaces declare their source, glossary, generator, outputs, and
+  validation command; and
+- enforcement demotes stale cells and blocks unsupported completeness claims.
+
+Completion B-D register their catalogs with this contract. Completion E reads
+the generated provenance and named review manifests when promoting maturity.
+Provider secrets are never exposed to untrusted pull-request code.
 
 ## Workstream 1: Localization Core And Coverage Baseline
 

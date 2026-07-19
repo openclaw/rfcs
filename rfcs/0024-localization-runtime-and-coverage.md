@@ -231,6 +231,30 @@ Model-generated output does not establish completeness by itself:
   named language owner remains accountable for the completeness claim; and
 - runtime model calls must not translate deterministic product messages.
 
+OpenClaw extends its existing Control UI, native-app, and docs refresh
+automation into one continuous catalog-maintenance contract:
+
+1. **Detect:** trusted CI compares English source revisions with registered
+   target catalogs and reports missing, fallback, or stale entries.
+2. **Refresh:** a trusted `main`, scheduled, or manually dispatched workflow
+   uses an approved model/provider and glossary to generate candidate locale
+   artifacts.
+3. **Validate:** key, placeholder, protected-literal, formatting, script,
+   direction, fallback, and generated-artifact checks run before publication.
+4. **Publish:** the generated changes are committed to a reviewable automation
+   branch and opened or updated as a pull request through the existing
+   generated-PR application flow.
+5. **Enforce:** CI blocks a `complete` claim while source drift, fallback,
+   missing artifacts, or required review remains unresolved.
+
+Validate and publish are sub-steps of the trusted refresh phase. Failed
+generation or validation aborts publication and leaves the detected drift
+visible. Detection and enforcement failures fail closed.
+
+Translation-provider credentials never run against untrusted pull-request
+code. Pull requests run deterministic detection and enforcement only. AI fills
+candidate gaps; it does not approve its output or change maturity by itself.
+
 ## Goals
 
 - Define one BCP 47-compatible locale identity and alias contract.
@@ -248,6 +272,8 @@ Model-generated output does not establish completeness by itself:
   translations to alter executable commands or decision tokens.
 - Define locale-keyed command and skill metadata that channels and UI surfaces
   can project.
+- Keep catalogs current through trusted AI-assisted generated pull requests and
+  a deterministic detect/refresh/enforce drift gate.
 - Keep model-generated content language separate from product UI localization
   so it can use the locale registry in a post-v1 extension without blocking the
   runtime localization contract.

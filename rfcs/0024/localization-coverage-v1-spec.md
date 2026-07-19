@@ -235,6 +235,44 @@ its review policy. A `complete` locale/surface pair requires:
 Translation automation may accelerate coverage, but it cannot self-attest
 quality or promote a maturity state.
 
+## Translation Drift Gate
+
+Every registered generated catalog declares:
+
+- English source and source revision;
+- target locale artifacts;
+- glossary and protected literals;
+- generator workflow and provider/model provenance;
+- deterministic validation command; and
+- review policy for its content classes.
+
+The maintenance workflow follows a dependency-guard-style state machine:
+
+| Phase | Trigger | Behavior |
+| --- | --- | --- |
+| `detect` | Pull request | Runs without provider credentials. Reports changed English source, missing targets, stale revisions, fallback, and review drift. |
+| `refresh` | Trusted `main`, schedule, or manual dispatch | Generates candidate translations per locale, validates isolated artifacts, and opens or updates a generated pull request. Failed generation or validation aborts publication. |
+| `enforce` | Pull request and release | Blocks invalid catalogs and any `complete` claim whose source, artifacts, or required review are stale. |
+
+The refresh workflow must check out a trusted exact source revision reachable
+from a protected base-repository ref, keep provider credentials unavailable to
+untrusted pull-request code, and publish through a scoped generated-PR
+application identity. Generated changes retain source, glossary, workflow,
+provider/model, and catalog-revision provenance.
+
+Detection and enforcement fail closed on malformed manifests, tool failure, or
+unreadable required evidence. A failed refresh leaves the prior catalogs and
+maturity state unchanged while reporting the unresolved drift.
+
+The gate may automatically repair missing low-risk catalog entries in a
+generated pull request. It must not:
+
+- push generated translations directly to a protected branch;
+- promote its own output to `complete`;
+- bypass named review required by the content class;
+- change stable commands, codes, IDs, paths, or protected literals; or
+- invoke a runtime model to render deterministic product text.
+
 ## Maturity States
 
 Each locale/surface pair has one state:
