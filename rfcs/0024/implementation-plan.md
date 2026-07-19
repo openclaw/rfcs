@@ -1,41 +1,58 @@
 # Localization Implementation Plan
 
-RFC 0024 has five owner-coherent implementation workstreams. A workstream may
-land as more than one stacked PR when a smaller renderer-owned slice provides a
-cleaner review and proof boundary. Each PR must leave the repository in a usable
-state and include the infrastructure required by its first production consumer.
-
-Stack PR numbers are publication order, not workstream identifiers. In
-particular, the CLI/TUI workstream is intentionally split across several
-bounded PRs rather than absorbing every command surface into one change.
+RFC 0024 ships as a ten-PR arc: five foundation PRs followed by five completion
+PRs. The foundation creates and proves the shared contracts. The completion
+stack fills every declared product surface and closes the release matrix.
 
 Generated-content language remains a post-v1 follow-up because it changes model
-behavior rather than product-owned interface text.
+behavior rather than deterministic product-owned interface text.
 
-## Evidence Stack As Of 2026-07-17
+## Foundation Stack
 
-| Slice | Owner-coherent renderer | State | Evidence |
-| --- | --- | --- | --- |
-| PR 1 | Core and coverage baseline | Open upstream PR | [openclaw/openclaw#109456](https://github.com/openclaw/openclaw/pull/109456) |
-| PR 2 | Runtime safety and Gateway compatibility prototype | Fork draft | [giodl73-repo/openclaw#116](https://github.com/giodl73-repo/openclaw/pull/116) |
-| PR 3 | CLI process locale and bounded command rendering | Fork draft | [giodl73-repo/openclaw#117](https://github.com/giodl73-repo/openclaw/pull/117) |
-| PR 4 | CLI updater dry-run, progress, result, recovery, and completion rendering | Fork draft | [giodl73-repo/openclaw#118](https://github.com/giodl73-repo/openclaw/pull/118) |
-| PR 5 | CLI updater managed-service lifecycle rendering | Local proof-complete branch | `user/giodl/localization-update-service` |
+The preferred foundation stack is implemented and open for review:
 
-The first five slices validate these cross-cutting rules:
+| PR | Scope | Result |
+| --- | --- | --- |
+| [#134](https://github.com/giodl73-repo/openclaw/pull/134) | Runtime foundation | Shared locale kernel, safety message contracts, Gateway compatibility, and process-scoped CLI rendering. |
+| [#135](https://github.com/giodl73-repo/openclaw/pull/135) | Runtime adoption | Updater, service lifecycle, completion-cache, and shell presentation use the shared runtime. |
+| [#136](https://github.com/giodl73-repo/openclaw/pull/136) | Governance and inventory | Contributor workflow, generated inventory, maturity states, catalog revisions, and promotion blockers. |
+| [#137](https://github.com/giodl73-repo/openclaw/pull/137) | Product surfaces | CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata. |
+| [#138](https://github.com/giodl73-repo/openclaw/pull/138) | Convergence and readiness | Cross-surface locale alignment, translation evidence, RTL safety, and fail-closed release reporting. |
 
-- capture one immutable locale context at the owning command/request entry and
-  pass it through nested renderers;
+The foundation stack validates these cross-cutting rules:
+
+- capture one immutable locale context at the owning command/request entry;
 - preserve exact reviewed English for compatibility callers;
 - keep human presentation separate from locale-invariant structured output;
 - classify parameters as literal data or product-owned presentation;
-- localize product-owned enum labels instead of interpolating raw values;
-- preserve commands, flags, paths, IDs, PIDs, versions, codes, and raw upstream
+- preserve commands, flags, paths, IDs, versions, codes, and upstream
   diagnostics;
-- add English, non-English, fallback, protected-literal, structured-output, and
-  mixed-language interpolation proof for each migrated renderer; and
-- stop at service, plugin, Gateway, recipient-locale, and safety-copy ownership
-  boundaries.
+- render recognized Gateway metadata without changing stable error semantics;
+- use whole-message English fallback for incomplete safety catalogs; and
+- bind maturity claims to checked artifacts, catalog revisions, and review
+  evidence.
+
+Earlier smaller drafts remain development provenance only. Review and delivery
+should use #134-#138.
+
+## Completion Stack
+
+The completion stack owns all 15 surfaces and all 315 translation-target cells.
+Candidate catalogs may land as `partial`; generated or model-authored copy
+cannot attest itself as reviewed.
+
+| PR | Primary scope | Cells | Completion result |
+| --- | --- | ---: | --- |
+| Completion A | Control UI, onboarding, channel/plugin setup, CLI, and TUI | 105 | Every operator-facing surface has complete target catalogs, zero fallback gaps, and script/RTL proof. |
+| Completion B | Bounded user-facing runtime and Gateway errors | 42 | An owner-approved error inventory uses stable descriptors, translated edge rendering, and compatible English fallback. |
+| Completion C | Server-rendered channels, command metadata, Telegram/Discord menus, and skill metadata | 105 | Every channel and capability surface has explicit locale ownership, complete catalogs, and unchanged stable identity. |
+| Completion D | Android, Apple, and docs | 63 | Native quality blockers are cleared, artifacts are current, docs are verified, and Persian/Thai publishing has an explicit disposition. |
+| Completion E | Review evidence and release promotion | Product-wide | Named review is bound to exact revisions, eligible cells become complete, and the generated release claim matches the evidence. |
+
+The terminal target is all 313 OpenClaw-controlled cells complete. `docs/fa`
+and `docs/th` must either gain an approved publishing path or remain the only
+two disclosed external platform constraints. An unqualified `fully-localized`
+claim requires all 315 cells to be complete.
 
 ## Workstream 1: Localization Core And Coverage Baseline
 
@@ -239,19 +256,24 @@ runtime.
 ## Dependency Shape
 
 ```text
-workstream 1 core + coverage baseline
-  -> workstream 2 runtime safety + Gateway errors
-  -> workstream 3 CLI + TUI
-  -> workstream 4 command/channel/skill metadata
+#134 foundation
+  -> #135 runtime adoption
+  -> #136 governance and inventory
+  -> #137 product surfaces
+  -> #138 convergence and readiness
 
-workstreams 2-4 -> workstream 5 completeness gates + locale-safe runtime
+#138
+  -> completion A operator surfaces
+  -> completion B runtime and Gateway
+  -> completion C channels and metadata
+  -> completion D native apps and docs
 
-post-v1 generated content language reuses workstream 1
+completion A-D + named review evidence
+  -> completion E release promotion
 ```
 
-Workstreams 2, 3, and 4 can proceed in parallel after workstream 1.
-Workstream 5 closes the release and quality contract after their migrated
-surfaces exist.
+Completion A-D can proceed by owner after #138. Completion E closes the product
+claim only after their artifacts and named review evidence are current.
 
 ## Cross-RFC Alignment
 
@@ -267,7 +289,7 @@ surfaces exist.
 RFC 0024 v1 is complete when:
 
 - the shared locale, descriptor, fallback, and coverage contracts are shipped;
-- all 22 existing product locales are registered and reported;
+- English plus all 21 translation targets are registered and reported;
 - Gateway errors and channel safety messages localize through stable
   descriptors;
 - CLI and TUI human output is localized without destabilizing structured
@@ -277,5 +299,8 @@ RFC 0024 v1 is complete when:
 - right-to-left locales set direction and isolate literal commands and IDs;
 - missing translations fall back safely to English;
 - release artifacts publish an honest localization coverage report; and
-- OpenClaw does not claim full product localization until every product-owned
-  surface is complete for all 22 locales.
+- all 313 OpenClaw-controlled translation-target cells are complete;
+- any remaining `docs/fa` or `docs/th` platform constraint is explicitly
+  disclosed; and
+- OpenClaw does not claim full product localization until all 315
+  translation-target cells are complete.

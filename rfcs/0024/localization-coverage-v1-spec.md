@@ -142,9 +142,10 @@ the maturity of every locale/surface pair. Swedish is included because it
 already ships in the native-app localization inventory, even though Control UI
 and documentation do not currently support it.
 
-The product-level phrase "fully localized" is valid only when every
-product-owned surface is `complete` for all 22 locales. Surface-specific claims
-remain valid when they name the surface and satisfy its complete-state rules.
+The product-level phrase "fully localized" is valid only when English source
+and every product-owned surface are `complete` for all 21 translation targets.
+Surface-specific claims remain valid when they name the surface and satisfy
+its complete-state rules.
 Platform projections may instead be `platform-constrained` where an upstream
 API cannot represent a product locale. That state must be disclosed and blocks
 the unqualified phrase "fully localized," but it does not imply an OpenClaw
@@ -158,6 +159,14 @@ formatting support, and an explicit initial maturity state.
 The initial set is not a comprehensive language-coverage claim. The coverage
 report must expose language, script, direction, and regional gaps so future
 locale additions can be prioritized by OpenClaw users and maintainers.
+
+The v1 manifest contains 15 English source rows plus 15 product surfaces across
+21 translation targets. Release completion is calculated over those 315
+translation-target cells. The completion target is all 313
+OpenClaw-controlled target cells at `complete`. `docs/fa` and `docs/th` must
+either gain an approved publishing path or remain the only disclosed
+`platform-constrained` cells. An unqualified `fully-localized` claim requires
+all 315 target cells to be complete.
 
 Pseudo-locales and bounded script fixtures are declared under
 `testFixtures`, not the release locale registry. They support expansion,
@@ -381,6 +390,10 @@ The report distinguishes:
   "OpenClaw-owned localization complete" claim when every owned catalog and
   adapter check passes, but the release report must name each constrained
   platform/locale pair and must not claim that users see that locale natively.
+- The release report uses `openclaw-owned-complete-with-platform-constraints`
+  only when every non-constrained translation-target cell is complete.
+- The release report uses `fully-localized` only when every one of the 315
+  translation-target cells is complete.
 - Safety, security, authentication, authorization, destructive-action,
   privacy, and recovery surfaces use one reviewed English message when the
   locale/surface pair is not complete; key-level mixed-language fallback is
@@ -424,7 +437,8 @@ native app does not create false drift for an unchanged runtime artifact.
 
 ## Contribution Workflow
 
-Every catalog documents:
+One public contributor guide indexes every localization surface and its owning
+workflow. Every catalog documents:
 
 - source file;
 - generated files;
@@ -436,6 +450,25 @@ Every catalog documents:
 - structured-output invariants;
 - how to add a locale; and
 - how to update an existing translation.
+
+The new-string lifecycle is:
+
+1. add or change reviewed English at the owning final-render boundary;
+2. for a new message, add a stable namespaced key; for a copy-only change,
+   reuse the existing key; classify every parameter;
+3. update the owning source catalog, glossary, and generation inputs;
+4. regenerate only owner-declared artifacts;
+5. add English compatibility, non-English, fallback, and protected-literal
+   proof appropriate to the surface;
+6. refresh the coverage manifest and run the documented validation command;
+7. demote affected complete locale rows to `partial` until regenerated
+   translations and required human review are present, and report the stale
+   translation as a separate finding.
+
+Generated catalogs, locale trees, translation memory, and native projections
+are edited only through their owning generation workflow. A changed English
+source string cannot retain a `complete` locale claim solely because an older
+translation with the same key still exists.
 
 Generated updates use pull requests, not direct pushes to protected branches.
 

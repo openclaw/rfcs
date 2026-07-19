@@ -3,7 +3,7 @@ title: Localization Runtime and Product Coverage
 authors:
   - Gio Della-Libera
 created: 2026-07-16
-last_updated: 2026-07-17
+last_updated: 2026-07-19
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/42
@@ -29,6 +29,35 @@ Supporting material:
 - [Localized Metadata v1 specification](0024/localized-metadata-v1-spec.md)
 - [GitHub issue catalog](0024/issue-catalog.md)
 - [Implementation plan](0024/implementation-plan.md)
+
+### Ten-PR delivery arc
+
+RFC 0024 closes through two five-PR stacks.
+
+The foundation stack is implemented and open for review:
+
+1. [Foundation](https://github.com/giodl73-repo/openclaw/pull/134):
+   locale kernel, safety contracts, and process-scoped rendering.
+2. [Runtime adoption](https://github.com/giodl73-repo/openclaw/pull/135):
+   updater, service, completion-cache, and shell presentation.
+3. [Governance and inventory](https://github.com/giodl73-repo/openclaw/pull/136):
+   authoring workflow, generated inventory, maturity, and promotion gates.
+4. [Product surfaces](https://github.com/giodl73-repo/openclaw/pull/137):
+   CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata.
+5. [Convergence and readiness](https://github.com/giodl73-repo/openclaw/pull/138):
+   cross-surface alignment, translation evidence, RTL safety, and honest
+   release reporting.
+
+The completion stack fills the product rather than adding another framework:
+
+1. complete Control UI, onboarding/setup, CLI, and TUI catalogs;
+2. complete a bounded owner-approved runtime and Gateway error inventory;
+3. complete server-rendered channels, command menus, and capability metadata;
+4. complete native-app and documentation artifacts; and
+5. ingest named review evidence and promote the final release matrix.
+
+The original smaller implementation slices remain useful development
+provenance, but they are not the preferred review or delivery plan.
 
 ## Motivation
 
@@ -641,9 +670,10 @@ are rejected without disabling unrelated core catalogs.
 
 ### Implementation evidence and refinements
 
-The initial RFC 0024 implementation stack has validated the architecture across
-the shared kernel, runtime safety prototypes, process-scoped CLI rendering,
-updater presentation, and managed Gateway service lifecycle output.
+The five-PR foundation stack has validated the architecture across the shared
+kernel, runtime safety, process-scoped CLI/TUI rendering, updater and service
+presentation, Gateway/UI errors, channel approvals, metadata, native/docs
+convergence, RTL interpolation, and product-level release reporting.
 
 The evidence changed the implementation guidance in these concrete ways:
 
@@ -663,6 +693,13 @@ The evidence changed the implementation guidance in these concrete ways:
 - service, plugin, Gateway, channel-recipient, and safety-copy ownership
   boundaries remain separate slices rather than being hidden inside a broad
   extraction change.
+
+The checked manifest contains 15 English source rows plus 15 surfaces across
+21 translation targets. Release completion is calculated over those 315
+translation-target cells. The completion stack owns all remaining target
+cells. Its terminal claim is all 313 OpenClaw-controlled target cells complete,
+with `docs/fa` and `docs/th` either completed through an approved publishing
+path or disclosed as the only external platform constraints.
 
 Conformance tests for a migrated renderer therefore include exact English
 compatibility, one non-English rendering, protected-literal preservation,
@@ -716,13 +753,10 @@ needs a product-level report.
 
 - Which owner approves the first public locale preference surface for
   server-rendered channel messages?
-- Which locales qualify as release-complete for the first runtime and CLI
-  slices?
-- Should core runtime catalogs use the current dotted-key format or adopt a
-  MessageFormat-compatible syntax before pluralized messages are needed?
 - How should third-party plugin catalogs declare review quality and fallback
   without implying OpenClaw endorsement?
-- Should the coverage manifest live at the repository root or under a
-  localization-owned directory?
 - What human-review standard is required before approval, authentication, or
   destructive-operation text is marked complete?
+- Who owns the named reviewer roster for all 21 translation targets?
+- Do Persian and Thai documentation use another publishing path, or remain
+  explicit external platform constraints?
