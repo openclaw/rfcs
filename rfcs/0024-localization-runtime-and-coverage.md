@@ -13,14 +13,14 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/42
 
 ## Summary
 
-Define the contracts required to make OpenClaw fully localizable without
-replacing its existing Control UI, native-app, documentation, and onboarding
-translation pipelines. OpenClaw gains one locale-resolution model, structured
-user-facing message descriptors, compatibility-safe Gateway error metadata,
-localized command and skill metadata, and a release-visible coverage manifest.
-Translation remains owned by the surface that renders the text, while stable
-message keys, literal parameters, locale aliases, fallback behavior, and
-coverage semantics become shared product contracts.
+OpenClaw will adopt one localization contract across runtime, CLI/TUI, Gateway,
+channels, metadata, UI, native apps, and docs without replacing the translation
+pipelines that already work.
+
+Core owns locale identity, resolution precedence, stable message descriptors,
+catalog validation, and coverage semantics. Each user-facing surface continues
+to own its catalogs and final rendering. Existing codes, commands, identifiers,
+structured output, and reviewed English messages remain compatible.
 
 Supporting material:
 
@@ -30,21 +30,49 @@ Supporting material:
 - [GitHub issue catalog](0024/issue-catalog.md)
 - [Implementation plan](0024/implementation-plan.md)
 
+## Decision
+
+Accepting this RFC approves these product contracts:
+
+1. OpenClaw resolves locale through one immutable `LocalizationContext`.
+   Explicit user and recipient choices outrank request, surface, operator, and
+   platform inference; unsupported explicit values fail safely to English.
+2. Product-owned runtime copy is represented as a stable message key, typed
+   literal parameters, and reviewed English fallback. The surface that presents
+   the message owns the catalog and final rendering.
+3. Gateway errors retain their existing code and English `message`. Reviewed
+   errors may add bounded localization metadata under `details.localization`;
+   capable clients render it and legacy clients ignore it.
+4. Commands, skills, and plugins retain stable identities while exposing
+   locale-keyed presentation metadata for Gateway and client projections.
+5. A generated manifest records every locale/surface maturity cell, its owner,
+   source and catalog revision, required checks, review evidence, and promotion
+   blockers. Release claims are derived from that manifest and fail closed.
+
+This RFC does not authorize broad exception/log extraction, runtime model
+translation, translation of commands or protocol values, AI self-review, or a
+new external plugin runtime-catalog API.
+
+The five open foundation PRs implement and demonstrate these contracts. They do
+not claim that OpenClaw is already fully translated. Completion A-E fills every
+catalog and evidence cell after owners approve the direction.
+
 ### Ten-PR delivery arc
 
 RFC 0024 closes through two five-PR stacks.
 
 The foundation stack is implemented and open for review:
 
-1. [Foundation](https://github.com/giodl73-repo/openclaw/pull/134):
-   locale kernel, safety contracts, and process-scoped rendering.
-2. [Runtime adoption](https://github.com/giodl73-repo/openclaw/pull/135):
+1. [Locale context and message rendering](https://github.com/openclaw/openclaw/pull/111541):
+   shared registry, locale resolution, immutable catalogs, additive Gateway
+   metadata, and the first CLI, approval, and Control UI consumers.
+2. [Runtime adoption](https://github.com/openclaw/openclaw/pull/111542):
    updater, service, completion-cache, and shell presentation.
-3. [Governance and inventory](https://github.com/giodl73-repo/openclaw/pull/136):
+3. [Governance and inventory](https://github.com/openclaw/openclaw/pull/111543):
    authoring workflow, generated inventory, maturity, and promotion gates.
-4. [Product surfaces](https://github.com/giodl73-repo/openclaw/pull/137):
+4. [Product surfaces](https://github.com/openclaw/openclaw/pull/111544):
    CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata.
-5. [Convergence and readiness](https://github.com/giodl73-repo/openclaw/pull/138):
+5. [Convergence and readiness](https://github.com/openclaw/openclaw/pull/111545):
    cross-surface alignment, translation evidence, RTL safety, and honest
    release reporting.
 

@@ -13,11 +13,11 @@ The preferred foundation stack is implemented and open for review:
 
 | PR | Scope | Result |
 | --- | --- | --- |
-| [#134](https://github.com/giodl73-repo/openclaw/pull/134) | Runtime foundation | Shared locale kernel, safety message contracts, Gateway compatibility, and process-scoped CLI rendering. |
-| [#135](https://github.com/giodl73-repo/openclaw/pull/135) | Runtime adoption | Updater, service lifecycle, completion-cache, and shell presentation use the shared runtime. |
-| [#136](https://github.com/giodl73-repo/openclaw/pull/136) | Governance and inventory | Contributor workflow, generated inventory, maturity states, catalog revisions, and promotion blockers. |
-| [#137](https://github.com/giodl73-repo/openclaw/pull/137) | Product surfaces | CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata. |
-| [#138](https://github.com/giodl73-repo/openclaw/pull/138) | Convergence and readiness | Cross-surface locale alignment, translation evidence, RTL safety, and fail-closed release reporting. |
+| [#111541](https://github.com/openclaw/openclaw/pull/111541) | Locale context and message rendering | Shared registry, locale resolution, immutable catalogs, additive Gateway metadata, and first CLI, approval, and Control UI consumers. |
+| [#111542](https://github.com/openclaw/openclaw/pull/111542) | Runtime adoption | Updater, service lifecycle, completion-cache, and shell presentation use the shared runtime. |
+| [#111543](https://github.com/openclaw/openclaw/pull/111543) | Governance and inventory | Contributor workflow, generated inventory, maturity states, catalog revisions, and promotion blockers. |
+| [#111544](https://github.com/openclaw/openclaw/pull/111544) | Product surfaces | CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata. |
+| [#111545](https://github.com/openclaw/openclaw/pull/111545) | Convergence and readiness | Cross-surface locale alignment, translation evidence, RTL safety, and fail-closed release reporting. |
 
 The foundation stack validates these cross-cutting rules:
 
@@ -33,7 +33,7 @@ The foundation stack validates these cross-cutting rules:
   evidence.
 
 Earlier smaller drafts remain development provenance only. Review and delivery
-should use #134-#138.
+should use #111541-#111545.
 
 ## Completion Stack
 
@@ -274,13 +274,13 @@ runtime.
 ## Dependency Shape
 
 ```text
-#134 foundation
-  -> #135 runtime adoption
-  -> #136 governance and inventory
-  -> #137 product surfaces
-  -> #138 convergence and readiness
+#111541 locale context and message rendering
+  -> #111542 runtime adoption
+  -> #111543 governance and inventory
+  -> #111544 product surfaces
+  -> #111545 convergence and readiness
 
-#138
+#111545
   -> completion A operator surfaces
   -> completion B runtime and Gateway
   -> completion C channels and metadata
@@ -290,7 +290,7 @@ completion A-D + named review evidence
   -> completion E release promotion
 ```
 
-Completion A-D can proceed by owner after #138. Completion E closes the product
+Completion A-D can proceed by owner after #111545. Completion E closes the product
 claim only after their artifacts and named review evidence are current.
 
 ## Cross-RFC Alignment

@@ -10,19 +10,19 @@ precedent, and duplicate history.
 
 | Issue | Surface | Current gap | RFC owner | Delivery |
 | --- | --- | --- | --- | --- |
-| [#28303](https://github.com/openclaw/openclaw/issues/28303) | Locale identity | `zh-CN`/`zh-TW` public IDs do not express script semantics; migration is unresolved. | Locale registry | Foundation #134 |
-| [#90608](https://github.com/openclaw/openclaw/issues/90608) | Locale preference | Browser inference can select an unwanted locale; explicit choice/default needs precedence. | Locale context | Foundation #134 |
-| [#81253](https://github.com/openclaw/openclaw/issues/81253) | Exec approvals | Safety prompt labels and guidance are hardcoded English. | Runtime messages | Foundation #134/#137; Completion B/C |
-| [#79458](https://github.com/openclaw/openclaw/issues/79458) | Command metadata | Slash-command descriptions lack one locale-keyed contract. | Metadata | Foundation #137; Completion C |
-| [#55239](https://github.com/openclaw/openclaw/issues/55239) | Telegram | Native command menu descriptions remain English. | Metadata projection | Foundation #137; Completion C |
-| [#89971](https://github.com/openclaw/openclaw/issues/89971) | Skills | Skill display names and descriptions are raw English metadata. | Metadata | Foundation #137; Completion C |
+| [#28303](https://github.com/openclaw/openclaw/issues/28303) | Locale identity | `zh-CN`/`zh-TW` public IDs do not express script semantics; migration is unresolved. | Locale registry | Foundation #111541 |
+| [#90608](https://github.com/openclaw/openclaw/issues/90608) | Locale preference | Browser inference can select an unwanted locale; explicit choice/default needs precedence. | Locale context | Foundation #111541 |
+| [#81253](https://github.com/openclaw/openclaw/issues/81253) | Exec approvals | Safety prompt labels and guidance are hardcoded English. | Runtime messages | Foundation #111541/#111544; Completion B/C |
+| [#79458](https://github.com/openclaw/openclaw/issues/79458) | Command metadata | Slash-command descriptions lack one locale-keyed contract. | Metadata | Foundation #111544; Completion C |
+| [#55239](https://github.com/openclaw/openclaw/issues/55239) | Telegram | Native command menu descriptions remain English. | Metadata projection | Foundation #111544; Completion C |
+| [#89971](https://github.com/openclaw/openclaw/issues/89971) | Skills | Skill display names and descriptions are raw English metadata. | Metadata | Foundation #111544; Completion C |
 | [#79223](https://github.com/openclaw/openclaw/issues/79223) | Dreaming | Dream Diary generated prose has no explicit language input. | Content language | Post-v1 |
 | [#101314](https://github.com/openclaw/openclaw/issues/101314) | Dreaming | Journal headings and status labels are hardcoded English, while generated prose has separate language behavior. | Runtime messages + content language | Completion B + Post-v1 |
 | [#53345](https://github.com/openclaw/openclaw/issues/53345) | Agent content | Korean UI is present, but agent response-language consistency is a separate unresolved behavior. | Content language | Post-v1 |
 | [#78038](https://github.com/openclaw/openclaw/issues/78038) | Control UI | Specific zh-CN strings are untranslated or inaccurate. | Coverage/quality | Completion A |
-| [#88570](https://github.com/openclaw/openclaw/issues/88570) | Product-wide | CLI, runtime errors, channel notices, UI pages, and coverage reporting remain incomplete. | Umbrella coverage | Foundation #134-#138; Completion A-E |
+| [#88570](https://github.com/openclaw/openclaw/issues/88570) | Product-wide | CLI, runtime errors, channel notices, UI pages, and coverage reporting remain incomplete. | Umbrella coverage | Foundation #111541-#111545; Completion A-E |
 | [#107851](https://github.com/openclaw/openclaw/issues/107851) | Control UI | `tabs.chat` is missing in non-English bundles. | Coverage/quality | Completion A |
-| [#105266](https://github.com/openclaw/openclaw/issues/105266) | Test infrastructure | Locale-rendering tests can observe stale/split localization state. | Coverage infrastructure | Foundation #134/#138 |
+| [#105266](https://github.com/openclaw/openclaw/issues/105266) | Test infrastructure | Locale-rendering tests can observe stale/split localization state. | Coverage infrastructure | Foundation #111541/#111545 |
 | [#106576](https://github.com/openclaw/openclaw/issues/106576) | Localized hosts | Sandbox behavior matches English `stderr` prose. | Locale robustness | Completion B |
 
 ## Historical Runtime And Architecture Evidence
