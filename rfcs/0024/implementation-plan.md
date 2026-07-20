@@ -15,7 +15,7 @@ The preferred foundation stack is implemented and open for review:
 | --- | --- | --- |
 | [#111541](https://github.com/openclaw/openclaw/pull/111541) | Locale context and message rendering | Shared registry, locale resolution, immutable catalogs, additive Gateway metadata, and first CLI, approval, and Control UI consumers. |
 | [#111542](https://github.com/openclaw/openclaw/pull/111542) | Runtime adoption | Updater, service lifecycle, completion-cache, and shell presentation use the shared runtime. |
-| [#111543](https://github.com/openclaw/openclaw/pull/111543) | Governance and inventory | Contributor workflow, generated inventory, maturity states, catalog revisions, and promotion blockers. |
+| [#111543](https://github.com/openclaw/openclaw/pull/111543) | Governance and inventory | Contributor workflow, generic coverage validation, ordered owner/domain declarations, generated inventory, maturity states, catalog revisions, and promotion blockers. |
 | [#111544](https://github.com/openclaw/openclaw/pull/111544) | Product surfaces | CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata. |
 | [#111545](https://github.com/openclaw/openclaw/pull/111545) | Convergence and readiness | Cross-surface locale alignment, translation evidence, RTL safety, and fail-closed release reporting. |
 
@@ -28,7 +28,11 @@ The foundation stack validates these cross-cutting rules:
 - preserve commands, flags, paths, IDs, versions, codes, and upstream
   diagnostics;
 - render recognized Gateway metadata without changing stable error semantics;
+- publish reviewed Gateway descriptor identities through
+  `packages/gateway-protocol`, not private Gateway source;
 - use whole-message English fallback for incomplete safety catalogs; and
+- keep localization-core validation generic while owners publish declarations
+  that the root product report aggregates with duplicate-ID/order rejection;
 - bind maturity claims to checked artifacts, catalog revisions, and review
   evidence.
 
@@ -37,9 +41,9 @@ should use #111541-#111545.
 
 ## Completion Stack
 
-The completion stack owns all 15 surfaces and all 315 translation-target cells.
-Candidate catalogs may land as `partial`; generated or model-authored copy
-cannot attest itself as reviewed.
+The completion stack owns the current 15 owner-declared product surfaces and
+all 315 translation-target cells. Candidate catalogs may land as `partial`;
+generated or model-authored copy cannot attest itself as reviewed.
 
 | PR | Primary scope | Cells | Completion result |
 | --- | --- | ---: | --- |
@@ -64,8 +68,8 @@ pattern rather than creating a new bot:
   providers per locale;
 - workers publish isolated artifacts that are combined and validated once;
 - the generated-PR application opens or updates one reviewable branch;
-- registered surfaces declare their source, glossary, generator, outputs, and
-  validation command; and
+- owner/domain modules declare registered surfaces, their source, glossary,
+  generator, outputs, and validation command; and
 - enforcement demotes stale cells and blocks unsupported completeness claims.
 
 Completion B-D register their catalogs with this contract. Completion E reads
@@ -90,7 +94,10 @@ Provider secrets are never exposed to untrusted pull-request code.
   - bounded top-level plural/select catalog entries using locale plural rules;
   - Control UI and wizard locale-resolution adapters as production consumers;
   - shared key, placeholder, namespace, and fallback validation;
-  - checked-in localization coverage manifest;
+  - generic localization-core coverage validation;
+  - ordered owner/domain surface declarations with duplicate-ID/order
+    rejection;
+  - checked-in generated localization coverage manifest;
   - representative script, direction, shaping, and segmentation matrix;
   - advisory hardcoded-string and locale-sensitive parsing inventory;
   - catalog revision identity and locale-state isolation fixes.
@@ -106,6 +113,8 @@ Provider secrets are never exposed to untrusted pull-request code.
   - one accepted descriptor and one missing-key fallback;
   - English, Russian/Ukrainian, Polish, and Arabic plural-category fixtures;
   - invalid placeholder and namespace failures;
+  - acceptance of a new valid owner surface without editing localization core;
+  - duplicate surface ID and deterministic-order collision failures;
   - render-path denial of filesystem, network, environment, and storage access;
   - parallel locale isolation with no process-global locale bleed;
   - concurrent locale changes and catalog replacement;

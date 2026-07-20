@@ -64,6 +64,35 @@ for every release locale in the referenced registry. Missing rows are schema
 errors rather than implicit `unsupported` states. Test fixtures are a separate
 set and never receive surface maturity rows.
 
+### Surface ownership and aggregation
+
+The localization-core package defines generic manifest validation, maturity
+semantics, derived checks, and promotion blockers. It must not contain a closed
+union of Control UI, CLI, TUI, channel, plugin, skill, native-app, or
+documentation surface IDs.
+
+Each product owner publishes a build-time surface declaration with:
+
+- a stable lowercase kebab-case surface ID;
+- deterministic product-report order;
+- owner and artifact identity;
+- source, catalog, and revision paths;
+- migration state and validation command;
+- content classes; and
+- locale artifact discovery or explicit supported-locale evidence.
+
+The product aggregation layer consumes every owner/domain declaration. It must
+fail on duplicate surface IDs, duplicate order claims, missing declared paths,
+or declared locale support without a corresponding artifact. The generated
+manifest does not persist the declaration order field; order only makes the
+checked report deterministic.
+
+The current RFC 0024 release portfolio contains 15 owner-declared product
+surfaces. That portfolio and its 315 target cells are product release policy,
+not a closed type restriction in localization core. A future owner can publish
+a valid new surface without modifying generic core validation, while changing
+the required release portfolio remains an explicit product-policy change.
+
 `manifestRevision` is computed from the canonical checked-in manifest bytes and
 is not stored inside that manifest. Release reports, attestations, and packaged
 status expose the computed revision.
@@ -210,11 +239,11 @@ The product report groups required surfaces by user experience:
 | Interact | Server-rendered channel messages, notifications, native command menus, and core/bundled command and skill metadata |
 | Approve and recover | Approval prompts, Gateway errors, authentication failures, doctor and repair guidance |
 
-Every product-owned surface must appear in the manifest even when its current
-state is `unsupported`. A locale cannot become product-complete by omitting an
-untranslated surface from the report. External plugin and skill metadata is
-reported separately when available and never blocks an OpenClaw product
-completeness claim.
+Every product-owned surface declaration must appear in the generated manifest
+even when its current state is `unsupported`. A locale cannot become
+product-complete by omitting an untranslated surface from the report. External
+plugin and skill metadata is reported separately when available and never
+blocks an OpenClaw product completeness claim.
 
 ## Translation Provenance And Review
 

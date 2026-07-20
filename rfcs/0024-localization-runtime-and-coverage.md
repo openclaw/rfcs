@@ -17,10 +17,12 @@ OpenClaw will adopt one localization contract across runtime, CLI/TUI, Gateway,
 channels, metadata, UI, native apps, and docs without replacing the translation
 pipelines that already work.
 
-Core owns locale identity, resolution precedence, stable message descriptors,
-catalog validation, and coverage semantics. Each user-facing surface continues
-to own its catalogs and final rendering. Existing codes, commands, identifiers,
-structured output, and reviewed English messages remain compatible.
+Core owns locale identity, resolution precedence, catalog validation, and
+generic coverage semantics. Gateway-owned descriptors live in the shared
+Gateway protocol boundary. Each user-facing owner publishes its coverage
+declarations and continues to own its catalogs and final rendering. Existing
+codes, commands, identifiers, structured output, and reviewed English messages
+remain compatible.
 
 Supporting material:
 
@@ -42,12 +44,15 @@ Accepting this RFC approves these product contracts:
    the message owns the catalog and final rendering.
 3. Gateway errors retain their existing code and English `message`. Reviewed
    errors may add bounded localization metadata under `details.localization`;
-   capable clients render it and legacy clients ignore it.
+   shared descriptor identities live in `packages/gateway-protocol`, capable
+   clients render them, and legacy clients ignore them.
 4. Commands, skills, and plugins retain stable identities while exposing
    locale-keyed presentation metadata for Gateway and client projections.
-5. A generated manifest records every locale/surface maturity cell, its owner,
-   source and catalog revision, required checks, review evidence, and promotion
-   blockers. Release claims are derived from that manifest and fail closed.
+5. Localization core validates a generic coverage schema rather than owning a
+   closed product-surface union. Surface owners publish ordered declarations;
+   the product aggregation layer rejects duplicate IDs or order claims and
+   generates the manifest of locale/surface maturity cells, revisions, checks,
+   review evidence, and promotion blockers. Release claims fail closed.
 
 This RFC does not authorize broad exception/log extraction, runtime model
 translation, translation of commands or protocol values, AI self-review, or a
@@ -69,7 +74,8 @@ The foundation stack is implemented and open for review:
 2. [Runtime adoption](https://github.com/openclaw/openclaw/pull/111542):
    updater, service, completion-cache, and shell presentation.
 3. [Governance and inventory](https://github.com/openclaw/openclaw/pull/111543):
-   authoring workflow, generated inventory, maturity, and promotion gates.
+   authoring workflow, generic coverage validation, owner-published surface
+   declarations, generated inventory, maturity, and promotion gates.
 4. [Product surfaces](https://github.com/openclaw/openclaw/pull/111544):
    CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata.
 5. [Convergence and readiness](https://github.com/openclaw/openclaw/pull/111545):
@@ -305,8 +311,9 @@ candidate gaps; it does not approve its output or change maturity by itself.
 - Keep model-generated content language separate from product UI localization
   so it can use the locale registry in a post-v1 extension without blocking the
   runtime localization contract.
-- Define a checked-in surface/locale coverage manifest and CI checks for key
-  parity, placeholders, untranslated fallback, and hardcoded product text.
+- Define owner-published surface declarations, a checked-in generated
+  surface/locale coverage manifest, and CI checks for key parity, placeholders,
+  untranslated fallback, and hardcoded product text.
 - Preserve the existing Control UI, native-app, docs, and onboarding pipelines
   and migrate them incrementally.
 - Produce a dependency-ordered implementation plan of small reviewable slices.
@@ -664,7 +671,19 @@ language selector.
 
 ### Coverage manifest and release claims
 
-OpenClaw adds a checked-in localization coverage manifest describing:
+Localization core defines the generic manifest schema, maturity semantics,
+derived checks, and promotion-blocker rules. It does not enumerate every UI,
+channel, plugin, skill, native, or documentation surface.
+
+Each product owner publishes a build-time declaration containing its stable
+surface ID, owner, artifact, source/catalog paths, migration state, validation
+command, content classes, and locale artifact discovery. A root product
+aggregator includes every declaration, orders the generated report
+deterministically, and fails on duplicate surface IDs or order claims. Adding a
+new owner surface changes its declaration and the product portfolio, not the
+generic localization-core validator.
+
+OpenClaw checks in the generated localization coverage manifest describing:
 
 - supported locales and aliases;
 - locale maturity;
@@ -746,14 +765,20 @@ The evidence changed the implementation guidance in these concrete ways:
   command group has complete English and Simplified Chinese catalogs; and
 - service, plugin, Gateway, channel-recipient, and safety-copy ownership
   boundaries remain separate slices rather than being hidden inside a broad
-  extraction change.
+  extraction change;
+- Gateway localization descriptor identities are shared from
+  `packages/gateway-protocol` rather than imported from private Gateway source;
+  and
+- the 15-surface release portfolio is composed from owner/domain declarations
+  while localization-core remains generic and accepts future valid surface IDs.
 
-The checked manifest contains 15 English source rows plus 15 surfaces across
-21 translation targets. Release completion is calculated over those 315
-translation-target cells. The completion stack owns all remaining target
-cells. Its terminal claim is all 313 OpenClaw-controlled target cells complete,
-with `docs/fa` and `docs/th` either completed through an approved publishing
-path or disclosed as the only external platform constraints.
+The current product aggregation contains 15 English source rows plus 15
+owner-declared surfaces across 21 translation targets. Release completion is
+calculated over those 315 translation-target cells. The completion stack owns
+all remaining target cells. Its terminal claim is all 313 OpenClaw-controlled
+target cells complete, with `docs/fa` and `docs/th` either completed through an
+approved publishing path or disclosed as the only external platform
+constraints.
 
 Conformance tests for a migrated renderer therefore include exact English
 compatibility, one non-English rendering, protected-literal preservation,

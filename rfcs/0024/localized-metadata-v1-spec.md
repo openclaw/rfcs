@@ -126,6 +126,17 @@ must define host capability or minimum-version negotiation. Unsupported hosts
 must either consume the legacy English string or reject installation with an
 actionable version requirement; they must not fail later during activation.
 
+## Product Coverage Ownership
+
+The command, skill, channel-menu, and bundled-plugin owners publish their
+product surface declarations for the localization coverage report. The
+localization-core package validates those declarations generically; it does not
+enumerate a closed metadata-surface union.
+
+External package metadata remains package-owned evidence. It does not create a
+required OpenClaw product surface or alter product completeness unless a future
+RFC explicitly promotes that package into the product release portfolio.
+
 ## Security
 
 - Localized text is untrusted display data.

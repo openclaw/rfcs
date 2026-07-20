@@ -211,6 +211,11 @@ shared validator. The projection includes `details.localization` only for
 recognized, validated localizable errors. Unknown or intentionally English-only
 errors project only `message`.
 
+Reviewed Gateway error descriptors and message-key identities are defined in
+the shared `packages/gateway-protocol` boundary so producers and clients depend
+on the same protocol-owned contract. Surface-specific catalogs and rendering
+remain outside that package.
+
 Requirements:
 
 - `key` is a stable namespaced identifier.
@@ -359,7 +364,8 @@ Rules:
 - Unknown keys or catalog failures show `message`.
 - Sensitive details cannot be promoted into `messageParams`.
 - Clients must not parse or compare translated output.
-- The producer and consumer use one reviewed key registry.
+- The producer and consumer use one reviewed key registry from
+  `packages/gateway-protocol`.
 - A descriptor has at most 16 scalar parameters; parameter names are non-empty
   and at most 64 characters; string values are at most 4096 characters; and
   numeric values are finite.
