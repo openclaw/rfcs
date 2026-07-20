@@ -186,7 +186,12 @@ A conforming registry must validate a publication in this order:
    scanning rules.
 9. Compute and retain the immutable artifact digest over the exact distributed
    artifact bytes.
-10. Store the validated full manifest separately from its public safe summary.
+10. Store a bounded public safe summary derived from the validated manifest.
+
+The exact artifact remains the authoritative stored declaration. A registry is
+not required to duplicate the parsed full manifest into its metadata store; if
+it does, that copy must remain private and must fit the registry's documented
+storage limits without truncation.
 
 Validation is all-or-nothing. A registry must not publish a partial package or
 silently discard unsupported manifest fields or components.
@@ -200,6 +205,10 @@ consumer records the observed byte length and must also verify it when the
 registry supplies an expected length.
 Floating tags and version ranges may be discovery inputs, but they must be
 resolved before a managed lifecycle plan is produced.
+
+Artifact metadata must identify the archive format or transport kind. A
+consumer must select its bounded safe extractor from that metadata and must not
+assume that every registry artifact uses the same archive format.
 
 The registry artifact digest covers the exact distributed artifact bytes. The
 trusted registry or signed feed binds that digest to package identity; the
@@ -513,8 +522,10 @@ A conforming registry must:
 - parse and validate the selected manifest strictly;
 - verify every referenced source file;
 - retain exact artifact length and SHA-256 integrity;
-- keep public summaries derived from the artifact while allowing authorized
-  clients to retrieve the exact artifact for local manifest review;
+- retain a bounded public summary derived from the validated artifact without
+  requiring a second full-manifest copy in registry metadata;
+- allow authorized clients to retrieve the exact artifact for local manifest
+  review;
 - never imply that Claw approval bypasses dependency policy.
 
 ## Client Conformance
