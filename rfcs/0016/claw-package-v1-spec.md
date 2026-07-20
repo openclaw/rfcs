@@ -248,6 +248,13 @@ Registry approval of a Claw must not transitively approve a skill or plugin
 dependency. The client must resolve and evaluate every dependency through its
 normal policy and installer path.
 
+During experimentation, a registry must not redefine an already published
+stable plugin/skill feed schema by adding a Claw entry variant under the same
+schema version. It may publish Claws through a separately identified, gated,
+and versioned experimental feed contract. A disabled deployment must fail
+closed before reading or serving stored Claw feed state, and an ungated edge
+redirect must not expose the experimental route indirectly.
+
 Public search and release APIs should expose a bounded, derived summary for
 indexing. Before consent, the applying client must make the exact grouped
 manifest available for review and display its complete package effects from the

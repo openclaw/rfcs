@@ -700,10 +700,13 @@ manifest.
 
 ### Feeds, catalogs, and ClawHub
 
-RFC 0009 feeds remain the discovery and policy layer. A feed may expose a Claw
-package, pin an exact version, recommend or block it, and independently block or
-substitute package dependencies. Approval of the Claw does not transitively
-approve its skills or plugins.
+RFC 0009 feeds remain the conceptual discovery and policy layer. A feed may
+expose a Claw package, pin an exact version, recommend or block it, and
+independently block or substitute package dependencies. Approval of the Claw
+does not transitively approve its skills or plugins. While Claws are
+experimental, ClawHub uses a separate gated Claw feed parser, serializer, feed
+id, and route rather than adding `type: "claw"` to RFC 0009's stable plugin and
+skill feed schema version 1.
 
 That feed boundary is intentionally narrower than the complete Control UI
 experience. Hosted feeds currently provide official plugin and skill catalog
@@ -859,15 +862,28 @@ ClawHub follows the OpenClaw schema and lifecycle contract in four ordered PRs:
 2. [#3090](https://github.com/openclaw/clawhub/pull/3090) - guarded publication,
    package ingestion, source-file checks, CLI authoring support, and author
    guidance. It also owns the fail-closed public-read boundary while disabled
-   and strips full manifests from every public release serializer.
+   and strips full manifests from every public release serializer. Publication
+   retains the exact immutable artifact bytes and bounded summary, validates
+   every package path, requires exact manifest/source spelling, applies strict
+   UTF-8 and pre-parse size limits, and accepts Claw npm packs without requiring
+   a plugin manifest.
 3. [#3091](https://github.com/openclaw/clawhub/pull/3091) - enabled search,
-   detail, and version APIs that expose only safe summaries.
+   detail, and version APIs that expose only the latest or requested release's
+   bounded summary.
 4. [#3092](https://github.com/openclaw/clawhub/pull/3092) - separately gated
-   hosted Claw feed with safe summaries and exact artifact digests, plus a
-   repeatable published-package proof through real OpenClaw add dry-run. The
-   proof rejects unsafe paths, links, and special archive entries before
-   extraction, and the unversioned feed URL permanently redirects to the
-   versioned route.
+   hosted Claw feed with its own experimental wire contract, safe summaries,
+   and exact artifact digests, plus a repeatable published-package proof through
+   real OpenClaw add dry-run. The versioned route is gated before publication
+   lookup and has no ungated unversioned redirect. The proof bounds download,
+   entry count, per-file and aggregate expansion; rejects unsafe or colliding
+   paths, links, and special archive entries; and supports npm-pack and legacy
+   ZIP package roots.
+
+The #3092 proof is a registry-to-OpenClaw bridge: it selects an exact candidate
+from the experimental Claw feed, verifies and extracts the artifact, then hands
+the package directory to OpenClaw. It proves that the published package produces
+a real non-mutating OpenClaw plan; native OpenClaw Claw-feed resolution remains
+a separate dependent integration.
 
 The ClawHub runtime surfaces in this track require
 `CLAWHUB_EXPERIMENTAL_CLAWS=1`. The deployment gate is independent of
