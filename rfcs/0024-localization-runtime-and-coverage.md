@@ -3,7 +3,7 @@ title: Localization Runtime and Product Coverage
 authors:
   - Gio Della-Libera
 created: 2026-07-16
-last_updated: 2026-07-19
+last_updated: 2026-07-20
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/42
@@ -53,6 +53,10 @@ Accepting this RFC approves these product contracts:
    the product aggregation layer rejects duplicate IDs or order claims and
    generates the manifest of locale/surface maturity cells, revisions, checks,
    review evidence, and promotion blockers. Release claims fail closed.
+6. A migrated surface satisfies the localization-ready ownership standard:
+   semantic meaning, locale authority, catalog/rendering, compatibility,
+   privacy, conformance evidence, and deletion of the superseded presentation
+   path all have named owners and proof.
 
 This RFC does not authorize broad exception/log extraction, runtime model
 translation, translation of commands or protocol values, AI self-review, or a
@@ -349,6 +353,57 @@ OpenClaw distinguishes four categories:
 
 This classification prevents localization from weakening protocol stability or
 changing executable content.
+
+### Localization-ready ownership
+
+Localization separates ownership rather than transferring it to localization
+core:
+
+- the semantic owner defines the message meaning, stable key, allowed
+  parameters, reviewed English fallback, and any safety or recovery semantics;
+- the rendering owner selects the legitimate locale context, owns the catalog
+  and renderer, and preserves literal values and platform constraints;
+- localization core owns generic context, validation, fallback, and rendering
+  primitives, but does not invent message meaning or recipient locale; and
+- the coverage owner aggregates owner-published evidence without becoming the
+  source of message or translation truth.
+
+One team may fill multiple roles, but every adopted message family or surface
+must identify them explicitly. A renderer must not reinterpret an error,
+decision, finding, status, or recovery action merely to make it translatable.
+
+A localization-ready adoption has:
+
+1. a named semantic owner and authoritative descriptor-construction boundary;
+2. a named rendering/catalog owner and authoritative locale-resolution
+   boundary;
+3. stable machine identity, typed parameters, and reviewed English fallback;
+4. one immutable locale context and catalog snapshot per operation;
+5. explicit literal, presentation, sensitivity, and safety classification;
+6. locale-invariant codes, commands, decisions, structured output, and policy;
+7. deterministic accepted, fallback, invalid-input, and rollback behavior;
+8. compatibility proof for every affected protocol or automation consumer;
+9. coverage and required human-review evidence bound to exact revisions; and
+10. deletion of the hardcoded, duplicated, parsed-prose, or edge-invented
+    presentation path that the descriptor replaces.
+
+Each implementation slice records this evidence in its PR description, focused
+fixture, or owner-local design note. This is review evidence, not a runtime
+registry or new manifest schema.
+
+Stop rather than broaden the localization framework when:
+
+- no semantic owner can approve a stable meaning and parameter schema;
+- no legitimate recipient or operator locale is available;
+- a generic exception or external prose has no bounded product-owned
+  descriptor;
+- required safety or linguistic review is absent;
+- compatibility requires changing stable machine output; or
+- the old presentation authority cannot be removed or clearly bounded.
+
+In those cases OpenClaw preserves stable machine output and reviewed English
+fallback, records the surface as incomplete where applicable, and leaves the
+underlying operation unchanged.
 
 ### Locale identity and compatibility
 
@@ -723,12 +778,18 @@ Migration is incremental:
 
 1. Add shared contracts without changing output.
 2. Capture one immutable locale context at the owning surface entry.
-3. Give current English messages stable keys and descriptors.
-4. Classify every parameter as literal data or product-owned presentation.
-5. Localize one bounded renderer without changing structured output.
-6. Add optional protocol metadata where the owner approves it.
-7. Migrate clients and surfaces.
-8. Raise coverage gates directory by directory.
+3. Confirm the semantic owner, rendering owner, and authoritative descriptor
+   and locale-resolution boundaries.
+4. Give current English messages stable keys and descriptors.
+5. Classify every parameter as literal data or product-owned presentation,
+   including sensitivity and safety treatment.
+6. Localize one bounded renderer without changing structured output.
+7. Add optional protocol metadata where the owner approves it.
+8. Prove accepted, fallback, compatibility, privacy, and rollback behavior.
+9. Delete or explicitly bound the superseded hardcoded or duplicated
+   presentation path.
+10. Migrate clients and surfaces and raise coverage gates directory by
+    directory.
 
 English remains the source and compatibility fallback. Existing locale IDs,
 environment variables, persisted preferences, Gateway error messages, command

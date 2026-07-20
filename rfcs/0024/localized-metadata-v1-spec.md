@@ -114,6 +114,12 @@ Namespace ownership is enforced by catalog validation and the blocking
 Metadata is activation-pinned with the plugin registry snapshot. Reload
 atomically replaces the plugin's metadata set.
 
+Capability owners retain semantic ownership of command and skill identity,
+execution meaning, and the default English description. Each consuming surface
+owns locale selection, platform projection, truncation, and reconcile behavior.
+Localization metadata must not become an alternate authority for command
+behavior, skill prompts, policy, or invocation.
+
 External runtime-message catalogs are not registered through arbitrary
 callbacks or translation-provider hooks. V1 external localization is limited
 to the metadata defined in this specification. A post-v1 Plugin SDK seam may
@@ -151,8 +157,14 @@ RFC explicitly promotes that package into the product release portfolio.
 A metadata implementation conforms when:
 
 - command and skill identity remain stable across locales;
+- semantic capability ownership remains separate from surface rendering and
+  projection ownership;
 - native platform projections preserve reconcile behavior;
 - fallback is deterministic;
 - duplicate aliases are rejected;
 - localized metadata cannot alter execution or policy; and
-- one catalog can feed CLI, UI, and supported channel projections.
+- one catalog can feed CLI, UI, and supported channel projections;
+- public diagnostics omit localized descriptions and literal capability data by
+  default; and
+- English-only duplicate presentation paths replaced by the metadata contract
+  are deleted or retained only as named compatibility fallbacks.

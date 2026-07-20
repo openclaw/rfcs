@@ -45,6 +45,33 @@ Surface adapters own input discovery, persistence, catalog loading, output
 formatting, and wire projection. The kernel is internal in v1 and does not
 define a public plugin-provider API.
 
+## Ownership And Adoption
+
+Localization does not own the product meaning that it renders.
+
+- The semantic owner defines the stable message key, allowed parameter schema,
+  reviewed English fallback, and safety/recovery meaning.
+- The rendering owner defines the legitimate locale input, catalog, renderer,
+  escaping, and platform projection.
+- Localization core validates and renders those contracts without inventing
+  meaning, recipient locale, or machine behavior.
+- Coverage aggregates owner-published evidence without becoming a runtime
+  registry.
+
+Every migrated message family identifies its semantic owner, rendering owner,
+descriptor-construction boundary, and locale-resolution boundary in focused
+tests, its PR evidence, or an owner-local design note.
+
+Adoption is incomplete until the old hardcoded, duplicated, parsed-prose, or
+edge-invented presentation path is deleted or explicitly retained as a named
+compatibility fallback. Adding a descriptor beside an equally authoritative
+string path is non-conforming.
+
+Do not create a descriptor when no product owner can define bounded meaning and
+parameters. Do not invent a recipient locale when the rendering surface lacks
+an authoritative preference. Preserve reviewed English and stable machine
+output instead.
+
 ## Locale Registry
 
 Core owns a registry entry for every recognized locale:
@@ -465,7 +492,11 @@ Diagnostics may record:
 - catalog revision;
 - missing-key or invalid-parameter finding code.
 
-Diagnostics must not record sensitive parameter values by default.
+Public diagnostics and metrics must not record rendered text, message
+parameters, recipient or user identity, paths, commands, tokens, raw exceptions,
+or other literal values by default. A surface that requires private diagnostic
+capture must use an existing trusted/private-data path with explicit opt-in and
+must not promote that data into metrics, stability output, or public findings.
 
 ## Minimal Contribution Example
 
@@ -492,6 +523,8 @@ Adding one CLI message requires:
 5. Run key, placeholder, fallback, mixed-language, and affected renderer tests.
 6. Compare any structured output under English and one non-English locale.
 7. Leave `path` literal and escaped by the target renderer.
+8. Delete the superseded literal presentation path or document the exact
+   compatibility caller that still owns it.
 
 ## Conformance
 
@@ -512,6 +545,13 @@ A runtime localization implementation conforms to v1 when:
 - old Gateway clients continue to receive usable English messages;
 - new clients localize known errors without branching on text;
 - approval rendering preserves action semantics in every locale;
+- semantic and rendering ownership boundaries are named;
+- public diagnostics contain only bounded localization identity and provenance,
+  not rendered or literal content;
+- one owner-local conformance record proves accepted, fallback, invalid,
+  compatibility, privacy, and rollback behavior;
+- the superseded presentation authority is deleted or explicitly retained only
+  for a named compatibility path;
 - localization failure cannot crash the Gateway or authorize an action;
 - warmed catalog lookup and rendering of one message with at most 16 scalar
   parameters performs no I/O or network access and stays below 5 ms p95 on the

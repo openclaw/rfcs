@@ -81,6 +81,11 @@ Each product owner publishes a build-time surface declaration with:
 - content classes; and
 - locale artifact discovery or explicit supported-locale evidence.
 
+The declaration owner is accountable for that surface's catalog, rendering,
+artifact, and coverage evidence. It does not take semantic ownership from the
+Gateway, command, approval, runtime, policy, or other domain that defines the
+message meaning.
+
 The product aggregation layer consumes every owner/domain declaration. It must
 fail on duplicate surface IDs, duplicate order claims, missing declared paths,
 or declared locale support without a corresponding artifact. The generated
@@ -400,6 +405,32 @@ Allowlist entries require:
 - whether the text is developer-only, protocol identity, external prose, or
   intentionally literal.
 
+Migrated findings additionally name the replacement descriptor/catalog owner
+and the deletion condition for the old path. A surface cannot become `complete`
+while the replaced literal, duplicated adapter template, or prose-parsing path
+remains an unbounded second authority.
+
+## Adoption Conformance Record
+
+Every migrated message family or coherent surface slice records:
+
+| Field | Required evidence |
+| --- | --- |
+| Semantic owner | Owner of message meaning, key, parameter schema, fallback, and safety/recovery semantics |
+| Rendering owner | Owner of locale authority, catalog, escaping, and final projection |
+| Authoritative boundaries | Descriptor construction and locale resolution |
+| Accepted fixture | Reviewed English plus at least one non-English rendering |
+| Failure fixtures | Missing key/catalog, invalid parameters, incomplete safety review, and renderer failure as applicable |
+| Compatibility | Locale-invariant codes, commands, decisions, structured output, and legacy fallback |
+| Privacy | Public diagnostic fields and prohibited content |
+| Coverage | Surface declaration, catalog/artifact revision, maturity, and required review evidence |
+| Rollback | Exact fallback or demotion behavior |
+| Deletion | Hardcoded, duplicated, parsed-prose, or edge-invented authority removed |
+
+The record may live in focused fixtures, a PR evidence block, or an owner-local
+design note. It is not a runtime registry and does not add fields to the
+coverage manifest.
+
 ## Safety Review
 
 Approval, authentication, destructive-operation, policy-denial, and
@@ -522,7 +553,8 @@ The new-string lifecycle is:
 
 1. add or change reviewed English at the owning final-render boundary;
 2. for a new message, add a stable namespaced key; for a copy-only change,
-   reuse the existing key; classify every parameter;
+   reuse the existing key; confirm semantic and rendering ownership; classify
+   every parameter;
 3. update the owning source catalog, glossary, and generation inputs;
 4. regenerate only owner-declared artifacts;
 5. add English compatibility, non-English, fallback, and protected-literal
@@ -530,7 +562,10 @@ The new-string lifecycle is:
 6. refresh the coverage manifest and run the documented validation command;
 7. demote affected complete locale rows to `partial` until regenerated
    translations and required human review are present, and report the stale
-   translation as a separate finding.
+   translation as a separate finding;
+8. record privacy-safe observability and rollback behavior; and
+9. delete the superseded presentation path or record the named compatibility
+   boundary that still requires it.
 
 Generated catalogs, locale trees, translation memory, and native projections
 are edited only through their owning generation workflow. A changed English
@@ -557,4 +592,7 @@ The coverage system conforms to v1 when it can answer, at one commit:
 - whether migrated structured outputs are locale-invariant;
 - whether product-owned presentation labels are fully catalog-backed;
 - whether protected literals remain unchanged; and
+- which semantic and rendering owners approved each migrated family;
+- whether public diagnostics avoid rendered, literal, and recipient content;
+- which superseded presentation authority was deleted; and
 - which findings prevent promotion to complete.

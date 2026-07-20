@@ -21,6 +21,8 @@ The preferred foundation stack is implemented and open for review:
 
 The foundation stack validates these cross-cutting rules:
 
+- name the semantic owner, rendering owner, descriptor boundary, and
+  locale-resolution boundary for each adopted family;
 - capture one immutable locale context at the owning command/request entry;
 - preserve exact reviewed English for compatibility callers;
 - keep human presentation separate from locale-invariant structured output;
@@ -35,9 +37,35 @@ The foundation stack validates these cross-cutting rules:
   that the root product report aggregates with duplicate-ID/order rejection;
 - bind maturity claims to checked artifacts, catalog revisions, and review
   evidence.
+- keep public diagnostics free of rendered text, parameters, recipient
+  identity, paths, commands, tokens, and raw exceptions; and
+- delete or explicitly bound the superseded hardcoded, duplicated, parsed-prose,
+  or edge-invented presentation path.
 
 Earlier smaller drafts remain development provenance only. Review and delivery
 should use #111541-#111545.
+
+## Repair And Adoption Rule
+
+Each implementation PR is reviewed as:
+
+```text
+one semantic owner
++ one rendering owner
++ one authoritative descriptor boundary
++ one authoritative locale boundary
++ one accepted and one fallback/failure fixture
++ one compatibility and privacy proof
++ one deleted presentation workaround
+```
+
+The PR description or focused tests record the corresponding conformance
+evidence. Shared localization machinery is not acceptance by itself.
+
+Stop the slice when no owner can approve stable meaning, no legitimate locale
+exists, safety review is missing, stable machine output would change, or the
+old authority cannot be removed. Preserve reviewed English, keep the surface
+incomplete, and do not widen localization core to compensate.
 
 ## Completion Stack
 
@@ -316,6 +344,8 @@ claim only after their artifacts and named review evidence are current.
 RFC 0024 v1 is complete when:
 
 - the shared locale, descriptor, fallback, and coverage contracts are shipped;
+- every migrated family names semantic and rendering ownership plus its
+  descriptor and locale boundaries;
 - English plus all 21 translation targets are registered and reported;
 - Gateway errors and channel safety messages localize through stable
   descriptors;
@@ -325,6 +355,12 @@ RFC 0024 v1 is complete when:
 - runtime behavior does not depend on English host prose;
 - right-to-left locales set direction and isolate literal commands and IDs;
 - missing translations fall back safely to English;
+- public localization diagnostics remain bounded and content-free by default;
+- adopted slices include accepted, fallback/failure, compatibility, privacy,
+  rollback, and deletion evidence;
+- superseded hardcoded, duplicated, parsed-prose, and edge-invented
+  presentation authorities are removed or explicitly bounded compatibility
+  paths;
 - release artifacts publish an honest localization coverage report; and
 - all 313 OpenClaw-controlled translation-target cells are complete;
 - any remaining `docs/fa` or `docs/th` platform constraint is explicitly
