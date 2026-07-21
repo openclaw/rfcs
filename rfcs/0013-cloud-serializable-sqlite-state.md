@@ -3,9 +3,9 @@ title: SQLite Snapshot Backup Artifacts
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-07-06
-status: draft
-issue:
+last_updated: 2026-07-21
+status: completed
+issue: https://github.com/openclaw/openclaw/pull/105718
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
 ---
 
@@ -13,160 +13,119 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/20
 
 ## Summary
 
-Define a narrow core `openclaw backup sqlite snapshot` command that gives file-syncing hosts a safe file to sync for OpenClaw-owned SQLite state.
+Define a core `openclaw backup sqlite` command that gives operators and file-syncing hosts a SQLite-safe artifact for one OpenClaw-owned database.
 
-Hosted OpenClaw environments such as Scout/Lobster persist OpenClaw state by syncing files when they are saved. Live SQLite files are the wrong sync boundary: `state/openclaw.sqlite` or `agents/<agentId>/agent/openclaw-agent.sqlite` can be incomplete without their WAL, and `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` are process-local sidecars rather than durable artifacts.
+OpenClaw keeps SQLite as the hot local runtime database. The snapshot command is the translation layer between live SQLite state and durable host storage: it materializes a compact `database.sqlite`, writes a strict `manifest.json`, verifies both, and publishes only the completed snapshot directory.
 
-The SQLite snapshot backup command provides the missing translation step. It asks SQLite to materialize a clean database artifact, verifies it, writes a manifest, and publishes the completed artifact set into a sync-owned location. That completed artifact write, not arbitrary live database churn, is what the host should sync.
+This RFC does not choose a replacement database, require cloud storage, or add managed failover. It defines the local artifact contract that hosts can safely sync, retain, verify, and restore before OpenClaw opens SQLite again.
 
-SQLite remains the hot local runtime database. This RFC does not choose a replacement database, make cloud storage mandatory, or require managed failover. It defines a state-artifact boundary: OpenClaw core owns the SQLite-aware artifact operation, while the host owns upload, retention, routing, encryption, and restore timing.
+Implementation landed in [openclaw/openclaw#105718](https://github.com/openclaw/openclaw/pull/105718), commit [2f25e9cba384acfc06cdf83640f236fdb7c1af33](https://github.com/openclaw/openclaw/commit/2f25e9cba384acfc06cdf83640f236fdb7c1af33). It superseded the original prototype in [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) while preserving the SQLite-safe artifact direction.
 
 ## Motivation
 
-OpenClaw is moving runtime state into SQLite-backed stores. The database-first SQLite alignment landed in openclaw/openclaw#94646 makes that shape more explicit: `state/openclaw.sqlite` is the global control-plane database, while `agents/<agentId>/agent/openclaw-agent.sqlite` is the per-agent data-plane database. That is a good local runtime shape, but hosted reliability depends on more than having files on disk.
+OpenClaw stores important runtime state in SQLite-backed files. That is the right local runtime shape, but raw file syncing is the wrong durability boundary.
 
-The host-sync problem is concrete. A host can watch files and sync them as they are saved, but it should not sync OpenClaw's live SQLite working set as the durability boundary.
-
-The unsafe sync inputs are specific:
+The unsafe sync inputs are concrete:
 
 - `state/openclaw.sqlite` can be stale by itself when committed writes still live in `state/openclaw.sqlite-wal`.
 - `agents/<agentId>/agent/openclaw-agent.sqlite` can be stale by itself when committed writes still live in `agents/<agentId>/agent/openclaw-agent.sqlite-wal`.
 - `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` are process-local SQLite sidecars, not durable host-sync artifacts.
 - Copying a directory while OpenClaw is writing can split one logical database state across files captured at different moments.
 
-The syncable file is created deliberately. OpenClaw should open the source database through SQLite, wait for any required busy timeout or writer barrier, materialize a clean database copy using SQLite online backup, `VACUUM INTO`, or an equivalent SQLite-aware checkpoint/copy mechanism, run integrity verification, and write a manifest that records the database identity, schema version, source path, hash, and restore metadata. The host syncs that artifact set, not the live SQLite files.
+The syncable file must be created deliberately. OpenClaw should open the source database through SQLite, materialize a clean copy using a SQLite-aware mechanism, verify it, and publish a completed artifact set. A host should sync that artifact set, not arbitrary live database churn.
 
-For hosts that sync on filesystem changes, the sync trigger should be the completed artifact write, not arbitrary writes inside the live OpenClaw state directory. The artifact directory should contain completed database artifacts and manifests only. Live `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal` files should not be created there, because a sync agent can observe and upload them as soon as they appear.
-
-Deltas do not remove this requirement. Ryan's underlying concern is that whole-file copies do not scale, but unmanaged file deltas over live SQLite make the correctness problem worse: a file-sync tool can observe DB pages, WAL frames, and sidecars at different moments without knowing SQLite ordering or checkpoint state. If high-frequency sync is needed, the simple follow-up should be ordered WAL-bundle artifacts anchored to a verified full snapshot.
+The first landed implementation uses SQLite `VACUUM INTO` to capture committed WAL state into a compact database. That is different from copying a hot `.sqlite` file, and it is different from routinely vacuuming the runtime database. The operation happens only when creating a snapshot artifact.
 
 ## Goals
 
-- Keep SQLite as the hot local runtime database for this proposal.
-- Make snapshot behavior explicit through a narrow core `openclaw backup sqlite snapshot` command.
-- Produce a host-syncable SQLite artifact and manifest from live OpenClaw SQLite state.
-- Handle WAL state correctly without syncing live SQLite sidecars as durable artifacts.
-- Make restore and verification first-class behaviors, not incidental backup side effects.
-- Define a reusable SQLite snapshot provider contract for OpenClaw-owned SQLite databases.
-- Define the state-artifact boundary that lets hosted platforms persist OpenClaw state without understanding OpenClaw's internal SQLite file layout.
-- Keep the command narrow: create, verify, and restore syncable SQLite artifacts.
-- Document host sync guidance: ignore live SQLite sidecars and sync completed snapshot artifacts/manifests instead.
-- Add commands under `openclaw backup sqlite snapshot`.
-- Leave `openclaw backup` integration as a possible later follow-up, not part of the initial proof stack.
-- Keep default local OpenClaw runtime behavior unchanged unless the SQLite snapshot backup command is invoked.
-- Avoid hot writes over network filesystems as a durability or concurrency strategy.
-- Treat WAL bundles as the first high-frequency optimization after full snapshot artifacts are correct.
-- Define lifecycle metadata needed to validate, order, restore, and audit snapshots.
-- Leave cloud artifact storage, retention, scheduling, and failover orchestration to optional providers or later RFCs.
-- Let hosts such as Scout/Lobster own durable destination policy while OpenClaw owns the correctness of the local SQLite artifact operation.
-- Build on the existing database-first units: global control-plane SQLite, per-agent data-plane SQLite, and any dedicated owner store.
-- Leave room for core to adopt the same primitives later if snapshot and restore become required OpenClaw behavior.
+- Keep SQLite as the hot local runtime database.
+- Provide a narrow core command for one-database SQLite snapshot artifacts.
+- Support the shared OpenClaw state database and per-agent databases.
+- Produce a host-syncable `database.sqlite` plus `manifest.json`.
+- Handle WAL state correctly without syncing live SQLite sidecars.
+- Verify snapshot shape, content hash, SQLite integrity, schema, role, owner, and canonical indexes.
+- Restore only to a fresh target path, never by replacing a live database in place.
+- Keep upload, scheduling, retention, failover, and restore-on-boot outside the Phase 1 command.
 
 ## Non-Goals
 
-- This RFC does not choose PostgreSQL, libSQL, remote SQLite, object storage, or any other backend product.
+- This RFC does not choose PostgreSQL, libSQL, remote SQLite, object storage, or another backend.
 - This RFC does not define a general database abstraction layer.
-- This RFC does not require OpenClaw to own the hosting platform's upload, retention, tenant routing, encryption, or object-storage policy.
-- This RFC does not make snapshots, cloud storage, or managed failover mandatory for local, self-hosted, or development OpenClaw installs.
-- This RFC does not require cloud providers or host integrations to live in core.
-- This RFC does not require object-store credentials, a lease service, or a managed-service control plane in the default runtime.
-- This RFC does not replace the session/transcript migration plan tracked by openclaw/openclaw#88838.
-- This RFC does not define tenant isolation, row-level authorization, or a multi-tenant schema model.
-- This RFC does not define FTS/vector search portability.
-- This RFC does not require real-time multi-writer SQLite over shared storage.
-- This RFC does not define the final managed failover control plane.
-- This RFC does not change the existing `openclaw backup create` or `openclaw backup verify` behavior.
+- This RFC does not make cloud storage or managed failover mandatory.
+- This RFC does not require OpenClaw to own upload, tenant routing, retention, or encryption policy.
+- This RFC does not require hot writes over a network filesystem.
+- This RFC does not define WAL bundles, leases, promotion, fencing, or standby orchestration.
+- This RFC does not change `openclaw backup create` archive behavior.
 
 ## Proposal
 
-### Command shape
+### Command Shape
 
-Add a core `openclaw backup sqlite snapshot` command that owns SQLite-safe snapshot and restore workflows for OpenClaw state.
-
-The command surface should stay narrow inside the existing backup area:
+Add SQLite snapshot operations under the existing backup command:
 
 ```text
-openclaw backup sqlite snapshot create
-openclaw backup sqlite snapshot verify
-openclaw backup sqlite snapshot restore
-openclaw backup sqlite snapshot list
+openclaw backup sqlite create --global --repository <dir>
+openclaw backup sqlite create --agent <id> --repository <dir>
+openclaw backup sqlite list --repository <dir>
+openclaw backup sqlite verify <snapshot-directory>
+openclaw backup sqlite verify <snapshot-directory> --scratch <private-dir>
+openclaw backup sqlite restore <snapshot-directory> --target <new-database-path>
 ```
 
-The first named target shape can be:
+The command is deliberately under `backup sqlite`, not a top-level `snapshot` command. `openclaw backup create` and `openclaw backup verify` remain broad archive commands. `openclaw backup sqlite` is the per-database SQLite artifact path.
+
+### Responsibility Split
+
+OpenClaw core owns the SQLite-aware artifact contract because the host cannot infer it safely from filesystem events.
+
+OpenClaw owns:
+
+- eligible database roles
+- SQLite-safe snapshot creation
+- snapshot repository validation
+- staging and atomic publication
+- manifest creation and strict parsing
+- content hashing
+- verification against OpenClaw database role and owner invariants
+- restore to a fresh local SQLite file
+- rejection of stale sidecars, unsafe paths, symlinks, hardlinks, and race-prone staging paths
+
+The host or operator owns:
+
+- upload and sync destination
+- retention policy
+- encryption and access control outside the local repository
+- restore timing
+- startup orchestration
+- failover policy
+
+The contract is:
 
 ```text
-openclaw backup sqlite snapshot create --target global
-openclaw backup sqlite snapshot create --agent main
-openclaw backup sqlite snapshot verify <snapshot>
-openclaw backup sqlite snapshot restore <snapshot> --target <state-dir>
+live OpenClaw SQLite database -> verified snapshot directory
+verified snapshot directory -> durable destination and pre-start restore
 ```
 
-This does not imply automatic scheduling, cloud storage, failover, or a new database abstraction. The core command produces and verifies the syncable artifact; the host decides where that artifact is stored and when it is restored.
+### Host Flow
 
-This keeps the feature out of the top-level command namespace while still making the SQLite implication explicit. `openclaw backup create` and `openclaw backup verify` keep their existing archive behavior; `backup sqlite snapshot` is the per-database SQLite artifact path.
-
-### Responsibility split
-
-OpenClaw core must provide the SQLite-safe artifact contract because the host cannot safely infer it from the filesystem alone.
-
-OpenClaw should provide:
-
-- eligible database discovery or registry for OpenClaw-owned SQLite databases
-- consistent SQLite checkpoint creation
-- materialization of a host-syncable database artifact from a live local SQLite database
-- guidance or generated ignore rules for host sync: ignore `*.sqlite-wal`, `*.sqlite-shm`, and `*.sqlite-journal`; do not use the live SQLite runtime directory as the sync-owned artifact directory
-- restore or hydrate before opening runtime state
-- restored database verification
-- lifecycle metadata shape
-- safety rules such as no hot writes over network filesystems
-
-The `backup sqlite snapshot` command should own the operator workflow around the core primitive:
-
-- SQLite snapshot backup command UX
-- local snapshot artifact creation and publication into a sync-owned artifact directory
-- snapshot manifest creation and verification
-- restore workflow orchestration
-- provider hooks for future storage backends, if accepted
-
-Optional future integrations and providers can own:
-
-- integration with `openclaw backup`
-- local snapshot repositories
-- S3-compatible artifact storage
-- Azure Blob or other cloud artifact storage
-- ODSP, blob, git, durable-volume, or other host-specific persistence adapters
-- retention policy and upload scheduling
-- writer lease coordination
-- warm standby or managed failover orchestration
-- integration with external tools such as Litestream or LiteFS, if later accepted
-
-In other words, OpenClaw should own this translation:
+Before upload or sync:
 
 ```text
-live OpenClaw SQLite database -> verified snapshot artifact + manifest
+1. host or operator runs openclaw backup sqlite create
+2. OpenClaw validates the source database role and repository
+3. OpenClaw creates and verifies a compact database artifact in private staging
+4. OpenClaw writes manifest.json and database.sqlite
+5. OpenClaw publishes the completed snapshot directory
+6. host syncs only completed snapshot directories
 ```
 
-The hosting platform should own this policy:
+Before startup after replacement:
 
 ```text
-verified snapshot artifact + manifest -> durable destination and restore timing
-```
-
-That split keeps SQLite correctness in the codebase that owns the schema and file layout, while keeping cloud credentials, tenant routing, retention, and platform lifecycle outside the default OpenClaw runtime.
-
-The host-facing flow should be explicit:
-
-```text
-before upload/sync:
-  1. host or operator asks OpenClaw to snapshot an eligible database
-  2. OpenClaw creates a clean database artifact in a staging location
-  3. OpenClaw verifies the artifact and writes the final artifact + manifest into the sync-owned artifact directory
-  4. host sync is triggered by the completed artifact/manifest write
-
-before startup after replacement:
-  1. host downloads/selects a verified artifact set
-  2. OpenClaw verifies and hydrates local database files
-  3. OpenClaw opens SQLite for runtime writes only after hydration succeeds
+1. host selects or downloads a completed snapshot directory
+2. OpenClaw verifies the snapshot from a content-pinned private copy
+3. OpenClaw restores to a fresh local SQLite target
+4. OpenClaw opens SQLite for runtime writes only after restore succeeds
 ```
 
 ### Architecture
@@ -179,422 +138,153 @@ flowchart LR
     App -->|local reads/writes| DB
   end
 
-  subgraph Core[SQLite-safe core primitives]
-    Checkpoint[checkpoint]
+  subgraph Core[OpenClaw backup sqlite]
+    Create[create]
     Verify[verify]
-    Restore[restore / hydrate]
-    Metadata[lifecycle metadata]
+    Restore[restore]
+    Manifest[manifest.json]
+    Artifact[database.sqlite]
   end
 
-  subgraph Command[Core SQLite snapshot backup command]
-    Cmd[openclaw backup sqlite snapshot]
-    Manifest[snapshot manifest]
-    LocalRepo[(local snapshot repo)]
+  subgraph Repo[Local snapshot repository]
+    SnapshotDir[completed snapshot directory]
   end
 
-  subgraph Providers[Optional providers]
-    Object[(object/blob storage)]
-    Host[(host persistence layer)]
-    Retention[retention schedule]
-    Failover[standby / failover]
+  subgraph Host[Host/operator policy]
+    Sync[file/object sync]
+    Retain[retention]
+    Startup[pre-start hydration]
   end
 
-  DB --> Checkpoint
-  Checkpoint --> Metadata
-  Checkpoint --> Manifest
-  Cmd --> Checkpoint
-  Cmd --> Restore
-  Manifest --> LocalRepo
-  LocalRepo --> Restore
-  LocalRepo --> Object
-  LocalRepo --> Host
-  Object --> Restore
-  Host --> Restore
-  Restore --> Verify
-  Verify --> DB
-  Retention -. optional .-> LocalRepo
-  Failover -. later .-> Restore
+  DB --> Create
+  Create --> Verify
+  Create --> Manifest
+  Create --> Artifact
+  Manifest --> SnapshotDir
+  Artifact --> SnapshotDir
+  SnapshotDir --> Sync
+  Sync --> Retain
+  Sync --> Startup
+  Startup --> Verify
+  Verify --> Restore
+  Restore --> DB
 ```
 
-The diagram is a responsibility split, not a default managed-hosting requirement. Default local OpenClaw can run with only the runtime box. Operators and hosts use the SQLite snapshot backup command when they need verified snapshot and restore workflows.
+The diagram is a responsibility split. The default local runtime can ignore the host box entirely. Hosted deployments can use the snapshot directory as the sync boundary without copying live SQLite sidecars.
 
-For hosted OpenClaw, the same split becomes the host integration contract. The host can ask OpenClaw to materialize a clean artifact before upload and can hydrate local disk from a verified artifact before OpenClaw opens SQLite. The host does not need to treat live SQLite sidecars as durable sync inputs.
+### Snapshot Semantics
 
-### Snapshot semantics
+The unit of snapshotting is one existing OpenClaw-owned SQLite database:
 
-An OpenClaw-owned SQLite database is snapshot-safe when it can be captured, verified, restored, and resumed on another host or directory without relying on a live shared filesystem.
+- the shared OpenClaw state database
+- one per-agent database
 
-The unit of snapshotting is an existing OpenClaw-owned SQLite database. The primary units are:
+The landed implementation also has a generic role in the manifest format, but the public named sources are intentionally strict. A future dedicated owner store can become eligible only after it has explicit role, owner, schema, and lifecycle invariants.
 
-- the global control-plane database at `state/openclaw.sqlite`
-- one per-agent data-plane database at `agents/<agentId>/agent/openclaw-agent.sqlite`
-- any future dedicated owner store that has explicit ownership, schema, and lifecycle metadata
-
-This RFC does not rename or redesign those logical units; openclaw/openclaw#94646 makes them concrete enough for snapshot to target. The RFC defines snapshot behavior that can apply to each eligible database.
-
-Memory-search matters for hosted deployments such as Lobster because hosts
-should not need to hard-code private SQLite paths or copy the live SQLite file
-family. Today, memory-search state is owned by the per-agent database-first
-store, so Phase 1 can protect it through the per-agent database target:
+A snapshot directory contains exactly:
 
 ```text
-openclaw backup sqlite snapshot create --agent main
+manifest.json
+database.sqlite
 ```
 
-A future memory-search-only target would need a separate design because it
-would either need a dedicated owner database or a true logical export. It should
-not be presented as memory-only while snapshotting the full per-agent database.
+The manifest records schema version, snapshot id, creation time, database role, database owner fields when applicable, database basename, SQLite `user_version`, artifact path, SHA-256, and size.
 
-The provider contract should therefore take a database reference rather than assume one hard-coded database path. Core can decide which SQLite databases are eligible and apply the same snapshot semantics to each eligible database.
+Snapshot creation must:
 
-A snapshot must:
+- validate the live source database before reading it
+- use SQLite to produce a compact artifact that includes committed WAL state
+- verify the generated database
+- hash the generated artifact
+- publish only a completed directory
+- refuse unsafe repositories and publication races
+- avoid producing live SQLite sidecars in the sync-owned artifact directory
 
-- handle `.sqlite`, `-wal`, and `-shm` state correctly
-- avoid half-copied database state
-- record the schema version and database identity
-- record the checkpoint cursor or equivalent replay position when available
-- produce enough metadata to verify restore integrity
-- be restorable before OpenClaw opens the database for runtime writes
+Global snapshots may sanitize transient runtime rows before publication when those rows are not durable state and should not be retained in deleted pages.
 
-The implementation may use SQLite online backup APIs, `VACUUM INTO`, WAL checkpoints, page-level capture, or another implementation-specific mechanism. The observable contract is a consistent restore point.
+### Verification And Restore
 
-For the initial proof, `VACUUM INTO` is acceptable because it asks SQLite to produce a compact, consistent destination database. That is different from asking the host to copy a hot `.sqlite` file. It is also different from routinely vacuuming OpenClaw's runtime databases; the operation happens only when creating a snapshot artifact.
+Verification is first-class. It must reject malformed, tampered, incomplete, or unsafe snapshots before SQLite opens untrusted bytes.
 
-### Snapshot artifacts
+The landed command verifies:
 
-Snapshot storage should store durable artifacts, not a live database file used directly by the runtime.
-
-The artifact model should support:
-
-- compact snapshot artifacts
-- ordered manifests
-- content hashes or equivalent integrity checks
-- optional WAL bundles after the first milestones
-- resumable upload and download when a remote provider is configured
-- restore from the latest valid snapshot plus any required ordered WAL bundles
-
-The follow-up high-frequency mechanism should start with WAL bundles, not a broad delta abstraction.
-
-WAL bundles must be anchored to a verified snapshot generation. The system should not treat arbitrary file-sync deltas from the live runtime directory as a restore stream. A valid bundle design needs ordering, a base snapshot cursor, integrity checks, and replay rules that SQLite/OpenClaw can verify before opening the restored database.
-
-### WAL bundle model
-
-WAL bundles are the first proposed answer to Ryan's scaling concern, but only
-after OpenClaw has a verified full snapshot contract. A WAL bundle is not the
-live `*.sqlite-wal` file. It is an OpenClaw-authored artifact cut from a known
-SQLite state range, written to staging, verified, and then published into the
-sync-owned artifact directory.
-
-The first WAL bundle design should keep these invariants:
-
-- every bundle names its base snapshot generation or previous bundle cursor
-- every bundle has a monotonically ordered sequence number
-- every bundle records the source database id, schema version, and page size or
-  equivalent compatibility data
-- every bundle records content hashes before upload and after download
-- restore applies bundles only after verifying the base snapshot
-- restore rejects gaps, forks, duplicate sequence numbers, incompatible schema
-  versions, and failed integrity checks
-- OpenClaw verifies the final restored database before runtime opens SQLite
-
-The milestone should be: full snapshot first, verified restore second, then
-simple ordered WAL bundles from a snapshot cursor. File-sync deltas over the live runtime
-directory remain out of scope because they do not carry SQLite ordering,
-checkpoint, or replay semantics.
-
-Artifacts should be suitable for host persistence. A hosting platform should be able to upload, retain, copy, and later download the artifact set without preserving process-local SQLite sidecars or relying on a mounted shared filesystem.
-
-The sync-owned artifact directory should not be the live SQLite runtime directory. If the host syncs on file save, OpenClaw should write completed artifacts into a separate artifact location after verification. That keeps the host from observing transient SQLite sidecars or partially materialized runtime state.
-
-Artifacts should be created at explicit lifecycle moments:
-
-- on demand, when an operator or host requests a snapshot
-- before a managed host uploads/syncs OpenClaw state
-- before container shutdown or ownership release when the platform can coordinate that moment
-- before migration or other state-changing maintenance when a rollback point is required
-- periodically, when a provider adds scheduling or retention policy
-
-Restore artifacts should be consumed before OpenClaw opens the target database for runtime writes. A host that downloads artifacts after OpenClaw has already opened SQLite risks racing the runtime and should be treated as outside this contract.
-
-### Restore verification
-
-Restore is a required behavior for `openclaw backup sqlite snapshot`, not an incidental backup side effect.
-
-A restore operation must:
-
-- locate the selected snapshot and required artifacts
-- verify artifact ordering and integrity
-- hydrate local database files before runtime opens them
-- run SQLite integrity checks or equivalent validation
-- confirm the restored schema version is supported
-- record the restore point OpenClaw is resuming from
-
-The first implementation milestone should prove that OpenClaw can boot from restored state on a fresh directory, host, or container.
-
-### Failover path
-
-The command is not required to implement automatic failover in the first milestone, but it should be designed as the foundation for failover.
-
-Failover becomes possible when OpenClaw has:
-
-1. a recent verified snapshot or restore point
-2. a way to hydrate local disk before startup
-3. a way to confirm schema and integrity before runtime writes
-4. a clear owner for the database after restore
-5. optional WAL bundles or upload scheduling to reduce the data-loss window
-
-A later RFC can define leases, promotion, fencing, standby replicas, and managed orchestration. This RFC provides the snapshot and restore substrate those systems need.
-
-### Writer ownership
-
-OpenClaw must not treat a network filesystem as the concurrency model for hot SQLite writes.
-
-Each snapshot-managed SQLite database should have explicit writer ownership when the deployment allows failover or multiple possible hosts. A managed deployment can move ownership, but only through a controlled sequence:
-
-1. acquire ownership or a writer lease for the database, if leases are enabled
-2. hydrate local disk from a verified restore point when needed
-3. open and write SQLite locally
-4. periodically create and publish snapshot artifacts
-5. release ownership with a final verified snapshot when supported
-6. allow another host to restore from the latest verified durable point
-
-Concurrent readers and replicas can be designed later, but the write path must have one clear owner at a time unless a future RFC defines a stronger multi-writer mechanism.
-
-### Lifecycle metadata
-
-Each snapshot needs metadata sufficient to reason about restore, replay, and integrity.
-
-At minimum, snapshot metadata should include:
-
-- database id
-- database kind or owner
-- database role, such as global control-plane or per-agent data-plane
-- owning agent id when the snapshot is for a per-agent database
+- strict manifest shape
+- artifact size and SHA-256
+- SQLite integrity
+- foreign keys
 - schema version
-- snapshot generation
-- checkpoint or WAL cursor when available
-- artifact manifest id
-- integrity hash or verification record
-- snapshot creation time
-- restore source and restore point when hydrated
-- current writer owner or lease holder, when leases are enabled
+- database role and owner
+- OpenClaw-owned index definitions
+- unexpected entries
+- symlinks and hardlinks
+- path identity and publication-race hazards
+- private staging path ownership and ACL safety
 
-The exact storage location for this metadata is implementation-defined, but `openclaw backup sqlite snapshot` must be able to read enough metadata to verify and restore a snapshot without opening a possibly unsafe runtime database first.
+Restore repeats verification and writes only to a fresh target path. It refuses an existing target and refuses stale `-wal`, `-shm`, or `-journal` sidecars. Activating a restored database remains an explicit offline operator step.
 
-### Provider shape
+### Security And Sensitivity
 
-The implementation can start as a SQLite-specific snapshot provider rather than a database abstraction layer.
+SQLite snapshot artifacts can contain auth profiles, session state, plugin state, per-agent state, and credentials-adjacent records. Snapshot repositories must be protected with the same access controls, encryption, retention policy, and destination restrictions as live OpenClaw state.
 
-The provider contract should be reusable by any OpenClaw feature that needs to capture or restore an OpenClaw-owned SQLite database. `openclaw backup sqlite snapshot` is the first proposed CLI surface, but the contract should not depend on command-only state.
+The implementation fails closed rather than falling back to raw file copies when it cannot prove the repository, staging root, manifest, artifact, path identity, role, owner, ACL, or schema invariants.
 
-A minimal shape is:
+### WAL Bundles
 
-```ts
-type SqliteSnapshotProvider = {
-  create(dbRef): Promise<SnapshotResult>;
-  verify(snapshotRef): Promise<VerifyResult>;
-  restore(snapshotRef, targetPath): Promise<RestoreResult>;
-  list?(): Promise<SnapshotSummary[]>;
-  status?(): Promise<SnapshotStatus>;
-};
-```
+Ryan's scaling concern about whole-file copies is real, but file-sync deltas over live SQLite are not a safe answer. They can observe database pages, WAL frames, and sidecars at different moments without SQLite ordering or checkpoint semantics.
 
-A later provider can add remote persistence:
+If Phase 1 metrics show full snapshots are too large, too slow, or too infrequent, the next design should be ordered WAL-bundle artifacts anchored to a verified full snapshot. A WAL bundle would be an OpenClaw-authored artifact, not the live `*.sqlite-wal` file.
 
-```ts
-type RemoteSnapshotProvider = SqliteSnapshotProvider & {
-  upload(snapshotRef): Promise<UploadResult>;
-  download(snapshotRef, targetPath): Promise<DownloadResult>;
-  prune?(policy): Promise<PruneResult>;
-};
-```
+The minimum WAL-bundle design should include:
 
-This keeps SQLite runtime access local while making state artifacts portable. A local snapshot provider can be the reference implementation. Cloud/object-store providers can come later without changing the default local runtime.
+- base snapshot generation
+- monotonic bundle sequence number
+- source database role and owner
+- schema and page-size compatibility data
+- content hash and byte size
+- staging then publish into the artifact repository
+- restore rejection for gaps, forks, duplicates, incompatible schema, and failed integrity checks
+- final SQLite verification before runtime opens the restored database
 
-If the design proves broadly useful, the same contract can support backup restore, startup hydration, or state migration workflows without changing the narrow `openclaw backup sqlite snapshot` command.
+WAL bundles, compaction, pruning, upload scheduling, and restore-on-boot remain follow-up work.
 
-### Implementation roadmap
+## Implementation
 
-The implementation should be split into two phases.
+Phase 1 landed in [openclaw/openclaw#105718](https://github.com/openclaw/openclaw/pull/105718):
 
-Phase 1 is the committed SQLite snapshot backup command work. It proves full verified
-snapshots, named OpenClaw database targets, and fresh-state restore. It should
-also collect the metrics that decide whether Phase 2 is worth doing:
+- `openclaw backup sqlite create|list|verify|restore`
+- strict local snapshot repository
+- `VACUUM INTO` artifact creation
+- committed WAL-state capture
+- manifest and SHA-256 verification
+- fresh-target restore
+- global and per-agent database roles
+- protected Windows DACL creation
+- POSIX and macOS ownership/ACL checks
+- symlink, hardlink, path-race, and publication-race defenses
+- native Linux, Windows, and macOS proof
 
-- snapshot artifact size by database role
-- snapshot duration
-- upload or sync bytes and time, when the host can report them
-- restore duration
-- snapshot frequency required to meet the desired recovery point objective
-- observed WAL growth between snapshots
-- runtime impact while snapshotting
+The original contributor prototype was [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805). It was closed as superseded because the landed implementation needed stricter database roles, schema/index/owner validation, fresh-only restore, content-pinned verification, durable publication, and cross-platform path-security hardening.
 
-Phase 2 is gated. It should start only if Phase 1 data shows full snapshots are
-too large, too slow, or too infrequent for hosted deployments. Phase 2's planned
-shape is WAL bundles plus the minimum compaction proof needed to keep bundle
-chains bounded.
-
-The current Phase 1 implementation stack is:
-
-| PR                                                                         | Purpose                                       |
-| -------------------------------------------------------------------------- | --------------------------------------------- |
-| [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) | Core SQLite snapshot backup command and safe-sync artifact  |
-| [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967) | Snapshot stress harness for Phase 1 greenlight |
-
-Before maintainers accept this RFC or land the core command, the same
-artifact-boundary idea should be exercised in Microsoft Scout/Lobster for about
-one week through the Lobster-owned snapshot plugin path. That pilot is not a
-replacement for the core command proposal; it is the operational evidence
-checkpoint for it. The pilot should answer:
-
-- whether hosts can reliably sync only completed `manifest.json` and
-  `database.sqlite` snapshot artifacts while ignoring live SQLite files,
-  temporary files, and sidecars
-- how often Scout needs snapshots to meet its recovery expectations
-- observed snapshot artifact size and creation time for real hosted use
-- whether users or operators need a core `openclaw backup sqlite snapshot` command, a
-  host-owned plugin command, or both
-- whether Phase 2 WAL bundles are justified by measured size, timing, or
-  frequency data
-
-Earlier provider, CLI, and named-target slices were collapsed into
-[openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805) so
-the core feature can be reviewed as one product boundary.
-
-#### Phase 1 / PR A: core SQLite snapshot backup command and safe-sync artifact
-
-Add the shared SQLite snapshot provider, local artifact repository, public
-`openclaw backup sqlite snapshot` command surface, named database targets, and safe-sync
-artifact proof.
-
-- `SqliteSnapshotProvider` contract
-- local snapshot repository
-- snapshot manifest and content hash verification
-- SQLite-safe snapshot creation for one database reference using shared core/package primitives where OpenClaw already owns the SQLite invariants
-- tests against a WAL-mode SQLite database
-- an internal restore in tests to prove the artifact is usable
-- user-facing core commands:
-
-```text
-openclaw backup sqlite snapshot create
-openclaw backup sqlite snapshot verify
-openclaw backup sqlite snapshot restore
-```
-- `--target global` for `state/openclaw.sqlite`
-- `--agent <agentId>` for `agents/<agentId>/agent/openclaw-agent.sqlite`
-- manifest fields for database role, agent id, schema version, and source path
-- host-sync guidance that says live SQLite sidecars are ignored and completed
-  artifacts are the sync input
-- target-directory safety checks, restore manifest validation, SQLite integrity checks after restore, and docs for the `openclaw backup sqlite snapshot` command surface
-- proof that OpenClaw can create a snapshot from a named database target, copy only the completed snapshot directory, restore from that copied artifact into a fresh local SQLite path, and verify the restored database
-
-This proof should also document the host contract: which OpenClaw command or API materializes the artifact, which files are safe to sync, which live SQLite sidecars should be ignored, which manifest fields the host can store without interpreting SQLite internals, and what must be restored before OpenClaw opens the database.
-
-This PR should record or report the Phase 1 metrics when available: snapshot
-size, snapshot duration, restore duration, WAL growth, and upload/sync bytes and
-time when the host supplies them. It should also document the greenlight
-criteria maintainers would use before starting Phase 2.
-
-Implementation: [openclaw/openclaw#94805](https://github.com/openclaw/openclaw/pull/94805).
-
-#### Phase 1 / PR B: snapshot stress harness
-
-Add an opt-in harness that measures the Phase 1 behavior before maintainers
-decide whether Phase 2 is worth building.
-
-This PR should prove that snapshot artifacts still restore cleanly while a
-writer is committing transaction batches against the source database. It should
-cover `--target global` and `--agent <id>` at minimum, and should be able to add
-future dedicated targets only after their owner database or logical export
-contract is explicit. It should report snapshot/restore p50/p95 timings,
-snapshot bytes, WAL bytes after the run, writer rows, and restore verification
-counts.
-
-This PR should not make stress mandatory in normal CI. It is a local/release
-validation tool for maintainers and operators who need evidence before tuning
-snapshot frequency or greenlighting WAL bundles.
-
-Implementation: [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967).
-
-#### Phase 2 / PR C: simple WAL bundle proof
-
-Phase 2 is not automatically required by Phase 1. It needs a maintainer
-greenlight based on Phase 1 metrics.
-
-Add the smallest WAL-bundle proof that reduces full-snapshot frequency without
-blessing live-file deltas.
-
-This PR should include:
-
-- base snapshot generation and bundle sequence fields
-- hash and byte-size fields for WAL bundle artifacts
-- staging then publish into the sync-owned artifact directory
-- restore validation for gaps, forks, duplicate sequence numbers, and wrong base
-  snapshot generation
-- tests that prove invalid bundle chains are rejected before database restore
-- proof that restore works from:
-
-```text
-full snapshot + ordered WAL bundles -> verified local SQLite database
-```
-
-This PR should not add retention policy, object storage, failover, or multiple
-delta encodings. It should include a simple compaction proof: replay the latest
-full snapshot plus bundles into a temp database, verify it, and publish a new
-full snapshot generation. Conservative pruning policy can remain later work.
-
-#### Later work
-
-After the initial PRs, follow-up RFCs or implementation PRs can consider:
-
-- broader `openclaw backup` archive integration using the same provider contract
-- object/blob storage providers
-- retention and scheduling
-- WAL bundle retention and pruning policy
-- leases, promotion, fencing, and managed failover
-- external tool integrations such as Litestream or LiteFS
+The stress harness remains tracked separately in [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967). Broader state ownership and continuity work remains related to [openclaw/openclaw#101290](https://github.com/openclaw/openclaw/issues/101290).
 
 ## Rationale
 
-This approach targets the reliability problem directly. It does not require OpenClaw to choose a second database backend before it has defined capture and restore semantics for the SQLite state it already owns.
+This approach solves the reliability problem at the correct boundary. SQLite remains local and authoritative while OpenClaw is running. Durability is handled by verified artifacts, manifests, and explicit restore procedures.
 
-The database-first work in openclaw/openclaw#94646 improves this RFC because it gives snapshot a concrete target model. Snapshot does not have to invent logical database units. It can operate over the already-established global control-plane database and per-agent data-plane databases, then extend to dedicated owner stores only when those stores have comparable ownership and lifecycle metadata.
+The command belongs in core because core owns the database roles, schema invariants, SQLite capabilities, and restore safety checks. Hosts can persist files, but they should not need to rediscover which live SQLite files are safe or unsafe to copy.
 
-Calling the subcommand `snapshot` under `backup sqlite` keeps the first deliverable concrete without giving it top-level command real estate. The path says what it is: a backup-area SQLite artifact, not a broad backup archive and not automatic failover.
+Putting the feature under `openclaw backup sqlite` keeps it narrow and operator-facing without implying a broad backup archive, a new database backend, or automatic failover.
 
-Keeping the first implementation stack under `openclaw backup sqlite snapshot` keeps the proof small and command-scoped. Existing `openclaw backup create` and `openclaw backup verify` behavior can remain unchanged while the snapshot provider proves the harder SQLite correctness and restore semantics.
+Deferring WAL bundles is intentional. Full snapshots provide the first correct restore point and produce the metrics needed to decide whether incremental artifacts are worth the complexity.
 
-Treating remote storage as artifact storage avoids the common failure mode where object storage or network filesystems are used as if they were local disk. SQLite remains local and authoritative while running. Reliability comes from verified snapshots, manifests, restore procedures, and later WAL bundles.
+## Future Work
 
-Phase 2 is deliberately gated. WAL bundles reduce sync cost and restore-point
-gaps only if Phase 1 metrics show full snapshots are insufficient. Keeping WAL
-bundles behind a greenlight avoids committing to replay and compaction
-complexity before OpenClaw knows database size, snapshot time, host sync cost,
-restore time, WAL growth, and recovery point needs.
-
-Making the feature opt-in keeps the default OpenClaw runtime simple. Local and development users should not need object storage, a lease service, or a managed scheduler to keep using SQLite.
-
-Keeping the SQLite-safe artifact contract inside OpenClaw is important because safe snapshots and restores need access to database paths, WAL behavior, schema versions, and integrity checks. Provider-owned artifact storage keeps cloud credentials, retention policy, and managed failover out of the default runtime.
-
-Hosted deployments make that responsibility more important, not less. A host can persist a directory, but OpenClaw should define which database artifacts are safe to persist. Without that boundary, every host integration has to rediscover SQLite sidecar rules and OpenClaw database ownership independently.
-
-The provider contract gives OpenClaw a path from a narrow command to future backup, restore, startup hydration, or migration workflows.
-
-Explicit writer ownership keeps horizontal service orchestration honest. A service can move work between hosts, but it must move ownership and restore state deliberately rather than letting several instances write the same SQLite database through shared storage.
-
-The proposal also keeps storage ownership decisions out of scope. OpenClaw already has global control-plane state, per-agent data-plane state, and owner-specific stores; this RFC defines how those databases become restorable snapshot artifacts.
-
-## Unresolved questions
-
-- Which database-first unit should be used for the first named snapshot/restore proof: global control-plane state, one per-agent data-plane database, or both?
-- Should the first checkpoint implementation use SQLite online backup, `VACUUM INTO`, WAL checkpointing, page capture, or a higher-level export format?
-- Should the reference provider be a local snapshot repository only, or should it include one object/blob storage provider?
-- Which Phase 1 metric thresholds should greenlight Phase 2 WAL bundles: artifact size, snapshot duration, sync bytes/time, restore duration, WAL growth, or required recovery point objective?
-- Should simple compaction land with the first WAL bundle proof or as the next Phase 2 PR?
-- Where should writer ownership metadata live before a database is opened?
-- Should restore verification run during startup, doctor, a managed-control-plane action, or all three?
-- What is the minimum host-facing API or command shape needed for Scout/Lobster-style platforms to request artifact materialization and pre-start hydration?
-- Should every dedicated SQLite store use a named `--target`, or should some
-  stores only be reachable through a lower-level database registry/API?
-- Which artifacts should be included with database restore for support/debug exports versus canonical runtime recovery?
-- Should external tools such as Litestream or LiteFS be provider integrations, deployment recommendations, or out of scope for OpenClaw-owned code?
+- stress and crash-injection validation for concurrent writes
+- high-frequency snapshot metrics across hosted deployments
+- ordered WAL-bundle artifacts
+- compaction and pruning for bounded bundle chains
+- upload/download providers
+- scheduling and retention policy
+- restore-on-boot host integration
+- leases, promotion, fencing, and managed failover
+- dedicated snapshot targets for future owner stores
