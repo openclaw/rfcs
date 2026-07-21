@@ -3,7 +3,7 @@ title: Approval Prompt Markdown Contract
 authors:
   - omarshahine
 created: 2026-05-30
-last_updated: 2026-06-11
+last_updated: 2026-07-21
 status: accepted
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/4
@@ -23,7 +23,7 @@ markdown into native styling or downgrades it to clean plaintext.
 
 ## Motivation
 
-Three core builders produce approval prompt text today and all return plain
+Four core surfaces produce approval prompt text today and all return plain
 strings that channels send as ordinary outbound messages:
 
 - `src/infra/plugin-approvals.ts` builds the legacy plugin approval prompt
@@ -36,8 +36,15 @@ strings that channels send as ordinary outbound messages:
   `APPROVAL_REACTION_BINDINGS` table.
 - `src/infra/exec-approval-reply.ts` builds the exec approval pending payload
   (`buildExecApprovalPendingReplyPayload`). This one already emits a markdown
-  subset: fenced code blocks for the pending command via `buildFence` and
-  inline code for `Full id`.
+  subset: fenced code blocks for the pending command via
+  `formatFencedCodeBlock` and inline code for `Full id` via
+  `formatInlineCodeSpan`, both from `src/shared/markdown-code.ts`.
+- `src/infra/exec-approval-forwarder.ts` builds the non-native fallback prompt
+  (`buildExecApprovalRequestMessage`, plus its resolved and expired variants)
+  and dispatches per-channel rendering through `buildApprovalRenderPayload`.
+  It also emits fenced code blocks. This is the path used by every channel that
+  declares an approval capability without a render adapter, so it is where the
+  unrendered-marker problem is most visible.
 
 So core already ships markdown, just not on purpose and not uniformly. The exec
 approval `Pending command:` fence renders as a code block on channels that
@@ -60,6 +67,13 @@ layer for normal outbound text, but with diverging dialects:
 - Signal, WhatsApp, Slack, Discord, and Matrix each have their own format or
   send module with a distinct dialect (`**bold**` vs `*bold*`, fenced code
   support, escaping rules).
+
+Beyond those seven, a second group declares an approval capability with no
+render adapter at all: Feishu, Google Chat, Mattermost, Microsoft Teams,
+Nextcloud Talk, QQ Bot, Synology Chat, and Zalo. They receive approval text
+through the forwarder fallback and render none of the markdown core emits, so
+they show literal fences and backticks to the person being asked to approve a
+shell command. This group is the clearest evidence for the contract.
 
 The dialects diverge, which is exactly why a single canonical core dialect plus
 per-channel translation is the right seam. The goal is not a new approval
@@ -122,6 +136,19 @@ The plugin SDK owns:
 3. A `downgradeApprovalMarkdownToPlaintext(text)` helper that strips markers
    losslessly, so any channel can call one function to get safe plaintext.
 
+The helper wraps the existing IR-based `stripMarkdown`
+(`src/shared/text/strip-markdown.ts`) rather than adding a second stripper. It
+exists to pin two options that must not be caller-configurable at the approval
+boundary:
+
+- `mode: "plain-text"`. The speech-mode cleanup collapses repeated punctuation
+  and punctuation-only lines, which would silently rewrite a pending shell
+  command inside its own fence.
+- `linkStyle: "label-and-url"`. Label-only projection would render
+  `[click here](https://example.invalid)` as `click here` and hide the
+  destination from the approver. Keeping the URL visible is a security
+  property of an approval prompt, not a formatting preference.
+
 ### Channel capability
 
 Channels gain an explicit capability on their approval handler. It is a field,
@@ -140,21 +167,48 @@ A channel must never pass canonical markdown straight to a transport that will
 mangle it. Either it translates, or it downgrades. There is no implicit
 pass-through.
 
+The field belongs on the approval capability object, not on the runtime
+approval adapter projected from it. `resolveChannelApprovalAdapter` copies a
+fixed list of named fields and returns nothing at all for auth-only
+capabilities, and most of the channels this contract is meant to fix are
+auth-only. The mode must therefore be read through
+`resolveChannelApprovalCapability`. Reading it through the adapter projection
+looks correct and fails on exactly the channels that need it.
+
+Core can enforce the downgrade directly on the forwarder path, where the target
+channel is already resolved. On the native approval runtime path it cannot: the
+per-channel `buildPendingPayload` returns a channel-specific payload type, and
+Discord and Slack return native containers with no shared text field for core
+to reach into. Channels on that path honor their declared mode themselves, and
+a conformance test asserts every channel declaring an approval capability also
+declares an explicit mode. See Unresolved questions.
+
 ### Migration
 
 Compatibility is opt-in, so the default is the safe one.
 
-1. Land the canonical subset, the downgrade helper, and the capability with
-   every channel defaulting to `plaintext`. Behavior is unchanged for users
-   because the downgrade reproduces today's plaintext, including turning the
-   existing exec fence into the same readable block channels show today.
-2. Move iMessage to `markdown` first. It already converts the subset to typed
-   runs on send, so the change is wiring the approval path to skip the
-   downgrade and reuse the existing converter.
-3. Move Telegram, Signal, WhatsApp, Slack, Discord, and Matrix to `markdown`
-   one at a time, each with channel-native escaping and rendering proof.
+1. Land the canonical subset, the downgrade helper, the capability, and core
+   enforcement on the forwarder path. In the same change, declare
+   `approvalText: "markdown"` on every channel that already renders the subset
+   today: Telegram, Matrix, Signal, WhatsApp, Slack, and Discord. Channels with
+   no renderer keep the default and stop showing literal markers.
+2. Move iMessage to `markdown`. Its converter handles bold, italic, underline,
+   and strikethrough but ignores inline code and fences, so approval prompts
+   currently show literal backticks. This step teaches the converter to consume
+   code constructs, then flips the mode.
+3. Revisit any channel left at the default whose transport could express more
+   than plaintext, one at a time, each with channel-native escaping and
+   rendering proof.
 4. Once a channel opts in, its approval prompt formatting is a tested contract,
    not incidental output.
+
+Step 1 is not behavior-neutral, and an earlier revision of this RFC wrongly
+claimed it was. The default reproduces today's output only for channels that
+render nothing. For channels that already parse markdown, leaving them at the
+default would strip formatting they ship today, which is why their declaration
+belongs in step 1 rather than a later one. The user-visible effect of step 1 is
+that channels with no renderer stop showing stray markers, and channels with a
+renderer are unchanged.
 
 There is no flag day. A channel that never opts in keeps shipping clean
 plaintext forever, which is a supported end state, not a temporary shim.
@@ -167,8 +221,9 @@ plaintext forever, which is a supported end state, not a temporary shim.
 - Per-channel tests asserting the chosen mode: `plaintext` channels emit no
   markers; `markdown` channels emit native styling and escape reserved
   characters.
-- iMessage: prove the approval prompt produces typed-run ranges via the
-  existing converter and strips clean on the macOS 14 path.
+- iMessage: prove the approval prompt produces typed-run ranges once the
+  converter consumes inline code and fences, and strips clean on the macOS 14
+  path.
 - Telegram: prove reserved-character escaping on a prompt whose title or
   command contains `*`, `_`, backticks, or other reserved characters.
 - Real-channel delivery proof for each channel at the point it opts into
@@ -203,8 +258,21 @@ emits incidentally rather than introducing a brand new format.
 
 ## Unresolved questions
 
+One question is open, raised while scoping implementation.
+
+- **Enforcement on the native approval runtime path.** Core enforces the
+  downgrade on the forwarder path, but the native runtime path returns
+  channel-specific payload types with no shared text field, so channels there
+  honor their declared mode themselves and a conformance test only proves a
+  mode was declared, not that it was obeyed. The alternative is threading an
+  explicit text mode into the two shared pending-prompt builders so core does
+  the stripping for both paths, at the cost of a new parameter on widely-called
+  public SDK builders. The gap is currently unreachable because every channel
+  on that path declares `markdown`, so this can be deferred past step 1, but it
+  should be settled before a channel on that path declares `plaintext`.
+
 The questions raised during initial review are resolved as follows, and the
-decisions are reflected in the Proposal above. No open questions remain.
+decisions are reflected in the Proposal above.
 
 - **Underline in the canonical subset.** Resolved: no. The canonical subset
   stays at the strict cross-channel intersection, and core never emits
