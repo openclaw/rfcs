@@ -27,6 +27,81 @@ local, actionable setup when needed. Shipping is gated on CUA accepting an
 inherited, already-connected transport; the researched path-addressed embedded
 endpoint is not an acceptable privileged boundary.
 
+## Design constraints and requirements
+
+The proposal is driven by the following non-negotiable requirements. A design
+that violates one of them needs an explicit RFC amendment rather than an
+implementation shortcut.
+
+1. **CUA is the default ready provider, not OpenClaw's native driver.** OpenClaw
+   ships and supports the integration, but CUA continues to own the driver
+   behavior described by its [interface contracts](https://cua.ai/docs/reference/cua-driver/contracts)
+   and [platform support matrix](https://cua.ai/docs/reference/cua-driver/platform-support).
+   OpenClaw does not rebuild CUA's OS automation stack.
+2. **Computer Use remains pluggable.** The contract is a narrow extension of
+   the [OpenClaw Plugin SDK](https://docs.openclaw.ai/plugins/sdk-overview), CUA
+   is selected by default only when ready, and the existing
+   [Peekaboo bridge](https://docs.openclaw.ai/platforms/mac/peekaboo) remains an
+   explicit macOS alternative. Providers may expose different native tools and
+   guidance; OpenClaw does not force them into one lowest-common-denominator
+   action schema.
+3. **Gateway and desktop host may be different machines.** The model and plugin
+   run through the Gateway while all observation, input, native processes, and
+   OS prompts stay on the selected desktop node. This extends OpenClaw's
+   existing [Gateway/node host model](https://docs.openclaw.ai/nodes); a plugin
+   installed at the Gateway does not thereby install code on a remote node.
+4. **The desktop node owns the native runtime.** Detection, verified install,
+   launch, update, rollback, health, and disablement are node-local operations.
+   The Gateway may select and invoke a ready provider, but it never supplies a
+   binary URL, executable path, checksum, or launch recipe to the node.
+5. **macOS permissions belong to OpenClaw.** The signed `OpenClaw.app` identity
+   described by OpenClaw's [macOS permission model](https://docs.openclaw.ai/platforms/mac/permissions)
+   must directly spawn CUA embedded mode. This follows CUA's
+   [daemon/proxy process model](https://cua.ai/docs/reference/cua-driver/process-model)
+   and [`--embedded` contract](https://cua.ai/docs/reference/cua-driver/cli-reference),
+   so Accessibility and Screen Recording appear under OpenClaw rather than a
+   Gateway `node` process or separately launched driver.
+6. **One provider contract works across macOS, Windows, and Linux.** Platform
+   hosts may differ in packaging, permissions, UIAccess, X11, Wayland, or
+   interactive-session handling, but the Gateway binding, inventory,
+   invocation, policy, skill, and result contracts remain the same. Unsupported
+   platform capabilities return explicit states; they do not silently degrade.
+7. **CUA functionality and model guidance are preserved.** OpenClaw consumes
+   CUA's native MCP schemas, sessions, structured/image results, capture and
+   delivery behavior, browser targeting, recording, and fallback ladder. The
+   [CUA agent skill](https://cua.ai/docs/how-to-guides/driver/install-agent-skill)
+   remains substantive model guidance delivered through OpenClaw's
+   [skill system](https://docs.openclaw.ai/tools/skills), but its OpenClaw
+   profile is MCP-first and cannot invoke the CUA CLI as a policy bypass.
+8. **Computer Use has a dedicated classified route.** Calls do not travel as
+   ordinary node MCP or shell execution. OpenClaw binds one node, provider,
+   generation, session, and policy lease; applies argument-aware risk and
+   resource policy; and rejects arbitrary exec authority on that same host.
+   CUA's [permission policy](https://cua.ai/docs/concepts/how-permission-policies-work)
+   remains an independent daemon-side defense, not a replacement for Gateway
+   enforcement.
+9. **Local consent cannot be delegated to the model or remote Gateway.** Node
+   enablement, OS permission prompts, protected browser/profile attachment, and
+   Stop/revocation controls happen on the desktop node. The Gateway exposes
+   closed readiness and recovery states and never silently replays a mutation,
+   changes host, or falls back to another provider.
+10. **Only locally trusted native artifacts receive app-owned authority.** A
+    node uses a pinned provider package, verified driver/helper digests,
+    running-image checks, and atomic managed storage. A matching version string,
+    system `PATH` entry, plugin claim, or node-advertised tool list is not
+    sufficient provenance.
+11. **The production transport cannot expose a reusable privileged listener.**
+    CUA embedded mode must accept an inherited, already-connected channel
+    between the app-owned daemon and MCP proxy. The currently documented local
+    socket/named-pipe topology is useful for ordinary clients but is not the
+    security boundary for OpenClaw-owned permissions. This upstream capability
+    is a ship blocker, not a reason to weaken the contract.
+12. **SDK and protocol surface lands with consumers and proof.** Additive node
+    protocol can land dormant, but public Plugin SDK registration lands with a
+    real provider runtime consumer. CUA becomes the default only after packaged
+    macOS, Windows, Linux, remote-Gateway, security, and upgrade acceptance
+    gates pass.
+
 ## Motivation
 
 OpenClaw already has several pieces of Computer Use infrastructure, but they do
@@ -117,9 +192,9 @@ The desired user experience is instead:
 - Claiming that CUA policy can contain arbitrary code execution on the selected
   desktop host. The secure Computer Use profile excludes such execution from
   the run.
-- Replacing OpenClaw's browser tools. Browser DOM automation remains distinct;
-  CUA can operate native browser chrome or serve as an explicit visual/native
-  fallback.
+- Replacing [OpenClaw's browser tools](https://docs.openclaw.ai/tools/browser).
+  Browser DOM automation remains distinct; CUA can operate native browser
+  chrome or serve as an explicit visual/native fallback.
 - Guaranteeing foreground-free behavior for every provider or platform. The
   selected provider advertises its behavior and its skill teaches the model the
   correct operating mode.
@@ -280,9 +355,10 @@ the Gateway machine merely because that machine runs the agent.
 
 ### Provider registration contract
 
-The public Plugin SDK should expose one provider registration whose fields are
-consumed by the runtime in the same change. The exact TypeScript names may
-change during implementation, but the semantic contract is:
+The [public Plugin SDK](https://docs.openclaw.ai/plugins/sdk-overview) should
+expose one provider registration whose fields are consumed by the runtime in
+the same change. The exact TypeScript names may change during implementation,
+but the semantic contract is:
 
 ```ts
 type ComputerUseProviderRegistration = {
@@ -451,6 +527,10 @@ user or agent can rebind explicitly after readiness is restored.
 
 ### CUA process topology
 
+The topology specializes CUA's documented
+[daemon/proxy process model](https://cua.ai/docs/reference/cua-driver/process-model)
+for an OpenClaw-owned desktop node.
+
 #### macOS
 
 The native app, not the Gateway and not the TypeScript worker, directly starts
@@ -559,8 +639,11 @@ underlying privileged listener reachable.
 
 ### Driver installation and compatibility
 
-Native drivers are node-local managed artifacts. They are not plugin npm peer
-dependencies and are not downloaded by a remote Gateway.
+Native drivers are node-local managed artifacts. The upstream
+[CUA installation flow](https://cua.ai/docs/how-to-guides/driver/install) is a
+candidate source, but OpenClaw applies its own pinned artifact and provenance
+contract. Drivers are not plugin npm peer dependencies and are not downloaded
+by a remote Gateway.
 
 Each release of the bundled plugin carries an audited CUA artifact lock:
 
@@ -661,7 +744,8 @@ garbage-collected after they are no longer active or needed for rollback.
 
 ### CUA model guidance without a CLI bypass
 
-CUA's skill is a significant part of the integration. It teaches the model to:
+CUA's [agent skill](https://cua.ai/docs/how-to-guides/driver/install-agent-skill)
+is a significant part of the integration. It teaches the model to:
 
 - start and end explicit sessions;
 - snapshot before and after every action;
@@ -719,8 +803,9 @@ through that reader. Arbitrary node filesystem reads remain unavailable.
 
 ### Browser targeting and the full-background rung
 
-The CUA integration preserves CUA's browser capability model rather than
-flattening it into generic clicks or direct CDP identifiers.
+The CUA integration preserves CUA's documented
+[browser targeting and background delivery](https://cua.ai/docs/concepts/browser-targeting-and-background-delivery)
+model rather than flattening it into generic clicks or direct CDP identifiers.
 
 The model begins with native `list_apps` and `list_windows` results and selects
 an exact `(pid, window_id)`. `get_browser_state` may then bind that native window
@@ -831,7 +916,9 @@ run from managed Computer Use.
 
 #### CUA daemon policy
 
-CUA's policy stack and permission mode are separate and both are used.
+CUA's [policy stack](https://cua.ai/docs/concepts/how-permission-policies-work)
+and [permission mode](https://cua.ai/docs/reference/cua-driver/permission-modes)
+are separate and both are used.
 
 The node provider package supplies an administrator-owned, deny-by-default CUA
 managed policy through `CUA_DRIVER_MANAGED_POLICY_FILE`. It permits only the
