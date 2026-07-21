@@ -6,7 +6,7 @@ created: 2026-07-21
 last_updated: 2026-07-21
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/45
 ---
 
 # Proposal: Default, Pluggable Computer Use with CUA
@@ -23,7 +23,9 @@ embedded daemon so Accessibility and Screen Recording remain attributed to
 OpenClaw. Windows and Linux use the same Gateway and plugin contracts with
 platform-specific node hosts. A remote Gateway never installs or launches a
 driver on another machine; the selected node advertises readiness and presents
-local, actionable setup when needed.
+local, actionable setup when needed. Shipping is gated on CUA accepting an
+inherited, already-connected transport; the researched path-addressed embedded
+endpoint is not an acceptable privileged boundary.
 
 ## Motivation
 
@@ -339,9 +341,9 @@ type ComputerUseProviderInventory = {
   backend: string | null;
   driver: {
     version: string;
-    source: "managed" | "system" | "bundled";
-    digest: string | null;
-  };
+    source: "managed-download" | "managed-import" | "bundled";
+    digest: string;
+  } | null;
   readiness:
     | { state: "ready" }
     | { state: "disabled" }
@@ -352,14 +354,16 @@ type ComputerUseProviderInventory = {
     | { state: "starting" }
     | { state: "failed"; reasonCode: string };
   permissionAttribution: "openclaw-host" | "provider" | "os-session" | "unknown";
-  authorization: {
-    mode: "bounded";
-    managedPolicyHash: string;
-    userPolicyHash: string | null;
-    sessionManifestHash: string | null;
-    expiresAt: string | null;
-    protectedConsent: "ready" | "unavailable" | "degraded";
-  };
+  authorization:
+    | { state: "inactive" }
+    | {
+        state: "bounded";
+        managedPolicyHash: string;
+        userPolicyHash: string | null;
+        sessionManifestHash: string;
+        expiresAt: string;
+        protectedConsent: "ready" | "unavailable" | "degraded";
+      };
   toolCatalogHash: string;
   tools: readonly NodeComputerUseToolDescriptor[];
   skill: {
@@ -371,6 +375,9 @@ type ComputerUseProviderInventory = {
 ```
 
 The inventory contains bounded facts, not raw process output or exception text.
+`driver` is null only when no locally accepted artifact is present. A ready
+provider must report a non-null driver and bounded authorization with a current
+manifest and expiry; inactive authorization cannot accompany `ready`.
 `generation` changes whenever the provider-spec digest, driver process,
 compatibility decision, tool catalog, permission state, policy hash, bounded
 manifest, protected-consent readiness, or selected local provider state changes.
@@ -573,9 +580,9 @@ The pinned version is the recommended path. The node never launches an
 operator-installed system path directly. It may import that binary only when
 its exact bytes match an artifact digest in the node's locally shipped provider
 lock. Import copies the bytes atomically into a versioned node-managed store,
-rejects links and mutable aliases, and verifies the copied artifact again. A
-self-reported version, manifest, tool catalog, or behavior probe is not
-provenance.
+rejects links and mutable aliases, verifies the copied artifact again, and
+reports it as `managed-import`. A self-reported version, manifest, tool catalog,
+or behavior probe is not provenance.
 
 Launch is bound to the verified executable, not a previously checked path. On
 platforms with suspended-process creation, the node starts suspended, verifies
@@ -912,7 +919,8 @@ The app's **Enable Computer Use** flow:
 
 1. explains that CUA is the default driver and that OpenClaw will own local
    permission prompts;
-2. detects a compatible system or managed CUA installation;
+2. detects a managed CUA installation or an exact-match system artifact that
+   is eligible for verified import;
 3. offers the pinned managed install when needed;
 4. verifies artifact, manifest, MCP capabilities, and matching skill profile;
 5. requests or directs the user through local OS permissions;
@@ -953,7 +961,7 @@ If several nodes are ready, onboarding requires a default host choice. Agent or
 session configuration may override it explicitly. A model does not choose a
 machine from a list of similarly named dynamic tools.
 
-#### Headless Linux node
+#### Linux node without a companion app
 
 The equivalent local flow is available through a node-local command such as:
 
@@ -965,7 +973,9 @@ openclaw node computer-use test
 
 Those commands operate on the node where they are executed, not on the Gateway
 unless it is the same machine. They print bounded diagnostics and never expose
-connected transport handles or secrets by default.
+connected transport handles or secrets by default. The node still requires an
+interactive desktop session; a truly headless Linux node reports
+`backend-unavailable`.
 
 ### Provider selection and Peekaboo
 
@@ -997,7 +1007,7 @@ stderr:
 
 - selected host and provider;
 - provider generation and version;
-- managed/system/bundled artifact source;
+- managed-download/managed-import/bundled artifact source;
 - compatibility result and missing required capability codes;
 - local enablement;
 - permission attribution and readiness;
