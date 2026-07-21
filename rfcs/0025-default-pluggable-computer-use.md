@@ -1082,87 +1082,29 @@ are broadly useful architecture changes; CUA remains the first consumer.
 
 ### Implementation sequence
 
-The work should land in vertical slices. Public SDK contracts should not merge
-without a runtime consumer.
+The detailed [implementation plan](0025/implementation-plan.md) organizes work
+into parallel development waves with explicit merge dependencies, repository
+ownership, proof, and rollout gates.
 
-#### PR 1: RFC-approved provider identity and runtime binding
+1. **Upstream prerequisites:** CUA inherited connected IPC, an OpenClaw
+   MCP-first skill/capability profile, and node-controlled resource/helper
+   paths proceed in parallel.
+2. **OpenClaw foundations:** additive node protocol, provider runtime, early
+   Peekaboo migration, and reusable node MCP hosting establish the generic
+   contract. The Plugin SDK export lands with Peekaboo as a real consumer.
+3. **CUA Linux reference slice:** the generated provider package, bundled CUA
+   adapter, and Linux lifecycle proceed in parallel where possible, then join
+   in a local and remote-Gateway X11 gate.
+4. **Platform and UX wave:** macOS app hosting, the Windows companion host, and
+   Gateway onboarding/doctor work proceed in parallel against the proven Linux
+   contracts.
+5. **Closure and rollout:** security, packaging, browser/model parity, and
+   upgrade gates complete before CUA becomes the default ready provider.
 
-- revise or supersede
-  [openclaw/openclaw#110293](https://github.com/openclaw/openclaw/pull/110293)
-  so provider registration is consumed by runtime;
-- add static ownership plus runtime provider registration;
-- add the prepared host/provider binding and selected-provider filtering;
-- add the secure execution profile that rejects arbitrary process execution on
-  the selected Computer Use host;
-- keep transport, permissions, and native launch policy out of static metadata;
-- add one test provider that proves registration, selection, and cleanup end to
-  end without publishing an unused SDK promise.
-
-#### PR 2: node inventory and classified invocation
-
-- add the additive provider inventory protocol and generation handling;
-- add `computer.provider.call.v1`;
-- extract reusable MCP session/result plumbing behind the node provider host;
-- add the bounded provider skill-resource reader without granting `system.run`;
-- enforce plugin-owned argument/resource policy and dangerous-command arming;
-- carry policy hashes, bounded-manifest state, protected-consent readiness, and
-  local waiting states without exposing policy contents;
-- add stale generation, unknown tool, cancellation, oversize result, and node
-  disconnect tests.
-
-#### PR 3: bundled CUA provider plugin and Linux vertical slice
-
-- add the bundled `computer-use` plugin with CUA registration;
-- add the generated node provider package, artifact lock, compatibility probes,
-  required tool catalog, argument/resource classifiers, and matching
-  skill-profile verification;
-- require and test CUA's inherited connected embedded transport before marking
-  the provider production-ready;
-- generate a deny-by-default CUA managed policy and bounded session manifest
-  while preserving any narrower operator user policy;
-- implement Linux node-local detect/install/start/stop/status/test;
-- materialize CUA's native MCP tools and MCP-first skill for the selected node;
-- prove a local and remote-Gateway Linux flow on X11.
-
-#### PR 4: macOS embedded provider host
-
-- add native app ownership of `cua-driver serve --embedded`;
-- pass only the inherited connected transport handle to the app-owned
-  TypeScript worker;
-- add permission grant, live probe, restart, disable, and crash-recovery UX;
-- implement exact-resource local approval, bounded daemon rebinding, explicit
-  retry, and a persistent indicator with Stop control;
-- publish host attribution and readiness;
-- prove one OpenClaw TCC identity with an interactive packaged-app test.
-
-#### PR 5: Windows companion provider host
-
-- add a generic outbound MCP provider capability to the companion;
-- consume and verify the published OpenClaw CUA node provider package;
-- implement managed CUA artifact lifecycle and dynamic inventory;
-- implement the same bounded rebind/retry and Stop contract in the companion;
-- integrate the UIAccess helper path or report the capability as unavailable;
-- add local and remote-Gateway setup/status/test flows;
-- prove packaged Windows companion operation.
-
-#### PR 6: Peekaboo provider migration
-
-- adapt existing macOS `computer.act` behavior to provider `peekaboo`;
-- preserve its current arming, idempotency, and synthetic-input cleanup;
-- add explicit provider selection and provider-specific model guidance;
-- remove the old parallel Computer Use path after migration.
-
-#### PR 7: product UX, doctor, and release hardening
-
-- add Gateway host/provider selection UX and remote-node setup guidance;
-- add node-local managed update/rollback UX;
-- add closed diagnostics and doctor checks;
-- add cross-platform packaging and upgrade tests;
-- document provider authoring and node-runtime requirements.
-
-The Windows companion lives in a separate repository, so its PR can proceed
-after the additive Gateway protocol is available. The macOS app and Linux node
-host live in the main OpenClaw repository.
+The critical path is CUA inherited connected IPC -> Linux provider lifecycle ->
+Linux vertical proof -> macOS/Windows packaged hosts -> cross-platform closure
+-> default rollout. Work outside that path should not wait for the current CUA
+embedded transport to change.
 
 ### Acceptance criteria
 
