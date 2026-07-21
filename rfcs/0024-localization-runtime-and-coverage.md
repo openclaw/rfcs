@@ -3,7 +3,7 @@ title: Localization Runtime and Product Coverage
 authors:
   - Gio Della-Libera
 created: 2026-07-16
-last_updated: 2026-07-20
+last_updated: 2026-07-21
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/42
@@ -57,6 +57,11 @@ Accepting this RFC approves these product contracts:
    semantic meaning, locale authority, catalog/rendering, compatibility,
    privacy, conformance evidence, and deletion of the superseded presentation
    path all have named owners and proof.
+7. Owner workflows share one source-pinned translation-run evidence contract:
+   exact source revision, locale, source and glossary revisions, generator and
+   workflow identity, provider/model identity, generated artifact revision,
+   and validation result. Extraction, publication, and review policy remain
+   owner-specific.
 
 This RFC does not authorize broad exception/log extraction, runtime model
 translation, translation of commands or protocol values, AI self-review, or a
@@ -258,6 +263,34 @@ app, and documentation catalogs. That is an authoring pipeline, not runtime
 translation: deterministic product text is generated into reviewed,
 version-controlled catalogs before release.
 
+The current implementation is already partially shared:
+
+- `openclaw/docs` orchestrates documentation translation and publication, but
+  checks out an exact `openclaw/openclaw` source revision and runs the
+  source-owned `scripts/docs-i18n` translator;
+- native translation imports the Control UI translation client instead of
+  maintaining another provider implementation; and
+- docs, Control UI, and native workflows use aligned provider-secret naming
+  and source-pinned execution.
+
+RFC 0024 formalizes that alignment without creating another repository or
+translation service. Every generated translation run emits the same bounded
+evidence:
+
+```text
+source repository + exact source revision
++ locale + source/glossary revisions
++ generator/workflow + provider/model identity
++ generated artifact revision + validation result
+-> reviewable candidate translation evidence
+```
+
+Owner workflows keep their native extraction and publication models. Docs
+continue publishing through `openclaw/docs`; Control UI, native, CLI/TUI, and
+runtime catalogs publish through their owning `openclaw/openclaw` workflows.
+Safety catalogs may use the same candidate-generation evidence while retaining
+stricter review and auto-merge policy.
+
 Model-generated output does not establish completeness by itself:
 
 - generated catalogs retain source, workflow, model/provider, glossary, and
@@ -312,6 +345,9 @@ candidate gaps; it does not approve its output or change maturity by itself.
   can project.
 - Keep catalogs current through trusted AI-assisted generated pull requests and
   a deterministic detect/refresh/enforce drift gate.
+- Share one source-pinned translation-run evidence contract across docs,
+  Control UI, native, CLI/TUI, runtime, channel, and metadata workflows without
+  forcing one extractor, catalog format, or publication policy.
 - Keep model-generated content language separate from product UI localization
   so it can use the locale registry in a post-v1 extension without blocking the
   runtime localization contract.
@@ -654,6 +690,9 @@ This RFC does not create a monolithic catalog:
 - Control UI continues to own its TypeScript locale bundles.
 - Apple and Android continue to use native generated catalogs.
 - Docs continue to use the docs translation workflow and glossaries.
+- Documentation orchestration and generated locale trees remain in
+  `openclaw/docs`, while the source-pinned translator implementation remains
+  owned by `openclaw/openclaw`.
 - CLI and server-rendered runtime messages use core runtime catalogs.
 - Bundled plugins may use namespaced runtime catalogs through an internal
   activation adapter.
@@ -832,6 +871,10 @@ The evidence changed the implementation guidance in these concrete ways:
   and
 - the 15-surface release portfolio is composed from owner/domain declarations
   while localization-core remains generic and accepts future valid surface IDs.
+- documentation translation already consumes an exact source revision and
+  source-owned translator from `openclaw/openclaw`, while native reuses the
+  Control UI translation client; completion work should standardize their run
+  evidence rather than introduce another translation service.
 
 The current product aggregation contains 15 English source rows plus 15
 owner-declared surfaces across 21 translation targets. Release completion is

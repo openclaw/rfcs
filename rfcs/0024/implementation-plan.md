@@ -75,11 +75,11 @@ generated or model-authored copy cannot attest itself as reviewed.
 
 | PR | Primary scope | Cells | Completion result |
 | --- | --- | ---: | --- |
-| Completion A | Control UI, onboarding, channel/plugin setup, CLI, and TUI | 105 | The existing AI generated-PR pipeline becomes a shared detect/refresh/enforce gate; every operator-facing surface has complete target catalogs, zero fallback gaps, and script/RTL proof. |
+| Completion A | Control UI, onboarding, channel/plugin setup, CLI, and TUI | 105 | The existing AI generated-PR pipeline gains the common translation-run evidence contract and becomes the shared detect/refresh/enforce gate; every operator-facing surface has complete target catalogs, zero fallback gaps, and script/RTL proof. |
 | Completion B | Bounded user-facing runtime and Gateway errors | 42 | An owner-approved error inventory uses stable descriptors, translated edge rendering, and compatible English fallback. |
 | Completion C | Server-rendered channels, command metadata, Telegram/Discord menus, and skill metadata | 105 | Every channel and capability surface has explicit locale ownership, complete catalogs, and unchanged stable identity. |
-| Completion D | Android, Apple, and docs | 63 | Native quality blockers are cleared, artifacts are current, docs are verified, and Persian/Thai publishing has an explicit disposition. |
-| Completion E | Review evidence and release promotion | Product-wide | Named review is bound to exact revisions, eligible cells become complete, and the generated release claim matches the evidence. |
+| Completion D | Android, Apple, and docs | 63 | Native and `openclaw/docs` runs emit the same minimum source-pinned evidence, native quality blockers are cleared, artifacts are current, and Persian/Thai publishing has an explicit disposition. |
+| Completion E | Review evidence and release promotion | Product-wide | Common generation evidence and named review are bound to exact revisions, eligible cells become complete, and the generated release claim matches the evidence. |
 
 The terminal target is all 313 OpenClaw-controlled cells complete. `docs/fa`
 and `docs/th` must either gain an approved publishing path or remain the only
@@ -91,6 +91,8 @@ claim requires all 315 cells to be complete.
 Completion A generalizes the existing Control UI and native-app locale-refresh
 pattern rather than creating a new bot:
 
+- define the common translation-run evidence record and make one operator
+  catalog lane the first producer;
 - deterministic PR checks detect missing or stale target entries;
 - trusted `main`, scheduled, or manual workflows run approved translation
   providers per locale;
@@ -100,9 +102,20 @@ pattern rather than creating a new bot:
   generator, outputs, and validation command; and
 - enforcement demotes stale cells and blocks unsupported completeness claims.
 
-Completion B-D register their catalogs with this contract. Completion E reads
-the generated provenance and named review manifests when promoting maturity.
-Provider secrets are never exposed to untrusted pull-request code.
+The implementation preserves the existing sharing:
+
+- `openclaw/docs` checks out an exact `openclaw/openclaw` revision and runs the
+  source-owned `scripts/docs-i18n` translator;
+- native translation imports the Control UI translation client; and
+- owner workflows retain their own extraction, validation, publication, and
+  auto-merge policies.
+
+Completion B-D register their catalogs with the common evidence contract.
+Completion D verifies the cross-repository documentation record rather than
+copying docs artifacts or translation memory into the product repository.
+Completion E reads generation evidence plus named review manifests when
+promoting maturity. Provider secrets are never exposed to untrusted
+pull-request code.
 
 ## Workstream 1: Localization Core And Coverage Baseline
 
@@ -362,6 +375,9 @@ RFC 0024 v1 is complete when:
   presentation authorities are removed or explicitly bounded compatibility
   paths;
 - release artifacts publish an honest localization coverage report; and
+- generated catalog runs expose common source, glossary, generator, artifact,
+  and validation provenance without exposing credentials or translated
+  content;
 - all 313 OpenClaw-controlled translation-target cells are complete;
 - any remaining `docs/fa` or `docs/th` platform constraint is explicitly
   disclosed; and

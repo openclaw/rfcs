@@ -45,6 +45,29 @@ Surface adapters own input discovery, persistence, catalog loading, output
 formatting, and wire projection. The kernel is internal in v1 and does not
 define a public plugin-provider API.
 
+## Build-Time Translation Boundary
+
+Translation providers are build-time authoring tools and are never part of the
+runtime kernel. Owner workflows may use different extractors and catalog
+formats, but generated runs share one source-pinned evidence contract:
+
+```text
+source repository + exact source revision
++ target locale + source/glossary revisions
++ generator/workflow + provider/model identity
++ generated artifact revision + validation result
+```
+
+The evidence contains no credentials, prompts containing private user content,
+or rendered runtime parameters. It supports catalog review and maturity
+promotion; it is not loaded by the runtime.
+
+Documentation orchestration may remain in `openclaw/docs` while using the
+source-owned translator from an exact `openclaw/openclaw` revision. Control UI,
+native, CLI/TUI, runtime, channel, and metadata workflows keep owner-specific
+publication. Sharing this evidence contract does not create a runtime
+translation service or a public provider API.
+
 ## Ownership And Adoption
 
 Localization does not own the product meaning that it renders.

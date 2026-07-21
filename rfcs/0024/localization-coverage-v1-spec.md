@@ -269,6 +269,57 @@ its review policy. A `complete` locale/surface pair requires:
 Translation automation may accelerate coverage, but it cannot self-attest
 quality or promote a maturity state.
 
+### Translation-run evidence
+
+Every generated candidate wave emits a checked, content-free evidence record.
+This record is separate from the runtime catalog and does not add provider
+fields to `LocalizationContext` or `LocalizedMessage`.
+
+```yaml
+version: 1
+surface: <owner surface ID>
+locale: <canonical target locale>
+source:
+  repository: <owner/name>
+  revision: <exact protected-source commit>
+  contentRevision: <source inventory or catalog hash>
+  glossaryRevision: <glossary hash or none>
+generator:
+  repository: <owner/name>
+  workflow: <workflow identity>
+  revision: <generator/tool revision>
+  provider: <provider ID>
+  model: <model ID>
+artifact:
+  identity: <owner artifact ID>
+  revision: <generated artifact hash>
+validation:
+  command: <deterministic owner command>
+  status: passed
+```
+
+Requirements:
+
+- `source.revision` identifies an exact commit reachable from the trusted
+  protected source branch.
+- Provider credentials, prompts containing private content, translated text,
+  runtime parameters, recipient identity, and raw provider errors are absent.
+- The artifact revision covers the candidate output actually validated and
+  published.
+- A stale source, glossary, generator, artifact, or validation result prevents
+  promotion and queues or defers to a newer reconciliation.
+- Owner workflows may add fields, but Completion E relies only on this common
+  minimum.
+- The record proves generation and validation, not linguistic or safety
+  approval.
+
+The repositories remain owner-specific. `openclaw/docs` owns documentation
+orchestration, translation memory, generated locale trees, MDX repair, and
+publication while executing the source-owned translator from an exact
+`openclaw/openclaw` revision. Product catalog workflows publish through their
+own `openclaw/openclaw` automation branches. A shared evidence schema does not
+require one repository, extractor, file format, or auto-merge policy.
+
 ## Translation Drift Gate
 
 Every registered generated catalog declares:
@@ -277,6 +328,7 @@ Every registered generated catalog declares:
 - target locale artifacts;
 - glossary and protected literals;
 - generator workflow and provider/model provenance;
+- the common translation-run evidence revision;
 - deterministic validation command; and
 - review policy for its content classes.
 
