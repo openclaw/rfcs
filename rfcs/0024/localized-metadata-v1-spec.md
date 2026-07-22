@@ -5,6 +5,11 @@ other cataloged OpenClaw capabilities.
 
 Status: draft, tied to RFC 0024.
 
+This specification defines the reusable additive shape. It does not by itself
+authorize a command-catalog, skill-manifest, plugin SDK, or platform adapter
+schema change. Each owning maintainer must approve that public surface and its
+compatibility plan before activation.
+
 ## Scope
 
 V1 covers:
@@ -44,6 +49,22 @@ Rules:
   Product language-default inference does not silently map unrelated regional
   variants for an external package.
 - Empty localized strings are invalid.
+
+Validation occurs before activation and applies these v1 limits:
+
+- each `default` or localized value is at most 4,096 UTF-8 bytes;
+- each `LocalizedText.localizations` map contains at most 64 entries;
+- all localized metadata for one capability is at most 65,536 UTF-8 bytes; and
+- all localized metadata contributed by one package is at most 1,048,576 UTF-8
+  bytes.
+
+Aggregate size is the sum of the UTF-8 byte lengths of each default value,
+normalized locale tag, and localized value in the applicable capability or
+package. Core, bundled, and external metadata use the same calculation, so a
+package has one portable pass/fail result across conforming v1 hosts.
+
+Adapters may impose stricter platform limits. Oversized or invalid optional
+external metadata is rejected without disabling unrelated core capabilities.
 
 ## Commands
 

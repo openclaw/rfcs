@@ -144,7 +144,10 @@ Inferred browser and operating-system locale matching:
 4. Progressively truncate subtags to find a registered language-level locale,
    so `fr-CA` can select `fr`.
 5. Use the one registered inferred language default, so `ja` can select
-   `ja-JP` and `pt-PT` can preserve the existing `pt-BR` product fallback.
+   `ja-JP`. A cross-region default such as inferred `pt-PT` selecting the only
+   shipped Portuguese catalog, `pt-BR`, requires an explicit product-registry
+   rule, rationale, and compatibility fixture; it is never derived merely from
+   a shared language subtag.
 6. Fall back to English.
 
 The registry validates that this algorithm produces at most one result for
@@ -245,7 +248,10 @@ type CatalogMessage =
 localization metadata is serialized from this type:
 
 ```ts
-function projectGatewayMessage(message: LocalizedMessage): {
+function projectGatewayMessage(
+  message: LocalizedMessage,
+  englishCatalog: CatalogSnapshot,
+): {
   message: string;
   details?: {
     localization: {
@@ -257,9 +263,12 @@ function projectGatewayMessage(message: LocalizedMessage): {
 ```
 
 Descriptor construction, catalog validation, and Gateway projection use one
-shared validator. The projection includes `details.localization` only for
-recognized, validated localizable errors. Unknown or intentionally English-only
-errors project only `message`.
+shared validator. Gateway projection renders `message` from the reviewed
+English catalog snapshot, including any plural or select case, so legacy
+clients receive the same English wording that existed before migration. The
+projection includes `details.localization` only for recognized, validated
+localizable errors. Unknown or intentionally English-only errors project only
+`message`.
 
 Reviewed Gateway error descriptors and message-key identities are defined in
 the shared `packages/gateway-protocol` boundary so producers and clients depend
@@ -269,7 +278,8 @@ remain outside that package.
 Requirements:
 
 - `key` is a stable namespaced identifier.
-- `fallback` is required reviewed English text.
+- `fallback` is a required reviewed English template with the same placeholder
+  contract as the English catalog entry.
 - Parameters are flat scalar values in v1.
 - Parameter names are stable and match the English catalog declaration.
 - A catalog cannot add, remove, or rename parameters.
@@ -301,8 +311,14 @@ V1 supports one top-level plural or select operation per catalog message:
 - every case has the same placeholder names and types;
 - unsupported categories are validation errors;
 - nested plural/select expressions are deferred; and
-- the descriptor `fallback` is the already-rendered reviewed English result for
-  the current parameters.
+- `fallback` remains one reviewed English template that is safe for every
+  allowed selector value, for example `Files: {count}`. It is the descriptor's
+  last-resort recovery template, not the source of the normal Gateway
+  compatibility message. The reviewed English catalog contains the legacy
+  plural/select cases, and Gateway projection renders the matching English case
+  before emitting `message`. Other renderers interpolate the selected catalog
+  case or the recovery template; descriptor construction sites do not
+  pre-render fallback text.
 
 This bounded structure covers count- and state-sensitive runtime copy without
 requiring every surface to adopt one catalog file format or a full
@@ -408,7 +424,9 @@ type LocalizableErrorShape = {
 Rules:
 
 - `code` and `message` remain required.
-- `message` remains the English compatibility fallback.
+- `message` remains the English compatibility presentation and is rendered from
+  the reviewed English catalog snapshot. For a migrated plural/select message,
+  that snapshot preserves the legacy selector-sensitive English cases.
 - `details.localization` is optional and does not change protocol branching.
 - Clients localize only recognized keys.
 - Unknown keys or catalog failures show `message`.
@@ -491,14 +509,21 @@ output across at least English and one non-English locale for exact equality.
   catalog; do not silently publish a partial generated artifact.
 - Invalid optional plugin catalog: reject that catalog and retain plugin
   operation with default metadata where safe.
-- Renderer exception: use English fallback; do not fail the underlying
-  operation solely because localization failed.
+- A missing catalog, key, locale entry, or invalid catalog entry uses the
+  reviewed English fallback template with already-validated descriptor
+  parameters and emits a bounded diagnostic.
+- Invalid descriptor parameters are rejected before rendering. A protocol
+  surface uses its canonical English compatibility message; another surface
+  uses its named independently renderable English compatibility path. It does
+  not attempt to interpolate invalid values or fail the underlying operation.
+- Implementations must not broadly swallow unrelated programmer or operation
+  exceptions.
 - Missing safety translation: use reviewed English, not unreviewed machine
   translation.
-- A non-complete safety, security, authentication, authorization,
-  destructive-action, privacy, or recovery catalog renders the entire message
-  from one reviewed English snapshot; it never mixes translated and fallback
-  fragments.
+- A safety, security, authentication, authorization, destructive-action,
+  privacy, or recovery message family without current scoped review evidence
+  renders the entire presentation from one reviewed English snapshot; it never
+  mixes translated and fallback fragments.
 - Emergency rollback: remove the affected translation or key mapping and use
   the English fallback without changing codes, commands, or authorization
   behavior.
@@ -537,7 +562,7 @@ Adding one CLI message requires:
    renderLocalizedMessage(context, {
      key: "cli.agent.messageFile.empty",
      params: { path: messageFile },
-     fallback: `Message file is empty: ${messageFile}`,
+     fallback: "Message file is empty: {path}",
    });
    ```
 
@@ -577,7 +602,8 @@ A runtime localization implementation conforms to v1 when:
   for a named compatibility path;
 - localization failure cannot crash the Gateway or authorize an action;
 - warmed catalog lookup and rendering of one message with at most 16 scalar
-  parameters performs no I/O or network access and stays below 5 ms p95 on the
-  localization benchmark lane; and
+  parameters performs no I/O or network access. Implementations should publish
+  a reproducible warmed benchmark before adopting a numeric performance gate;
+  and
 - catalog replacement cannot split one in-flight rendering operation across
   revisions.

@@ -40,24 +40,28 @@ Accepting this RFC approves these product contracts:
    Explicit user and recipient choices outrank request, surface, operator, and
    platform inference; unsupported explicit values fail safely to English.
 2. Product-owned runtime copy is represented as a stable message key, typed
-   literal parameters, and reviewed English fallback. The surface that presents
-   the message owns the catalog and final rendering.
-3. Gateway errors retain their existing code and English `message`. Reviewed
-   errors may add bounded localization metadata under `details.localization`;
-   shared descriptor identities live in `packages/gateway-protocol`, capable
-   clients render them, and legacy clients ignore them.
-4. Commands, skills, and plugins retain stable identities while exposing
-   locale-keyed presentation metadata for Gateway and client projections.
-5. Localization core validates a generic coverage schema rather than owning a
-   closed product-surface union. Surface owners publish ordered declarations;
-   the product aggregation layer rejects duplicate IDs or order claims and
-   generates the manifest of locale/surface maturity cells, revisions, checks,
-   review evidence, and promotion blockers. Release claims fail closed.
+   literal parameters, and a reviewed English fallback template. The surface
+   that presents the message owns the catalog and final rendering.
+3. Subject to Gateway-owner approval, Gateway errors retain their existing code
+   and English `message` while reviewed errors may add bounded localization
+   metadata under `details.localization`. Shared descriptor identities live in
+   `packages/gateway-protocol`, capable clients render them, and legacy clients
+   ignore them.
+4. Subject to the command, skill, and plugin owners approving each additive
+   public schema, capability identities remain stable while locale-keyed
+   presentation metadata may be projected to Gateway and client surfaces.
+5. Localization core defines generic maturity and scoped-evidence semantics
+   rather than owning a closed product-surface union. Once release aggregation
+   is enabled, surface owners publish declarations and the product layer
+   generates locale/surface maturity, revision, review, and blocker evidence.
+   Missing required portfolio declarations fail the release claim, not the
+   runtime kernel.
 6. A migrated surface satisfies the localization-ready ownership standard:
    semantic meaning, locale authority, catalog/rendering, compatibility,
    privacy, conformance evidence, and deletion of the superseded presentation
    path all have named owners and proof.
-7. Owner workflows share one source-pinned translation-run evidence contract:
+7. Owner workflows may publish one source-pinned translation-run evidence
+   contract:
    exact source revision, locale, source and glossary revisions, generator and
    workflow identity, provider/model identity, generated artifact revision,
    and validation result. Extraction, publication, and review policy remain
@@ -67,40 +71,31 @@ This RFC does not authorize broad exception/log extraction, runtime model
 translation, translation of commands or protocol values, AI self-review, or a
 new external plugin runtime-catalog API.
 
-The five open foundation PRs implement and demonstrate these contracts. They do
-not claim that OpenClaw is already fully translated. Completion A-E fills every
-catalog and evidence cell after owners approve the direction.
+The five open foundation drafts are implementation evidence, not the accepted
+delivery topology. They demonstrate that the contracts can compose, but their
+cumulative diffs cross too many semantic and rendering owners to be the units
+of approval or landing.
 
-### Ten-PR delivery arc
+### Acceptance and delivery milestones
 
-RFC 0024 closes through two five-PR stacks.
+RFC 0024 separates architecture acceptance from implementation and product
+completion:
 
-The foundation stack is implemented and open for review:
+1. **Architecture accepted:** owners approve the locale, descriptor, fallback,
+   and minimum coverage semantics. Any Gateway, command, skill, plugin, or
+   recipient-locale surface remains gated on its named owner.
+2. **Foundation shipped:** a minimal kernel and one existing owner-controlled
+   consumer land with accepted, fallback, compatibility, privacy, and deletion
+   proof.
+3. **Owner cohorts complete:** operator, runtime-safety, channel/capability, and
+   native/docs owners migrate bounded message families through independent,
+   reviewable PRs and generated catalog waves.
+4. **Product claim promoted:** the release report evaluates only landed,
+   owner-declared evidence and may make a qualified or full localization claim.
 
-1. [Locale context and message rendering](https://github.com/openclaw/openclaw/pull/111541):
-   shared registry, locale resolution, immutable catalogs, additive Gateway
-   metadata, and the first CLI, approval, and Control UI consumers.
-2. [Runtime adoption](https://github.com/openclaw/openclaw/pull/111542):
-   updater, service, completion-cache, and shell presentation.
-3. [Governance and inventory](https://github.com/openclaw/openclaw/pull/111543):
-   authoring workflow, generic coverage validation, owner-published surface
-   declarations, generated inventory, maturity, and promotion gates.
-4. [Product surfaces](https://github.com/openclaw/openclaw/pull/111544):
-   CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata.
-5. [Convergence and readiness](https://github.com/openclaw/openclaw/pull/111545):
-   cross-surface alignment, translation evidence, RTL safety, and honest
-   release reporting.
-
-The completion stack fills the product rather than adding another framework:
-
-1. complete Control UI, onboarding/setup, CLI, and TUI catalogs;
-2. complete a bounded owner-approved runtime and Gateway error inventory;
-3. complete server-rendered channels, command menus, and capability metadata;
-4. complete native-app and documentation artifacts; and
-5. ingest named review evidence and promote the final release matrix.
-
-The original smaller implementation slices remain useful development
-provenance, but they are not the preferred review or delivery plan.
+The current 15-surface, 315-cell portfolio is a delivery target and release
+policy snapshot. It is not an RFC-acceptance condition, a localization-core
+type restriction, or a requirement that one PR fill an entire cohort.
 
 ## Motivation
 
@@ -202,7 +197,8 @@ sv
 ```
 
 English is the source locale and the other 21 are translation targets. Every
-locale is registered from PR 1, but completeness remains measured per surface.
+locale is registered by the minimal foundation, but completeness remains
+measured per surface.
 For example, Swedish begins with native-app coverage and remains unsupported on
 other surfaces until their catalogs exist. OpenClaw must not claim full
 22-locale product coverage
@@ -413,13 +409,16 @@ A localization-ready adoption has:
 1. a named semantic owner and authoritative descriptor-construction boundary;
 2. a named rendering/catalog owner and authoritative locale-resolution
    boundary;
-3. stable machine identity, typed parameters, and reviewed English fallback;
+3. stable machine identity, typed parameters, and a reviewed English fallback
+   template rendered by the same edge renderer as translated templates;
 4. one immutable locale context and catalog snapshot per operation;
 5. explicit literal, presentation, sensitivity, and safety classification;
 6. locale-invariant codes, commands, decisions, structured output, and policy;
 7. deterministic accepted, fallback, invalid-input, and rollback behavior;
 8. compatibility proof for every affected protocol or automation consumer;
-9. coverage and required human-review evidence bound to exact revisions; and
+9. coverage and required human-review evidence bound to the exact message
+   family, source, locale-specific reviewed-content, and review-policy
+   revisions; and
 10. deletion of the hardcoded, duplicated, parsed-prose, or edge-invented
     presentation path that the descriptor replaces.
 
@@ -531,9 +530,9 @@ one; production orchestration must inject the captured context.
 
 ### Foundational localization kernel
 
-PR 1 introduces one small internal localization kernel at the lowest dependency
-layer shared by browser and server code. The exact package path is an
-implementation decision, but the kernel owns:
+The first implementation slice introduces one small internal localization
+kernel at the lowest dependency layer shared by browser and server code. The
+exact package path is an implementation decision, but the kernel owns:
 
 - locale registration, normalization, aliases, inferred matching, fallback,
   display names, and direction;
@@ -562,9 +561,9 @@ internal localization kernel
 ```
 
 The dependency never points from the kernel back into a surface. Existing UI,
-native-app, documentation, and wizard catalogs remain surface-owned. PR 1
-proves the kernel through existing Control UI and wizard locale resolution plus
-one runtime English descriptor; it does not land a type-only framework.
+native-app, documentation, and wizard catalogs remain surface-owned. The slice
+proves the kernel through one selected existing consumer plus browser/server
+conformance fixtures; it does not land a type-only framework.
 
 This is not a public localization-provider plugin API in v1. Translation
 providers remain build-time authoring tools. A public plugin seam is considered
@@ -589,10 +588,12 @@ a second message model. Both projections use the same key and parameter
 validator.
 
 The key is stable machine identity for catalog lookup, telemetry, tests, and
-coverage. `fallback` is reviewed English text for old clients, missing
-translations, diagnostics, and emergency recovery. Parameters are literal
-values; translators cannot introduce executable tokens or reinterpret
-parameter types.
+coverage. `fallback` is a reviewed English template for old clients, missing
+translations, diagnostics, and emergency recovery. The renderer interpolates
+that template with the same validated parameters and literal-isolation rules as
+a translated template; descriptor construction sites never pre-render it.
+Parameters are literal values; translators cannot introduce executable tokens
+or reinterpret parameter types.
 
 Not every enum-like value is literal product identity. Product-owned
 presentation categories such as install-kind labels, update-kind labels, status
@@ -668,10 +669,10 @@ The localized renderer must:
 - avoid locale-sensitive parsing of the rendered result; and
 - pass the same payload through all channel routes.
 
-If the selected safety catalog is missing, invalid, incomplete, or lacks the
-required human-review attestation, the renderer uses one reviewed English
-snapshot for the complete approval presentation. It does not mix translated
-labels with English fallback fragments.
+If the selected safety message family is missing, invalid, incomplete, or lacks
+the required scoped human-review attestation, the renderer uses one reviewed
+English snapshot for the complete approval presentation. It does not mix
+translated labels with English fallback fragments.
 
 Security-sensitive copy requires human review for each release-complete locale.
 Machine-generated translation can seed drafts but cannot alone mark the
@@ -769,15 +770,17 @@ Localization core defines the generic manifest schema, maturity semantics,
 derived checks, and promotion-blocker rules. It does not enumerate every UI,
 channel, plugin, skill, native, or documentation surface.
 
-Each product owner publishes a build-time declaration containing its stable
-surface ID, owner, artifact, source/catalog paths, migration state, validation
-command, content classes, and locale artifact discovery. A root product
+Each product owner may publish a build-time declaration once it has an adopted
+message family or artifact. The declaration contains its stable surface ID,
+owner, artifact, source/catalog paths, migration state, validation command,
+message-family classifications, and locale artifact discovery. A root product
 aggregator includes every declaration, orders the generated report
 deterministically, and fails on duplicate surface IDs or order claims. Adding a
 new owner surface changes its declaration and the product portfolio, not the
 generic localization-core validator.
 
-OpenClaw checks in the generated localization coverage manifest describing:
+The product aggregation layer may check in a generated localization coverage
+manifest describing:
 
 - supported locales and aliases;
 - locale maturity;
@@ -799,7 +802,8 @@ CI produces a localization report and enforces:
 - deterministic generated artifacts;
 - locale-change test isolation;
 - advisory hardcoded-string inventory initially; and
-- blocking hardcoded-string checks only for migrated directories.
+- blocking hardcoded-string checks only for explicitly migrated message
+  families, key namespaces, or narrowly owned directories.
 
 OpenClaw must not advertise a surface as complete for a locale unless the
 manifest and checks support that claim.
@@ -827,8 +831,8 @@ Migration is incremental:
 8. Prove accepted, fallback, compatibility, privacy, and rollback behavior.
 9. Delete or explicitly bound the superseded hardcoded or duplicated
    presentation path.
-10. Migrate clients and surfaces and raise coverage gates directory by
-    directory.
+10. Migrate clients and surfaces and raise coverage gates by owned message
+    family, key namespace, or narrowly owned directory.
 
 English remains the source and compatibility fallback. Existing locale IDs,
 environment variables, persisted preferences, Gateway error messages, command
@@ -843,10 +847,11 @@ are rejected without disabling unrelated core catalogs.
 
 ### Implementation evidence and refinements
 
-The five-PR foundation stack has validated the architecture across the shared
-kernel, runtime safety, process-scoped CLI/TUI rendering, updater and service
-presentation, Gateway/UI errors, channel approvals, metadata, native/docs
-convergence, RTL interpolation, and product-level release reporting.
+The five foundation drafts have provided cross-cutting implementation evidence
+across the shared kernel, runtime safety, process-scoped CLI/TUI rendering,
+updater and service presentation, Gateway/UI errors, channel approvals,
+metadata, native/docs convergence, RTL interpolation, and product-level release
+reporting.
 
 The evidence changed the implementation guidance in these concrete ways:
 
@@ -876,13 +881,13 @@ The evidence changed the implementation guidance in these concrete ways:
   Control UI translation client; completion work should standardize their run
   evidence rather than introduce another translation service.
 
-The current product aggregation contains 15 English source rows plus 15
+The current product-policy snapshot contains 15 English source rows plus 15
 owner-declared surfaces across 21 translation targets. Release completion is
-calculated over those 315 translation-target cells. The completion stack owns
-all remaining target cells. Its terminal claim is all 313 OpenClaw-controlled
-target cells complete, with `docs/fa` and `docs/th` either completed through an
-approved publishing path or disclosed as the only external platform
-constraints.
+calculated over those 315 translation-target cells. Independent owner cohorts
+may fill the remaining cells. The terminal product target is all 313
+OpenClaw-controlled target cells complete, with `docs/fa` and `docs/th` either
+completed through an approved publishing path or disclosed as the only
+external platform constraints.
 
 Conformance tests for a migrated renderer therefore include exact English
 compatibility, one non-English rendering, protected-literal preservation,
@@ -931,6 +936,11 @@ Locale files alone do not prove a localized product. Missing keys, English
 fallback, untranslated server messages, stale generated assets, and test
 isolation failures all produce incomplete experiences. A product-level claim
 needs a product-level report.
+
+The RFC standardizes the meaning of maturity and evidence. The current surface
+portfolio, reviewer roster, completion schedule, and generated report layout
+remain delivery and release policy so they can evolve without changing the
+runtime contract.
 
 ## Unresolved questions
 

@@ -7,9 +7,12 @@ Status: draft, tied to RFC 0024.
 
 ## Coverage Manifest
 
-OpenClaw checks in one localization coverage manifest. The exact path is an
-implementation decision. This abbreviated example omits the other required
-release-locale rows:
+OpenClaw may check in a localization coverage manifest once adopted owners need
+shared aggregation. The exact path is an implementation decision. An
+owner/adoption report contains only landed declarations; a product release
+claim overlays the required release portfolio and fails if a required surface
+is absent. Missing portfolio rows block that claim, not the minimal runtime
+kernel. This abbreviated example omits the other required release-locale rows:
 
 ```yaml
 version: 1
@@ -29,7 +32,10 @@ surfaces:
     catalogRevision: <catalog content hash>
     source: ui/src/i18n/locales/en.ts
     catalogs: ui/src/i18n/locales
-    contentClasses: [general]
+    messageFamilies:
+      general-ui:
+        keyPrefixes: [ui.]
+        contentClasses: [general]
     locales:
       en:
         maturity: source
@@ -44,7 +50,10 @@ surfaces:
     catalogRevision: <catalog content hash>
     source: src/localization/locales/en.ts
     catalogs: src/localization/locales
-    contentClasses: [safety, security, recovery]
+    messageFamilies:
+      approval-recovery:
+        keyPrefixes: [runtime.approval.]
+        contentClasses: [safety, security, recovery]
     locales:
       en:
         maturity: source
@@ -59,7 +68,8 @@ The coverage manifest references the shared locale registry rather than
 duplicating aliases, fallback, direction, or source-locale data. The checked-in
 schema must validate the registry reference and revision, locale state keys,
 test-fixture IDs, paths, owners, artifact IDs, per-artifact catalog revisions,
-content classes, and maturity states. Every surface must contain one state row
+message-family classifications, and maturity states. Every declared release
+surface must contain one state row
 for every release locale in the referenced registry. Missing rows are schema
 errors rather than implicit `unsupported` states. Test fixtures are a separate
 set and never receive surface maturity rows.
@@ -78,7 +88,8 @@ Each product owner publishes a build-time surface declaration with:
 - owner and artifact identity;
 - source, catalog, and revision paths;
 - migration state and validation command;
-- content classes; and
+- one or more stable message-family IDs with owned key prefixes, paths, or
+  another deterministic inventory boundary and their content classes; and
 - locale artifact discovery or explicit supported-locale evidence.
 
 The declaration owner is accountable for that surface's catalog, rendering,
@@ -99,8 +110,10 @@ a valid new surface without modifying generic core validation, while changing
 the required release portfolio remains an explicit product-policy change.
 
 `manifestRevision` is computed from the canonical checked-in manifest bytes and
-is not stored inside that manifest. Release reports, attestations, and packaged
-status expose the computed revision.
+is not stored inside that manifest. Release reports and packaged status expose
+the computed revision. Individual review attestations do not bind to this
+whole-product revision because unrelated surface changes must not invalidate
+otherwise current review evidence.
 
 `contentClasses` uses this closed v1 set:
 
@@ -116,8 +129,8 @@ recovery
 generated
 ```
 
-Checks are derived from maturity and content class, not selected by each
-surface:
+Checks are derived from maturity and message-family content class, not selected
+ad hoc by each surface:
 
 - every `complete` pair requires key parity, placeholder parity, fallback
   reporting with zero untranslated fallback, namespace ownership, and
@@ -125,9 +138,23 @@ surface:
 - `generated` content additionally requires generated-artifact parity;
 - `safety`, `security`, `authentication`, `authorization`,
   `destructive-action`, `privacy`, and `recovery` content additionally requires
-  human-review attestation for that locale and revision; and
-- a migrated surface cannot become `complete` while its owned source directory
-  has unresolved blocking hardcoded-string findings.
+  human-review attestation for that locale, message family, and revision; and
+- a migrated surface cannot become `complete` while one of its adopted message
+  families has unresolved blocking hardcoded-string findings.
+
+A surface is the release-reporting unit. A message family is the migration,
+review, and safety-attestation unit. One recovery or authentication message
+must not force unrelated general UI copy through the strongest review regime,
+while every high-risk family still fails closed.
+
+For each locale and message family, the generator computes a
+`reviewedContentRevision` over the stable family ID and inventory boundary, the
+English entries, descriptor fallback templates, parameter schemas, and that
+locale's translated entries. A fallback-only wording change therefore
+invalidates review evidence for its family even when catalog files are
+unchanged. The surface-wide `catalogRevision` remains packaging and
+deployment-drift evidence; it does not determine whether a scoped linguistic or
+safety review is current.
 
 The schema rejects a manifest that omits any derived requirement. New content
 classes or check identities require a schema change rather than an ad hoc
@@ -194,10 +221,11 @@ The initial set is not a comprehensive language-coverage claim. The coverage
 report must expose language, script, direction, and regional gaps so future
 locale additions can be prioritized by OpenClaw users and maintainers.
 
-The v1 manifest contains 15 English source rows plus 15 product surfaces across
-21 translation targets. Release completion is calculated over those 315
-translation-target cells. The completion target is all 313
-OpenClaw-controlled target cells at `complete`. `docs/fa` and `docs/th` must
+The initial release-policy snapshot contains 15 English source rows plus 15
+product surfaces across 21 translation targets. Release completion is
+calculated over those 315 translation-target cells. This is not an
+RFC-acceptance gate. The product completion target is all 313 OpenClaw-controlled
+target cells at `complete`. `docs/fa` and `docs/th` must
 either gain an approved publishing path or remain the only disclosed
 `platform-constrained` cells. An unqualified `fully-localized` claim requires
 all 315 target cells to be complete.
@@ -308,8 +336,8 @@ Requirements:
   published.
 - A stale source, glossary, generator, artifact, or validation result prevents
   promotion and queues or defers to a newer reconciliation.
-- Owner workflows may add fields, but Completion E relies only on this common
-  minimum.
+- Owner workflows may add fields, but product release aggregation relies only
+  on this common minimum.
 - The record proves generation and validation, not linguistic or safety
   approval.
 
@@ -330,7 +358,7 @@ Every registered generated catalog declares:
 - generator workflow and provider/model provenance;
 - the common translation-run evidence revision;
 - deterministic validation command; and
-- review policy for its content classes.
+- review policy for each adopted message family's content classes.
 
 The maintenance workflow follows a dependency-guard-style state machine:
 
@@ -376,6 +404,11 @@ Each locale/surface pair has one state:
 a locale file. `platform-constrained` requires evidence of the platform locale
 limit, the selected fallback, and adapter reconcile behavior.
 
+A locale/surface pair can be `complete` only when every adopted message family
+in that surface satisfies its derived checks and scoped review requirements.
+Unadopted inventory remains visible as a blocker or keeps the pair `partial`;
+it is not silently excluded by choosing a narrow family boundary.
+
 ## Automated Checks
 
 ### Blocking from the start
@@ -397,8 +430,8 @@ limit, the selected fallback, and adapter reconcile behavior.
 
 ### Blocking for migrated renderers
 
-Once a renderer or directory is declared migrated, its checks additionally
-require:
+Once a message family, key namespace, or narrowly owned directory is declared
+migrated, its checks additionally require:
 
 - exact reviewed English compatibility unless the change explicitly documents
   an English-copy change;
@@ -423,8 +456,8 @@ require:
 - untranslated external metadata; and
 - locale-sensitive parsing of host prose.
 
-Advisory checks become blocking per migrated directory or surface, not
-repository-wide in one change.
+Advisory checks become blocking per migrated message family, key namespace, or
+narrowly owned directory, not repository-wide in one change.
 
 Every advisory migration entry records an owner and `reviewBy` release or date.
 Passing that boundary requires promotion to blocking, an explicit renewed
@@ -496,19 +529,28 @@ beyond the repository's normal commit history:
 review:
   required: true
   status: reviewed
+  surface: gateway-errors
+  messageFamily: approval-not-found
+  locale: pt-BR
   reviewerRole: security-localization-reviewer
-  sourceRevision: <commit>
+  sourceProvenanceCommit: <commit containing the reviewed content>
+  reviewedContentRevision: <locale-and-message-family content hash>
   checklist: localization-safety-v1
+  reviewPolicyRevision: <localization-safety-v1 policy hash>
   attestationRevision: <commit>
 ```
 
 The attestation is checked data. A normal approving commit without the required
-role, checklist, and reviewed source revision does not satisfy safety review.
-It also records `surface`, `locale`, `catalogRevision`, and `manifestRevision`.
-CI requires exact revision equality before promoting or retaining `complete`;
-a regenerated or cherry-picked catalog invalidates stale review evidence. If a
-release manifest is signed, the attestation hash is included in that signed
-manifest rather than creating a separate signing system.
+role, checklist, content revision, and provenance does not satisfy safety
+review. It also records `surface`, `messageFamily`, `locale`,
+`sourceProvenanceCommit`, `reviewedContentRevision`, and
+`reviewPolicyRevision`. The provenance commit must contain the reviewed content
+and remain reachable from an accepted protected history, but it need not equal
+the later release commit. CI requires exact equality only for the current
+`reviewedContentRevision` and `reviewPolicyRevision`; a changed reviewed family
+invalidates its stale evidence without invalidating unrelated commits, families,
+or surfaces. If a release manifest is signed, the attestation hash is included
+in that signed manifest rather than creating a separate signing system.
 
 ## Report
 
@@ -545,9 +587,9 @@ The report distinguishes:
 - The release report uses `fully-localized` only when every one of the 315
   translation-target cells is complete.
 - Safety, security, authentication, authorization, destructive-action,
-  privacy, and recovery surfaces use one reviewed English message when the
-  locale/surface pair is not complete; key-level mixed-language fallback is
-  forbidden for those messages.
+  privacy, and recovery message families use one reviewed English presentation
+  when the family lacks current scoped review evidence; key-level
+  mixed-language fallback is forbidden for those messages.
 - A missing translation must not block an unrelated runtime operation; it
   blocks only the completeness claim.
 - Locale infrastructure failures that can corrupt or drop catalogs are release
@@ -643,8 +685,9 @@ The coverage system conforms to v1 when it can answer, at one commit:
 - which validation command proves the claim;
 - whether migrated structured outputs are locale-invariant;
 - whether product-owned presentation labels are fully catalog-backed;
-- whether protected literals remain unchanged; and
+- whether protected literals remain unchanged;
 - which semantic and rendering owners approved each migrated family;
+- which message-family boundary each safety or linguistic review attests;
 - whether public diagnostics avoid rendered, literal, and recipient content;
 - which superseded presentation authority was deleted; and
 - which findings prevent promotion to complete.

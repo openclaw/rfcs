@@ -1,49 +1,74 @@
 # Localization Implementation Plan
 
-RFC 0024 ships as a ten-PR arc: five foundation PRs followed by five completion
-PRs. The foundation creates and proves the shared contracts. The completion
-stack fills every declared product surface and closes the release matrix.
+RFC 0024 ships through serial owner-scoped vertical slices. It does not require
+a fixed PR count, a cumulative stack, or completion of the product translation
+matrix before the architecture can be accepted.
 
 Generated-content language remains a post-v1 follow-up because it changes model
 behavior rather than deterministic product-owned interface text.
 
-## Foundation Stack
+## Existing Drafts
 
-The preferred foundation stack is implemented and open for review:
+The five current drafts remain useful implementation evidence, but they are not
+the preferred landing units:
 
-| PR | Scope | Result |
+| Draft | Evidence to preserve | Delivery disposition |
 | --- | --- | --- |
-| [#111541](https://github.com/openclaw/openclaw/pull/111541) | Locale context and message rendering | Shared registry, locale resolution, immutable catalogs, additive Gateway metadata, and first CLI, approval, and Control UI consumers. |
-| [#111542](https://github.com/openclaw/openclaw/pull/111542) | Runtime adoption | Updater, service lifecycle, completion-cache, and shell presentation use the shared runtime. |
-| [#111543](https://github.com/openclaw/openclaw/pull/111543) | Governance and inventory | Contributor workflow, generic coverage validation, ordered owner/domain declarations, generated inventory, maturity states, catalog revisions, and promotion blockers. |
-| [#111544](https://github.com/openclaw/openclaw/pull/111544) | Product surfaces | CLI/TUI, Gateway/UI, channel safety, command, skill, and plugin metadata. |
-| [#111545](https://github.com/openclaw/openclaw/pull/111545) | Convergence and readiness | Cross-surface locale alignment, translation evidence, RTL safety, and fail-closed release reporting. |
+| [#111541](https://github.com/openclaw/openclaw/pull/111541) | Registry, context, renderer, validation, and representative consumers | Reduce to the minimal kernel plus one existing owner-controlled consumer. |
+| [#111542](https://github.com/openclaw/openclaw/pull/111542) | Operation-scoped updater rendering and compatibility fixtures | Rebase onto the minimal kernel and keep as a bounded updater-owned slice. |
+| [#111543](https://github.com/openclaw/openclaw/pull/111543) | Generic declarations, contributor guidance, and evidence generation | Introduce after landed surfaces exist; report only adopted owner declarations initially. |
+| [#111544](https://github.com/openclaw/openclaw/pull/111544) | Gateway/UI, TUI, channel, command, skill, and plugin prototypes | Split by semantic owner and public contract; do not land as one change. |
+| [#111545](https://github.com/openclaw/openclaw/pull/111545) | RTL isolation, convergence checks, and fail-closed reporting | Keep owner-local safety checks; defer product readiness aggregation until evidence exists. |
 
-The foundation stack validates these cross-cutting rules:
+## Serial Foundation Plan
 
-- name the semantic owner, rendering owner, descriptor boundary, and
-  locale-resolution boundary for each adopted family;
-- capture one immutable locale context at the owning command/request entry;
-- preserve exact reviewed English for compatibility callers;
-- keep human presentation separate from locale-invariant structured output;
-- classify parameters as literal data or product-owned presentation;
-- preserve commands, flags, paths, IDs, versions, codes, and upstream
-  diagnostics;
-- render recognized Gateway metadata without changing stable error semantics;
-- publish reviewed Gateway descriptor identities through
-  `packages/gateway-protocol`, not private Gateway source;
-- use whole-message English fallback for incomplete safety catalogs; and
-- keep localization-core validation generic while owners publish declarations
-  that the root product report aggregates with duplicate-ID/order rejection;
-- bind maturity claims to checked artifacts, catalog revisions, and review
-  evidence.
-- keep public diagnostics free of rendered text, parameters, recipient
-  identity, paths, commands, tokens, and raw exceptions; and
-- delete or explicitly bound the superseded hardcoded, duplicated, parsed-prose,
-  or edge-invented presentation path.
+### Slice 1: minimal kernel and existing consumer
 
-Earlier smaller drafts remain development provenance only. Review and delivery
-should use #111541-#111545.
+- locale registry, exact/inferred resolution, and immutable context;
+- descriptor, reviewed English fallback template, interpolation, and literal
+  isolation;
+- catalog and placeholder validation;
+- one existing Control UI or onboarding consumer; and
+- accepted, fallback, locale-isolation, compatibility, and deletion proof.
+
+It excludes Gateway metadata, capability metadata, the 15-surface portfolio,
+readiness reports, broad CLI/TUI extraction, and a public plugin catalog API.
+
+### Slice 2: one owner-approved safety path
+
+After Gateway-owner approval, prove `APPROVAL_NOT_FOUND` end to end:
+
+- one shared protocol-owned descriptor;
+- bounded optional `details.localization` metadata;
+- unchanged English code/message behavior for legacy clients;
+- Control UI edge rendering;
+- one reviewed non-English catalog; and
+- malformed, missing-key, privacy, and old-client fixtures.
+
+### Slice 3: updater-owned CLI adoption
+
+Rework the bounded updater changes from #111542 onto Slice 1. Keep JSON,
+commands, flags, paths, versions, status/reason values, stderr, and exit behavior
+locale-invariant. Delete the replaced updater presentation path.
+
+### Slice 4: one bounded TUI family
+
+Adopt one owner-approved family such as status or recovery. Do not combine this
+with command metadata, skills, plugins, channels, or a whole-TUI migration.
+
+### Independent owner tracks
+
+After their public contracts are approved, these tracks proceed independently:
+
+- command metadata and per-platform projection;
+- skill metadata;
+- plugin metadata and host-version negotiation;
+- Telegram and Discord command menus;
+- additional runtime and Gateway error families; and
+- channel safety messages only where a legitimate recipient locale exists.
+
+No track is blocked on a global readiness PR, and no track changes another
+owner's schema merely to satisfy localization-core.
 
 ## Repair And Adoption Rule
 
@@ -67,80 +92,64 @@ exists, safety review is missing, stable machine output would change, or the
 old authority cannot be removed. Preserve reviewed English, keep the surface
 incomplete, and do not widen localization core to compensate.
 
-## Completion Stack
+## Completion Cohorts
 
-The completion stack owns the current 15 owner-declared product surfaces and
-all 315 translation-target cells. Candidate catalogs may land as `partial`;
-generated or model-authored copy cannot attest itself as reviewed.
+Completion names are tracking cohorts, not single PRs or a linear stack:
 
-| PR | Primary scope | Cells | Completion result |
-| --- | --- | ---: | --- |
-| Completion A | Control UI, onboarding, channel/plugin setup, CLI, and TUI | 105 | The existing AI generated-PR pipeline gains the common translation-run evidence contract and becomes the shared detect/refresh/enforce gate; every operator-facing surface has complete target catalogs, zero fallback gaps, and script/RTL proof. |
-| Completion B | Bounded user-facing runtime and Gateway errors | 42 | An owner-approved error inventory uses stable descriptors, translated edge rendering, and compatible English fallback. |
-| Completion C | Server-rendered channels, command metadata, Telegram/Discord menus, and skill metadata | 105 | Every channel and capability surface has explicit locale ownership, complete catalogs, and unchanged stable identity. |
-| Completion D | Android, Apple, and docs | 63 | Native and `openclaw/docs` runs emit the same minimum source-pinned evidence, native quality blockers are cleared, artifacts are current, and Persian/Thai publishing has an explicit disposition. |
-| Completion E | Review evidence and release promotion | Product-wide | Common generation evidence and named review are bound to exact revisions, eligible cells become complete, and the generated release claim matches the evidence. |
+| Cohort | Primary scope | Product target |
+| --- | --- | --- |
+| Operator surfaces | Control UI, onboarding, channel/plugin setup, CLI, and TUI | Owner-scoped migrations and catalog waves eventually cover 105 target cells. |
+| Runtime safety | Bounded user-facing runtime and Gateway errors | Owner-approved inventories use stable descriptors, edge rendering, and compatible English fallback. |
+| Channels and capabilities | Server-rendered channels, command menus, command metadata, and skill/plugin metadata | Each public contract and locale authority lands independently. |
+| Native and docs | Android, Apple, and documentation | Existing owner pipelines emit source-pinned evidence; Persian/Thai publishing receives an explicit disposition. |
+| Release promotion | Product-wide | Scoped generation and review evidence promotes eligible cells and produces an honest release claim. |
 
-The terminal target is all 313 OpenClaw-controlled cells complete. `docs/fa`
-and `docs/th` must either gain an approved publishing path or remain the only
-two disclosed external platform constraints. An unqualified `fully-localized`
-claim requires all 315 cells to be complete.
+The current product-policy target is all 313 OpenClaw-controlled cells complete.
+`docs/fa` and `docs/th` must either gain an approved publishing path or remain
+the only two disclosed external platform constraints. An unqualified
+`fully-localized` claim requires all 315 cells to be complete. None of these
+counts is an RFC-acceptance condition.
 
 ## Continuous Translation Maintenance
 
-Completion A generalizes the existing Control UI and native-app locale-refresh
-pattern rather than creating a new bot:
+Owner cohorts generalize existing Control UI, native-app, and docs refresh
+patterns rather than creating a new translation service:
 
-- define the common translation-run evidence record and make one operator
-  catalog lane the first producer;
-- deterministic PR checks detect missing or stale target entries;
+- define a common minimum translation-run evidence record when a second owner
+  needs to consume or aggregate it;
+- deterministic owner checks detect missing or stale target entries;
 - trusted `main`, scheduled, or manual workflows run approved translation
   providers per locale;
-- workers publish isolated artifacts that are combined and validated once;
-- the generated-PR application opens or updates one reviewable branch;
-- owner/domain modules declare registered surfaces, their source, glossary,
-  generator, outputs, and validation command; and
-- enforcement demotes stale cells and blocks unsupported completeness claims.
+- owner workflows retain extraction, validation, publication, and auto-merge
+  policy; and
+- generated or model-authored copy cannot attest itself as reviewed.
 
-The implementation preserves the existing sharing:
+`openclaw/docs` continues to check out an exact `openclaw/openclaw` revision and
+run the source-owned translator. Native translation continues to reuse the
+Control UI translation client. The release cohort reads their scoped evidence;
+it does not copy their catalogs or translation memory into a central service.
+Provider secrets are never exposed to untrusted pull-request code.
 
-- `openclaw/docs` checks out an exact `openclaw/openclaw` revision and runs the
-  source-owned `scripts/docs-i18n` translator;
-- native translation imports the Control UI translation client; and
-- owner workflows retain their own extraction, validation, publication, and
-  auto-merge policies.
-
-Completion B-D register their catalogs with the common evidence contract.
-Completion D verifies the cross-repository documentation record rather than
-copying docs artifacts or translation memory into the product repository.
-Completion E reads generation evidence plus named review manifests when
-promoting maturity. Provider secrets are never exposed to untrusted
-pull-request code.
-
-## Workstream 1: Localization Core And Coverage Baseline
+## Workstream 1: Minimal Localization Core
 
 - Depends on: accepted RFC 0024
 - Issues: #28303, #90608, #105266
-- Owners: core runtime, Control UI, CLI
+- Owners: core runtime plus one existing consumer owner
 - Includes:
   - one dependency-light internal localization kernel shared by browser and
     server adapters;
   - shared locale registry, aliases, fallback chains, and direction;
   - registration of the existing 22-locale OpenClaw product union;
-  - locale-driven document language and direction at UI rendering boundaries;
+  - locale-driven language and direction at the selected rendering boundary;
   - `zh-CN` and `zh-TW` canonical IDs with `zh-Hans` and `zh-Hant` aliases;
-  - normalized existing Control UI and wizard locale resolution;
+  - normalized locale resolution for one selected existing consumer;
   - immutable localization context with provenance;
   - one internal `LocalizedMessage` descriptor and English renderer;
   - bounded top-level plural/select catalog entries using locale plural rules;
-  - Control UI and wizard locale-resolution adapters as production consumers;
+  - one Control UI or wizard locale-resolution adapter as a production
+    consumer;
   - shared key, placeholder, namespace, and fallback validation;
-  - generic localization-core coverage validation;
-  - ordered owner/domain surface declarations with duplicate-ID/order
-    rejection;
-  - checked-in generated localization coverage manifest;
   - representative script, direction, shaping, and segmentation matrix;
-  - advisory hardcoded-string and locale-sensitive parsing inventory;
   - catalog revision identity and locale-state isolation fixes.
 - Compatibility:
   - preserve `OPENCLAW_LOCALE`;
@@ -154,17 +163,15 @@ pull-request code.
   - one accepted descriptor and one missing-key fallback;
   - English, Russian/Ukrainian, Polish, and Arabic plural-category fixtures;
   - invalid placeholder and namespace failures;
-  - acceptance of a new valid owner surface without editing localization core;
-  - duplicate surface ID and deterministic-order collision failures;
   - render-path denial of filesystem, network, environment, and storage access;
   - parallel locale isolation with no process-global locale bleed;
   - concurrent locale changes and catalog replacement;
-  - unchanged English onboarding and representative UI snapshots;
-  - warmed rendering stays within the v1 performance budget.
+  - unchanged English snapshots for the selected consumer; and
+  - a reproducible warmed benchmark report before any numeric gate is adopted.
 - Result:
-  - the shared kernel exists and has production consumers;
-  - current localized surfaces use it without visible behavior changes;
-  - coverage can report later migrations from the first PR.
+  - the shared kernel exists with one production consumer;
+  - that consumer uses it without visible English behavior changes; and
+  - later owners can adopt it without broadening the kernel.
 
 ## Workstream 2: Runtime Safety Messages And Gateway Errors
 
@@ -324,24 +331,25 @@ runtime.
 ## Dependency Shape
 
 ```text
-#111541 locale context and message rendering
-  -> #111542 runtime adoption
-  -> #111543 governance and inventory
-  -> #111544 product surfaces
-  -> #111545 convergence and readiness
+accepted locale/descriptor/fallback contract
+  -> minimal kernel + existing consumer
+       -> updater-owned adoption
+       -> bounded TUI family
+       -> owner-approved Gateway safety slice
 
-#111545
-  -> completion A operator surfaces
-  -> completion B runtime and Gateway
-  -> completion C channels and metadata
-  -> completion D native apps and docs
+owner-approved public contracts
+  -> command metadata
+  -> skill/plugin metadata
+  -> channel and native menu projections
 
-completion A-D + named review evidence
-  -> completion E release promotion
+landed owner declarations + scoped review evidence
+  -> coverage aggregation
+  -> release promotion
 ```
 
-Completion A-D can proceed by owner after #111545. Completion E closes the product
-claim only after their artifacts and named review evidence are current.
+Owner cohorts can proceed independently after the minimal kernel and their own
+public contract approvals. Release promotion closes the product claim only
+after landed artifacts and scoped named-review evidence are current.
 
 ## Cross-RFC Alignment
 
@@ -352,34 +360,33 @@ claim only after their artifacts and named review evidence are current.
 - Gateway protocol changes remain owned by OpenClaw Gateway maintainers.
 - Plugin and skill manifest changes remain owned by plugin/package maintainers.
 
-## V1 Acceptance Criteria
+## Acceptance Criteria
 
-RFC 0024 v1 is complete when:
+### RFC acceptance
 
-- the shared locale, descriptor, fallback, and coverage contracts are shipped;
-- every migrated family names semantic and rendering ownership plus its
-  descriptor and locale boundaries;
-- English plus all 21 translation targets are registered and reported;
-- Gateway errors and channel safety messages localize through stable
-  descriptors;
-- CLI and TUI human output is localized without destabilizing structured
-  output;
-- command and skill metadata use one locale-aware contract;
-- runtime behavior does not depend on English host prose;
-- right-to-left locales set direction and isolate literal commands and IDs;
-- missing translations fall back safely to English;
-- public localization diagnostics remain bounded and content-free by default;
+RFC 0024 can be accepted when owners approve:
+
+- locale identity, precedence, immutable context, and fallback semantics;
+- the stable descriptor, typed parameter, and edge-rendering model;
+- locale-invariant machine identities and structured output;
+- the minimum maturity and scoped-evidence meanings; and
+- explicit owner gates for Gateway, recipient locale, command, skill, and
+  plugin public surfaces.
+
+### Foundation shipped
+
+The foundation is shipped when:
+
+- the minimal kernel and one existing owner-controlled consumer land;
+- reviewed English fallback templates are rendered at the edge;
+- right-to-left literal isolation and missing-key fallback are proven;
 - adopted slices include accepted, fallback/failure, compatibility, privacy,
-  rollback, and deletion evidence;
-- superseded hardcoded, duplicated, parsed-prose, and edge-invented
-  presentation authorities are removed or explicitly bounded compatibility
-  paths;
-- release artifacts publish an honest localization coverage report; and
-- generated catalog runs expose common source, glossary, generator, artifact,
-  and validation provenance without exposing credentials or translated
-  content;
-- all 313 OpenClaw-controlled translation-target cells are complete;
-- any remaining `docs/fa` or `docs/th` platform constraint is explicitly
-  disclosed; and
-- OpenClaw does not claim full product localization until all 315
-  translation-target cells are complete.
+  rollback, and deletion evidence; and
+- public diagnostics remain bounded and content-free by default.
+
+### Product completion
+
+Product completion is a later release-policy decision. It requires an honest
+coverage report, current generated artifacts, scoped named review, disclosure
+of any platform constraints, and the chosen 313/315 or 315/315 target. It is
+not required to accept the RFC or ship the runtime foundation.
