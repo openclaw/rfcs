@@ -43,8 +43,9 @@ strings that channels send as ordinary outbound messages:
   (`buildExecApprovalRequestMessage`, plus its resolved and expired variants)
   and dispatches per-channel rendering through `buildApprovalRenderPayload`.
   It also emits fenced code blocks. This is the path used by every channel that
-  declares an approval capability without a render adapter, so it is where the
-  unrendered-marker problem is most visible.
+  declares an approval capability with neither a render adapter nor a native
+  approval runtime, so it is where the unrendered-marker problem is most
+  visible.
 
 So core already ships markdown, just not on purpose and not uniformly. The exec
 approval `Pending command:` fence renders as a code block on channels that
@@ -68,12 +69,16 @@ layer for normal outbound text, but with diverging dialects:
   send module with a distinct dialect (`**bold**` vs `*bold*`, fenced code
   support, escaping rules).
 
-Beyond those seven, a second group declares an approval capability with no
-render adapter at all: Feishu, Google Chat, Mattermost, Microsoft Teams,
-Nextcloud Talk, QQ Bot, Synology Chat, and Zalo. They receive approval text
-through the forwarder fallback and render none of the markdown core emits, so
-they show literal fences and backticks to the person being asked to approve a
-shell command. This group is the clearest evidence for the contract.
+Beyond those seven, a second group declares an auth-only approval capability
+built with `createChannelApprovalAuth`: Feishu, Mattermost, Microsoft Teams,
+Nextcloud Talk, Synology Chat, and Zalo. They have neither a render adapter nor
+a native approval runtime, so their approval text comes from the forwarder
+fallback, and none of them applies any markdown translation on the way out.
+Whatever their transport does with a fence or a backtick is accidental and
+undeclared: Mattermost happens to render markdown server-side, while others
+surface the raw markers to the person being asked to approve a shell command.
+That the outcome varies by transport, with nothing in the codebase stating
+which is intended, is the clearest evidence for the contract.
 
 The dialects diverge, which is exactly why a single canonical core dialect plus
 per-channel translation is the right seam. The goal is not a new approval
@@ -190,8 +195,12 @@ Compatibility is opt-in, so the default is the safe one.
 1. Land the canonical subset, the downgrade helper, the capability, and core
    enforcement on the forwarder path. In the same change, declare
    `approvalText: "markdown"` on every channel that already renders the subset
-   today: Telegram, Matrix, Signal, WhatsApp, Slack, and Discord. Channels with
-   no renderer keep the default and stop showing literal markers.
+   today: Telegram, Matrix, Signal, WhatsApp, Slack, and Discord. Assess each
+   remaining channel against its actual transport before leaving it at the
+   default, because rendering can come from the transport rather than from
+   channel code. Mattermost is the known case: it has no render adapter but its
+   server renders markdown, so it needs the same declaration despite carrying
+   an auth-only capability.
 2. Move iMessage to `markdown`. Its converter handles bold, italic, underline,
    and strikethrough but ignores inline code and fences, so approval prompts
    currently show literal backticks. This step teaches the converter to consume
@@ -203,12 +212,18 @@ Compatibility is opt-in, so the default is the safe one.
    not incidental output.
 
 Step 1 is not behavior-neutral, and an earlier revision of this RFC wrongly
-claimed it was. The default reproduces today's output only for channels that
-render nothing. For channels that already parse markdown, leaving them at the
-default would strip formatting they ship today, which is why their declaration
-belongs in step 1 rather than a later one. The user-visible effect of step 1 is
-that channels with no renderer stop showing stray markers, and channels with a
-renderer are unchanged.
+claimed it was. The default reproduces today's output only where nothing
+renders the markers. Anywhere they are already rendered, whether by channel
+code or by the transport itself, leaving the default in place would strip
+formatting that ships today, which is why those declarations belong in step 1
+rather than a later one. The user-visible effect of step 1 is that surfaces
+showing raw markers stop showing them, and surfaces already rendering are
+unchanged.
+
+The declaration is per channel, not per capability shape. An auth-only
+capability can carry `approvalText` even though it projects no runtime approval
+adapter, which is precisely why the mode must be read from the capability
+rather than from that projection.
 
 There is no flag day. A channel that never opts in keeps shipping clean
 plaintext forever, which is a supported end state, not a temporary shim.
