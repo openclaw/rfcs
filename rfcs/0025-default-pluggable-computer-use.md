@@ -25,8 +25,8 @@ escalation. The bundled `cua-computer` plugin maps this contract to CUA and
 provides CUA-derived model guidance. On macOS, `OpenClaw.app` directly starts
 CUA embedded mode and the app-owned TypeScript node worker runs the same plugin
 adapter used by Windows and Linux. CUA remains replaceable by another node-local
-fulfiller such as Peekaboo. The original native MCP projection proposal is
-preserved as an [alternative](0025/alternative-node-mcp-approach.md).
+fulfiller such as Peekaboo. The earlier native-MCP projection is rejected; its
+tradeoffs are recorded below, but it is not a second design or delivery plan.
 
 ## Design constraints and requirements
 
@@ -140,6 +140,11 @@ contract at the stable concepts between those extremes.
 The original design remains useful when native provider fidelity is more
 important than a stable cross-provider action contract. It is no longer the
 recommended OpenClaw architecture.
+
+The comparison above is the complete decision record for that rejected design.
+This RFC keeps one normative architecture and one implementation plan; it does
+not retain a parallel native-MCP plan that future work could accidentally
+maintain or revive.
 
 ## Goals
 
@@ -310,14 +315,39 @@ their own trusted services into the selected bundled provider. External plugins
 can fulfill the interface only with authority already available to their node
 runtime.
 
-The existing `registerNodeHostCommand` implementation is sufficient for the
-current CUA proof and remains available for unrelated commands. The provider
-API should land only with migration of `cua-computer`, so it has a real consumer.
+The existing `registerNodeHostCommand` implementation remains available for
+unrelated commands. The provider API should land only with replacement of the
+experimental CUA proof's direct command path, so it has a real consumer and no
+legacy CUA registration path remains.
 [openclaw/openclaw#110293](https://github.com/openclaw/openclaw/pull/110293)
 may supply the `{id, label}` identity portion if it lands first, but this RFC
 does not depend on it. The transport- and permission-specific metadata proposed
 by [openclaw/openclaw#101564](https://github.com/openclaw/openclaw/pull/101564)
 is unnecessary for execution.
+
+### CUA cutover and removal
+
+Compatibility is deliberately narrow. OpenClaw retains the shipped v1
+`computer.act` wire contract and its existing generic node and Peekaboo behavior
+for old nodes. The experimental CUA plugin is not a separate compatibility
+target: its direct command registration, pre-provider lifecycle, and narrow
+eight-tool adapter are replaced in place by the provider execution path.
+
+The replacement must provide the v1 coordinate action subset through the
+canonical provider while v2 action families roll out. It must not leave a
+legacy CUA adapter, plugin mode, fallback, config reader, or duplicate test
+suite beside that path. Any useful driver transport, frame authorization, or
+refusal logic moves into the canonical provider implementation; unused
+interfaces and tests are deleted.
+
+The pre-release `driverPath` and ambient-`PATH` setup are not upgrade contracts.
+Managed artifacts become the production path. If a developer override remains
+useful, it is one explicitly developer-only current configuration surface, not
+a compatibility reader for the old plugin configuration.
+
+The CUA compatibility bundle names one accepted CUA manifest/version at a time.
+An unknown or skewed driver fails closed; OpenClaw does not carry multiple
+version-specific mappings or adapters to preserve experimental behavior.
 
 ### Versioned node capability declaration
 
@@ -988,16 +1018,19 @@ route, complicate host selection, and make Peekaboo or another provider expose
 a fundamentally different tool set. It also makes CUA's CLI/MCP skill tempting
 as a bypass around `computer.act`.
 
-The preserved [node-MCP alternative](0025/alternative-node-mcp-approach.md)
-documents that approach and its stronger native-fidelity tradeoff.
+The decision table above records the native-projection alternative and its
+stronger native-fidelity tradeoff. It is deliberately not kept as a competing
+implementation plan.
 
 ### Why not keep the current eight-tool CUA mapping
 
-The existing mapping is a useful compatibility slice but reduces CUA to global
+The experimental mapping is a useful bootstrap slice but reduces CUA to global
 foreground desktop input. It loses background window operation, semantic
 targets, exact browser binding, verification, sessions, recording, and the
 fallback strategy that makes CUA effective. Expanding the action contract is
 necessary for CUA to be the default rather than merely another mouse backend.
+The replacement retains the portable v1 coordinate behavior through the
+canonical provider; it does not preserve the bootstrap adapter as a second path.
 
 ### Why not add all 49 tools one-for-one
 

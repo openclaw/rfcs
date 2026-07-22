@@ -1,9 +1,9 @@
 # Implementation Plan
 
 This plan delivers RFC 0025 by extending OpenClaw's existing
-`screen.snapshot` + `computer.act` architecture. The former plan for projecting
-CUA's native MCP catalog through a dedicated provider route is preserved in
-[alternative-node-mcp-implementation-plan.md](alternative-node-mcp-implementation-plan.md).
+`screen.snapshot` + `computer.act` architecture. It is the sole normative
+delivery plan; the rejected native-MCP projection is recorded in the RFC's
+decision table and has no parallel implementation track.
 
 Work is organized into mergeable PRs and parallel waves. A later wave may begin
 against frozen fixtures before every earlier platform implementation has
@@ -13,9 +13,14 @@ landed, but production rollout follows the dependency graph.
 
 - Every PR is independently safe. Incomplete v2 capabilities remain
   unadvertised and unavailable.
-- V1 `computer.act`, `screen.snapshot`, frame binding, arming, idempotency,
-  cancellation, and Peekaboo behavior remain green throughout migration.
+- The shipped v1 `computer.act` wire contract, `screen.snapshot`, frame
+  binding, arming, idempotency, cancellation, and Peekaboo behavior remain
+  green throughout migration. They are compatibility requirements for old
+  generic nodes, not a requirement to preserve the experimental CUA adapter.
 - Protocol changes are additive. Old nodes continue to expose only v1.
+- The experimental CUA plugin is replaced in place. It has no legacy command
+  registration, adapter mode, config reader, or test suite after its useful
+  behavior has moved to the canonical provider execution path.
 - OpenClaw core remains provider-neutral. CUA versions, MCP mappings, skill,
   policies, and artifact metadata live in the bundled `cua-computer` plugin.
 - A public Plugin SDK method lands only with the migrated CUA plugin as a real
@@ -142,7 +147,9 @@ work can begin against those fixtures before every core PR merges.
   - Define stable closed error codes for stale provider/execution/frame/
     observation/element/browser refs, unsupported action/delivery, busy host,
     missing permission, and unavailable backend.
-  - Preserve v1 wire decoding and current `OpenClawComputerActParams` fixtures.
+  - Preserve v1 wire decoding and current generic
+    `OpenClawComputerActParams` fixtures; do not preserve CUA-private types as
+    a second contract.
   - Generate or share fixtures consumed by TypeScript and Swift.
 - Proof:
   - Protocol round-trip tests for every action family and result branch.
@@ -198,8 +205,10 @@ work can begin against those fixtures before every core PR merges.
     provider switch, Stop, and idle expiry through one idempotent close path.
   - Extend node-host invocation context with the run identity and cancellation
     signal needed by the provider without exposing either to the model.
-  - Migrate the existing CUA plugin's v1 command registration as the first real
-    consumer before exporting the SDK surface.
+  - Replace the existing CUA plugin's direct v1 command registration with the
+    provider runtime as the first real consumer before exporting the SDK
+    surface. The canonical provider still fulfills v1 coordinate actions for
+    the generic wire contract.
 - Proof:
   - Duplicate providers cannot both own the command pair.
   - Readiness changes republish the node declaration deterministically.
@@ -207,8 +216,8 @@ work can begin against those fixtures before every core PR merges.
   - A second mutating execution receives `COMPUTER_HOST_BUSY`.
   - External plugin tests prove provider registration does not grant native app
     permission or process-launch authority.
-- Merge state: current CUA v1 behavior remains opt-in; provider registry is now
-  exercised in production code.
+- Merge state: the canonical CUA provider fulfills the opt-in v1 coordinate
+  subset; the old CUA registration path is gone.
 
 ## Wave 2: Provider and platform vertical slices
 
@@ -218,10 +227,13 @@ work can begin against those fixtures before every core PR merges.
 - Depends on: `OC-3`; consumes `OC-1` fixtures
 - Can run with: `OC-5`, `OC-6`, `OC-7`
 - Work:
-  - Split driver lifecycle, MCP transport, mapping, frame state, and provider
-    execution into explicit modules.
-  - Replace the hard-coded 0.10 prefix check with the accepted compatibility
-    bundle and exact capability/schema validation.
+  - Move only the reusable driver lifecycle, MCP transport, frame
+    authorization, and refusal logic into the canonical provider execution.
+    Delete the old direct command registration, bootstrap adapter, and any
+    modules or tests left unused by that move.
+  - Replace the hard-coded 0.10 prefix check with one accepted
+    compatibility-manifest version plus exact capability/schema validation.
+    Refuse skew rather than retaining version-specific adapters.
   - Preserve the deny-by-default environment allowlist, telemetry/update
     opt-outs, serialization, geometry checks, and typed refusals.
   - Inject one CUA session per OpenClaw execution and close it through provider
@@ -229,13 +241,20 @@ work can begin against those fixtures before every core PR merges.
   - Publish v2 readiness/capabilities only for implemented action families.
   - Keep unsupported primary-display, hold, modifier, Wayland, and platform
     branches explicit until later PRs close them.
+  - Remove the pre-release `driverPath` compatibility surface and ambient
+    `PATH` as production setup when managed artifacts land. A retained override
+    must be a single explicitly developer-only current setting.
 - Proof:
-  - Existing `extensions/cua-computer` tests remain green.
+  - The canonical provider fulfills the generic v1 coordinate scenarios and
+    all retained tests exercise that path. Delete tests whose only purpose was
+    the retired direct registration or bootstrap adapter.
   - Recorded CUA fixtures prove version, capability, schema, and generation
     behavior.
   - Provider restart invalidates frame and session state.
-- Merge state: behavior-equivalent to current v1 plus provider lifecycle; still
-  disabled by default.
+  - The removal check proves no direct CUA command registration, duplicate
+    mapping, legacy config reader, or dead bootstrap modules remain.
+- Merge state: one canonical CUA provider path fulfills the v1 coordinate
+  subset plus provider lifecycle; it is still disabled by default.
 
 ### OC-5: Add the macOS app-owned embedded CUA host
 
@@ -500,8 +519,10 @@ in parallel after `OC-8`.
 - Work:
   - Run packaged macOS, Windows, Linux X11, supported Wayland, local-Gateway,
     remote-Gateway, and provider-switch scenarios.
-  - Verify v1 regression, v2 semantic flow, browser, recording/resources,
-    provider sessions, cleanup, upgrades, rollback, and diagnostics.
+  - Verify the shipped generic v1 wire contract and Peekaboo behavior, v2
+    semantic flow, browser, recording/resources, provider sessions, cleanup,
+    upgrades, rollback, and diagnostics. This does not preserve the retired
+    direct CUA adapter.
   - Compare advertised capability with the accepted CUA parity matrix and
     document every intentionally unavailable branch.
 - Exit gate:
@@ -557,7 +578,9 @@ in parallel after `OC-8`.
   fixtures and do not regenerate protocol shapes by hand.
 - `CU-1` pins CUA fixtures to accepted tags. Tests do not fetch CUA `main`.
 - The CUA plugin compatibility bundle is one source of truth for supported
-  versions, mappings, policies, skill digest, and artifacts.
+  version, mappings, policies, skill digest, and artifacts. It has one accepted
+  manifest/version at a time, not a compatibility matrix for prior experimental
+  adapters.
 - Platform PRs use fake providers for lifecycle coverage and reserve real CUA
   for focused packaged E2E lanes.
 - Stacked branches may consume provisional fixtures, but merged PRs depend only
