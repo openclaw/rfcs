@@ -160,14 +160,30 @@ The portable agent object is:
 | `sandbox.mode` | enum | No | `off`, `non-main`, or `all`. |
 | `sandbox.scope` | enum | No | `session`, `agent`, or `shared`. |
 | `sandbox.workspaceAccess` | enum | No | `none`, `ro`, or `rw`. |
-| `tools.allow` | string array | No | At least one non-empty string when present. |
+| `tools.profile` | string | No | Must resolve through the applying OpenClaw version's canonical built-in profile registry. Custom profile definitions are not portable. |
+| `tools.allow` | string array | No | At least one non-empty string when present; mutually exclusive with `tools.alsoAllow`. |
+| `tools.alsoAllow` | string array | No | At least one non-empty string when present; extends a selected profile and is mutually exclusive with `tools.allow`. |
 | `tools.deny` | string array | No | At least one non-empty string when present. |
+| `tools.fs.workspaceOnly` | boolean | No | Restricts filesystem tools to the new agent's workspace. |
+| `memorySearch.enabled` | boolean | No | Enables or disables memory search for the new agent. |
+| `memorySearch.rememberAcrossConversations` | boolean | No | Explicitly permits relevant context from the agent's other private conversations. |
+| `memorySearch.sources` | enum array | No | Non-empty array containing only `memory` and `sessions`; `sessions` requires `rememberAcrossConversations: true`. |
 | `heartbeat` | object | No | Exact portable heartbeat object below. |
 | `humanDelay` | object | No | Exact portable human-delay object below. |
 
 All objects are strict. Consumers may accept empty optional objects, but
 canonical producers must omit an optional object when none of its members are
 present.
+
+These fields map directly to existing per-agent OpenClaw configuration. The
+host's global tool and runtime policy remains authoritative. A Claw cannot carry
+custom profile definitions, provider-specific or sender-specific tool policy,
+elevated access, executable settings, memory providers or credentials, remote
+endpoints, local memory paths, or indexing/storage tuning.
+
+The package `ref` for a skill is not necessarily its canonical runtime skill
+identity. Version 1 therefore does not set `agent.skills`; declared workspace
+skills are discovered normally and inherited operator allowlists remain intact.
 
 `heartbeat` may contain only:
 
@@ -341,8 +357,15 @@ agent:
   name: GitHub Triage
   description: Reviews incoming issues and prepares a daily summary.
   tools:
-    allow: [read, write, web_fetch]
+    profile: coding
+    alsoAllow: [cron]
     deny: [exec]
+    fs:
+      workspaceOnly: true
+  memorySearch:
+    enabled: true
+    rememberAcrossConversations: true
+    sources: [memory, sessions]
   heartbeat:
     every: 30m
 workspace:
@@ -395,9 +418,12 @@ of the same schema version, not different capability levels.
 
 ## Compatibility and Evolution
 
-Schema evolution requires a new integer `schemaVersion`. Consumers must reject
-unsupported versions rather than partially apply them. New optional fields must
-not be added to version 1 because strict v1 consumers reject unknown fields.
+This addendum finalizes the experimental schema version 1 field set before
+graduation. Consumers must reject unsupported versions rather than partially
+apply them. After graduation, new optional fields require a new integer
+`schemaVersion` because strict v1 consumers reject unknown fields. Omission of
+the portable tool and memory-search fields preserves existing inherited
+behavior.
 
 There is no canonical byte serialization. Producers should emit stable field
 ordering and formatting for reviewable diffs, but semantic equality is based on
@@ -425,6 +451,11 @@ A conforming consumer must:
 - reject duplicate YAML keys and unknown schema fields;
 - validate all identifiers, exact versions, paths, environment references,
   cron expressions, timezones, and uniqueness constraints;
+- validate profile selections as non-empty portable identifiers without
+  accepting custom profile definitions; an applying harness must additionally
+  resolve the identifier through its canonical built-in profile registry and
+  reject an unknown profile before planning mutation;
+- reject `tools.allow` combined with `tools.alsoAllow`;
 - ignore the Markdown body for runtime behavior;
 - preserve original bytes for integrity calculations;
 - reject a `CLAW.md` file larger than 1 MiB before parsing, including when it
@@ -445,4 +476,5 @@ A conforming producer must:
   timezones;
 - place human explanation, not executable declarations, in the Markdown body;
 - exclude credentials and operator-owned runtime choices;
+- emit only portable per-agent tool and memory-search settings;
 - validate the result against this specification before publication or export.

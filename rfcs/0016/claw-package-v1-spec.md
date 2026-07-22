@@ -236,9 +236,16 @@ A registry such as ClawHub owns:
 - safe search/detail summaries;
 - exact artifact resolution and hosted feed entries.
 
+Registry validation covers the portable profile identifier and modifier shape,
+but does not copy or freeze a harness's evolving built-in profile registry. A
+registry may therefore accept a structurally valid profile selection that an
+older applying client does not recognize. The applying client must reject that
+selection before planning mutation.
+
 OpenClaw owns:
 
 - local package and manifest validation;
+- resolution of profile selections through its current built-in registry;
 - read-only planning and operator consent;
 - creation of the new agent and workspace;
 - delegation to skill, plugin, MCP, agent, workspace, and scheduler owners;
@@ -285,6 +292,22 @@ surface, or recurring work requires a distinct machine-readable record and
 human-readable disclosure rather than being hidden in ordinary content
 reconciliation. The same classification applies during add and update; an
 owner must not invent a weaker capability-specific approval.
+
+Portable agent tool profiles are selections from the applying harness's
+canonical built-in registry, not package-defined policy objects. Planning must
+show the selected profile and modifiers. Update planning must resolve built-in
+profiles to tool capabilities before classifying a profile change; it must not
+treat profile labels as opaque. Enabling memory search, enabling
+cross-conversation memory, or adding the `memory` or `sessions` source is an
+escalation. Restricting filesystem tools to the agent workspace, disabling
+memory search or cross-conversation memory, or removing a source is a reduction.
+The `sessions` source requires an explicit cross-conversation memory opt-in.
+Update classification resolves inherited memory defaults before comparison.
+
+The applying host's global policy remains an upper bound. A package must not
+carry custom tool-profile definitions, local credentials or bindings, provider
+configuration, or local memory paths. Unsupported portable settings block the
+complete plan rather than being dropped.
 
 An application profile may satisfy capability and content consent with one
 confirmation only when the plan represents the capability set separately and
@@ -500,6 +523,12 @@ workspace sources. Export includes only portable supported state and excludes
 secrets, resolved environment values, models, providers, bindings, sessions,
 logs, caches, and unrelated global configuration.
 
+For agent policy, export may preserve a registered built-in tool-profile
+selection, `allow` or `alsoAllow`, `deny`, `fs.workspaceOnly`, and memory-search
+`enabled`, `rememberAcrossConversations`, and `sources`. It must exclude custom
+profile definitions and all other tool or memory-search configuration. The
+exported manifest must pass the same strict validator before being returned.
+
 Export may preserve an original package name and version only by returning the
 byte-for-byte original artifact with the same digest. Any regenerated package,
 including one exported from an unchanged installation, must use a new
@@ -548,6 +577,7 @@ A conforming applying client must:
 - delegate resources to canonical owners and record provenance;
 - fail closed on collisions, unsupported components, and unsafe paths;
 - distinguish applied state from local operational readiness;
+- preserve host policy as the upper bound for portable agent settings;
 - preserve drifted or independently owned state during update and remove;
 - derive managed and referenced relationships from canonical owner state;
 - retain referenced resources by default and bind any operator-selected

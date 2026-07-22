@@ -3,7 +3,7 @@ title: Claws
 authors:
   - Gio
 created: 2026-07-03
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/27
@@ -94,8 +94,10 @@ adopting or merging into an existing agent or managed workspace.
 - Embedding model, provider, thinking-level, authentication, or other
   operator-controlled runtime defaults.
 - Embedding channel account ids, group ids, credentials, or bindings.
-- Setting `agents.list[].skills`; workspace-installed skills remain naturally
-  discoverable and must not replace inherited allowlists.
+- Setting `agents.list[].skills`; package coordinates do not yet provide the
+  canonical skill identities needed to validate an agent allowlist safely.
+  Workspace-installed skills remain naturally discoverable and do not replace
+  inherited allowlists.
 - Defining a generic `connector` installation concept. Channel capabilities are
   supplied by normal channel plugins and configured or bound locally.
 - Defining a feed-backed MCP connector catalog or replacing the Control UI's
@@ -121,6 +123,7 @@ principles.
 | Package identity | Package name and version come from the enclosing package metadata and authenticated publish operation, following the ClawHub plugin precedent. |
 | Operator control | Models, providers, credentials, channel bindings, and local runtime defaults are not portable Claw settings. |
 | Agent configuration | Only explicitly supported portable job settings can be copied into the new `agents.list[]` entry. |
+| Tool policy | A Claw may select a built-in profile registered by the applying OpenClaw version and refine it with portable allow, deny, and workspace-only filesystem policy. Host policy remains authoritative. |
 | Skills | Skill packages install into the new agent's workspace and are discovered normally; the Claw does not set `agent.skills`. |
 | Plugins | Plugin packages use existing plugin installers, safety checks, enablement rules, and install records. |
 | Discovery and composition | Hosted feeds discover and govern plugin and skill packages; a Claw composes exact resolved package versions and direct MCP declarations rather than defining another catalog. |
@@ -231,8 +234,15 @@ The initial public shape is grouped by OpenClaw ownership boundary:
       "workspaceAccess": "rw"
     },
     "tools": {
-      "allow": ["read", "write", "edit", "web_fetch", "memory_search", "memory_get"],
-      "deny": ["exec", "browser", "nodes"]
+      "profile": "coding",
+      "alsoAllow": ["cron"],
+      "deny": ["exec", "browser", "nodes"],
+      "fs": { "workspaceOnly": true }
+    },
+    "memorySearch": {
+      "enabled": true,
+      "rememberAcrossConversations": true,
+      "sources": ["memory", "sessions"]
     },
     "heartbeat": {
       "every": "30m",
@@ -316,9 +326,11 @@ The schema version 1 field set, validation rules, JSON representation, and
 `CLAW.md` envelope are normative for the experimental implementation.
 Implementation slices may land separately behind the experimental gate, but a
 producer or consumer must not claim schema v1 conformance until it implements
-the complete grouped data model. Version 1 is strict: new portable fields,
-semantic changes, and ownership changes require a new schema version so
-existing consumers never interpret or silently discard an unknown declaration.
+the complete grouped data model. This addendum finalizes the experimental v1
+field set before graduation; omitted optional fields retain the prior behavior.
+After v1 graduates, new portable fields, semantic changes, and ownership changes
+require a new schema version so existing consumers never interpret or silently
+discard an unknown declaration.
 
 Unknown fields fail closed. Implementations must not silently drop a declared
 component and still call the agent complete.
@@ -333,7 +345,10 @@ can include:
 - agent identity presentation;
 - group-chat mention patterns;
 - sandbox boundaries;
-- tool allow and deny policy;
+- a built-in tool profile registered by the applying OpenClaw version;
+- tool `allow` or `alsoAllow`, `deny`, and `fs.workspaceOnly` policy;
+- memory-search enablement, explicit cross-conversation memory opt-in, and the
+  portable `memory` and `sessions` sources;
 - heartbeat behavior;
 - human-delay behavior.
 
@@ -344,10 +359,30 @@ The following remain operator controlled and are rejected in a Claw manifest:
 - channel account ids, group ids, and bindings;
 - default-agent selection and global `agents.defaults`;
 - `agent.skills` allowlists;
+- custom tool-profile definitions, provider-specific tool policy, elevated
+  access, executable defaults, and sender-specific policy;
+- memory providers, models, credentials, remote endpoints, local paths, and
+  storage or indexing tuning;
 - arbitrary config fragments or unknown future agent fields.
 
 The generated `agents.list[]` entry inherits operator defaults. Add appends one
 entry and does not rewrite existing list members or defaults.
+
+A profile name is valid only when the applying OpenClaw version resolves it
+through the canonical built-in profile registry. The Claw schema must not copy a
+fixed list of profile names. A Claw carries a profile selection, not a custom
+profile definition. Global and operator policy continue to constrain the
+resulting tool surface and cannot be widened by a Claw.
+
+`tools.allow` is an explicit allowlist. `tools.alsoAllow` extends a selected
+profile, so a single tools object must not contain both. Update preview resolves
+built-in profiles to their effective tool sets before classifying a profile
+change as an escalation or reduction. Enabling memory search, enabling
+`rememberAcrossConversations`, or adding a source is a capability escalation;
+disabling either behavior or removing a source is a reduction. A portable
+declaration of the `sessions` source requires
+`rememberAcrossConversations: true` so it cannot silently normalize to ordinary
+workspace memory.
 
 For example, adding the illustrative manifest above with local agent id
 `github-triage` appends an agent entry while preserving the operator's current
@@ -382,8 +417,15 @@ defaults and agents:
           "workspaceAccess": "rw"
         },
         "tools": {
-          "allow": ["read", "write", "edit", "web_fetch", "memory_search", "memory_get"],
-          "deny": ["exec", "browser", "nodes"]
+          "profile": "coding",
+          "alsoAllow": ["cron"],
+          "deny": ["exec", "browser", "nodes"],
+          "fs": { "workspaceOnly": true }
+        },
+        "memorySearch": {
+          "enabled": true,
+          "rememberAcrossConversations": true,
+          "sources": ["memory", "sessions"]
         },
         "heartbeat": {
           "every": "30m",
@@ -658,6 +700,13 @@ servers, and cron jobs owned by the installed Claw. Local modifications become
 manual conflicts. Operator defaults, models, providers, credentials, bindings,
 and unrelated config remain untouched.
 
+Portable tool-profile changes are compared using the built-in profile registry's
+resolved capabilities rather than opaque profile labels. Tool additions,
+memory-search enablement, cross-conversation memory, and added memory sources
+require distinct capability consent. Restricting filesystem access, disabling
+memory search or cross-conversation memory, or removing sources is reported as a
+reduction. Update compares inherited memory defaults before classification.
+
 Consented update rebuilds the read-only plan immediately before mutation. Each
 owner uses its strongest available concurrency boundary: workspace content
 digests, expected MCP config values, stable cron declaration keys and scheduler
@@ -720,7 +769,10 @@ identity from a UI suggestion.
 ClawHub owns authenticated publication, package ownership, search/detail/API
 surfaces, hosted feed export, and authoring guidance. OpenClaw owns manifest
 validation, planning, local mutation, provenance, and lifecycle behavior. Both
-must share the schema and fixtures rather than maintain divergent validators.
+must share the portable structural schema and fixtures rather than maintain
+divergent package contracts. Applying OpenClaw additionally resolves a selected
+profile through its current built-in registry; ClawHub must not freeze that
+runtime-owned registry into publication validation.
 
 ### Safety and security
 
@@ -809,7 +861,7 @@ Implementation should widen the trust boundary in reviewable slices:
 
 ### Current OpenClaw implementation stack
 
-The experimental implementation is one RFC plus twelve ordered OpenClaw PRs. Each
+The experimental implementation is one RFC plus thirteen ordered OpenClaw PRs. Each
 implementation PR is based on the preceding head so reviewers can evaluate one
 ownership boundary at a time:
 
@@ -839,12 +891,17 @@ ownership boundary at a time:
     `CLAW.md` YAML-frontmatter input/export adaptation with grouped JSON read
     compatibility and no separate lifecycle behavior. It supersedes #106888,
     which was merged only into an obsolete stack head.
+13. [#112773](https://github.com/openclaw/openclaw/pull/112773) - registered
+    built-in tool profile selection, portable tool modifiers and filesystem
+    restriction, narrow memory-search behavior, export round trip, and
+    capability-aware updates.
 
 Public documentation follows the same staged boundary as the implementation.
 #101328 introduces the experimental guide, navigation, opt-in, schema, inspect,
 and add preview. Each later PR extends that guide only with the command or
 resource behavior implemented at that stage. #111391 adds only `CLAW.md`
-authoring and canonical export documentation. At every intermediate stack head,
+authoring and canonical export documentation. The final settings slice documents
+only the portable policy fields it implements. At every intermediate stack head,
 the guide must describe no later command or ownership behavior.
 
 These PRs replace the old workspace-apply prototype rather than
