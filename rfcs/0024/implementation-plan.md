@@ -9,10 +9,11 @@ behavior rather than deterministic product-owned interface text.
 
 The auditable delivery queue is the
 [projected owner slice registry](projected-owner-slice-registry.md). Its current
-46 entries apply the same planning pattern as a structured health-rule
+47 entries apply the same planning pattern as a structured health-rule
 registry: every known family has an owner, gate, proof bar, and deletion target.
 The first audit had 44 entries; owner review split the previously implicit
-authoring-gate and generated-refresh obligations into `G45` and `G46`.
+authoring-gate and generated-refresh obligations into `G45` and `G46`, then
+follow-up review added the new-surface adoption gate as `G47`.
 The number is not fixed. Source audit may delete, split, or add entries without
 changing the runtime contract.
 
@@ -55,6 +56,9 @@ deterministic CI detect the stale target, run trusted asynchronous generation
 and validation, and open a generated pull request. Later owners adopt that lane
 only for their declared families, namespaces, or directories, with both the
 scoped gate and owner-owned refresh configured in the same adoption slice.
+`G47` follows as a separate build-time guard so a newly introduced
+product-string surface cannot bypass that decision by never entering an owner
+registry.
 
 ## Serial Foundation Plan
 
@@ -109,7 +113,7 @@ After their public contracts are approved, these tracks proceed independently:
 No track is blocked on a global readiness PR, and no track changes another
 owner's schema merely to satisfy localization-core.
 
-The current 46-entry registry assigns these tracks to `F01`-`G46`. It is the
+The current 47-entry registry assigns these tracks to `F01`-`G47`. It is the
 planning source for follow-up PR selection. Pick the earliest entry whose owner
 and dependency gates are satisfied; do not select work merely to advance the
 numeric count.
@@ -148,7 +152,7 @@ Completion names are tracking cohorts, not single PRs or a linear stack:
 | Runtime safety | Bounded user-facing runtime and Gateway errors | `F05` and `R16`-`R24` use owner-approved descriptors, edge rendering, and compatible English fallback. |
 | Channels and capabilities | Server-rendered channels, command menus, command metadata, and skill/plugin metadata | `M25`-`M36` land each public contract and locale authority independently. |
 | Native and docs | Android, Apple, and documentation | `P39`-`P42` extend existing owner pipelines and record the Persian/Thai disposition. |
-| Authoring automation | Shared tooling plus each adopting owner | `G45`-`G46` prove scoped deterministic enforcement and trusted generated-PR refresh, beginning with one core exemplar. |
+| Authoring automation | Shared tooling plus each adopting owner | `G45`-`G46` prove scoped deterministic enforcement and trusted generated-PR refresh; `G47` requires a disposition for newly introduced product-string surfaces. |
 | Release promotion | Product-wide | `E43`-`E44` aggregate only landed scoped evidence and produce an honest release claim. |
 
 The current product-policy target is all 313 OpenClaw-controlled cells complete.
@@ -197,6 +201,23 @@ adoption. One routine, non-safety message family must prove:
 The exemplar proves plumbing, not linguistic completion. Its generated output
 does not approve itself, and safety families require their stricter owner and
 review policy before adopting the same lane.
+
+`G47` then proves initial adoption without pretending arbitrary string literals
+are classifiable. Each owner adapter enumerates real product-surface
+registrations or declared product-facing source roots. The gate compares newly
+added scopes with the checked-in localization disposition inventory and fails
+until each scope is one of:
+
+- adopted with catalog source, targets, and validation;
+- served by an existing owner pipeline that demonstrates conformance; or
+- explicitly English-only, platform-constrained, or deferred with a named
+  owner and rationale.
+
+The initial implementation baselines existing unclassified scopes as legacy
+debt and gates additions or scope expansions only. It does not scan tests, logs,
+developer diagnostics, model-authored text, or all source literals. One fixture
+must prove that adding an enumerated surface fails before classification and
+passes after a valid disposition is added.
 
 After the exemplar lands, every subsequent slice that adds or migrates
 deterministic product strings must leave its area enrolled end to end. The PR

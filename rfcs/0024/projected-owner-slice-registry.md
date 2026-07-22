@@ -11,9 +11,10 @@ registry, a fixed pull-request count, or an RFC-acceptance gate.
 
 ## Registry Contract
 
-The current audit has 46 entries. The first audit had 44; owner review exposed
+The current audit has 47 entries. The first audit had 44; owner review exposed
 two automation obligations that had been described by the RFC but not named as
-delivery slices. Forty-six is the current decomposition, not a quota. An entry
+delivery slices, and follow-up review exposed the new-surface adoption gap.
+Forty-seven is the current decomposition, not a quota. An entry
 may be deleted when source audit proves that existing owner
 behavior is already sufficient, or split when it crosses semantic, rendering,
 locale, or publication ownership. Entries may combine only when the same owner
@@ -42,7 +43,10 @@ credential-free authoring/drift gate, and its owner workflow runs trusted
 asynchronous generation, validation, and generated-PR publication. An owner
 with an existing pipeline may prove that pipeline satisfies the contract rather
 than replace it. Schema-only, English-only, or deferred slices record why no
-translated catalog is being enrolled.
+translated catalog is being enrolled. `G47` separately ensures that newly
+enumerated product-string surfaces receive one of those dispositions at
+introduction time; platform-constrained dispositions also identify their owner
+and reason.
 
 ## Owner Registries
 
@@ -57,7 +61,7 @@ translated catalog is being enrolled.
 | `channel.<adapter>` | Legitimate recipient locale, escaping, platform projection, and fallback | Cross-channel locale inference |
 | `native.android`, `native.apple`, `docs` | Existing platform catalogs, generation, validation, and publication | Runtime catalog formats |
 | `release-localization` | Landed declarations, scoped review evidence, maturity, and release claims | Runtime rendering or translation generation |
-| `catalog-automation` | Deterministic authoring gates and trusted generated-catalog refresh plumbing | Product meaning, catalog ownership, language review, or release promotion |
+| `catalog-automation` | Deterministic authoring gates, new-surface disposition checks, and trusted generated-catalog refresh plumbing | Product meaning, catalog ownership, language review, or release promotion |
 
 ## A. Current Foundation Evidence
 
@@ -146,10 +150,10 @@ PRs remain separate where the repository policy requires it.
 
 ## F. Authoring Gates And Translation Automation
 
-These two obligations are explicit delivery slices. They may land together in
-one bounded core exemplar PR because they share tooling ownership and one test
-fixture, but adopted surfaces opt in independently and retain their own source,
-catalog, generation, review, and publication policy.
+These three obligations are explicit delivery slices. The first two may land
+together in one bounded core exemplar PR because they share tooling ownership
+and one test fixture, but adopted surfaces opt in independently and retain their
+own source, catalog, generation, review, and publication policy.
 
 Draft OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) is the reference
@@ -161,6 +165,7 @@ slices have landed.
 | --- | --- | --- | --- | --- |
 | `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until it is registered; invalid ICU, placeholder mismatch, protected-literal drift, stale catalog evidence, and hand-edited generated paths fail without provider credentials. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
 | `G46` | `catalog-automation` + first adopting owner | Trusted async catalog refresh and generated-PR reference lane | `G45`; approved provider secret on trusted `main`, schedule, or manual dispatch | One English fixture change produces an isolated locale candidate, validates it, records source-pinned generation evidence, and opens or updates a generated PR through the existing publisher. Stale input or validation failure publishes nothing and leaves coverage partial. No direct protected-branch push, AI self-review, or automatic safety-copy promotion. Replaces hand-copied translation updates for the adopted fixture. |
+| `G47` | `catalog-automation` + surface-registry owners | New product-string surface disposition gate | `G45` and `G46`; one owner adapter that enumerates real surface registrations or declared product-facing source roots | Adding an enumerated surface or expanding a declared product-facing scope fails until it is adopted, mapped to a conforming owner pipeline, or explicitly English-only, platform-constrained, or deferred with a named owner and rationale. Existing unclassified scopes are baselined as legacy debt. No repository-wide literal heuristic, runtime registry, or classification requirement for tests, logs, developer diagnostics, or model-authored text. Replaces review-only discovery of newly introduced localization debt. |
 
 The exemplar is deliberately routine product copy. Safety catalogs may reuse
 the lane only with their named semantic owner, language reviewer, and SecOps
@@ -188,6 +193,7 @@ F01 kernel
 F01 kernel + F03 contributor contract
   -> G45 scoped authoring gate
   -> G46 trusted async refresh exemplar
+  -> G47 new-surface disposition gate
 
 F05 Gateway approval descriptor
   -> O06 generated Control UI catalog
@@ -208,7 +214,8 @@ Independent owners may work in parallel after their own dependency and owner
 gate. Within one owner registry, source/contract work lands before generated
 artifacts or adapter projections. Once the core exemplar lands, every later
 string-bearing area slice includes its scoped `G45` gate and `G46` refresh
-adoption (or evidence that its existing owner workflow already conforms).
+adoption (or evidence that its existing owner workflow already conforms), while
+`G47` prevents newly enumerated surfaces from remaining outside that decision.
 
 ## Review Findings Applied
 
@@ -218,7 +225,7 @@ The projected registry was evaluated through four tension lenses:
   rendering performs no network, model, or catalog-generation work.
 - **Operator:** every implementation entry must replace a visible hardcoded or
   duplicated authority; registry maintenance alone is not user value.
-- **Simplicity/community:** 46 is an auditable inventory, not a mandated stack,
+- **Simplicity/community:** 47 is an auditable inventory, not a mandated stack,
   new framework, or contributor tax; owner-native catalogs and workflows stay
   authoritative.
 - **Security:** safety entries require stable machine semantics, whole-family

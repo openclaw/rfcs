@@ -103,13 +103,14 @@ generates and validates a locale candidate and opens a generated pull request.
 Each later surface opts in only for its owner-declared families, namespaces, or
 directories and must bring both halves of that loop.
 
-The current delivery audit identifies 46 projected owner slices. The first
+The current delivery audit identifies 47 projected owner slices. The first
 audit had 44; owner review exposed the authoring-gate and generated-refresh
-obligations that are now explicit as `G45` and `G46`. This is the
-proposed queue to work down over time, using the same planning pattern as
-Doctor's structured rule registry. The count is planning evidence, not a
-required pull-request count or acceptance gate. A slice is deleted when source
-audit proves that no migration is needed and split when it crosses an owner,
+obligations now explicit as `G45` and `G46`, and follow-up review exposed the
+new-surface adoption obligation now explicit as `G47`. This is the proposed
+queue to work down over time, using the same planning pattern as Doctor's
+structured rule registry. The count is planning evidence, not a required
+pull-request count or acceptance gate. A slice is deleted when source audit
+proves that no migration is needed and split when it crosses an owner,
 locale-authority, public-contract, or publication boundary. Coverage and
 release state consume only landed owner declarations; the planning registry is
 never loaded by the runtime.
@@ -362,11 +363,21 @@ code. Pull requests run deterministic detection and enforcement only. AI fills
 candidate gaps; it does not approve its output or change maturity by itself.
 
 The projected registry names the reusable implementation proof explicitly:
-`G45` installs the owner-scoped deterministic authoring/drift gate, and `G46`
-installs the trusted asynchronous refresh-to-generated-PR lane. They begin with
-one routine core exemplar; existing Control UI, native, and docs owners keep
-their current workflows, while later CLI/TUI/runtime owners adopt the reference
-contract without surrendering catalog or review ownership.
+`G45` installs the owner-scoped deterministic authoring/drift gate, `G46`
+installs the trusted asynchronous refresh-to-generated-PR lane, and `G47`
+prevents newly introduced product-string surfaces from remaining unclassified.
+The first two begin with one routine core exemplar; existing Control UI, native,
+and docs owners keep their current workflows, while later CLI/TUI/runtime owners
+adopt the reference contract without surrendering catalog or review ownership.
+
+`G47` is a build-time adoption gate, not a heuristic scan of every string
+literal. Owner adapters enumerate product-surface registrations or declared
+product-facing source roots. A newly added scope must identify its semantic
+owner and either enroll in the catalog contract, point to a conforming existing
+pipeline, or record an explicit English-only, platform-constrained, or deferred
+disposition with rationale. Existing unclassified scopes are baselined as
+legacy backlog; tests, logs, developer diagnostics, and model-authored text do
+not become product surfaces merely because they contain strings.
 
 After that exemplar lands, each slice that adds or migrates deterministic
 product strings brings its area fully onto the contract: a blocking,
