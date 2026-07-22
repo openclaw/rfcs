@@ -1,604 +1,608 @@
 # Implementation Plan
 
-This sidecar turns RFC 0025 into mergeable work across `trycua/cua`,
-`openclaw/openclaw`, and `openclaw/openclaw-windows-node`. Work is grouped into
-parallel development waves. A wave may begin when its input contracts are
-stable; individual PRs still merge in the dependency order shown below.
+This plan delivers RFC 0025 by extending OpenClaw's existing
+`screen.snapshot` + `computer.act` architecture. The former plan for projecting
+CUA's native MCP catalog through a dedicated provider route is preserved in
+[alternative-node-mcp-implementation-plan.md](alternative-node-mcp-implementation-plan.md).
 
-## Delivery Rules
+Work is organized into mergeable PRs and parallel waves. A later wave may begin
+against frozen fixtures before every earlier platform implementation has
+landed, but production rollout follows the dependency graph.
 
-- Every merged PR is independently safe. Incomplete CUA paths remain
-  undiscoverable and cannot materialize agent tools.
-- Protocol changes are additive. A node that does not publish Computer Use
-  inventory continues to operate without Computer Use.
-- The public Plugin SDK registration lands with a real runtime consumer.
-  Peekaboo is the first consumer; CUA follows on the same contract.
-- The Gateway never sends install recipes, executable paths, or launch flags to
-  a node. Official nodes consume a locally trusted provider package.
-- CUA is not selected by default until its node-local provider is installed,
-  compatible, enabled, permission-ready, private-transport-ready,
-  protected-consent-ready, and probe-ready.
-- Provider readiness never implies run authorization. Each execution acquires a
-  unique lease and exact bounded manifest before provider-native tools become
-  callable, then releases them through one idempotent terminal path.
-- Platform PRs share protocol and provider-package fixtures. They do not copy
-  CUA tool policy or artifact metadata into Swift, C#, and TypeScript.
-- Each PR owns one boundary where practical. Cross-repo generated artifacts are
-  versioned and digest-checked rather than coordinated by undocumented timing.
-- Temporary Computer Use exposure through generic MCP and the old direct
-  `computer.act` materialization path are removed when their canonical
-  replacements land. Ordinary generic MCP behavior remains unchanged.
+## Delivery rules
 
-## Dependency Graph
+- Every PR is independently safe. Incomplete v2 capabilities remain
+  unadvertised and unavailable.
+- V1 `computer.act`, `screen.snapshot`, frame binding, arming, idempotency,
+  cancellation, and Peekaboo behavior remain green throughout migration.
+- Protocol changes are additive. Old nodes continue to expose only v1.
+- OpenClaw core remains provider-neutral. CUA versions, MCP mappings, skill,
+  policies, and artifact metadata live in the bundled `cua-computer` plugin.
+- A public Plugin SDK method lands only with the migrated CUA plugin as a real
+  runtime consumer.
+- The Gateway never sends a driver URL, executable path, socket, launch recipe,
+  native session id, or local resource path to a node.
+- The model never receives a raw CUA MCP passthrough or CLI fallback.
+- Unsupported action variants are omitted or rejected, never silently weakened.
+- Provider changes, restarts, and capability changes invalidate generation and
+  every dependent frame or semantic reference.
+- Default rollout waits for packaged macOS, Windows, Linux, local-Gateway, and
+  remote-Gateway proof. Individual platform capabilities may remain explicitly
+  unavailable.
+
+## Dependency graph
 
 ```text
-CUA-1 + CUA-4 -----------------------------------> OC-6 Linux host
-CUA-2 ---------------------------> OC-5 CUA plugin
-CUA-3 ---------------------------> OC-5 and OC-6
-CUA-4 ---------------------------> OC-5 and platform hosts
-
-OC-1 node protocol/router ----+--> OC-2 provider runtime + Peekaboo
-                              +--> OC-3 reusable node MCP host
-                              +--> OC-4 generated provider package
-
-OC-2 + OC-4 + CUA-2/3/4 ------------------------> OC-5 CUA plugin
-OC-3 + OC-4 + CUA-1/3/4 ------------------------> OC-6 Linux host
-OC-5 + OC-6 ------------------------------------> OC-7 Linux gate
-
-OC-7 + CUA-1/4 --------------+-------------------> OC-8 macOS
-OC-4/5 + CUA-1/4 ------------+-------------------> WIN-1 Windows
-OC-7 ------------------------+-------------------> OC-9A Gateway UX
-OC-6 ------------------------+-------------------> OC-9B Linux CLI/doctor
-
-OC-8 + WIN-1 + OC-9A/B -------------------------> OC-10A/B/C + WIN-2
-OC-10A/B/C + WIN-2 ------------------------------> OC-11 default rollout
+Wave 0: contract freeze and CUA fixtures
+  CU-1 + CU-2
+       |
+       v
+Wave 1: OpenClaw v2 foundations
+  OC-1 ------+------ OC-2
+    |        |        |
+    +------ OC-3 -----+
+                 |
+                 v
+Wave 2: provider and platform vertical slices
+  OC-4 (CUA semantic Windows/Linux) --+
+  OC-5 (macOS embedded CUA) ----------+--> OC-8 integration gate
+  WIN-1 (Windows companion host) -----+
+  OC-6 (Peekaboo/provider selection) -+
+  OC-7 (local Gateway loopback) ------+
+                 |
+                 v
+Wave 3: rich CUA families
+  OC-9A app/window/input
+  OC-9B browser
+  OC-9C recording/resources
+  OC-9D skill/model guidance
+                 |
+                 v
+Wave 4: artifacts, onboarding, security and packaging
+  OC-10A artifacts/update
+  OC-10B UX/diagnostics
+  OC-10C policy/security
+                 |
+                 v
+Wave 5: cross-platform acceptance and default rollout
+  OC-11 -> OC-12
 ```
 
-`OC-1`, `CUA-1`, `CUA-2`, `CUA-3`, and `CUA-4` are the initial parallel lanes.
-`OC-2` and `OC-3` can be developed in parallel once the `OC-1` wire fixtures
-are stable, although both merge after `OC-1`. `OC-5` and `OC-6` can then be
-developed in parallel against `OC-4` fixtures. macOS, Windows, and product UX
-are the largest final parallel wave.
+`CU-1` and `CU-2` can proceed in parallel with the RFC review. `OC-2` and
+`OC-3` can proceed in parallel after `OC-1` freezes the v2 fixtures. Platform
+work can begin against those fixtures before every core PR merges.
 
-## Shared Contract Freeze
+## Wave 0: Contract freeze and upstream alignment
 
-Before Wave 1 branches diverge, owners should agree on these RFC-level names
-and invariants:
-
-| Contract | Freeze requirement |
-| --- | --- |
-| Provider identity | `providerId`, `providerSpecDigest`, and node-local `generation` have distinct meanings. |
-| Invocation | `computer.provider.call.v1` carries one selected node, provider, generation, execution/lease, policy lease, tool, classified arguments, and deadline. |
-| Inventory | Provider readiness is separate from execution authorization; both use closed states with driver provenance, tool/skill digests, permission attribution, and protected-consent readiness. |
-| Errors | Unknown provider/tool, stale generation/execution, inactive authorization, host busy, local approval required, rebound/retry required, and backend unavailable have stable codes. |
-| Live schemas | The reviewed catalog is the maximum surface; live `tools/list` schemas select supported reviewed branches, and unsupported branches are rejected rather than stripped. |
-| Results | Existing MCP text, image, structured result, cancellation, timeout, and size-limit behavior is preserved, including native effect/escalation precedence without automatic mutation retry. |
-| Provider package | One generated data-only package contains artifact locks, launch capabilities, probes, and a provider-spec digest. |
-| Execution binding | One v1 execution lease maps to one node-injected opaque CUA session; durable chat/session ids and callers cannot own or supply native authority. |
-| Release | Every execution exit reaches one idempotent release path that revokes grants/indicators, ends leases/session state, releases input/recording, removes the process manifest, and advances generation. |
-
-The freeze is a review checkpoint, not a separate permanent schema repository.
-Canonical schemas live in the repositories that execute them.
-
-## Wave 0: Upstream CUA Prerequisites
-
-These upstream PRs can proceed independently of OpenClaw core. They are ship
-dependencies, not blockers for starting the additive Gateway work.
-
-### CUA-1: Inherited connected embedded transport
-
-- Repo: `trycua/cua`
-- Depends on: none
-- Can run with: `CUA-2`, `CUA-3`, `CUA-4`, `OC-1`
-- Work:
-  - Let the embedding host create an already-connected Unix or Windows channel
-    and pass one protected endpoint to `serve --embedded` and the other to the
-    MCP proxy.
-  - Do not create a discoverable listening socket, named pipe, bearer secret,
-    or reusable endpoint in this mode.
-  - Publish the exact launch and handle-inheritance contract for macOS,
-    Windows, and Linux.
-  - Ensure daemon and proxy shutdown follows parent/handle closure.
-- Proof:
-  - Integration tests show that only inherited handles can reach the daemon.
-  - A second same-user process cannot discover or connect to an endpoint.
-  - macOS direct-spawn tests preserve host attribution.
-- Gate unlocked: production node hosts may launch CUA embedded mode.
-
-Tracker: [trycua/cua#2410](https://github.com/trycua/cua/issues/2410)
-
-### CUA-4: Embedded protected-consent and indicator adapter
-
-- Repo: `trycua/cua`
-- Depends on: none; integrates with the private channel from `CUA-1`
-- Can run with: `CUA-1`, `CUA-2`, `CUA-3`, `OC-1`
-- Work:
-  - Expose an authenticated embedding-host implementation path for CUA's
-    `ProtectedConsentProvider` over a separate inherited control channel or a
-    structurally separated control subchannel that model-facing MCP cannot
-    write.
-  - Bind schema/nonce/request digest, daemon instance, provider generation,
-    permission mode, policy hashes, OpenClaw execution lease, CUA/transport
-    sessions, operation/risk, expiry, and exact browser resource.
-  - Support standard decisions and bounded `activate_preapproved()` without a
-    second prompt, while requiring indicator activation before a grant becomes
-    live.
-  - Support host Stop, daemon-driven indicator deactivation, asynchronous
-    revocation, and fail-closed host/control-channel death.
-- Proof:
-  - Wrong digest, daemon, generation, policy, execution lease, session,
-    operation, expiry, PID/window, process fingerprint, browser product, or
-    endpoint owner is rejected.
-  - Indicator activation failure prevents the grant; local Stop revokes it and
-    releases browser capabilities even after the original caller disconnects.
-  - Packaged-host tests prove that the protected UI cannot be driven through
-    CUA AX, PX, foreground, desktop, or browser routes.
-- Gate unlocked: bounded existing-profile attachment may become run-authorized
-  after the daemon restart loads an exact-resource manifest.
-
-Tracker: [trycua/cua#2411](https://github.com/trycua/cua/issues/2411)
-
-### CUA-2: OpenClaw MCP-first skill and capability profile
-
-- Repo: `trycua/cua`
-- Depends on: none
-- Can run with: `CUA-1`, `CUA-3`, `CUA-4`, `OC-1`
-- Work:
-  - Publish a versioned OpenClaw skill profile that retains CUA workflow,
-    platform, AX-background, PX-background, exact-browser-page,
-    foreground-delivery, explicit desktop-escalation, snapshot, and
-    verification guidance while removing direct CLI/bootstrap, daemon,
-    transport-selection, and shell instructions.
-  - Extend the machine-readable driver manifest with the embedded transport,
-    authorization, recording, browser, helper-path, and skill-profile
-    capabilities OpenClaw must probe.
-  - Bind the profile and companion resources to a digest and driver version.
-- Proof:
-  - The profile can complete representative CUA tasks using only MCP tools.
-  - Result guidance distinguishes `confirmed`, `unverifiable`,
-    `suspected_noop`, refusal/delivery failure, and
-    `escalation.recommended` without automatic mutation retry.
-  - `bring_to_front` remains standalone, and foreground transition uses a
-    live-schema `delivery_mode: "foreground"` argument.
-  - A mismatched profile or missing required capability fails compatibility.
-- Gate unlocked: the bundled plugin can materialize version-matched guidance.
-
-Tracker: [trycua/cua#2412](https://github.com/trycua/cua/issues/2412)
-
-### CUA-3: Node-controlled resources and native helpers
-
-- Repo: `trycua/cua`
-- Depends on: none
-- Can run with: `CUA-1`, `CUA-2`, `CUA-4`, `OC-1`
-- Work:
-  - Accept host-injected absolute paths for recording output, download roots,
-    upload staging, replay input, and optional helpers such as ffmpeg.
-  - Ensure model arguments cannot override those host-owned paths.
-  - Make helper availability and browser resource constraints probeable.
-  - Preserve managed policy, bounded manifests, exact browser binding, and the
-    full-background rung required by the RFC.
-- Proof:
-  - Arbitrary model-supplied paths and ambient `PATH` helpers are rejected.
-  - Exact-resource bounded policy tests cover browser attach and file flows.
-- Gate unlocked: OpenClaw can safely expose the corresponding CUA operations.
-
-Tracker: [trycua/cua#2413](https://github.com/trycua/cua/issues/2413)
-
-## Wave 1: OpenClaw Foundations
-
-Wave 1 establishes generic runtime behavior. Development can overlap after the
-shared contract freeze, but `OC-1` merges first because it owns the wire shape.
-
-### OC-1: Additive node inventory and classified invocation
+### CU-1: Freeze the CUA-to-`computer.act` parity matrix
 
 - Repo: `openclaw/openclaw`
-- Depends on: accepted RFC contract
-- Can run with: all Wave 0 work
+- Depends on: RFC acceptance
+- Can run with: `CU-2`
 - Work:
-  - Add provider inventory schemas and generated Gateway protocol types.
-  - Add `computer.provider.call.v1` to node invocation, dangerous-command
-    arming, cancellation, timeout, and result limits.
-  - Carry provider-spec digest, generation, tool catalog, policy state, skill
-    state, protected-consent state, separate provider readiness/run
-    authorization, execution/lease identity, and closed readiness codes.
-  - Reject arbitrary server names, commands, native paths, and unknown fields.
-  - Add protocol fixtures for old nodes, ready providers, stale generations,
-    missing permissions, and backend-unavailable states.
+  - Turn the RFC action-family table into a machine-readable or test-fixture
+    matrix covering all 49 published CUA MCP tools.
+  - Classify each tool as portable model action, consolidated alias,
+    node-internal lifecycle, local maintenance, or intentionally omitted legacy
+    surface.
+  - Record accepted CUA `tools/list`, input schemas, output fixtures, refusal
+    fixtures, and platform capability data for the first supported version.
+  - Include CUA current-main contract manifest fixtures for the 14 generated
+    portable tools without assuming that manifest covers the rich surface.
+  - Freeze target-ref, result, delivery, observation, resource, and generation
+    semantics used by the OpenClaw protocol fixtures.
 - Proof:
-  - Old node clients continue to pair and invoke existing commands.
-  - Classified calls fail closed for unknown tools, stale generations,
-    disconnects, cancellation, and oversized results.
-- Merge state: additive and dormant; no provider tools are visible yet.
+  - Every published CUA tool appears exactly once in the matrix.
+  - Fixtures cover images, structured content, effect/verification/escalation,
+    stale refs, unsupported delivery, browser refs, recording, and refusal.
+  - Source links point to the accepted CUA tag rather than moving `main`.
+- Merge state: fixtures and design data only; no runtime behavior.
 
-### OC-2: Provider runtime, SDK registration, and Peekaboo migration
+### CU-2: Align upstream CUA embedding and skill contracts
+
+- Repo: `trycua/cua`
+- Depends on: none
+- Can run with: `CU-1` and all Wave 1 work
+- Work:
+  - Update [trycua/cua#2412](https://github.com/trycua/cua/issues/2412)
+    from native OpenClaw MCP projection to an OpenClaw `computer.act` action
+    profile, or agree that OpenClaw owns a thin version-pinned overlay.
+  - Confirm the accepted embedded `serve` + `mcp` launch contract and macOS
+    responsibility-chain tests.
+  - Continue inherited connected IPC in
+    [trycua/cua#2410](https://github.com/trycua/cua/issues/2410).
+  - Continue protected browser host consent in
+    [trycua/cua#2411](https://github.com/trycua/cua/issues/2411).
+  - Continue trusted host resources/helpers in
+    [trycua/cua#2413](https://github.com/trycua/cua/issues/2413).
+  - Expand the generated contract manifest to richer action families where CUA
+    wants stable portable schemas.
+- Proof:
+  - Packaged reference-host test confirms direct app spawning and host TCC
+    attribution.
+  - Skill profile contains no CLI/bootstrap/transport instructions.
+  - Resource and protected-browser capabilities remain machine-detectable and
+    fail closed when unavailable.
+- Merge state: upstream improvements are consumed capability-by-capability.
+  Basic desktop observation/input does not wait for browser/resource features.
+
+## Wave 1: OpenClaw v2 foundations
+
+### OC-1: Add v2 protocol types and capability fixtures
+
+- Repo: `openclaw/openclaw`
+- Depends on: `CU-1` fixture freeze
+- Can run with: early `OC-2` and `OC-3` branches
+- Work:
+  - Add additive Gateway/node protocol types for the Computer Use capability
+    descriptor, provider id/generation, readiness, supported action names,
+    target classes, delivery modes, observation classes, and feature flags.
+  - Add the `ComputerActV2Request`, closed action union, portable target union,
+    observation envelope, resource handles, and result envelope.
+  - Define stable closed error codes for stale provider/execution/frame/
+    observation/element/browser refs, unsupported action/delivery, busy host,
+    missing permission, and unavailable backend.
+  - Preserve v1 wire decoding and current `OpenClawComputerActParams` fixtures.
+  - Generate or share fixtures consumed by TypeScript and Swift.
+- Proof:
+  - Protocol round-trip tests for every action family and result branch.
+  - Old node fixtures decode unchanged and expose no inferred v2 capability.
+  - Unknown v2 variants fail closed without changing protocol version.
+- Merge state: additive and dormant; no node advertises v2 yet.
+
+### OC-2: Extend the built-in Computer Use tool runtime
 
 - Repo: `openclaw/openclaw`
 - Depends on: `OC-1`
-- Starting point: revise or supersede `openclaw/openclaw#110293`
 - Can run with: `OC-3`
 - Work:
-  - Add the prepared host/provider/execution binding and deterministic selected
-    provider tool/skill materialization.
-  - Export the narrow Plugin SDK provider registration consumed by runtime.
-  - Create the bundled `computer-use` plugin and register Peekaboo as the first
-    production consumer.
-  - Adapt app-owned `computer.act` behind provider `peekaboo`, preserving
-    arming, idempotency, and synthetic-input cleanup.
-  - Add explicit provider selection and secure execution-profile conflicts.
-  - Remove the old parallel Peekaboo materialization path in the same PR.
+  - Retain the existing `computer` tool and current v1 action schema.
+  - Add precise model-facing schemas for the v2 action families. Split into a
+    small family of built-in tools only if provider schema limits make one
+    discriminated union unreliable; every tool still invokes `computer.act`.
+  - Bind one execution to node, provider id, provider generation, display,
+    observation refs, and resource handles.
+  - Track semantic refs only when their source result remains in model context,
+    extending the current screenshot-context invalidation rule.
+  - Preserve current coordinate `frameId` authorization.
+  - Project mixed image/structured observations and portable result evidence.
+  - Prefer a provider-returned fresh observation; use delayed
+    `screen.snapshot` only when the result lacks an image.
+  - Never retry mutations or advance the CUA interaction ladder.
 - Proof:
-  - Two synthetic nodes cannot leak tools or skills across selected bindings.
-  - Provider restart, generation change, and selection change invalidate tools.
-  - Peekaboo works through the provider route in a packaged macOS app.
-- Merge state: useful without CUA and proves that the SDK has a runtime consumer.
+  - Existing `computer-tool` tests remain green.
+  - New tests cover target affinity, stale semantic refs, provider generation,
+    provider observations, screenshot fallback, result precedence, and no
+    automatic mutation retry.
+  - Multi-node and provider-switch tests cannot retarget an established
+    execution silently.
+- Merge state: v2 activates only for a node advertising matching capability.
 
-### OC-3: Reusable node MCP provider host
+### OC-3: Add the node-local provider runtime and lifecycle
 
 - Repo: `openclaw/openclaw`
 - Depends on: `OC-1`
 - Can run with: `OC-2`
+- Starting point: current `registerNodeHostCommand` and optional identity work
+  in [openclaw/openclaw#110293](https://github.com/openclaw/openclaw/pull/110293)
 - Work:
-  - Extract persistent MCP initialization, `tools/list`, calls, cancellation,
-    and result mapping from generic node MCP behind an internal provider host.
-  - Keep generic `mcp.tools.call.v1` behavior unchanged for ordinary MCP.
-  - Add the digest-verified provider skill-resource reader without granting
-    arbitrary node filesystem or shell access.
-  - Add exclusive host lease, cleanup, bounded restart, and generation hooks.
-  - Add one idempotent execution-release owner for all terminal paths; it ends
-    the injected CUA session and leases, releases input/recording, stops or
-    restarts the daemon to remove a process manifest, and advances generation.
+  - Add one node-local Computer Use provider registry and active-provider
+    selection owner.
+  - Register `screen.snapshot` and `computer.act` once and dispatch both to the
+    selected provider execution.
+  - Add provider readiness, capability publication, availability watching, and
+    generation updates.
+  - Add exclusive mutating execution ownership and one serialized action queue.
+  - Add provider execution open/close with an opaque node-generated session.
+  - Route completion, cancellation, timeout, disconnect, crash, disable,
+    provider switch, Stop, and idle expiry through one idempotent close path.
+  - Extend node-host invocation context with the run identity and cancellation
+    signal needed by the provider without exposing either to the model.
+  - Migrate the existing CUA plugin's v1 command registration as the first real
+    consumer before exporting the SDK surface.
 - Proof:
-  - Generic node MCP regression tests remain green.
-  - A test provider returns text, image, and structured results through the
-    classified route and reaches the same release path on completion, failure,
-    cancellation, timeout, disconnect, crash, explicit CUA session end, Stop,
-    OpenClaw session clear, and lease expiry.
-- Merge state: reusable internal infrastructure; no CUA process is launched.
+  - Duplicate providers cannot both own the command pair.
+  - Readiness changes republish the node declaration deterministically.
+  - Every close trigger releases held input and invalidates provider state.
+  - A second mutating execution receives `COMPUTER_HOST_BUSY`.
+  - External plugin tests prove provider registration does not grant native app
+    permission or process-launch authority.
+- Merge state: current CUA v1 behavior remains opt-in; provider registry is now
+  exercised in production code.
 
-## Wave 2: CUA Plugin and Linux Reference Slice
+## Wave 2: Provider and platform vertical slices
 
-Linux is the reference implementation because it exercises remote-node
-lifecycle without coupling the first vertical slice to macOS TCC or the
-separate Windows repository.
-
-### OC-4: Generated node provider package and artifact lock
+### OC-4: Refactor the CUA plugin around the provider runtime
 
 - Repo: `openclaw/openclaw`
-- Depends on: `OC-1`; Wave 0 capability names should be stable
-- Can run with: late `OC-2`/`OC-3` work
+- Depends on: `OC-3`; consumes `OC-1` fixtures
+- Can run with: `OC-5`, `OC-6`, `OC-7`
 - Work:
-  - Define the data-only CUA node provider package and deterministic
-    `providerSpecDigest` generation.
-  - Add per-platform artifact/helper locks, publisher expectations, launch
-    capabilities, required probes, and accepted skill digests.
-  - Produce fixtures and a published artifact that macOS packaging, Linux node
-    code, and the Windows companion can consume.
-  - Add drift checks so generated copies cannot be edited independently.
+  - Split driver lifecycle, MCP transport, mapping, frame state, and provider
+    execution into explicit modules.
+  - Replace the hard-coded 0.10 prefix check with the accepted compatibility
+    bundle and exact capability/schema validation.
+  - Preserve the deny-by-default environment allowlist, telemetry/update
+    opt-outs, serialization, geometry checks, and typed refusals.
+  - Inject one CUA session per OpenClaw execution and close it through provider
+    lifecycle.
+  - Publish v2 readiness/capabilities only for implemented action families.
+  - Keep unsupported primary-display, hold, modifier, Wayland, and platform
+    branches explicit until later PRs close them.
 - Proof:
-  - Reproducible generation yields the same digest on supported build hosts.
-  - Tampered artifacts, unknown specs, mutable links, and digest drift fail.
-- Merge state: data and verification only; it grants no process authority.
+  - Existing `extensions/cua-computer` tests remain green.
+  - Recorded CUA fixtures prove version, capability, schema, and generation
+    behavior.
+  - Provider restart invalidates frame and session state.
+- Merge state: behavior-equivalent to current v1 plus provider lifecycle; still
+  disabled by default.
 
-### OC-5: Bundled CUA provider adapter
+### OC-5: Add the macOS app-owned embedded CUA host
 
 - Repo: `openclaw/openclaw`
-- Depends on: `OC-2`, `OC-4`, `CUA-2`, `CUA-4`, relevant `CUA-3` contracts
-- Can run with: `OC-6`
+- Depends on: `OC-3`; integrates with `OC-4`
+- Can run with: `WIN-1`, `OC-6`, `OC-7`
 - Work:
-  - Register provider `cua` in the bundled `computer-use` plugin.
-  - Add version/spec compatibility, required and optional tool catalogs,
-    argument-aware risk/resource classifiers, and schema adaptation.
-  - Treat the reviewed catalog as a ceiling and intersect it with live
-    `tools/list` schemas at the semantic-branch level; reject unsupported
-    branches instead of silently removing arguments.
-  - Inject opaque execution-scoped CUA session ids and reject durable
-    chat/session ids or caller-supplied native session fields as authority.
-  - Materialize the exact MCP-first skill profile and companion resources.
-  - Hide unreviewed tools and operation variants rather than forwarding them.
+  - Add app-local CUA provider selection and lifecycle state.
+  - Bundle or verify the accepted CUA artifact.
+  - Make `OpenClaw.app` directly spawn `cua-driver serve --embedded` with a
+    private endpoint and minimal environment.
+  - Restart the daemon after TCC grant changes and verify attribution plus real
+    capture.
+  - Pass a private app-owned provider endpoint to the canonical TypeScript node
+    worker through an internal launch contract.
+  - Let the bundled CUA plugin start only the MCP proxy and fulfill the command
+    pair through the worker.
+  - Stop children and invalidate worker/provider generation on app Stop,
+    disconnect, provider switch, permission loss, crash, and update.
 - Proof:
-  - Contract tests use recorded `tools/list` and schema fixtures from each
-    accepted CUA version.
-  - Fixtures preserve schema-supported `delivery_mode` without an invented
-    capability token and keep `bring_to_front` as a standalone tool.
-  - Structured verdict tests preserve CUA's result precedence and prove the
-    Gateway does not retry mutations or advance the interaction ladder.
-  - Tool arguments cannot select arbitrary paths, origins, helpers, sessions,
-    or output locations.
-- Merge state: provider remains unavailable unless a node publishes matching
-  ready inventory.
+  - Swift process tests prove direct app spawn and no Gateway/worker daemon
+    spawn path.
+  - Signed packaged DMG shows OpenClaw as the intended Accessibility and Screen
+    Recording identity.
+  - Local and remote Gateways complete v1 screenshot/click/type tasks through
+    the worker CUA adapter.
+  - Endpoint ownership, mode, replacement, cleanup, and parent-death tests pass.
+- Merge state: CUA selectable but not default; richer v2 families may still be
+  absent.
 
-### OC-6: Linux node provider lifecycle
-
-- Repo: `openclaw/openclaw`
-- Depends on: `OC-1`, `OC-3`, `OC-4`, `CUA-1`, `CUA-4`, relevant `CUA-3`
-  contracts
-- Can run with: `OC-5`
-- Work:
-  - Add node-local detect, verified import, managed download, atomic install,
-    rollback, start, stop, status, and test operations.
-  - Launch daemon and MCP proxy through inherited connected IPC.
-  - Bind the embedded protected-consent/indicator adapter over the protected
-    control channel and keep it inaccessible to model-facing MCP.
-  - Generate managed policy and bounded manifests; preserve narrower operator
-    user policy.
-  - Publish provider readiness before run authorization, and make tools
-    callable only for a matching execution lease and generation.
-  - Preserve X11/Wayland session environment and publish honest backend state.
-  - Resolve approved resources only inside node-owned staging/artifact roots.
-- Proof:
-  - Artifact provenance and running-image identity are checked before OS work.
-  - X11 screenshot/input and unavailable Wayland/headless states are covered.
-  - A remote Gateway cannot trigger install or mutate launch configuration.
-  - Every execution exit removes broadened manifest authority and invalidates
-    the old generation through the idempotent release path.
-- Merge state: locally enabled only; no automatic default selection.
-
-### OC-7: Linux local and remote vertical gate
-
-- Repo: `openclaw/openclaw`
-- Depends on: `OC-5`, `OC-6`
-- Can run with: early Wave 3 development
-- Work:
-  - Join the plugin, Gateway router, node host, policy, skill, and managed
-    artifact paths in user-facing enable/status/test flows.
-  - Add local-Gateway and remote-Gateway scenarios on an X11 desktop.
-  - Exercise snapshot/action/verification, browser binding, recording/resource
-    restrictions, stale generation/execution, ready-without-authorization,
-    protected-provider activation, asynchronous Stop, and cleanup.
-- Proof:
-  - A packaged or clean-install node passes the Linux RFC acceptance criteria.
-  - No shell/CLI CUA bypass or generic MCP bypass remains available in the run.
-- Gate unlocked: shared contracts are stable enough for native app integrations.
-
-## Wave 3: Platform Hosts and Product UX
-
-macOS, Windows, and Gateway UX are separate ownership lanes. Their branches can
-start once the provider-package and plugin fixtures are stable; macOS and UX
-merge after the Linux gate has proven the shared lifecycle contracts. Windows
-can merge independently after its own packaged proof.
-
-### OC-8: macOS app-owned embedded host
-
-- Repo: `openclaw/openclaw`
-- Depends on: `OC-4`, `OC-5`, `OC-7`, `CUA-1`, `CUA-4`
-- Can run with: `WIN-1`, `OC-9A`, `OC-9B`
-- Work:
-  - Bundle or locally manage the locked CUA artifact in the app distribution.
-  - Make `OpenClaw.app` directly spawn the daemon and pass inherited connected
-    transport to the app-owned node worker/proxy.
-  - Implement the authenticated protected-consent adapter, including exact
-    request binding, bounded `activate_preapproved()`, indicator lifecycle,
-    Stop, and asynchronous daemon/host revocation.
-  - Add local permission, restart, crash recovery, exact-resource approval,
-    rebound/retry, and execution-release flows.
-  - Publish TCC attribution and live readiness probes.
-- Proof:
-  - Packaged DMG testing shows only OpenClaw as the responsible Accessibility
-    and Screen Recording identity.
-  - Local and remote Gateways complete screenshot and input tasks after one
-    local permission flow.
-  - Every execution exit, revocation, restart, stale reference, and Stop fails
-    closed and removes the old process manifest.
-
-### WIN-1: Windows companion provider host
+### WIN-1: Add the Windows companion CUA host
 
 - Repo: `openclaw/openclaw-windows-node`
-- Depends on: `OC-1`, `OC-4`, `OC-5`, `CUA-1`, `CUA-4`
-- Can run with: `OC-8`, `OC-9A`, `OC-9B`
+- Depends on: `OC-3`; integrates with `OC-4` and `OC-1` fixtures
+- Can run with: `OC-5`, `OC-6`, `OC-7`
 - Work:
-  - Add the generic outbound MCP provider capability to the companion.
-  - Consume and verify the published node provider package.
-  - Own managed artifact lifecycle, inherited IPC, dynamic inventory, bounded
-    policy, authenticated protected consent, indicator, asynchronous Stop,
-    execution release, update, and rollback.
-  - Manage the signed UIAccess helper when supported, otherwise publish the
-    elevated-target capability as unavailable.
+  - Host the canonical TypeScript node worker and bundled CUA plugin in the
+    companion, or add an equivalent worker boundary that consumes the same
+    plugin and protocol fixtures without a second action mapping.
+  - Supervise CUA daemon/proxy lifecycle in the logged-in interactive user
+    session and reject Session 0.
+  - Consume the same accepted compatibility bundle and managed artifact lock as
+    the main repository.
+  - Publish the same v2 provider descriptor, readiness, generation, and command
+    pair as a CLI Windows node.
+  - Own local setup, Stop, update, rollback, crash cleanup, and signed helper
+    lifecycle for any elevated/UIAccess capability.
 - Proof:
-  - Packaged companion tests cover standard and supported elevated targets.
-  - The companion, daemon, proxy, and supported helpers run in the intended
-    interactive user session; Session 0 reports unavailable.
-  - A remote Gateway can select and use the Windows node without installing
-    anything on the Gateway machine.
-  - Provider-package drift and unsigned/unknown helpers fail closed.
+  - Packaged companion works with local and remote Gateways.
+  - Session 0, disconnected desktop, unknown artifact, provider crash, and Stop
+    fail closed.
+  - Protocol fixtures and CUA mapping are not independently reimplemented.
+- Merge state: CUA selectable in the packaged companion but not default.
 
-### OC-9A: Gateway selection and remote onboarding
+### OC-6: Put Peekaboo behind explicit provider selection
 
 - Repo: `openclaw/openclaw`
-- Depends on: `OC-7`; consumes `OC-8`, `WIN-1`, and `OC-9B` states as they land
-- Can run with: `OC-8`, `WIN-1`, `OC-9B`
+- Depends on: `OC-3`
+- Can run with: `OC-4`, `OC-5`, `OC-7`
 - Work:
-  - Add host/provider selection, explicit arming, ready/unready node states,
-    deep links or node notifications, and local-action guidance.
-  - Keep pairing approval, node-local enablement, and Gateway arming as
-    separate user decisions.
-  - Prevent unready nodes from creating partial agent tool surfaces.
+  - Represent the existing native macOS `computer.act` fulfiller as provider
+    `peekaboo` in the app's active-provider state.
+  - Advertise only its actual v1 capabilities.
+  - Ensure the TypeScript worker command pair takes precedence only when CUA is
+    selected and ready.
+  - End active execution, release held input, and advance generation on
+    provider switch.
+  - Add no per-call fallback between CUA and Peekaboo.
 - Proof:
-  - Multi-node tests bind one host and never expose similarly named tools from
-    another node.
-  - Remote setup cannot dismiss local prompts or create a partial tool surface.
-  - Recovery states route users to the machine that can actually fix them.
+  - Both providers pass existing v1 frame-binding and arming scenarios.
+  - Switching providers invalidates old frame ids and actions.
+  - CUA failure never dispatches the same action through Peekaboo.
+- Merge state: explicit macOS provider choice works before CUA becomes default.
 
-### OC-9B: Linux CLI, doctor, and bounded diagnostics
+### OC-7: Add a local Gateway loopback desktop node
 
 - Repo: `openclaw/openclaw`
-- Depends on: `OC-6`; uses `OC-7` integration fixtures
-- Can run with: `OC-7`, `OC-8`, `WIN-1`, `OC-9A`
+- Depends on: `OC-3`, `OC-4`
+- Can run with: `OC-5`, `OC-6`
 - Work:
-  - Add Linux node CLI enable/status/test/update/rollback surfaces.
-  - Add Gateway doctor checks for selection/protocol and node-local checks for
-    artifacts, permissions, backend, policy, and child health.
-  - Define shared closed diagnostic codes consumed by native platform UIs.
-  - Present bounded diagnostics without stderr, policy contents, screenshots,
-    accessibility trees, or transport details.
+  - Add a local, explicitly enabled desktop node-host mode for Gateway-only
+    Windows/Linux installations.
+  - Load the same bundled plugin registry and advertise the same command pair
+    and v2 descriptor.
+  - Reuse node command policy and arming rather than adding direct Gateway CUA
+    execution.
+  - Keep macOS CLI-only behavior explicit: standalone CUA attribution is
+    allowed only when the user chooses it; OpenClaw-owned TCC requires the app.
 - Proof:
-  - Commands affect only the local node and never expose transport handles.
-  - Doctor distinguishes Gateway-fixable state from node-local action.
-  - macOS and Windows can render the same states without importing Linux code.
+  - Gateway-only Windows/Linux scenarios select exactly one loopback node and
+    pass current v1 tasks.
+  - Remote nodes and loopback nodes obey the same ambiguity and selection rules.
+  - Disabling loopback mode stops provider children and removes capability.
+- Merge state: opt-in local convenience path.
 
-## Wave 4: Security, Packaging, and Cross-Platform Closure
-
-These PRs can be split by platform and test surface after all three hosts speak
-the same stable contract.
-
-### OC-10A: Core, Linux, and macOS security closure
+### OC-8: V2 integration gate
 
 - Repo: `openclaw/openclaw`
-- Depends on: `OC-8`, `OC-9A`, `OC-9B`; consumes Windows protocol fixtures
+- Depends on: `OC-2`, `OC-4`, `OC-5`; consumes `OC-6` and `OC-7`
 - Work:
-  - Complete hostile-argument, stale capability, policy composition, protected
-    consent, ready-versus-authorized, execution release, host-busy, recording
-    isolation, and arbitrary-exec conflict tests.
-  - Prove generic MCP, CLI, shell, alternate plugin routes, and unknown node
-    inventory cannot reach managed CUA.
-  - Audit local IPC and process-handle protections on macOS and Linux.
-- Exit gate: every applicable RFC security acceptance criterion has executable
-  proof or a documented platform capability marked unavailable in the main
-  repository.
-
-### OC-10B: macOS and Linux packaging, upgrade, and recovery
-
-- Repo: `openclaw/openclaw`
-- Depends on: `OC-8`, `OC-9B`
-- Work:
-  - Exercise clean install, compatible system import, managed install, update,
-    failed update rollback, app/node upgrade, provider-spec skew, and uninstall
-    for macOS and Linux.
-  - Verify child cleanup, input/recording release, manifest removal, generation
-    changes, and previous known-good recovery after every terminal path and
-    crash.
-- Exit gate: packaged DMG and Linux node artifacts pass local and
-  remote-Gateway scenarios.
-
-### WIN-2: Windows security, packaging, upgrade, and recovery
-
-- Repo: `openclaw/openclaw-windows-node`
-- Depends on: `WIN-1`, `OC-9A/B` diagnostic contracts
-- Can run with: `OC-10A`, `OC-10B`, `OC-10C`
-- Work:
-  - Complete Windows IPC, helper, hostile-argument, policy, and local approval
-    tests, including interactive-session/Session 0 checks and authenticated
-    protected-provider revocation.
-  - Exercise clean install, managed update, failed update rollback, companion
-    upgrade, provider-spec skew, crash recovery, and uninstall.
-  - Publish package evidence in the same closed acceptance shape as macOS and
-    Linux.
-- Exit gate: the packaged Windows installer passes local and remote-Gateway
-  scenarios, with elevated-target support either proven or explicitly absent.
-
-### OC-10C: Browser and model-guidance parity
-
-- Repo: `openclaw/openclaw`
-- Depends on: accepted CUA version, `OC-5`, all ready platform hosts
-- Work:
-  - Run the exact native-window/tab binding and full-background acceptance
-    scenarios on supported Chromium/platform combinations.
-  - Verify snapshot-before/after, element invalidation, fallback ladders,
-    foreground transitions, exact browser-page routing, verdict precedence, and
-    explicit DOM-event behavior.
-  - Prove the Gateway neither retries mutations nor advances AX/PX/browser/
-    foreground/desktop rungs, and preserves standalone `bring_to_front` plus
-    live-schema `delivery_mode`.
-  - Compare exposed tools/resources with the accepted CUA profile and record
-    intentionally unavailable operations.
-- Exit gate: OpenClaw routing does not reduce CUA reasoning quality or silently
-  alter input trust semantics.
-
-## Wave 5: Default Rollout
-
-### OC-11: Enable CUA as the default ready provider
-
-- Repo: `openclaw/openclaw`
-- Depends on: `OC-10A`, `OC-10B`, `OC-10C`, `WIN-2`
-- Work:
-  - Select CUA by default only on hosts where it is installed, enabled, and
-    fully ready; acquire execution-scoped authorization separately for each
-    run before materializing callable tools.
-  - Keep Peekaboo explicitly selectable on macOS with no per-call fallback.
-  - Publish provider-authoring and node-runtime requirements.
-  - Add release monitoring for install failures, readiness codes, crash loops,
-    and version skew without collecting Computer Use content.
+  - Join capability advertisement, core tool binding, node provider execution,
+    CUA session, macOS app service handoff, and result projection.
+  - Implement one harmless v2 vertical action: list windows, observe one window
+    with image + semantic data, act on an element, and verify with fresh state.
+  - Run the same scenario on Linux X11 and macOS packaged app; run Windows when
+    its host lane is available.
 - Proof:
-  - The complete RFC acceptance matrix passes against release artifacts.
-  - Upgrade tests show existing users without Computer Use retain current node
-    behavior and receive no surprise native download or permission prompt.
+  - Local and remote Gateway versions of the scenario pass.
+  - Stale observation, provider restart, cancellation, and local Stop fail
+    closed.
+- Gate unlocked: action-family work may merge against a proven end-to-end v2
+  route.
+
+## Wave 3: Rich CUA action families
+
+The four lanes below share protocol fixtures but may be implemented and reviewed
+in parallel after `OC-8`.
+
+### OC-9A: App, window, semantic observation, and rich input
+
+- Repo: `openclaw/openclaw`
+- Depends on: `OC-8`
+- Can run with: `OC-9B`, `OC-9C`, `OC-9D`
+- Work:
+  - Implement app/window discovery and app lifecycle actions.
+  - Implement `get_accessibility_tree` and complete `get_window_state` with
+    bounded tree, image, element refs, query, truncation, and degradation.
+  - Add window-point and element targets, `set_value`, `zoom`, delivery mode,
+    and supported modifier/hold branches.
+  - Preserve standalone `bring_to_front` semantics.
+  - Implement explicit `escalate_scope` with CUA session capture scope.
+- Proof:
+  - Background element and window-pixel paths work without foreground theft on
+    supported platforms.
+  - Stale refs, hidden/minimized windows, DPI/Retina mapping, and provider
+    generation are covered.
+  - Unsupported branches refuse before MCP dispatch.
+
+### OC-9B: Browser targeting and full-background actions
+
+- Repo: `openclaw/openclaw`
+- Depends on: `OC-8`; isolated-profile support may consume upstream CUA work
+- Can run with: `OC-9A`, `OC-9C`, `OC-9D`
+- Work:
+  - Add browser observation and all typed browser action variants.
+  - Bind native window -> browser target -> tab/page refs exactly.
+  - Preserve trusted pointer versus explicit synthetic DOM-event semantics.
+  - Invalidate refs on navigation, target loss, provider restart, and execution
+    close.
+  - Enable isolated driver-owned profile preparation first.
+  - Keep existing-profile attachment unavailable until protected host consent
+    and indicator support from CUA passes packaged proof.
+- Proof:
+  - Occluded Chromium/Electron scenarios exercise navigation, text, DOM click,
+    dialogs, and pointer refusal/success branches.
+  - Heuristic target selection and stale refs fail closed.
+  - Existing-profile flow cannot be approved by model or Gateway arguments.
+
+### OC-9C: Recording, replay, and host-owned resources
+
+- Repo: `openclaw/openclaw`
+- Depends on: `OC-8`, applicable `trycua/cua#2413` capabilities
+- Can run with: `OC-9A`, `OC-9B`, `OC-9D`
+- Work:
+  - Add recording state/start/stop and replay actions.
+  - Add opaque OpenClaw resource handles for uploads, downloads, recordings,
+    screenshots, and replay inputs.
+  - Inject node-owned output roots and accepted helper paths outside model
+    schemas.
+  - Scope recording ownership to one provider execution.
+  - Keep update and FFmpeg installation local and non-agent-callable.
+- Proof:
+  - Path traversal, symlink replacement, arbitrary absolute paths, ambient
+    helper lookup, and cross-session recording control fail.
+  - Completion and every abnormal close path stop recording and finalize or
+    discard artifacts deterministically.
+
+### OC-9D: CUA skill and model-behavior parity
+
+- Repo: `openclaw/openclaw`, optionally `trycua/cua`
+- Depends on: `CU-1`; integrates after `OC-9A/B/C` capability names settle
+- Can run with: all `OC-9` implementation lanes
+- Work:
+  - Build the version-pinned OpenClaw CUA skill profile.
+  - Preserve core, platform, browser, and recording guidance while replacing
+    CLI/MCP-native calls with OpenClaw actions.
+  - Filter guidance by advertised action families without creating contradictory
+    platform instructions.
+  - Bind skill digest to the accepted CUA compatibility bundle.
+- Proof:
+  - Static checks reject CLI, shell, daemon, socket, installation, update, and
+    native-session instructions.
+  - Model evaluations cover snapshot-before-action, tree/image cross-check,
+    background-first delivery, no-op handling, browser binding, foreground and
+    desktop escalation, recording, and cleanup.
+  - Gateway traces prove no automatic mutation retry or ladder advancement.
+
+## Wave 4: Artifacts, onboarding, security, and packaging
+
+### OC-10A: Managed CUA artifacts and updates
+
+- Repo: `openclaw/openclaw`; Windows package lane may consume shared metadata
+- Depends on: `OC-4`, platform packaging decisions
+- Can run with: `OC-10B`, `OC-10C`
+- Work:
+  - Define one plugin-owned artifact lock and accepted compatibility bundle.
+  - Bundle CUA in official packages where approved; otherwise add explicit
+    node-local managed install.
+  - Verify digest, publisher expectation, regular-file identity, executable
+    path, and running image before OS work.
+  - Add atomic update, rollback, disable, and uninstall.
+  - Keep ambient `PATH` as developer mode only.
+- Proof:
+  - Clean install, import, update, failed update rollback, package upgrade, and
+    uninstall pass on each platform.
+  - Tamper, replacement, unknown version, and unknown capability manifest fail.
+
+### OC-10B: Host-aware onboarding and diagnostics
+
+- Repo: `openclaw/openclaw`; Windows companion UI as applicable
+- Depends on: `OC-5`, `OC-7`; consumes action readiness from `OC-9`
+- Can run with: `OC-10A`, `OC-10C`
+- Work:
+  - Add local provider selection, enablement, install, permission, backend,
+    test, Stop, update, rollback, and disable flows.
+  - Add Gateway host selection, active-provider/readiness display, arming, and
+    deep links or local-action instructions.
+  - Add `openclaw computer setup/status/test` for non-app node hosts.
+  - Distinguish Gateway-fixable, node-local, permission, backend, artifact, and
+    policy failures with closed codes.
+- Proof:
+  - Local Gateway, remote Gateway, multiple node, multiple provider, missing
+    permission, incompatible driver, and disconnected node flows are covered.
+  - Diagnostics contain no Computer Use content, native paths, endpoints,
+    policies, or raw stderr.
+
+### OC-10C: Policy and security closure
+
+- Repo: `openclaw/openclaw`
+- Depends on: `OC-9A/B/C`
+- Can run with: `OC-10A`, `OC-10B`
+- Work:
+  - Add argument-aware classification for high-risk action families.
+  - Generate and verify CUA managed policy for the advertised mapping.
+  - Prove CLI, shell, generic MCP, raw provider calls, and unselected plugin
+    commands cannot reach the managed CUA instance.
+  - Audit macOS private endpoint handling and decide whether
+    `trycua/cua#2410` is a default-rollout blocker.
+  - Complete local Stop, protected browser consent, resource isolation,
+    provider generation, replay, timeout ambiguity, and hostile-argument tests.
+- Proof:
+  - Security acceptance matrix passes on packaged macOS, Windows, and Linux.
+  - Any unavailable upstream protected feature remains absent from capability
+    advertisement rather than shipping weakened behavior.
+
+## Wave 5: Cross-platform acceptance and rollout
+
+### OC-11: Packaged cross-platform acceptance
+
+- Repo: `openclaw/openclaw` plus Windows companion package lane
+- Depends on: `OC-9A-D`, `OC-10A-C`
+- Work:
+  - Run packaged macOS, Windows, Linux X11, supported Wayland, local-Gateway,
+    remote-Gateway, and provider-switch scenarios.
+  - Verify v1 regression, v2 semantic flow, browser, recording/resources,
+    provider sessions, cleanup, upgrades, rollback, and diagnostics.
+  - Compare advertised capability with the accepted CUA parity matrix and
+    document every intentionally unavailable branch.
+- Exit gate:
+  - Every applicable RFC acceptance criterion has executable evidence.
+  - Missing platform features are explicit capabilities, not hidden fallbacks.
+
+### OC-12: Make CUA the default ready provider
+
+- Repo: `openclaw/openclaw`
+- Depends on: `OC-11`
+- Work:
+  - Enable/select CUA by default only on nodes where the accepted artifact and
+    required readiness checks pass.
+  - Keep provider installation/permission prompts local and explicit.
+  - Keep Peekaboo selectable on macOS and preserve explicit provider affinity.
+  - Publish provider-authoring, setup, security, and troubleshooting docs.
+  - Add privacy-preserving readiness, install, skew, and crash-loop telemetry
+    where OpenClaw policy permits it.
 - Rollback:
-  - Disable CUA default selection in product policy while leaving explicit
-    provider selection and Peekaboo operational.
-  - Roll node artifacts back to the retained known-good lock; never silently
-    switch an active run to another provider.
+  - Disable default CUA selection while preserving explicit CUA and Peekaboo
+    choices.
+  - Roll managed artifacts to the retained known-good version.
+  - Never switch an active execution to another provider.
 
-## PR and Ownership Matrix
+## PR and ownership matrix
 
-| ID | Primary owner boundary | Merge dependency | Parallel lane |
+| ID | Owner boundary | Depends on | Parallel lane |
 | --- | --- | --- | --- |
-| CUA-1 | CUA embedded transport | none | Upstream runtime |
-| CUA-4 | CUA protected consent/indicator | none; integrates with CUA-1 | Upstream security |
-| CUA-2 | CUA skill/manifest | none | Upstream guidance |
-| CUA-3 | CUA resources/helpers | none | Upstream policy |
-| OC-1 | Gateway protocol/router | RFC contract | OpenClaw protocol |
-| OC-2 | Core runtime, SDK, Peekaboo | OC-1 | OpenClaw runtime/macOS adapter |
-| OC-3 | Node MCP provider host | OC-1 | OpenClaw node host |
-| OC-4 | Generated provider package | OC-1 | Build/release metadata |
-| OC-5 | Bundled CUA plugin | OC-2, OC-4, CUA-2/3/4 | Plugin integration |
-| OC-6 | Linux provider lifecycle | OC-3/4, CUA-1/3/4 | Linux node |
-| OC-7 | Linux integration gate | OC-5/6 | End-to-end proof |
-| OC-8 | macOS embedded host | OC-7, CUA-1/4 | Native macOS app |
-| WIN-1 | Windows embedded host | OC-4/5, CUA-1/4 | Windows companion |
-| OC-9A | Gateway selection/onboarding | OC-7 | Gateway/UI |
-| OC-9B | Linux CLI/doctor/diagnostics | OC-6 | Node CLI/diagnostics |
-| OC-10A-C | Main-repo closure gates | OC-8, OC-9A/B | Security/package/parity |
-| WIN-2 | Windows closure gate | WIN-1, OC-9A/B | Windows package/security |
-| OC-11 | Default rollout | OC-10A-C, WIN-2 | Product/release |
+| CU-1 | CUA/OpenClaw contract fixtures | RFC | Contract research |
+| CU-2 | CUA embedding/skill/resources | none | Upstream |
+| OC-1 | Gateway/node v2 protocol | CU-1 | Protocol |
+| OC-2 | Built-in Computer Use tool | OC-1 | Gateway/agent runtime |
+| OC-3 | Node provider runtime/SDK | OC-1 | Node host |
+| OC-4 | CUA plugin provider refactor | OC-3 | Plugin |
+| OC-5 | macOS embedded CUA host | OC-3/4 | macOS app |
+| WIN-1 | Windows companion CUA host | OC-3/4 | Windows companion |
+| OC-6 | Peekaboo provider selection | OC-3 | macOS app |
+| OC-7 | Local Gateway loopback node | OC-3/4 | Gateway/node |
+| OC-8 | First v2 vertical slice | OC-2/4/5 | Integration |
+| OC-9A | App/window/input parity | OC-8 | CUA adapter |
+| OC-9B | Browser parity | OC-8 | CUA/browser |
+| OC-9C | Recording/resources | OC-8 + upstream resource support | CUA/resources |
+| OC-9D | Skill/model parity | CU-1 + action names | Guidance/evals |
+| OC-10A | Artifacts/update | OC-4/5 | Packaging |
+| OC-10B | Onboarding/diagnostics | OC-5/7 | UX |
+| OC-10C | Security/policy | OC-9A-C | Security |
+| OC-11 | Packaged acceptance | OC-9/10 + WIN-1 | Cross-platform QA |
+| OC-12 | Default rollout | OC-11 | Product/release |
 
-## Integration Branch and Fixture Strategy
+## Fixture and branch strategy
 
-- `OC-1` publishes canonical protocol fixtures used by OpenClaw and the Windows
-  companion. The Windows repository does not regenerate wire shapes by hand.
-- `OC-4` publishes the canonical provider-package artifact and digest. Native
-  app builds pin a released artifact; a Gateway never supplies it at runtime.
-- Stacked development branches may consume an unreleased fixture artifact, but
-  merge commits pin a published immutable version.
-- Platform PRs should use a fake provider for most lifecycle tests and reserve
-  real CUA execution for focused package/E2E lanes.
-- The cross-platform integration branch is disposable. Canonical behavior
-  lands through the bounded PRs above, not through a permanent compatibility
-  layer maintained only on the integration branch.
+- `OC-1` owns canonical TypeScript/Swift wire fixtures. Native apps consume the
+  fixtures and do not regenerate protocol shapes by hand.
+- `CU-1` pins CUA fixtures to accepted tags. Tests do not fetch CUA `main`.
+- The CUA plugin compatibility bundle is one source of truth for supported
+  versions, mappings, policies, skill digest, and artifacts.
+- Platform PRs use fake providers for lifecycle coverage and reserve real CUA
+  for focused packaged E2E lanes.
+- Stacked branches may consume provisional fixtures, but merged PRs depend only
+  on committed or published immutable fixtures.
+- Action families can land independently because capability advertisement is
+  exact. A half-implemented family remains absent.
 
-## Optional Infrastructure
+## Optional infrastructure
 
-`openclaw/openclaw#98005` may provide a language-neutral process boundary for
-future external Gateway-side provider adapters. If it lands, `OC-2` and `OC-5`
-may use that process model where it preserves the same registration and policy
-contract. It does not change `OC-1`, the node provider package, app-owned CUA
-launch, native permissions, or any platform host dependency, and no wave waits
-for it.
+- [openclaw/openclaw#110293](https://github.com/openclaw/openclaw/pull/110293)
+  may provide provider identity before `OC-3`. `OC-3` should consume it if it
+  lands, but should not retain a second registry.
+- [openclaw/openclaw#98005](https://github.com/openclaw/openclaw/pull/98005)
+  may help future external non-TypeScript providers. No current wave depends on
+  it.
+- Inherited connected IPC from
+  [trycua/cua#2410](https://github.com/trycua/cua/issues/2410) should replace the
+  private socket when available. `OC-10C` decides whether it is required before
+  default rollout based on the packaged threat review.
 
-## Critical Path and Schedule Risk
+## Critical path and schedule risk
 
-The critical path is:
+The initial useful path is:
 
 ```text
-CUA-1 + CUA-4 -> OC-6 -> OC-7 -> OC-8/WIN-1 -> OC-10A-C/WIN-2 -> OC-11
+CU-1 -> OC-1 -> OC-2/OC-3 -> OC-4/OC-5 -> OC-8
 ```
 
-`OC-1`, `OC-2`, `OC-3`, `OC-4`, CUA skill/policy work, and UX can reduce total
-calendar time by proceeding around that path. They cannot remove the `CUA-1`
-or `CUA-4` ship dependencies. The RFC should not weaken local IPC isolation or
-protected consent merely to fit the current path-addressed embedded endpoint or
-missing host adapter into the schedule.
+The default rollout path is:
 
-Other schedule risks:
+```text
+OC-8 -> OC-9A-D -> OC-10A-C -> OC-11 -> OC-12
+```
 
-- signed Windows UIAccess helper ownership may delay elevated-target support;
-- Wayland support varies by compositor and may ship as an explicit unavailable
-  capability after X11;
-- exact browser binding and full-background behavior may differ by platform and
-  accepted CUA release;
-- the protected-consent adapter and packaged host-owned Stop surface may delay
-  existing-profile support independently of inherited IPC;
-- macOS TCC proof must use a signed packaged app, not a development executable;
-- provider package publication must coordinate with the separate Windows build
-  without allowing runtime trust to depend on the Gateway.
+Main schedule risks are:
 
-These risks narrow reported capability. They do not justify silent fallback,
-arbitrary local execution, unverified artifacts, or remote permission control.
+- CUA schema churn before a stable rich compatibility manifest;
+- signed packaged macOS direct-spawn and TCC proof;
+- deciding whether private-socket embedding is sufficient for first rollout;
+- protected existing-profile consent and host-owned resource support;
+- Windows interactive-session and elevated-target packaging;
+- Wayland compositor variance;
+- model-tool schema limits if the v2 action union becomes too large;
+- keeping the adapted skill synchronized without forking CUA's operating model.
+
+These risks narrow capability or delay default selection. They do not justify a
+generic MCP bypass, raw provider passthrough, silent fallback, or reimplementation
+of CUA's native driver.
