@@ -982,6 +982,21 @@ not the security boundary: disabled direct routes and backend operations must
 also fail closed. ClawHub publication and discovery remain independently gated
 by `CLAWHUB_EXPERIMENTAL_CLAWS=1`.
 
+Control UI must not read or receive the Gateway process environment. The
+Gateway evaluates `OPENCLAW_EXPERIMENTAL_CLAWS`, conditionally registers the
+Claw lifecycle methods, and advertises only registered methods through the
+existing `hello-ok.features.methods` capability list. Control UI exposes each
+read or mutation surface only when its required method is advertised. With the
+gate disabled, Claw methods are absent from capability discovery and direct
+requests fail closed. A flag change takes effect through Gateway restart and
+the normal Control UI reconnect capability refresh.
+
+ClawHub follows the same server-authoritative rule without sharing a flag with
+OpenClaw. Its Convex runtime evaluates `CLAWHUB_EXPERIMENTAL_CLAWS`; disabled
+package queries omit or reject the Claw family, and the experimental feed
+returns `404` with `Cache-Control: no-store`. Browser clients infer availability
+only from those gated APIs and never receive the deployment environment value.
+
 ## Acceptance criteria
 
 The RFC implementation is acceptable when tests and real CLI proof demonstrate:
