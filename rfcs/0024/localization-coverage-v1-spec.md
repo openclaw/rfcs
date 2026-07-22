@@ -378,6 +378,21 @@ Detection and enforcement fail closed on malformed manifests, tool failure, or
 unreadable required evidence. A failed refresh leaves the prior catalogs and
 maturity state unchanged while reporting the unresolved drift.
 
+The projected delivery registry proves this contract with two explicit slices.
+`G45` adds deterministic, credential-free detect/enforce checks for one
+owner-declared routine message family. `G46` adds the trusted exact-source
+refresh, validation, evidence, and generated-PR path for the same fixture. They
+may land together in one bounded core/tooling exemplar PR, after which each
+surface adopts the checks only for its own declared families, namespaces, or
+directories. This delivery mapping is informative; the state-machine contract
+above remains normative.
+
+After the exemplar exists, a migrated string-bearing area does not satisfy the
+maintenance contract until both phases are wired for its declared scope:
+credential-free detect/enforce on pull requests and trusted refresh through a
+generated pull request. Existing owner workflows may provide this evidence;
+the RFC does not require replacing a conforming pipeline.
+
 The gate may automatically repair missing low-risk catalog entries in a
 generated pull request. It must not:
 

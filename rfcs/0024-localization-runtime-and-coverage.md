@@ -94,7 +94,16 @@ can report language-by-surface state, but these drafts do not install a closed
 global matrix or claim that other cells are localized. Owner declarations and
 aggregate product reporting remain the later `E43` and `E44` slices.
 
-The initial delivery audit identifies 44 projected owner slices. This is the
+The five drafts do not yet install the reusable authoring gate or asynchronous
+translation lane. The next bounded core/tooling exemplar will implement `G45`
+and `G46` together: a routine English source edit must trip deterministic CI,
+then a trusted exact-source workflow generates and validates a locale candidate
+and opens a generated pull request. Each later surface opts in only for its
+owner-declared families, namespaces, or directories.
+
+The current delivery audit identifies 46 projected owner slices. The first
+audit had 44; owner review exposed the authoring-gate and generated-refresh
+obligations that are now explicit as `G45` and `G46`. This is the
 proposed queue to work down over time, using the same planning pattern as
 Doctor's structured rule registry. The count is planning evidence, not a
 required pull-request count or acceptance gate. A slice is deleted when source
@@ -349,6 +358,19 @@ visible. Detection and enforcement failures fail closed.
 Translation-provider credentials never run against untrusted pull-request
 code. Pull requests run deterministic detection and enforcement only. AI fills
 candidate gaps; it does not approve its output or change maturity by itself.
+
+The projected registry names the reusable implementation proof explicitly:
+`G45` installs the owner-scoped deterministic authoring/drift gate, and `G46`
+installs the trusted asynchronous refresh-to-generated-PR lane. They begin with
+one routine core exemplar; existing Control UI, native, and docs owners keep
+their current workflows, while later CLI/TUI/runtime owners adopt the reference
+contract without surrendering catalog or review ownership.
+
+After that exemplar lands, each slice that adds or migrates deterministic
+product strings brings its area fully onto the contract: a blocking,
+credential-free gate for its declared scope plus a trusted owner-owned refresh,
+validation, evidence, and generated-PR path. Existing Control UI, native, and
+docs workflows may demonstrate conformance instead of being replaced.
 
 ## Goals
 

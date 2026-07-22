@@ -11,8 +11,10 @@ registry, a fixed pull-request count, or an RFC-acceptance gate.
 
 ## Registry Contract
 
-The initial audit has 44 entries. Forty-four is the current decomposition, not
-a quota. An entry may be deleted when source audit proves that existing owner
+The current audit has 46 entries. The first audit had 44; owner review exposed
+two automation obligations that had been described by the RFC but not named as
+delivery slices. Forty-six is the current decomposition, not a quota. An entry
+may be deleted when source audit proves that existing owner
 behavior is already sufficient, or split when it crosses semantic, rendering,
 locale, or publication ownership. Entries may combine only when the same owner
 can approve the same compatibility, privacy, rollback, and deletion proof.
@@ -33,6 +35,15 @@ surface-owned catalogs and protocol-owned descriptor registries. Coverage
 aggregation reads landed owner declarations; it does not make this planning
 file executable.
 
+After `G45` and `G46` land, every slice that adds or migrates deterministic
+product strings must also onboard its area to both halves of the maintenance
+contract before that area is complete: its declared scope runs the blocking,
+credential-free authoring/drift gate, and its owner workflow runs trusted
+asynchronous generation, validation, and generated-PR publication. An owner
+with an existing pipeline may prove that pipeline satisfies the contract rather
+than replace it. Schema-only, English-only, or deferred slices record why no
+translated catalog is being enrolled.
+
 ## Owner Registries
 
 | Registry | Owns | Does not own |
@@ -46,6 +57,7 @@ file executable.
 | `channel.<adapter>` | Legitimate recipient locale, escaping, platform projection, and fallback | Cross-channel locale inference |
 | `native.android`, `native.apple`, `docs` | Existing platform catalogs, generation, validation, and publication | Runtime catalog formats |
 | `release-localization` | Landed declarations, scoped review evidence, maturity, and release claims | Runtime rendering or translation generation |
+| `catalog-automation` | Deterministic authoring gates and trusted generated-catalog refresh plumbing | Product meaning, catalog ownership, language review, or release promotion |
 
 ## A. Current Foundation Evidence
 
@@ -132,7 +144,23 @@ PRs remain separate where the repository policy requires it.
 | `P41` | `docs` | Swedish documentation source/navigation and generated publication | Docs owner and `openclaw/docs` workflow | Exact source/tool revision, glossary, links/anchors, published artifact evidence; no second docs translator. |
 | `P42` | `docs` | Persian and Thai publishing-path decision and implementation | Docs platform owner decision | Either verified artifacts or explicit `platform-constrained` rows with fallback and platform evidence. |
 
-## F. Evidence And Product Promotion
+## F. Authoring Gates And Translation Automation
+
+These two obligations are explicit delivery slices. They may land together in
+one bounded core exemplar PR because they share tooling ownership and one test
+fixture, but adopted surfaces opt in independently and retain their own source,
+catalog, generation, review, and publication policy.
+
+| ID | Owner registry | Projected slice | Gate | Required proof and deletion target |
+| --- | --- | --- | --- | --- |
+| `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until it is registered; invalid ICU, placeholder mismatch, protected-literal drift, stale catalog evidence, and hand-edited generated paths fail without provider credentials. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
+| `G46` | `catalog-automation` + first adopting owner | Trusted async catalog refresh and generated-PR reference lane | `G45`; approved provider secret on trusted `main`, schedule, or manual dispatch | One English fixture change produces an isolated locale candidate, validates it, records source-pinned generation evidence, and opens or updates a generated PR through the existing publisher. Stale input or validation failure publishes nothing and leaves coverage partial. No direct protected-branch push, AI self-review, or automatic safety-copy promotion. Replaces hand-copied translation updates for the adopted fixture. |
+
+The exemplar is deliberately routine product copy. Safety catalogs may reuse
+the lane only with their named semantic owner, language reviewer, and SecOps
+policy; generated output alone cannot mark a safety family complete.
+
+## G. Evidence And Product Promotion
 
 These entries begin only after multiple owners have landed declarations. They
 must not be pulled forward merely to make the kernel or an early slice appear
@@ -151,6 +179,10 @@ F01 kernel
   -> F04 TUI -> O15
   -> O08/O09/O10-O14
 
+F01 kernel + F03 contributor contract
+  -> G45 scoped authoring gate
+  -> G46 trusted async refresh exemplar
+
 F05 Gateway approval descriptor
   -> O06 generated Control UI catalog
   -> R16-R19 additional reviewed Gateway tuples
@@ -168,7 +200,9 @@ landed owner declarations from all cohorts
 
 Independent owners may work in parallel after their own dependency and owner
 gate. Within one owner registry, source/contract work lands before generated
-artifacts or adapter projections.
+artifacts or adapter projections. Once the core exemplar lands, every later
+string-bearing area slice includes its scoped `G45` gate and `G46` refresh
+adoption (or evidence that its existing owner workflow already conforms).
 
 ## Review Findings Applied
 
@@ -178,7 +212,7 @@ The projected registry was evaluated through four tension lenses:
   rendering performs no network, model, or catalog-generation work.
 - **Operator:** every implementation entry must replace a visible hardcoded or
   duplicated authority; registry maintenance alone is not user value.
-- **Simplicity/community:** 44 is an auditable inventory, not a mandated stack,
+- **Simplicity/community:** 46 is an auditable inventory, not a mandated stack,
   new framework, or contributor tax; owner-native catalogs and workflows stay
   authoritative.
 - **Security:** safety entries require stable machine semantics, whole-family

@@ -8,9 +8,11 @@ Generated-content language remains a post-v1 follow-up because it changes model
 behavior rather than deterministic product-owned interface text.
 
 The auditable delivery queue is the
-[projected owner slice registry](projected-owner-slice-registry.md). Its initial
-44 entries apply the same planning pattern as a structured health-rule
+[projected owner slice registry](projected-owner-slice-registry.md). Its current
+46 entries apply the same planning pattern as a structured health-rule
 registry: every known family has an owner, gate, proof bar, and deletion target.
+The first audit had 44 entries; owner review split the previously implicit
+authoring-gate and generated-refresh obligations into `G45` and `G46`.
 The number is not fixed. Source audit may delete, split, or add entries without
 changing the runtime contract.
 
@@ -44,6 +46,13 @@ shape, but these drafts neither install a closed global reporting matrix nor
 claim completion for unadopted surfaces. Owner declarations and aggregate
 reporting begin later in `E43`; review evidence and release promotion follow in
 `E44`.
+
+The five drafts also do not yet prove the reusable CI and translation-authoring
+loop. The next bounded core/tooling exemplar will implement `G45` and `G46`
+together: change one routine English source message, observe deterministic CI
+detect the stale target, run trusted asynchronous generation and validation,
+and open a generated pull request. Later owners adopt that lane only for their
+declared families, namespaces, or directories.
 
 ## Serial Foundation Plan
 
@@ -98,7 +107,7 @@ After their public contracts are approved, these tracks proceed independently:
 No track is blocked on a global readiness PR, and no track changes another
 owner's schema merely to satisfy localization-core.
 
-The initial 44-entry registry assigns these tracks to `F01`-`E44`. It is the
+The current 46-entry registry assigns these tracks to `F01`-`G46`. It is the
 planning source for follow-up PR selection. Pick the earliest entry whose owner
 and dependency gates are satisfied; do not select work merely to advance the
 numeric count.
@@ -115,6 +124,8 @@ one semantic owner
 + one accepted and one fallback/failure fixture
 + one compatibility and privacy proof
 + one deleted presentation workaround
++ one scoped authoring gate and owner-owned generated refresh path when the
+  slice adds or migrates deterministic product strings
 ```
 
 The PR description or focused tests record the corresponding conformance
@@ -135,6 +146,7 @@ Completion names are tracking cohorts, not single PRs or a linear stack:
 | Runtime safety | Bounded user-facing runtime and Gateway errors | `F05` and `R16`-`R24` use owner-approved descriptors, edge rendering, and compatible English fallback. |
 | Channels and capabilities | Server-rendered channels, command menus, command metadata, and skill/plugin metadata | `M25`-`M36` land each public contract and locale authority independently. |
 | Native and docs | Android, Apple, and documentation | `P39`-`P42` extend existing owner pipelines and record the Persian/Thai disposition. |
+| Authoring automation | Shared tooling plus each adopting owner | `G45`-`G46` prove scoped deterministic enforcement and trusted generated-PR refresh, beginning with one core exemplar. |
 | Release promotion | Product-wide | `E43`-`E44` aggregate only landed scoped evidence and produce an honest release claim. |
 
 The current product-policy target is all 313 OpenClaw-controlled cells complete.
@@ -162,6 +174,36 @@ run the source-owned translator. Native translation continues to reuse the
 Control UI translation client. The release cohort reads their scoped evidence;
 it does not copy their catalogs or translation memory into a central service.
 Provider secrets are never exposed to untrusted pull-request code.
+
+### Core end-to-end exemplar
+
+`G45` and `G46` establish the reusable reference path before broad owner
+adoption. One routine, non-safety message family must prove:
+
+1. an English source edit is detected on an untrusted pull request without
+   provider credentials;
+2. the migrated scope fails its deterministic gate while the target catalog is
+   missing, stale, malformed, or violates ICU/placeholders/protected literals;
+3. a trusted exact-source workflow generates one locale candidate;
+4. validation succeeds before publication and records source-pinned generation
+   evidence;
+5. the existing generated-PR publisher opens or updates a reviewable pull
+   request rather than pushing directly; and
+6. failed or stale generation publishes nothing and leaves the affected cell
+   partial.
+
+The exemplar proves plumbing, not linguistic completion. Its generated output
+does not approve itself, and safety families require their stricter owner and
+review policy before adopting the same lane.
+
+After the exemplar lands, every subsequent slice that adds or migrates
+deterministic product strings must leave its area enrolled end to end. The PR
+defines the adopted family, namespace, or directory; enables its blocking
+credential-free gate; and configures the area's trusted asynchronous refresh,
+validation, evidence, and generated-PR path. Existing Control UI, native, or
+docs pipelines satisfy this requirement by proving conformance, not by being
+replaced. A schema-only, explicitly English-only, or deferred slice records why
+no translated catalog is enrolled.
 
 ## Workstream 1: Minimal Localization Core
 
