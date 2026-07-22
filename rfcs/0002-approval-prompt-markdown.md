@@ -198,6 +198,98 @@ to reach into. Channels on that path honor their declared mode themselves, and
 a conformance test asserts every channel declaring an approval capability also
 declares an explicit mode. See Unresolved questions.
 
+### Worked example
+
+A real exec approval prompt as core emits it today. This is the canonical
+markdown a channel declaring `approvalText: "markdown"` receives unchanged:
+
+````text
+React with:
+
+👍 Allow Once
+♾️ Allow Always
+👎 Deny
+
+Exec auto-review deferred to human approval (risk=medium): The command
+makes an external network request, which requires confirmation.
+
+Approval required.
+
+Run:
+
+```txt
+/approve a7a8b519-2311-4dcd-bccf-d6ca1d737969 allow-once
+```
+
+Pending command:
+
+```sh
+curl -sS -o /dev/null -w "%{http_code}" https://example.com
+```
+
+Other options:
+
+```txt
+/approve a7a8b519-2311-4dcd-bccf-d6ca1d737969 allow-always
+/approve a7a8b519-2311-4dcd-bccf-d6ca1d737969 deny
+```
+
+Host: gateway
+CWD: ~/GitHub/lobster/openclaw-agents/lobster
+Expires in: 30m
+Full id: `a7a8b519-2311-4dcd-bccf-d6ca1d737969`
+````
+
+On a channel that parses markdown, the three fences render as code blocks and
+the id renders as an inline code span. On a channel that does not, every
+backtick above is shown literally to the approver, including the three
+` ```txt ` and ` ```sh ` opening fences. That second outcome is what the
+default fixes.
+
+The same prompt after `downgradeApprovalMarkdownToPlaintext`, which is the
+verified output of the projection this RFC specifies:
+
+```text
+React with:
+
+👍 Allow Once
+♾️ Allow Always
+👎 Deny
+
+Exec auto-review deferred to human approval (risk=medium): The command
+makes an external network request, which requires confirmation.
+
+Approval required.
+
+Run:
+
+/approve a7a8b519-2311-4dcd-bccf-d6ca1d737969 allow-once
+
+Pending command:
+
+curl -sS -o /dev/null -w "%{http_code}" https://example.com
+
+Other options:
+
+/approve a7a8b519-2311-4dcd-bccf-d6ca1d737969 allow-always
+/approve a7a8b519-2311-4dcd-bccf-d6ca1d737969 deny
+
+Host: gateway
+CWD: ~/GitHub/lobster/openclaw-agents/lobster
+Expires in: 30m
+Full id: a7a8b519-2311-4dcd-bccf-d6ca1d737969
+```
+
+This is what content-lossless means in practice. Zero residual backticks. The
+pending command survives byte-for-byte, including the quoting in
+`-w "%{http_code}"` that a naive regex stripper would corrupt. Both `/approve`
+command lines and the full id survive verbatim, so every action the approver
+can take is still copyable. Only the markers are gone.
+
+Note what the contract does not cover. The reaction hint block and the decision
+buttons some channels render beneath the text are owned by the reaction runtime
+and the presentation payload respectively, not by this markdown contract.
+
 ### Migration
 
 Compatibility is opt-in, so the default is the safe one.
