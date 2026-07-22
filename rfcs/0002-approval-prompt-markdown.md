@@ -290,6 +290,41 @@ Note what the contract does not cover. The reaction hint block and the decision
 buttons some channels render beneath the text are owned by the reaction runtime
 and the presentation payload respectively, not by this markdown contract.
 
+### What a channel opting in actually gains
+
+The same prompt on iMessage, before and after it declares
+`approvalText: "markdown"`:
+
+![iMessage approval prompt before and after declaring approvalText](0002/imessage-approval-before-after.png)
+
+iMessage is the useful illustration because it shows the contract does not mean
+"render the markdown as written." Its typed-run vocabulary is bold, italic,
+underline, and strikethrough, so there is nowhere to render a fenced block at
+all. Opting in there means consuming the code markers and promoting the labels
+and the auto-review rationale to bold, not reproducing a code block. A channel
+declaring `markdown` is declaring that it owns the translation, and a faithful
+translation can legitimately drop a construct its transport cannot express, so
+long as the content survives.
+
+macOS 14 recipients see no typed runs, so the same message lands as the
+plaintext projection. Both outcomes are correct under the contract, and neither
+shows a stray marker.
+
+### Emphasis over generated content
+
+Core copy such as `Approval required.` or `Pending command:` is fixed and safe
+to wrap in markers. Some prompt content is not: the exec auto-review rationale
+above is model-generated text interpolated into the warning line, and approval
+prompts also carry commands, paths, and ids derived from user or agent input.
+
+Any builder applying emphasis to non-fixed content must escape the payload
+before wrapping it. An unescaped `*` or `_` inside a generated rationale
+silently breaks the emphasis span on a rendering channel, and on a parse-mode
+transport such as Telegram it is a delivery hazard rather than a cosmetic bug.
+The rule is narrow and worth stating explicitly because it is invisible in
+review: emphasis is safe over literal copy the builder owns, and requires
+escaping over anything it does not.
+
 ### Migration
 
 Compatibility is opt-in, so the default is the safe one.
@@ -347,6 +382,9 @@ plaintext forever, which is a supported end state, not a temporary shim.
   path.
 - Telegram: prove reserved-character escaping on a prompt whose title or
   command contains `*`, `_`, backticks, or other reserved characters.
+- Emphasis over generated content: a prompt whose auto-review rationale itself
+  contains `*` or `_` must not break its emphasis span on a rendering channel
+  and must not break delivery on a parse-mode channel.
 - Real-channel delivery proof for each channel at the point it opts into
   `markdown`, since rendering and escaping are transport behaviors.
 
