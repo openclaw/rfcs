@@ -94,12 +94,14 @@ can report language-by-surface state, but these drafts do not install a closed
 global matrix or claim that other cells are localized. Owner declarations and
 aggregate product reporting remain the later `E43` and `E44` slices.
 
-The five drafts do not yet install the reusable authoring gate or asynchronous
-translation lane. The next bounded core/tooling exemplar will implement `G45`
-and `G46` together: a routine English source edit must trip deterministic CI,
-then a trusted exact-source workflow generates and validates a locale candidate
-and opens a generated pull request. Each later surface opts in only for its
-owner-declared families, namespaces, or directories.
+The five runtime drafts do not install the reusable authoring gate or
+asynchronous translation lane. Draft OpenClaw PR
+[#112784](https://github.com/openclaw/openclaw/pull/112784) implements `G45`
+and `G46` together as the bounded core/tooling exemplar: a routine English
+source edit trips deterministic CI, then a trusted exact-source workflow
+generates and validates a locale candidate and opens a generated pull request.
+Each later surface opts in only for its owner-declared families, namespaces, or
+directories and must bring both halves of that loop.
 
 The current delivery audit identifies 46 projected owner slices. The first
 audit had 44; owner review exposed the authoring-gate and generated-refresh

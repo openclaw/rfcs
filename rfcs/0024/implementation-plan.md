@@ -47,12 +47,14 @@ claim completion for unadopted surfaces. Owner declarations and aggregate
 reporting begin later in `E43`; review evidence and release promotion follow in
 `E44`.
 
-The five drafts also do not yet prove the reusable CI and translation-authoring
-loop. The next bounded core/tooling exemplar will implement `G45` and `G46`
-together: change one routine English source message, observe deterministic CI
-detect the stale target, run trusted asynchronous generation and validation,
-and open a generated pull request. Later owners adopt that lane only for their
-declared families, namespaces, or directories.
+The five runtime drafts do not prove the reusable CI and translation-authoring
+loop. Draft OpenClaw PR
+[#112784](https://github.com/openclaw/openclaw/pull/112784) implements `G45`
+and `G46` together: change one routine English source message, observe
+deterministic CI detect the stale target, run trusted asynchronous generation
+and validation, and open a generated pull request. Later owners adopt that lane
+only for their declared families, namespaces, or directories, with both the
+scoped gate and owner-owned refresh configured in the same adoption slice.
 
 ## Serial Foundation Plan
 

@@ -151,6 +151,12 @@ one bounded core exemplar PR because they share tooling ownership and one test
 fixture, but adopted surfaces opt in independently and retain their own source,
 catalog, generation, review, and publication policy.
 
+Draft OpenClaw PR
+[#112784](https://github.com/openclaw/openclaw/pull/112784) is the reference
+implementation for both slices, using the wizard completion family as the first
+adopted area. Its draft status is implementation evidence, not a claim that the
+slices have landed.
+
 | ID | Owner registry | Projected slice | Gate | Required proof and deletion target |
 | --- | --- | --- | --- | --- |
 | `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until it is registered; invalid ICU, placeholder mismatch, protected-literal drift, stale catalog evidence, and hand-edited generated paths fail without provider credentials. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
