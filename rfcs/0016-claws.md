@@ -858,6 +858,9 @@ Implementation should widen the trust boundary in reviewable slices:
    grouped manifest, and safe sidecars; prove export-to-add in a fresh state dir.
 10. **ClawHub publication and feeds.** Share schema fixtures, publish a package,
     expose it through hosted feeds, and prove source resolution and add dry-run.
+11. **Control UI.** First expose read-only Claw inventory and health, then add
+    plan-backed lifecycle actions and ClawHub discovery without creating a
+    second mutation or policy implementation.
 
 ### Current OpenClaw implementation stack
 
@@ -952,6 +955,32 @@ grouped JSON manifest behind `CLAWHUB_EXPERIMENTAL_CLAWS=1`; it does not add a
 second format-specific gate. Search, detail, and feed APIs expose bounded
 summaries and immutable artifact coordinates; the applying client reviews the
 full declaration from the resolved artifact.
+
+### Planned Control UI implementation stack
+
+Control UI support is a non-blocking follow-up to the experimental CLI and
+ClawHub tracks. The UI must consume the same plan, provenance, status, doctor,
+and lifecycle operations as the CLI. It must not independently interpret a
+manifest, decide resource ownership, broaden consent, or implement a second
+mutation path.
+
+The follow-up is intentionally limited to two ordered PRs:
+
+1. **Read-only Claw lifecycle UI.** Add an experimental-gated Claw inventory
+   and agent detail surface showing package identity and version, applied
+   status, drift and doctor findings, and managed or referenced provenance.
+   This slice performs no Claw mutation and does not require ClawHub discovery.
+2. **Plan-backed lifecycle and discovery UI.** Add ClawHub search and package
+   detail, then render the canonical add, update, and remove previews with
+   capability escalation, affected resources, blockers, and partial outcomes.
+   Confirmation must submit the exact plan-integrity value produced by the
+   shared lifecycle planner. This slice depends on the ClawHub discovery APIs
+   and invokes the same lifecycle owners as the CLI.
+
+Both slices remain behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`. Hiding navigation is
+not the security boundary: disabled direct routes and backend operations must
+also fail closed. ClawHub publication and discovery remain independently gated
+by `CLAWHUB_EXPERIMENTAL_CLAWS=1`.
 
 ## Acceptance criteria
 
