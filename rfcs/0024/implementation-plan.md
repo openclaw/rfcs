@@ -56,9 +56,10 @@ deterministic CI detect the stale target, run trusted asynchronous generation
 and validation, and open a generated pull request. Later owners adopt that lane
 only for their declared families, namespaces, or directories, with both the
 scoped gate and owner-owned refresh configured in the same adoption slice.
-`G47` follows as a separate build-time guard so a newly introduced
-product-string surface cannot bypass that decision by never entering an owner
-registry.
+Draft OpenClaw PR
+[#112801](https://github.com/openclaw/openclaw/pull/112801) implements `G47` as
+a separate build-time guard so a newly introduced product-string surface cannot
+bypass that decision by never entering an owner registry.
 
 ## Serial Foundation Plan
 
