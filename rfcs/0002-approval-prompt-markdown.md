@@ -154,6 +154,16 @@ boundary:
   destination from the approver. Keeping the URL visible is a security
   property of an approval prompt, not a formatting preference.
 
+"Lossless" here means content-lossless, not byte-identical for the whole
+message. The projection trims the leading and trailing edges of the final
+string, so a prompt consisting of nothing but a fence would lose that fence's
+surrounding whitespace. Fenced content in the body of a prompt is preserved
+exactly, including leading indentation, trailing spaces, and internal blank
+lines, which is the shape every approval builder actually emits because the
+command fence is always followed by the host and id block. Conformance tests
+should assert that the command, id, and instruction text survive verbatim as
+substrings, not that the whole projection is byte-identical to its input.
+
 ### Channel capability
 
 Channels gain an explicit capability on their approval handler. It is a field,
@@ -195,12 +205,16 @@ Compatibility is opt-in, so the default is the safe one.
 1. Land the canonical subset, the downgrade helper, the capability, and core
    enforcement on the forwarder path. In the same change, declare
    `approvalText: "markdown"` on every channel that already renders the subset
-   today: Telegram, Matrix, Signal, WhatsApp, Slack, and Discord. Assess each
-   remaining channel against its actual transport before leaving it at the
-   default, because rendering can come from the transport rather than from
-   channel code. Mattermost is the known case: it has no render adapter but its
-   server renders markdown, so it needs the same declaration despite carrying
-   an auth-only capability.
+   today: Telegram, Matrix, Signal, WhatsApp, Slack, and Discord. For Telegram,
+   Matrix, Signal, and WhatsApp the declaration prevents a regression, because
+   their approval text is core-built markdown that their send path converts.
+   For Slack and Discord it records intent rather than preventing one: both
+   author native payloads in their own approval runtimes, so the forwarder
+   default never reaches them either way. Assess each remaining channel against
+   its actual transport before leaving it at the default, because rendering can
+   come from the transport rather than from channel code. Mattermost is the
+   known case: it has no render adapter but its server renders markdown, so it
+   needs the same declaration despite carrying an auth-only capability.
 2. Move iMessage to `markdown`. Its converter handles bold, italic, underline,
    and strikethrough but ignores inline code and fences, so approval prompts
    currently show literal backticks. This step teaches the converter to consume
@@ -282,9 +296,12 @@ One question is open, raised while scoping implementation.
   mode was declared, not that it was obeyed. The alternative is threading an
   explicit text mode into the two shared pending-prompt builders so core does
   the stripping for both paths, at the cost of a new parameter on widely-called
-  public SDK builders. The gap is currently unreachable because every channel
-  on that path declares `markdown`, so this can be deferred past step 1, but it
-  should be settled before a channel on that path declares `plaintext`.
+  public SDK builders. iMessage makes this concrete rather than hypothetical:
+  it has a native approval runtime and sits at the plaintext default through
+  step 1, so it is a channel on the unenforced path that must honor its own
+  declared mode from the moment step 1 lands. Step 1 can proceed either way,
+  since iMessage's own approval builder is the only caller that has to comply,
+  but the question should be settled no later than step 2.
 
 The questions raised during initial review are resolved as follows, and the
 decisions are reflected in the Proposal above.
