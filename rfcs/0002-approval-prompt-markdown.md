@@ -388,6 +388,35 @@ plaintext forever, which is a supported end state, not a temporary shim.
 - Real-channel delivery proof for each channel at the point it opts into
   `markdown`, since rendering and escaping are transport behaviors.
 
+Delivery proof must be **differential**, not absolute. The dominant risk in
+this work is a silent regression on a channel that already renders, and
+asserting that a channel shows a code block says nothing about whether the
+change altered it. Each scenario runs twice against the same live substrate,
+once before the change and once after, capturing the delivered message from the
+transport side rather than the builder's return value. Channels declaring
+`markdown` must produce an empty diff. Channels taking the default must produce
+a diff containing only removed markers. An empty diff for a defaulted channel
+means enforcement never fired.
+
+Two practical constraints shape where that proof can run:
+
+- **Self-contained substrates are worth more than credentialed ones.** A
+  Dockerised homeserver, chat server, or equivalent gives a reproducible lane
+  with no shared secret and no external account, so any contributor can rerun
+  it. Prefer extending an existing live-transport lane over adding a new one.
+- **Some channels have no CI lane and cannot get one.** iMessage needs macOS,
+  a signed-in Apple account, and the local bridge, and no Linux CI target can
+  reach it. Its proof is a manual run on a development gateway, never an
+  operator's live instance. This is a permanent property of the channel, not a
+  gap to close, so the migration should treat iMessage sign-off as an explicit
+  human gate rather than assuming automation will cover it.
+
+Channels where a formatting fault becomes a delivery fault deserve proof before
+cosmetic ones. Telegram is the clearest case, since it sends with a parse mode
+and an unescaped marker fails the send outright rather than merely looking
+wrong, which makes it the natural home for the generated-content escaping test
+above.
+
 ## Rationale
 
 The chosen design keeps formatting policy in core and rendering in channels,
