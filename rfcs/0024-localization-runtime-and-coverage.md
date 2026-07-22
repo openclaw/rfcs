@@ -24,6 +24,11 @@ declarations and continues to own its catalogs and final rendering. Existing
 codes, commands, identifiers, structured output, and reviewed English messages
 remain compatible.
 
+For JavaScript and TypeScript runtime catalogs, `intl-messageformat` owns ICU
+message parsing and formatting. The OpenClaw-specific layer owns the locale
+context, catalog and parameter validation, protected literals, compatibility,
+fallback, and safety rules around that formatter.
+
 Supporting material:
 
 - [Localization Runtime v1 specification](0024/localization-runtime-v1-spec.md)
@@ -42,7 +47,9 @@ Accepting this RFC approves these product contracts:
    platform inference; unsupported explicit values fail safely to English.
 2. Product-owned runtime copy is represented as a stable message key, typed
    literal parameters, and a reviewed English fallback template. The surface
-   that presents the message owns the catalog and final rendering.
+   that presents the message owns the catalog and final rendering. Shared
+   JavaScript and TypeScript runtime rendering delegates ICU formatting to
+   `intl-messageformat` rather than implementing a second message formatter.
 3. Subject to Gateway-owner approval, Gateway errors retain their existing code
    and English `message` while reviewed errors may add bounded localization
    metadata under `details.localization`. Shared descriptor identities live in
@@ -78,12 +85,23 @@ updater dry-run, contributor guidance, TUI status, and one Gateway approval
 descriptor. GitHub displays the stack cumulatively, but each intended delta is
 reviewed and landed only by its named semantic and rendering owners.
 
-The initial delivery audit identifies 44 projected owner slices. That count is
-planning evidence, not a required pull-request count or acceptance gate. A
-slice is deleted when source audit proves that no migration is needed and split
-when it crosses an owner, locale-authority, public-contract, or publication
-boundary. Coverage and release state consume only landed owner declarations;
-the planning registry is never loaded by the runtime.
+Accepting the RFC changes no runtime by itself. If the five drafts land in
+dependency order, OpenClaw has the internal locale/context and formatting
+foundation, the existing wizard consumer, localized updater dry-run and TUI
+status families, one reviewed Gateway/Control UI approval-error edge, and the
+contributor guide. The coverage specification then defines how adopted owners
+can report language-by-surface state, but these drafts do not install a closed
+global matrix or claim that other cells are localized. Owner declarations and
+aggregate product reporting remain the later `E43` and `E44` slices.
+
+The initial delivery audit identifies 44 projected owner slices. This is the
+proposed queue to work down over time, using the same planning pattern as
+Doctor's structured rule registry. The count is planning evidence, not a
+required pull-request count or acceptance gate. A slice is deleted when source
+audit proves that no migration is needed and split when it crosses an owner,
+locale-authority, public-contract, or publication boundary. Coverage and
+release state consume only landed owner declarations; the planning registry is
+never loaded by the runtime.
 
 ### Acceptance and delivery milestones
 
@@ -549,6 +567,8 @@ exact package path is an implementation decision, but the kernel owns:
 - immutable `LocalizationContext`;
 - the `LocalizedMessage` and scalar parameter types;
 - catalog lookup and reviewed English fallback;
+- ICU message parsing and formatting delegated to `intl-messageformat` for
+  shared JavaScript and TypeScript runtime catalogs;
 - key, parameter, namespace, and catalog validation primitives; and
 - renderer-safe bidirectional isolation helpers for literal data.
 
@@ -919,18 +939,22 @@ Gateway clients, scripts, screenshots, support workflows, and logs already
 observe English `message` values. Optional localization metadata provides a
 gradual migration path and keeps old clients usable.
 
-### Why not one localization library
+### Why one formatter does not imply one localization system
 
 Control UI, Swift, Kotlin, docs tooling, CLI, and server-rendered channel
 messages have different build and runtime constraints. Shared semantics are
-more valuable than forcing one file format.
+more valuable than forcing one file format. The shared JavaScript and
+TypeScript runtime kernel uses `intl-messageformat` for ICU formatting instead
+of maintaining a custom formatter, while native, UI, and documentation owners
+retain their existing formats and publication workflows.
 
 ### Why typed parameters and stable keys
 
-Project Fluent and Unicode MessageFormat demonstrate the value of separating
-message identity, variables, and language-specific rendering. OpenClaw v1 uses
-a smaller contract compatible with its current interpolation systems and adds
-one top-level structured plural or select operation. Nested selectors and
+Unicode MessageFormat demonstrates the value of separating message identity,
+variables, and language-specific rendering. OpenClaw v1 stores ICU message
+strings and delegates parsing and rendering to `intl-messageformat`. OpenClaw
+still validates a deliberately bounded v1 profile: scalar parameters, simple
+interpolation, and at most one top-level plural or select. Nested selectors and
 general number/date formatting remain future extensions.
 
 ### Why BCP 47 aliases rather than renaming immediately

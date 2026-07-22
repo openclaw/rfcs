@@ -27,12 +27,31 @@ remain draft implementation evidence until their named owners approve them:
 | `F04` | [#111544](https://github.com/openclaw/openclaw/pull/111544) | TUI status summary and relative ages | Keep other TUI, CLI, Gateway, metadata, and channel families separate. |
 | `F05` | [#111545](https://github.com/openclaw/openclaw/pull/111545) | One protocol-owned approval-not-found descriptor and Control UI edge | Generated target catalogs follow separately through the Control UI workflow; product readiness remains deferred. |
 
+## End State Of RFC Acceptance And The Five Drafts
+
+RFC acceptance approves contracts and owner gates; it does not change runtime
+behavior. Landing `F01` through `F05` in dependency order provides:
+
+- an internal locale/context kernel whose JavaScript and TypeScript ICU
+  formatting delegates to `intl-messageformat`;
+- the existing wizard as the first foundation consumer;
+- bounded updater dry-run and TUI status localization;
+- one reviewed Gateway descriptor and Control UI approval-error edge; and
+- contributor guidance for adding later owner-scoped families.
+
+The coverage specification defines the eventual language-by-surface reporting
+shape, but these drafts neither install a closed global reporting matrix nor
+claim completion for unadopted surfaces. Owner declarations and aggregate
+reporting begin later in `E43`; review evidence and release promotion follow in
+`E44`.
+
 ## Serial Foundation Plan
 
 ### Slice 1: minimal kernel and existing consumer
 
 - locale registry, exact/inferred resolution, and immutable context;
-- descriptor, reviewed English fallback template, interpolation, and literal
+- descriptor, reviewed English fallback template, `intl-messageformat`
+  rendering for shared JavaScript and TypeScript catalogs, and literal
   isolation;
 - catalog and placeholder validation;
 - one existing Control UI or onboarding consumer; and

@@ -27,6 +27,8 @@ adapters. It owns:
 - immutable localization context;
 - message and scalar parameter types;
 - catalog lookup and fallback;
+- ICU message parsing and formatting through `intl-messageformat` for shared
+  JavaScript and TypeScript runtime catalogs;
 - validation primitives; and
 - literal bidirectional-isolation helpers.
 
@@ -228,20 +230,8 @@ type LocalizedMessage = {
   fallback: string;
 };
 
-type CatalogMessage =
-  | string
-  | {
-      kind: "plural";
-      param: string;
-      cases: Partial<
-        Record<"zero" | "one" | "two" | "few" | "many" | "other", string>
-      > & { other: string };
-    }
-  | {
-      kind: "select";
-      param: string;
-      cases: Readonly<Record<string, string>> & { other: string };
-    };
+// An ICU MessageFormat string in the bounded v1 profile below.
+type CatalogMessage = string;
 ```
 
 `LocalizedMessage` is the only internal message descriptor. Gateway
@@ -302,7 +292,12 @@ A localized product-owned wrapper may contain a literal upstream error
 parameter. The wrapper is translated; the upstream detail is preserved for
 diagnosis. Translators must not parse or rewrite the detail.
 
-V1 supports one top-level plural or select operation per catalog message:
+Shared JavaScript and TypeScript runtime adapters parse and render
+`CatalogMessage` with `intl-messageformat`; they must not implement a separate
+ICU parser or plural/select evaluator. Catalog validation checks the parsed
+message against the bounded v1 profile before publication. V1 supports simple
+argument interpolation and at most one top-level plural or select operation per
+catalog message:
 
 - plural parameters are numeric and use `Intl.PluralRules` cardinal categories
   for the resolved locale;
@@ -320,9 +315,10 @@ V1 supports one top-level plural or select operation per catalog message:
   case or the recovery template; descriptor construction sites do not
   pre-render fallback text.
 
-This bounded structure covers count- and state-sensitive runtime copy without
-requiring every surface to adopt one catalog file format or a full
-MessageFormat implementation.
+This bounded profile covers count- and state-sensitive runtime copy without
+requiring every surface to adopt one catalog file format. `intl-messageformat`
+may support additional ICU features, but using it does not expand the v1
+profile without a specification revision.
 
 Each localizable Gateway error code declares an allowed parameter schema with
 parameter names, scalar types, and sensitivity classification. Projection
