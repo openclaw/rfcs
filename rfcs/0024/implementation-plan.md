@@ -7,18 +7,25 @@ matrix before the architecture can be accepted.
 Generated-content language remains a post-v1 follow-up because it changes model
 behavior rather than deterministic product-owned interface text.
 
+The auditable delivery queue is the
+[projected owner slice registry](projected-owner-slice-registry.md). Its initial
+44 entries apply the same planning pattern as a structured health-rule
+registry: every known family has an owner, gate, proof bar, and deletion target.
+The number is not fixed. Source audit may delete, split, or add entries without
+changing the runtime contract.
+
 ## Existing Drafts
 
-The five current drafts remain useful implementation evidence, but they are not
-the preferred landing units:
+The five current drafts have been reduced to bounded intended deltas. They
+remain draft implementation evidence until their named owners approve them:
 
-| Draft | Evidence to preserve | Delivery disposition |
-| --- | --- | --- |
-| [#111541](https://github.com/openclaw/openclaw/pull/111541) | Registry, context, renderer, validation, and representative consumers | Reduce to the minimal kernel plus one existing owner-controlled consumer. |
-| [#111542](https://github.com/openclaw/openclaw/pull/111542) | Operation-scoped updater rendering and compatibility fixtures | Rebase onto the minimal kernel and keep as a bounded updater-owned slice. |
-| [#111543](https://github.com/openclaw/openclaw/pull/111543) | Generic declarations, contributor guidance, and evidence generation | Introduce after landed surfaces exist; report only adopted owner declarations initially. |
-| [#111544](https://github.com/openclaw/openclaw/pull/111544) | Gateway/UI, TUI, channel, command, skill, and plugin prototypes | Split by semantic owner and public contract; do not land as one change. |
-| [#111545](https://github.com/openclaw/openclaw/pull/111545) | RTL isolation, convergence checks, and fail-closed reporting | Keep owner-local safety checks; defer product readiness aggregation until evidence exists. |
+| Registry entry | Draft | Intended review delta | Delivery disposition |
+| --- | --- | --- | --- |
+| `F01` | [#111541](https://github.com/openclaw/openclaw/pull/111541) | Minimal kernel and onboarding consumer | Land only after core and wizard owner review; no coverage or public metadata contract. |
+| `F02` | [#111542](https://github.com/openclaw/openclaw/pull/111542) | Updater human dry-run preview | Preserve JSON and operational literals; updater owner approves the final edge. |
+| `F03` | [#111543](https://github.com/openclaw/openclaw/pull/111543) | Contributor ownership guide | Document owner-native workflows without introducing mandatory coverage gates. |
+| `F04` | [#111544](https://github.com/openclaw/openclaw/pull/111544) | TUI status summary and relative ages | Keep other TUI, CLI, Gateway, metadata, and channel families separate. |
+| `F05` | [#111545](https://github.com/openclaw/openclaw/pull/111545) | One protocol-owned approval-not-found descriptor and Control UI edge | Generated target catalogs follow separately through the Control UI workflow; product readiness remains deferred. |
 
 ## Serial Foundation Plan
 
@@ -42,8 +49,10 @@ After Gateway-owner approval, prove `APPROVAL_NOT_FOUND` end to end:
 - bounded optional `details.localization` metadata;
 - unchanged English code/message behavior for legacy clients;
 - Control UI edge rendering;
-- one reviewed non-English catalog; and
-- malformed, missing-key, privacy, and old-client fixtures.
+- an English source key plus malformed, missing-key, privacy, and old-client
+  fixtures; and
+- a separate generated-locale follow-up through the owning Control UI workflow,
+  with named safety review before any locale/surface pair becomes `complete`.
 
 ### Slice 3: updater-owned CLI adoption
 
@@ -69,6 +78,11 @@ After their public contracts are approved, these tracks proceed independently:
 
 No track is blocked on a global readiness PR, and no track changes another
 owner's schema merely to satisfy localization-core.
+
+The initial 44-entry registry assigns these tracks to `F01`-`E44`. It is the
+planning source for follow-up PR selection. Pick the earliest entry whose owner
+and dependency gates are satisfied; do not select work merely to advance the
+numeric count.
 
 ## Repair And Adoption Rule
 
@@ -98,11 +112,11 @@ Completion names are tracking cohorts, not single PRs or a linear stack:
 
 | Cohort | Primary scope | Product target |
 | --- | --- | --- |
-| Operator surfaces | Control UI, onboarding, channel/plugin setup, CLI, and TUI | Owner-scoped migrations and catalog waves eventually cover 105 target cells. |
-| Runtime safety | Bounded user-facing runtime and Gateway errors | Owner-approved inventories use stable descriptors, edge rendering, and compatible English fallback. |
-| Channels and capabilities | Server-rendered channels, command menus, command metadata, and skill/plugin metadata | Each public contract and locale authority lands independently. |
-| Native and docs | Android, Apple, and documentation | Existing owner pipelines emit source-pinned evidence; Persian/Thai publishing receives an explicit disposition. |
-| Release promotion | Product-wide | Scoped generation and review evidence promotes eligible cells and produces an honest release claim. |
+| Operator surfaces | Control UI, onboarding, channel/plugin setup, CLI, and TUI | `F01`-`F04`, `O06`-`O15`, and `P37`-`P38` track owner-scoped migrations and catalog waves. |
+| Runtime safety | Bounded user-facing runtime and Gateway errors | `F05` and `R16`-`R24` use owner-approved descriptors, edge rendering, and compatible English fallback. |
+| Channels and capabilities | Server-rendered channels, command menus, command metadata, and skill/plugin metadata | `M25`-`M36` land each public contract and locale authority independently. |
+| Native and docs | Android, Apple, and documentation | `P39`-`P42` extend existing owner pipelines and record the Persian/Thai disposition. |
+| Release promotion | Product-wide | `E43`-`E44` aggregate only landed scoped evidence and produce an honest release claim. |
 
 The current product-policy target is all 313 OpenClaw-controlled cells complete.
 `docs/fa` and `docs/th` must either gain an approved publishing path or remain

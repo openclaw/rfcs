@@ -461,6 +461,13 @@ error requires the stable code/detail match, English fallback, key registry,
 parameter schema, client catalog entry, and old/new-client fixture in the same
 owner-reviewed change.
 
+The source descriptor and English client catalog may land before generated
+target catalogs when the client repository requires isolated locale-refresh
+pull requests. Until the generated artifact and required named review land, the
+affected target locale remains `partial` or `unsupported` and the client shows
+canonical English. Hand-editing a generated locale bundle in the descriptor PR
+is not required for runtime conformance and does not establish completion.
+
 ## CLI Resolution
 
 The existing onboarding source order remains valid:

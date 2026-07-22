@@ -497,6 +497,13 @@ remains an unbounded second authority.
 
 ## Adoption Conformance Record
 
+The RFC's projected owner slice registry is delivery planning, not coverage
+evidence. A projected, audited, or draft entry does not create a surface row or
+advance maturity. Coverage consumes only landed owner declarations and the
+artifacts, checks, and scoped review records defined in this specification.
+The registry may therefore split or delete projected entries without changing
+runtime or release semantics.
+
 Every migrated message family or coherent surface slice records:
 
 | Field | Required evidence |

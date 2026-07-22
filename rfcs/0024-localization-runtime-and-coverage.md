@@ -3,7 +3,7 @@ title: Localization Runtime and Product Coverage
 authors:
   - Gio Della-Libera
 created: 2026-07-16
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/42
@@ -31,6 +31,7 @@ Supporting material:
 - [Localized Metadata v1 specification](0024/localized-metadata-v1-spec.md)
 - [GitHub issue catalog](0024/issue-catalog.md)
 - [Implementation plan](0024/implementation-plan.md)
+- [Projected owner slice registry](0024/projected-owner-slice-registry.md)
 
 ## Decision
 
@@ -71,10 +72,18 @@ This RFC does not authorize broad exception/log extraction, runtime model
 translation, translation of commands or protocol values, AI self-review, or a
 new external plugin runtime-catalog API.
 
-The five open foundation drafts are implementation evidence, not the accepted
-delivery topology. They demonstrate that the contracts can compose, but their
-cumulative diffs cross too many semantic and rendering owners to be the units
-of approval or landing.
+The five open foundation drafts are the first bounded entries in the projected
+owner slice registry. Their review deltas now isolate the minimal kernel,
+updater dry-run, contributor guidance, TUI status, and one Gateway approval
+descriptor. GitHub displays the stack cumulatively, but each intended delta is
+reviewed and landed only by its named semantic and rendering owners.
+
+The initial delivery audit identifies 44 projected owner slices. That count is
+planning evidence, not a required pull-request count or acceptance gate. A
+slice is deleted when source audit proves that no migration is needed and split
+when it crosses an owner, locale-authority, public-contract, or publication
+boundary. Coverage and release state consume only landed owner declarations;
+the planning registry is never loaded by the runtime.
 
 ### Acceptance and delivery milestones
 
@@ -89,7 +98,8 @@ completion:
    proof.
 3. **Owner cohorts complete:** operator, runtime-safety, channel/capability, and
    native/docs owners migrate bounded message families through independent,
-   reviewable PRs and generated catalog waves.
+   reviewable PRs and generated catalog waves tracked in the projected owner
+   slice registry.
 4. **Product claim promoted:** the release report evaluates only landed,
    owner-declared evidence and may make a qualified or full localization claim.
 
