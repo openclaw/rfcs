@@ -58,6 +58,7 @@ durable hold bound to:
 - destination runtime generation;
 - accepted recovery-point identity;
 - aggregate manifest digest;
+- acceptance-set identity;
 - restore operation identity; and
 - destination owner.
 
@@ -106,6 +107,7 @@ versioned, and absent during ordinary startup.
 The restored-start binding must preserve:
 
 - accepted recovery-point and aggregate manifest identity;
+- exact acceptance-set identity;
 - destination runtime generation;
 - lifecycle owner generation;
 - component restore receipt identities;
@@ -149,6 +151,7 @@ successful SQLite open do not independently authorize work.
 Admission opens only after one canonical restored-ready record binds:
 
 - the accepted recovery point;
+- the accepted logical byte set;
 - destination and lifecycle generations;
 - component restore receipts;
 - scheduler reconciliation;

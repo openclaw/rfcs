@@ -16,7 +16,10 @@ This specification defines:
 - use of RFC 0013 global and per-agent snapshot directories as SQLite
   components;
 - explicit non-SQLite owner components;
+- a closed required-component inventory supplied by the runtime state owner;
 - captured, external, reconstructed, and ephemeral obligations;
+- an explicit protection classification that cannot imply credential-free
+  portability;
 - exact component identity, ordering, compatibility, and verification;
 - fail-closed aggregate manifest parsing and conformance.
 
@@ -95,7 +98,7 @@ Every component records:
 - stable component ID;
 - kind and owner;
 - immutable artifact digest and size;
-- owner manifest digest when the component has its own manifest;
+- owner manifest digest and size when the component has its own manifest;
 - compatibility identity;
 - dependency IDs;
 - capture time;
@@ -112,6 +115,13 @@ Illustrative V1 shape:
   "version": "openclaw-recovery-point/v1",
   "recoveryPointId": "recovery-point-42",
   "createdAt": "2026-07-21T15:00:00.000Z",
+  "inventory": {
+    "version": "openclaw-runtime-sqlite-inventory/v1",
+    "requiredComponentIds": ["sqlite/global", "sqlite/agent/main"]
+  },
+  "protection": {
+    "mode": "host-protected"
+  },
   "components": [
     {
       "id": "sqlite/global",
@@ -120,6 +130,7 @@ Illustrative V1 shape:
       "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "artifactSizeBytes": 1048576,
       "ownerManifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ownerManifestSizeBytes": 512,
       "compatibility": "openclaw-state-schema/7",
       "dependsOn": [],
       "required": true
@@ -143,6 +154,13 @@ Unknown required fields,
 unknown component kinds, duplicate IDs, missing dependencies, dependency
 cycles, digest mismatches, and unsupported major versions fail closed.
 
+The state owner supplies the complete required component IDs for the selected
+runtime before composition. V1 requires exactly one global component and the
+exact selected set of per-agent components. The inventory is canonicalized,
+stored in the manifest, and covered by `recoveryPointId`. Composition fails on
+a missing or extra component; successfully composing one agent cannot imply
+that every agent owned by the selected runtime was captured.
+
 The aggregate manifest does not copy the complete RFC 0013 manifest. It binds
 that owner manifest by digest and preserves it beside the component artifact.
 
@@ -150,11 +168,15 @@ that owner manifest by digest and preserves it beside the component artifact.
 
 An ordinary RFC 0013 snapshot can contain auth profiles, session state, plugin
 state, and credentials-adjacent records. This sidecar does not silently remove
-or rewrite those rows.
+or rewrite those rows. A recovery point composed directly from ordinary RFC
+0013 snapshots therefore has `protection.mode = host-protected`. The aggregate
+manifest cannot label itself credential-free or portable.
 
-A deployment may call a recovery point portable only when it contains no
-reissuable credential bytes and every sensitive surface has one explicit
-treatment:
+A deployment may call a recovery point credential-free portable only when a
+separate owner-authored portability receipt proves that every component is an
+approved portable projection, binds the exact component and artifact digest,
+names the owner contract and version, and proves every sensitive surface has
+one explicit treatment:
 
 - **captured**: the owner approves non-reissuable runtime-owned bytes for the
   selected host protection domain;
@@ -168,13 +190,33 @@ Host-managed or reissuable credentials, OAuth tokens, provider tokens, and
 short-lived session credentials must be `external` or omitted. They cannot use
 the `captured` treatment in V1.
 
-Manifest obligations carry stable owner and treatment identifiers, counts, and
-readiness requirements. They must not carry secret values, credential bytes,
-raw prompts, message payloads, or arbitrary commands.
+Manifest obligation arrays imply the `external`, `reconstructed`, or
+`ephemeral` treatment. Entries carry a closed obligation kind, stable owner,
+identifier, and readiness requirement. V1 initially supports only named
+SecretRef, plugin-dependency, and runtime-cache owner pairs; unknown owner,
+kind, or treatment combinations fail closed. Obligations must not carry secret
+values, credential bytes, raw prompts, message payloads, or arbitrary commands.
+Captured state is represented by its owner component, not by an obligation
+entry.
 
 If a credential-free portable projection is required, its state owner must
 define and verify that projection as a separate operation. It must not change
 ordinary `backup sqlite` behavior or mutate the live database.
+
+## Acceptance Byte Set
+
+The recovery point defines a closed logical acceptance byte set without
+standardizing a tarball, directory tree, object-store key, or transport:
+
+1. the canonical aggregate-manifest bytes;
+2. each exact owner-manifest byte sequence; and
+3. each exact component-artifact byte sequence.
+
+An acceptance inventory records the aggregate-manifest digest and size plus,
+for every canonically ordered component, its component ID, owner-manifest
+digest and size, and artifact digest and size. Its identity is the SHA-256 of
+the canonical inventory with that identity field omitted. Storage packaging
+and paths remain host-owned and are not part of component identity.
 
 ## Verification
 
@@ -184,9 +226,10 @@ Aggregate verification must:
 2. verify deterministic identity;
 3. verify every component digest and size from content-pinned reads;
 4. invoke the owner verifier for every required component;
-5. validate dependency ordering and compatibility;
-6. validate every obligation against the supported owner/treatment pairs; and
-7. return one exact verified recovery-point identity.
+5. require the component IDs to equal the closed owner inventory;
+6. validate dependency ordering and compatibility;
+7. validate every obligation against the supported owner/treatment pairs; and
+8. return one exact verified recovery-point identity and acceptance inventory.
 
 Verification failure must not create restore targets or return a
 success-shaped partial result.
@@ -195,7 +238,8 @@ success-shaped partial result.
 
 V1 conformance must prove:
 
-- one global and one per-agent RFC 0013 component;
+- one global and the exact owner-selected per-agent RFC 0013 components;
+- rejection of missing and extra components against the bound inventory;
 - deterministic aggregate identity;
 - exact owner-manifest binding;
 - canonical recovery-point identity;
@@ -203,6 +247,9 @@ V1 conformance must prove:
 - rejection of dependency cycles and unsupported compatibility;
 - explicit sensitive-state treatment and rejection of reissuable credential
   bytes;
+- ordinary snapshot composition remaining `host-protected` until an exact
+  owner portability receipt exists;
+- deterministic acceptance inventory over the closed logical byte set;
 - no secret values in aggregate metadata; and
 - no duplicate SQLite capture or verification implementation.
 

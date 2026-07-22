@@ -104,6 +104,13 @@ Final capture reuses owner primitives:
 - the Recovery Point Components v1 contract for aggregate composition; and
 - existing owner-specific capture for non-SQLite components.
 
+An aggregate made directly from ordinary RFC 0013 snapshots remains
+`host-protected`. It may move only into a host protection domain whose
+encryption, access control, and credential exposure policy accepts those exact
+bytes. A deployment must not call the point credential-free portable unless it
+also verifies owner-authored portability receipts bound to every component and
+artifact digest. An obligation list alone is not portability evidence.
+
 Final capture must not run while an authoritative writer can still mutate the
 captured source. A force kill, uncertain process termination, conventional
 shutdown warning, capture blocker, verification failure, or unknown writer
@@ -121,7 +128,10 @@ The host durably records:
 - source runtime generation;
 - handoff identity;
 - aggregate recovery-point identity and manifest digest;
-- exact accepted byte count and digest;
+- acceptance-set identity;
+- exact aggregate-manifest digest and size;
+- the canonical component acceptance inventory, including each owner-manifest
+  and artifact digest and size;
 - durability class;
 - accepted-at time; and
 - storage-owned opaque reference.
@@ -130,8 +140,11 @@ The opaque reference may identify a file, blob, object, or service record. It
 must not expose credentials in OpenClaw metadata.
 
 Local artifact creation and host acceptance are separate facts. A host may
-claim acceptance only after its selected durability boundary confirms the
-exact immutable bytes.
+claim acceptance only after its selected durability boundary confirms every
+byte sequence in the closed acceptance inventory. The storage implementation
+may package those bytes as files, blobs, or service records, but must return
+the same canonical acceptance-set identity. No digest of an unspecified
+directory, archive, or concatenation is valid evidence.
 
 ## Replay And Uncertainty
 
@@ -176,6 +189,9 @@ V1 conformance must prove:
 - third-party and unregistered work limitations remain explicit;
 - final capture occurs only after authoritative writers stop;
 - one exact recovery point is accepted durably;
+- the accepted logical byte set is closed and deterministically identified;
+- host-protected snapshots cannot be reported as credential-free portable
+  without exact owner portability receipts;
 - response loss replays the same acceptance;
 - digest conflict and unknown outcome block destruction; and
 - `safeToDestroy` is generation-scoped and cannot purge persistent data.
