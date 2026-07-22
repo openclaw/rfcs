@@ -3,7 +3,7 @@ title: Default, Pluggable Computer Use with CUA
 authors:
   - RomneyDa
 created: 2026-07-21
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/45
@@ -24,8 +24,10 @@ OpenClaw. Windows and Linux use the same Gateway and plugin contracts with
 platform-specific node hosts. A remote Gateway never installs or launches a
 driver on another machine; the selected node advertises readiness and presents
 local, actionable setup when needed. Shipping is gated on CUA accepting an
-inherited, already-connected transport; the researched path-addressed embedded
-endpoint is not an acceptable privileged boundary.
+inherited, already-connected transport and an authenticated embedded-host
+protected-consent/indicator adapter. The researched path-addressed embedded
+endpoint and a host dialog without CUA's protected provider are not acceptable
+privileged boundaries.
 
 ## Design constraints and requirements
 
@@ -75,8 +77,9 @@ implementation shortcut.
    profile is MCP-first and cannot invoke the CUA CLI as a policy bypass.
 8. **Computer Use has a dedicated classified route.** Calls do not travel as
    ordinary node MCP or shell execution. OpenClaw binds one node, provider,
-   generation, session, and policy lease; applies argument-aware risk and
-   resource policy; and rejects arbitrary exec authority on that same host.
+   generation, execution lease, CUA session, and policy lease; applies
+   argument-aware risk and resource policy; and rejects arbitrary exec
+   authority on that same host.
    CUA's [permission policy](https://cua.ai/docs/concepts/how-permission-policies-work)
    remains an independent daemon-side defense, not a replacement for Gateway
    enforcement.
@@ -96,7 +99,14 @@ implementation shortcut.
     socket/named-pipe topology is useful for ordinary clients but is not the
     security boundary for OpenClaw-owned permissions. This upstream capability
     is a ship blocker, not a reason to weaken the contract.
-12. **SDK and protocol surface lands with consumers and proof.** Additive node
+12. **Protected browser consent uses CUA's certified provider seam.** A bounded
+    exact-resource manifest pre-approves authority, but it does not activate
+    the persistent indicator required by CUA. The accepted CUA version must
+    let the trusted embedding host implement `ProtectedConsentProvider` over an
+    authenticated control channel, including Stop and asynchronous revocation.
+    Manifest restart and protected-provider activation are separate ship
+    dependencies.
+13. **SDK and protocol surface lands with consumers and proof.** Additive node
     protocol can land dormant, but public Plugin SDK registration lands with a
     real provider runtime consumer. CUA becomes the default only after packaged
     macOS, Windows, Linux, remote-Gateway, security, and upgrade acceptance
@@ -205,14 +215,17 @@ The desired user experience is instead:
 
 ### Product model
 
-OpenClaw introduces three explicit Computer Use concepts:
+OpenClaw introduces four explicit Computer Use concepts:
 
 - **Computer Use host**: the desktop node whose screen and input are being
   controlled.
 - **Computer Use provider**: the implementation available on that host, such as
   `cua` or `peekaboo`.
-- **Computer Use session**: the run-scoped binding of an agent to one host, one
-  provider, one provider capability snapshot, and one policy lease.
+- **Computer Use execution**: the binding of one agent execution to one host,
+  one provider capability snapshot, one execution lease, and one policy lease.
+- **CUA session**: the opaque native session injected by the node for that
+  execution. A durable OpenClaw chat/session id may correlate several
+  executions but never owns native authority.
 
 CUA is the default provider when it is installed, compatible, ready, and
 allowed on the selected host. If it is unavailable, OpenClaw shows setup or an
@@ -258,11 +271,11 @@ Core owns only generic Computer Use infrastructure:
 - provider declaration and registration contracts;
 - node provider inventory and readiness protocol;
 - Computer Use host and provider selection;
-- session binding and stale-snapshot detection;
+- execution binding and stale-snapshot detection;
 - classified invocation routing, cancellation, timeout, and result limits;
 - arming and policy enforcement;
 - filtering node-advertised tools against a trusted plugin registration;
-- deterministic tool and skill materialization for the selected session;
+- deterministic tool and skill materialization for the selected execution;
 - health and diagnostics envelopes.
 
 Core does not know CUA tool names, CUA command-line flags, CUA release URLs, or
@@ -280,6 +293,8 @@ The desktop node owns machine-local state and privileged process lifecycle:
 - MCP initialization, `tools/list`, tool calls, and cancellation;
 - provider version, capability, and health publication;
 - version-matched node-hosted skill material supplied to the Gateway;
+- one idempotent execution-release path for completion, failure, cancellation,
+  timeout, disconnect, crash, local Stop, session clear, or lease expiry;
 - cleanup when Computer Use is disabled, the node disconnects, or a bounded
   policy lease expires.
 
@@ -330,14 +345,14 @@ CUA continues to own:
 ```text
 Agent run
   |
-  | selected host + selected provider + policy lease
+  | selected host + selected provider + execution/policy leases
   v
 Bundled computer-use plugin (Gateway process)
   |  materializes provider-native tools and matching skill
   |  invokes classified Computer Use command
   v
 Gateway Computer Use router
-  |  validates session binding, node, provider, tool, risk, arming
+  |  validates execution binding, node, provider, tool, risk, arming
   v
 node.invoke: computer.provider.call.v1
   |
@@ -394,13 +409,16 @@ A provider registration is not authority to use OS permissions. The Gateway
 must match it with an inventory entry from a paired node and an explicitly
 enabled local provider. Unknown providers and unknown tools fail closed.
 
-Classification is argument-aware. The provider may remove unsupported
-arguments, preserve a model-visible opaque resource handle for node-side
-resolution, or require approval. The Gateway never resolves a handle to a node
-filesystem path. Calls are simple after classification: the router receives
-validated, path-free arguments and a closed risk class. A tool with multiple
-operations is assigned the highest applicable risk unless the plugin has a
-typed operation-specific classifier.
+Classification is argument-aware. The reviewed plugin catalog is the maximum
+allowed surface; the installed driver's live `tools/list` schemas determine
+which reviewed tools and semantic argument branches exist for the current
+generation. The provider may preserve a model-visible opaque resource handle
+for node-side resolution or require approval, but it must reject an unsupported
+semantic branch rather than silently remove or rewrite its arguments. The
+Gateway never resolves a handle to a node filesystem path. Calls are simple
+after classification: the router receives validated, path-free arguments and a
+closed risk class. A tool with multiple operations is assigned the highest
+applicable risk unless the plugin has a typed operation-specific classifier.
 
 ### Additive node protocol
 
@@ -430,15 +448,17 @@ type ComputerUseProviderInventory = {
     | { state: "starting" }
     | { state: "failed"; reasonCode: string };
   permissionAttribution: "openclaw-host" | "provider" | "os-session" | "unknown";
-  authorization:
+  protectedConsent: "ready" | "unavailable" | "degraded";
+  runAuthorization:
     | { state: "inactive" }
     | {
-        state: "bounded";
+        state: "authorized";
+        executionId: string;
+        executionLeaseId: string;
         managedPolicyHash: string;
         userPolicyHash: string | null;
         sessionManifestHash: string;
         expiresAt: string;
-        protectedConsent: "ready" | "unavailable" | "degraded";
       };
   toolCatalogHash: string;
   tools: readonly NodeComputerUseToolDescriptor[];
@@ -451,14 +471,19 @@ type ComputerUseProviderInventory = {
 ```
 
 The inventory contains bounded facts, not raw process output or exception text.
-`driver` is null only when no locally accepted artifact is present. A ready
-provider must report a non-null driver and bounded authorization with a current
-manifest and expiry; inactive authorization cannot accompany `ready`.
+`driver` is null only when no locally accepted artifact is present. Provider
+readiness and run authorization are separate states. `ready` proves the
+artifact, backend, permissions, private transport, protected-consent adapter,
+and probes are available; it may and normally does coexist with inactive run
+authorization. Provider-native tools become callable only after an execution
+owns a current bounded manifest and both execution and policy leases.
+
 `generation` changes whenever the provider-spec digest, driver process,
 compatibility decision, tool catalog, permission state, policy hash, bounded
-manifest, protected-consent readiness, or selected local provider state changes.
-Agent calls carry the generation they were materialized from; a mismatch fails
-with a typed stale-provider error and forces rematerialization.
+manifest, protected-consent readiness, run authorization, or selected local
+provider state changes. Agent calls carry the generation and execution lease
+they were materialized from; a mismatch fails with a typed stale-provider or
+stale-execution error and forces rematerialization.
 
 `providerSpecDigest` identifies the locally trusted node provider package. It
 is distinct from the native driver digest and tool catalog hash. Gateway
@@ -472,10 +497,11 @@ computer.provider.call.v1
 ```
 
 Its envelope contains the provider id, provider-spec digest, inventory
-generation, MCP tool name, path-free arguments, opaque resource handles,
-OpenClaw session id, deadline, and idempotency metadata where the provider
-supports it. It does not accept arbitrary MCP server names, node-native paths,
-or shell commands.
+generation, execution id, execution lease id, policy lease id, MCP tool name,
+path-free arguments, opaque resource handles, deadline, and idempotency metadata
+where the provider supports it. A durable OpenClaw chat/session id may be
+carried only as non-authoritative correlation metadata. The command does not
+accept arbitrary MCP server names, node-native paths, or shell commands.
 
 ### Why generic node MCP is insufficient
 
@@ -509,6 +535,8 @@ type PreparedComputerUseBinding = {
   providerSpecDigest: string;
   generation: string;
   toolCatalogHash: string;
+  executionId: string;
+  executionLeaseId: string;
   policyLeaseId: string;
 };
 ```
@@ -592,8 +620,11 @@ second CUA action implementation in C#.
 
 Driving elevated or UWP targets requires CUA's UIAccess path. CUA's embedded
 mode does not make that helper lifecycle automatic. Windows readiness must
-report elevated-target support honestly and remain degraded until the
-companion installs and manages the signed helper according to CUA's contract.
+prove that the companion, daemon, MCP proxy, and supported helpers all run in
+the intended interactive user session. Session 0 reports unavailable rather
+than empty or degraded window results. Readiness must also report
+elevated-target support honestly and remain degraded until the companion
+installs and manages the signed helper according to CUA's contract.
 
 #### Linux
 
@@ -636,6 +667,13 @@ pipe. Accepting an inherited connected transport is therefore an upstream
 prerequisite for shipping the app-owned TCC integration. OpenClaw must not
 insert a broker in front of an unauthenticated daemon while leaving the
 underlying privileged listener reachable.
+
+The embedding host also needs an authenticated protected-control channel to
+the daemon. It may be a separate inherited channel or a cryptographically and
+structurally separated subchannel, but ordinary MCP calls cannot write it. It
+binds the daemon's `ProtectedConsentProvider` requests and asynchronous
+revocation to the exact OpenClaw execution lease; inherited IPC alone does not
+provide protected consent.
 
 ### Driver installation and compatibility
 
@@ -685,8 +723,9 @@ and selected through a node-controlled absolute path supported by CUA. Ambient
 After provenance succeeds, all of these compatibility checks must also pass:
 
 1. its version is in the plugin's tested range;
-2. `cua-driver manifest` advertises the required launch, embedded, and inherited
-   connected-transport features;
+2. `cua-driver manifest` advertises the required launch, embedded, inherited
+   connected-transport, protected-consent adapter, and trusted resource/helper
+   features;
 3. MCP initialization and `tools/list` succeed;
 4. every required tool and required schema capability is present;
 5. the resulting tool catalog matches a plugin-known operation and resource
@@ -694,9 +733,13 @@ After provenance succeeds, all of these compatibility checks must also pass:
 6. platform-specific live probes pass.
 
 A semver match alone is insufficient. Unknown newer tools remain hidden and
-uncallable until the plugin assigns them a risk class. A newer unknown driver is
-not auto-selected merely because it starts successfully. A custom or locally
-built driver is never granted OpenClaw's app-owned permissions in the production
+uncallable until the plugin assigns them a risk class. For known tools, the live
+schema is intersected with the reviewed catalog at the semantic-branch level. A
+schema-supported field such as `delivery_mode` remains available without an
+invented capability token, while an absent branch is rejected explicitly
+rather than stripped during dispatch. A newer unknown driver is not
+auto-selected merely because it starts successfully. A custom or locally built
+driver is never granted OpenClaw's app-owned permissions in the production
 profile; developers use an explicit non-production flow with separate OS
 identity and warnings.
 
@@ -706,7 +749,7 @@ applies these rules:
 
 - screenshots and accessibility state return through MCP results; model
   arguments cannot choose arbitrary output files;
-- recording outputs are injected into a node-owned, session-scoped artifact
+- recording outputs are injected into a node-owned, execution-scoped artifact
   directory;
 - `record_video: true` on Windows or Linux is exposed only when the node
   provider package contains a digest-verified ffmpeg helper and the accepted
@@ -717,7 +760,7 @@ applies these rules:
   node resolves to exact, digest-checked files in a node-owned staging area
   immediately before dispatch; arbitrary absolute paths are rejected and the
   Gateway never learns the staged native path;
-- browser navigation and data operations enforce the session's approved origin
+- browser navigation and data operations enforce the execution's approved origin
   set where the provider exposes a typed origin boundary;
 - browser downloads use a node-owned download directory and explicit policy;
 - dependency installation tools such as `install_ffmpeg` are local onboarding
@@ -751,7 +794,8 @@ is a significant part of the integration. It teaches the model to:
 - snapshot before and after every action;
 - preserve element-index validity;
 - choose window, auto, or desktop capture scope;
-- escalate through accessibility, pixel, foreground, and desktop fallbacks;
+- follow the AX-background, PX-background, exact-browser-page,
+  foreground-delivery, and explicit desktop-escalation ladder;
 - use browser-specific paths and recording features correctly;
 - preserve exact native-window/browser bindings and the explicit
   full-background CDP rung without silently changing input trust models;
@@ -761,7 +805,7 @@ That content should not be reduced to a short OpenClaw tool description.
 
 The current canonical CUA skill defaults to shelling out to
 `cua-driver <tool> '<json>'`. OpenClaw must not expose that default in a managed
-Computer Use session. Direct CLI execution can target the wrong machine, omit
+Computer Use execution. Direct CLI execution can target the wrong machine, omit
 the app-owned connected transport, use a different CUA session, and bypass
 `computer.provider.call.v1` policy.
 
@@ -770,9 +814,9 @@ profile in the CUA skill pack. It preserves CUA's semantic instructions and
 platform companion documents, but its transport section says:
 
 - use the selected provider-native OpenClaw tools;
-- never invoke CUA through shell/CLI for this session;
+- never invoke CUA through shell/CLI for this execution;
 - never start or update the daemon;
-- treat the OpenClaw session binding as the transport owner;
+- treat the OpenClaw execution binding as the transport owner;
 - use the exact tool names and schemas published for the selected node.
 
 CUA already distributes a skill tarball matched to each driver release and can
@@ -800,6 +844,53 @@ a bounded skill-resource reader that can return only files from the published,
 digest-verified provider skill bundle. Provider skills become eligible through
 the ready Computer Use binding, and relative companion documents resolve
 through that reader. Arbitrary node filesystem reads remain unavailable.
+
+### Interaction ladder and verdict ownership
+
+The version-matched CUA skill, not the Gateway, teaches and drives this
+verify-then-escalate ladder:
+
+1. Call `get_window_state(pid, window_id)` and ground on the AX tree and
+   screenshot returned together.
+2. Try an element AX action with background delivery, then re-snapshot and
+   verify.
+3. On a concrete PX signal, try an element PX action from that window
+   screenshot, still in background mode, then re-snapshot and verify.
+4. When the native window can be bound to an exact browser target, use the
+   browser-page route and verify against fresh browser state and refs.
+5. Use `delivery_mode: "foreground"` only after background delivery was shown
+   or reported to be ineffective, then verify again.
+6. Only for an `auto` session, and only after the window ladder is exhausted,
+   call `escalate_session`. Use `get_desktop_state` plus desktop/system input
+   for external UI such as permission prompts, file pickers, or authentication
+   sheets, then verify in the desktop coordinate frame.
+
+`bring_to_front` remains a standalone platform-specific tool where the live
+schema exposes it. It is not an action argument or an invented cross-platform
+capability. The normal cross-platform foreground transition repeats the same
+action with `delivery_mode: "foreground"`.
+
+The Gateway does not implement or advance CUA's interaction ladder. It
+preserves CUA's native live schemas and structured outcomes, applies host,
+execution, resource, and policy admission checks to each model-selected call,
+and never automatically retries a mutation or substitutes another interaction
+route. CUA enforces its session, capture-scope, reference, delivery, and consent
+invariants. The model selects the next rung using the version-matched CUA skill.
+OpenClaw never maintains a second copy of CUA element, browser-ref, or
+capture-scope state.
+
+The skill and integration tests preserve this result precedence:
+
+- `confirmed`: verify the expected state and finish;
+- `unverifiable`: inspect fresh state before deciding whether another mutation
+  is needed; it is not a failure;
+- `suspected_noop`, an explicit refusal, or a delivery failure: another rung
+  may be appropriate;
+- `escalation.recommended`: describes a supported next move but does not prove
+  the previous mutation failed.
+
+This precedence prevents duplicate clicks, text, submissions, and other side
+effects.
 
 ### Browser targeting and the full-background rung
 
@@ -844,17 +935,39 @@ policy described above.
 The model still chooses CUA capture scope and explicitly calls `start_session`
 and `end_session` as CUA's skill requires. The model does not choose the native
 session id. The plugin removes that field from model-visible schemas, and the
-node injects one stable, opaque id namespaced to the OpenClaw run, selected
-node, and provider into every session-aware CUA call. Any caller-supplied
-reserved or native session field is rejected. Anonymous action calls are never
-dispatched. The native id contains no user text, workspace paths, credentials,
-or externally meaningful identifiers.
+node injects one stable, opaque id namespaced to the unique OpenClaw execution
+lease, selected node, and provider into every session-aware CUA call. Any
+caller-supplied reserved or native session field is rejected. Anonymous action
+calls are never dispatched. The native id contains no durable chat/session id,
+user text, workspace paths, credentials, or externally meaningful identifiers.
 
-OpenClaw performs best-effort `end_session` cleanup on normal completion,
-cancellation, provider restart, node disconnect, or idle cleanup even if the
-model does not call it.
+Calling CUA `end_session` is necessary session cleanup, but it does not remove
+the process-level immutable bounded manifest. Every exit from an authorized
+Computer Use execution therefore converges on one idempotent node-owned release
+path. The triggers are normal completion, failure, cancellation, timeout, node
+or Gateway disconnect, provider crash, explicit CUA session end, local Stop,
+OpenClaw session clear, execution-lease expiry, and policy-lease expiry. Release
+performs these steps:
 
-V1 allows one active Computer Use session per provider host. The app-owned MCP
+1. Revoke the exact browser grant and protected indicator, including an
+   asynchronous revocation signal to CUA when local Stop originates in the
+   host UI.
+2. End the injected CUA session and the OpenClaw execution, host, and policy
+   leases.
+3. Release synthetic input, agent cursor, recording, replay, and other
+   execution-owned state.
+4. Stop or restart the daemon so the execution's exact-resource bounded
+   manifest no longer exists in the process.
+5. Advance provider generation and reject every capability minted for the old
+   execution.
+
+The release operation is keyed by `executionLeaseId`, not by a durable
+OpenClaw chat/session id. Repeated or racing exit notifications are no-ops after
+the first successful state transition. A fresh execution must acquire a fresh
+lease, manifest, CUA session, generation, and tool binding before calls become
+available again.
+
+V1 allows one active Computer Use execution per provider host. The app-owned MCP
 connection serializes calls, and another run receives `computer-use-host-busy`
 until the active lease ends. This preserves CUA's process-global caches,
 recording state, and connected-transport isolation without pretending separate
@@ -867,7 +980,7 @@ connections do not isolate that state.
 
 The exclusive provider-host lease therefore also owns recording. The adapter
 verifies lease ownership before `get_recording_state` or `stop_recording`,
-injects the session-owned output directory, and releases recording during
+injects the execution-owned output directory, and releases recording during
 lifecycle cleanup. A future CUA version with daemon-enforced state isolation and
 an app-owned connected channel per run may allow concurrent sessions after
 compatibility probing.
@@ -951,41 +1064,65 @@ resource resolver.
 
 The node repeats security-critical argument checks before MCP dispatch so a
 compromised or version-skewed Gateway cannot turn an approved attachment handle
-into an arbitrary local path. The Gateway owns user/session policy; the node
-owns final native-resource resolution.
+into an arbitrary local path. The Gateway owns user and execution policy; the
+node owns final native-resource resolution.
 
 #### Protected consent and bounded rebinding
 
 CUA's bounded manifest is immutable and must name an existing browser profile's
 exact PID/window before the daemon starts. Those resources are often discovered
 during the run. V1 uses an explicit approve-rebind-retry protocol rather than
-pretending current CUA can resume an operation-time approval in place:
+pretending current CUA can resume an operation-time approval in place. It also
+requires CUA's embedded `ProtectedConsentProvider` adapter: the new manifest
+pre-approves the exact resource, while the protected provider activates and
+revokes the persistent indicator after the new daemon starts. Neither contract
+substitutes for the other.
+
+The protected control exchange is inaccessible to model-facing MCP and binds
+the schema version, nonce, CUA request digest, daemon instance, provider
+generation, immutable permission mode, managed and user policy hashes,
+OpenClaw execution lease, injected CUA and transport sessions, operation, risk
+class, expiry, and exact browser resource. The resource includes PID, native
+window, browser product, process fingerprint, and endpoint owner when
+available. A replay against any other daemon, generation, policy, lease,
+session, operation, expiry, or resource fails closed.
+
+The bounded flow is:
 
 1. the plugin classifies an operation such as
    `browser_prepare(existing_profile)` and does not dispatch it to CUA;
 2. the selected node app displays the exact PID/window, operation, requested
    origin scope, expiry, and policy context;
-3. local approval ends the current provider lease, revokes its CUA session, and
-   creates a new bounded manifest containing that exact resource;
-4. the app restarts CUA, advances provider generation, rebinds the OpenClaw run
-   to a new opaque CUA session, and activates a persistent Computer Use
-   indicator with a Stop control;
-5. the original call returns `provider-rebound-retry-required`; the skill makes
+3. local approval invokes the idempotent release path for the current execution
+   authorization and creates a new bounded manifest containing that exact
+   resource;
+4. the app restarts CUA with the new manifest, advances provider generation,
+   and binds a fresh execution lease plus opaque CUA session over the inherited
+   data and protected-control channels;
+5. when CUA calls `activate_preapproved()`, the host adapter validates the exact
+   request digest and activates a persistent Computer Use indicator with Stop;
+   failure to activate the indicator prevents the browser grant from becoming
+   live;
+6. the original call returns `provider-rebound-retry-required`; the skill makes
    the model re-list/re-snapshot and explicitly retry against the new
    generation. OpenClaw never automatically replays the pending mutation.
 
 A remote Gateway may initiate the request, but only the local node UI can
-approve the new bounded scope. Stop revokes the CUA session and manifest scope,
-ends the provider lease, releases input, and advances generation again. A model
-Boolean, ordinary MCP elicitation, chat reply, or Gateway-only approval cannot
-approve the manifest.
+approve the new bounded scope. Local Stop revokes the indicator immediately,
+sends asynchronous revocation over the protected control channel, and invokes
+the same execution-release path even if the Gateway or original caller is
+gone. Daemon-side grant revocation deactivates the host indicator. Host death,
+protected-channel closure, indicator failure, policy change, daemon restart,
+CUA session end, or execution-lease end also revokes the grant. A model Boolean,
+ordinary MCP elicitation, chat reply, or Gateway-only approval cannot approve
+the manifest or activate the indicator.
 
-If CUA later exposes a certified protected-host provider that can bind a live
-decision to daemon instance, request nonce, generation, mode, policy hashes,
-session, operation, expiry, exact resource, and persistent Stop indicator,
-OpenClaw may avoid the restart only after compatibility-gating that contract.
-Until then, an implementation that cannot perform bounded rebinding leaves
-existing-profile attachment unavailable.
+The accepted CUA version must expose and compatibility-advertise this embedded
+provider adapter. If inherited IPC, bounded rebinding, protected-provider
+activation, or asynchronous revocation is unavailable, existing-profile
+attachment remains unavailable. A future CUA contract may reduce restarts only
+if it can replace the process-level immutable manifest safely; the current
+design always restarts to remove or broaden manifest authority.
 
 The connected provider transport is never published as a model-visible
 argument. Inherited-handle isolation, platform process protections, bounded CUA
@@ -993,12 +1130,15 @@ policy, and OpenClaw's classified route are required defense-in-depth layers.
 
 ### Onboarding and user flows
 
-Onboarding distinguishes four states that are often conflated:
+Onboarding distinguishes five states that are often conflated:
 
 1. the node is paired and online;
 2. a provider is installed and compatible on that node;
 3. local OS permissions/backend access are ready;
-4. the Gateway has selected and armed that host/provider.
+4. the provider is ready, including private transport, protected-consent
+   adapter, and probes, but no execution owns native authority;
+5. the Gateway has selected and armed that host/provider and the current
+   execution has acquired bounded run authorization.
 
 #### Local Gateway and desktop app
 
@@ -1011,14 +1151,16 @@ The app's **Enable Computer Use** flow:
 3. offers the pinned managed install when needed;
 4. verifies artifact, manifest, MCP capabilities, and matching skill profile;
 5. requests or directs the user through local OS permissions;
-6. verifies bounded rebinding and the persistent Stop indicator;
+6. verifies the authenticated protected-consent adapter, indicator lifecycle,
+   Stop, and asynchronous revocation;
 7. starts the provider under the correct app/node owner with immutable managed
-   policy and bounded session inputs;
+   policy and no active run authorization;
 8. runs permission, screenshot, accessibility, and tool-catalog probes;
-9. publishes ready inventory;
+9. publishes ready inventory with `runAuthorization.state: "inactive"`;
 10. selects this node and CUA as the Gateway default after explicit
     confirmation;
-11. performs a harmless test capture and presents the result locally.
+11. acquires a short-lived test execution authorization, performs a harmless
+    capture, presents the result locally, and invokes the release path.
 
 #### Remote Gateway and desktop node
 
@@ -1033,8 +1175,9 @@ lists paired desktop nodes with actionable states, for example:
 Selecting an unready node creates no partial agent tool surface. The Gateway
 offers a deep link or node-directed notification, and the node app performs the
 local flow. When the node publishes ready inventory, the Gateway can complete
-host selection and arming. Pairing approval and Computer Use approval remain
-separate decisions.
+host selection and arming. Provider-native tools remain unavailable until the
+run acquires its own execution authorization. Pairing approval, node readiness,
+Gateway arming, and run authorization remain separate decisions.
 
 An operation that needs a broader bounded scope returns a typed local-approval
 state while the selected node presents the exact request. After approval and
@@ -1106,8 +1249,9 @@ stderr:
 - daemon/proxy lifecycle state;
 - last successful readiness probe time;
 - active session count and connected-channel health;
-- active host lease and local Stop-indicator state;
-- policy lease state.
+- provider readiness and run-authorization state;
+- active execution, host, and policy lease state;
+- protected-control channel and local Stop-indicator state.
 
 Logs may include provider stderr after OpenClaw's normal redaction and size
 limits, but protocol diagnostics use closed codes. Screenshots, accessibility
@@ -1130,13 +1274,16 @@ The integration fails closed in these cases:
 - required CUA tool/schema missing;
 - unknown CUA tool requested;
 - unapproved operation, origin, file, output path, or resource handle;
-- Computer Use host lease held by another session;
+- Computer Use host lease held by another execution;
 - local permissions revoked;
 - Wayland portal/session unavailable;
 - managed or user policy missing, invalid, or denying the operation;
 - bounded daemon policy expired;
 - protected consent unavailable or locally denied;
+- Windows host, daemon, proxy, or helper running outside the intended
+  interactive user session, including Session 0;
 - browser binding, origin, trust route, or capability generation stale;
+- execution authorization inactive, expired, or bound to another execution;
 - Gateway Computer Use lease not armed;
 - tool result exceeds Gateway limits;
 - daemon or proxy crashes repeatedly.
@@ -1173,9 +1320,10 @@ The detailed [implementation plan](0025/implementation-plan.md) organizes work
 into parallel development waves with explicit merge dependencies, repository
 ownership, proof, and rollout gates.
 
-1. **Upstream prerequisites:** CUA inherited connected IPC, an OpenClaw
-   MCP-first skill/capability profile, and node-controlled resource/helper
-   paths proceed in parallel.
+1. **Upstream prerequisites:** CUA inherited connected IPC, an authenticated
+   embedded protected-consent/indicator adapter, an OpenClaw MCP-first
+   skill/capability profile, and node-controlled resource/helper paths proceed
+   in parallel.
 2. **OpenClaw foundations:** additive node protocol, provider runtime, early
    Peekaboo migration, and reusable node MCP hosting establish the generic
    contract. The Plugin SDK export lands with Peekaboo as a real consumer.
@@ -1188,10 +1336,11 @@ ownership, proof, and rollout gates.
 5. **Closure and rollout:** security, packaging, browser/model parity, and
    upgrade gates complete before CUA becomes the default ready provider.
 
-The critical path is CUA inherited connected IPC -> Linux provider lifecycle ->
-Linux vertical proof -> macOS/Windows packaged hosts -> cross-platform closure
--> default rollout. Work outside that path should not wait for the current CUA
-embedded transport to change.
+The critical path is CUA inherited connected IPC plus the protected-consent
+adapter -> Linux provider lifecycle -> Linux vertical proof -> macOS/Windows
+packaged hosts -> cross-platform closure -> default rollout. Work outside that
+path should not wait for the current CUA embedded transport and protected-host
+contracts to change.
 
 ### Acceptance criteria
 
@@ -1201,7 +1350,7 @@ The feature is not complete until all of these are demonstrated:
   and Screen Recording identity, and a CUA screenshot plus accessibility action
   succeeds after one permission flow;
 - Windows packaged companion: CUA runs under companion-owned lifecycle and a
-  remote Gateway can use it;
+  remote Gateway can use it, while Session 0 reports unavailable;
 - Linux X11 node: managed install, readiness, screenshot, and input work from a
   remote Gateway;
 - Wayland: unsupported or portal-blocked states are reported honestly and
@@ -1216,6 +1365,9 @@ The feature is not complete until all of these are demonstrated:
   imported locked artifact before it can perform OS work;
 - provider package skew: an unknown `providerSpecDigest` cannot become ready;
 - driver restart: old sessions and element references fail as stale;
+- provider/run state: a provider can be ready with no authorized run, tools are
+  unavailable until a unique execution lease is authorized, and a durable
+  chat/session id cannot reuse authority across executions;
 - policy: the run cannot arm Computer Use while `system.run`, local exec, or
   another arbitrary process route targets the selected desktop host; generic
   MCP cannot invoke managed CUA outside the classified route;
@@ -1231,8 +1383,19 @@ The feature is not complete until all of these are demonstrated:
   closed; their hashes change provider generation; unrestricted mode is denied;
 - protected consent: existing-profile attachment cannot proceed from a model
   Boolean or Gateway approval alone; local approval creates a new exact-resource
-  manifest and generation, requires explicit retry, and local Stop revokes the
-  active grant;
+  manifest and generation; CUA `activate_preapproved()` activates the persistent
+  indicator through the authenticated host adapter; explicit retry is required;
+  and local Stop asynchronously revokes the active grant;
+- execution release: completion, failure, cancellation, timeout, node or
+  Gateway disconnect, provider crash, explicit CUA session end, local Stop,
+  OpenClaw session clear, and lease expiry all reach the same idempotent release
+  path, remove the process-level bounded manifest by stopping or restarting the
+  daemon, and invalidate the old generation;
+- live schemas: the reviewed catalog limits the maximum surface, the installed
+  driver's `tools/list` decides which reviewed branches exist,
+  schema-supported `delivery_mode` needs no invented capability token,
+  unsupported branches fail explicitly, and `bring_to_front` remains a
+  standalone tool;
 - browser targeting: an exactly bound occluded Chromium tab can use the
   documented full-background navigation/text/explicit DOM-event rung, while an
   unproven trusted pointer route fails before dispatch and stale refs are
@@ -1242,7 +1405,8 @@ The feature is not complete until all of these are demonstrated:
 - skill resources: CUA companion guidance is readable without granting general
   node shell or filesystem access;
 - skill: an end-to-end task exercises snapshot-before/after and at least one
-  documented CUA fallback without direct CLI execution;
+  documented CUA fallback without direct CLI execution, automatic mutation
+  retry, or Gateway-controlled ladder advancement;
 - disable/revoke: active input is released, child processes stop, and subsequent
   calls fail closed;
 - image and structured MCP results reach the model without base64 inflation or
@@ -1353,6 +1517,15 @@ This RFC was researched against OpenClaw main at
 
 ### CUA
 
+- [trycua/cua#2410](https://github.com/trycua/cua/issues/2410) tracks inherited
+  connected IPC for embedded hosts.
+- [trycua/cua#2411](https://github.com/trycua/cua/issues/2411) tracks the
+  authenticated embedded `ProtectedConsentProvider`, persistent indicator,
+  Stop, and asynchronous revocation contract.
+- [trycua/cua#2412](https://github.com/trycua/cua/issues/2412) tracks the
+  versioned OpenClaw MCP-first skill and capability profile.
+- [trycua/cua#2413](https://github.com/trycua/cua/issues/2413) tracks trusted
+  host-owned resource and helper paths.
 - [How permission policies work](https://cua.ai/docs/concepts/how-permission-policies-work)
   defines the daemon enforcement point, deny-by-default managed/user policy
   composition, immutable process snapshot, argument rules, and the explicit
@@ -1418,6 +1591,10 @@ This RFC was researched against OpenClaw main at
 - What exact inherited connected transport will CUA expose on Unix and Windows?
   OpenClaw's requirement of no discoverable privileged listener is fixed even
   if the upstream handle-passing mechanism changes.
+- What exact protected-control framing will CUA expose for the embedding host's
+  consent/indicator adapter? Model-facing MCP must not be able to forge it, and
+  its daemon, request, generation, policy, execution, session, operation,
+  expiry, and resource bindings are fixed even if framing changes.
 - Will CUA publish and version an explicit OpenClaw MCP-first skill profile, or
   must the initial integration use an exact-digest transport overlay?
 - Which CUA release first satisfies the required embedded topology, bounded
