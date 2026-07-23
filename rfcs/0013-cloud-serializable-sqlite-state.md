@@ -241,8 +241,8 @@ slices exercised by these sidecars:
   composes verified global and owner-selected per-agent RFC 0013 snapshots into
   one deterministic `host-protected` recovery point and exact acceptance byte
   inventory.
-- [giodl73-repo/openclaw#152](https://github.com/giodl73-repo/openclaw/pull/152)
-  is a fork-only draft stacked on #112385. It adds one hidden offline final
+- [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865)
+  is a draft stacked on #112385. It adds one hidden offline final
   capture operation with durable intent, exact committed-result replay, and
   fail-closed quarantine for conflicting or incomplete attempts.
 
