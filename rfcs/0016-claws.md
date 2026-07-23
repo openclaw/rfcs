@@ -1026,6 +1026,47 @@ package queries omit or reject the Claw family, and the experimental feed
 returns `404` with `Cache-Control: no-store`. Browser clients infer availability
 only from those gated APIs and never receive the deployment environment value.
 
+### Post-merge validation and graduation
+
+After the ClawHub and Control UI tracks merge, the next phase is product
+validation and graduation rather than expanding experimental schema v1. This
+roadmap is non-blocking for the implementation stacks above and does not add
+v1 acceptance criteria.
+
+1. **First-party starter Claws.** Publish a small set of complete, maintained
+   scenarios that exercise materially different capabilities, such as software
+   development, research, financial analysis, and productivity. The primary
+   product test is whether a user can discover a useful Claw, understand its
+   declared effects, preview and consent, apply it, and reach a working agent in
+   one flow. Status, update, doctor, and remove must remain understandable after
+   that initial success.
+2. **Authoring and publication.** Validate and tighten the existing path from a
+   working local agent through selective `claws export`, package validation, and
+   authenticated ClawHub publication. Authors should not need to reconstruct a
+   complete manifest manually, but export must continue to exclude secrets,
+   bindings, operator policy, local paths, and unrelated instance state.
+3. **Experimental graduation.** Use the first-party and internal pilot results
+   to freeze the v1 field set, decide whether `CLAW.md` remains the default
+   authoring and export representation, define released migrations and
+   compatibility guarantees, stabilize CLI and JSON output contracts, and only
+   then remove the OpenClaw and ClawHub experimental gates. Graduation requires
+   an explicit change; merging experimental implementation does not imply it.
+4. **Portable Claws.** After OpenClaw demonstrates that the package model and
+   lifecycle have product value, separate the harness-neutral package contract
+   from OpenClaw-specific planning, policy, mutation, and provenance. A future
+   specification and tool may then support a command such as
+   `npx claws --agent openclaw`, followed by additional harness adapters such as
+   Hermes. Cross-harness CLI behavior and adapter conformance are deliberately
+   outside experimental v1 and require their own proposal.
+5. **Evidence-driven lifecycle expansion.** Richer automation types,
+   audit/history tombstones, stronger rollback, additional artifact transports,
+   and broader `agents delete` cleanup remain follow-ups. They should be added
+   only when observed starter-Claw and operator workflows justify their storage,
+   compatibility, and ownership costs.
+
+The immediate post-merge milestone is therefore an end-to-end operational
+agent outcome, not merely successful package installation.
+
 ## Acceptance criteria
 
 The RFC implementation is acceptable when tests and real CLI proof demonstrate:
