@@ -3,9 +3,9 @@ title: Localization Runtime and Product Coverage
 authors:
   - Gio Della-Libera
 created: 2026-07-16
-last_updated: 2026-07-22
-status: draft
-issue:
+last_updated: 2026-07-23
+status: accepted
+issue: https://github.com/openclaw/openclaw/issues/113105
 rfc_pr: https://github.com/openclaw/rfcs/pull/42
 ---
 
