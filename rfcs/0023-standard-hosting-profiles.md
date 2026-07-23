@@ -419,7 +419,7 @@ single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
 It is based on readiness head `208dc2db604` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains eleven profile-only commits at exact head `41475969aec`:
+and contains twelve profile-only commits at exact head `6d02550698f`:
 
 | Commit | Intended scope |
 | --- | --- |
@@ -434,6 +434,7 @@ and contains eleven profile-only commits at exact head `41475969aec`:
 | `c144faccbfa` | Document profile selection, predicates, host inputs, and support boundaries. |
 | `c93b48bd9ab` | Align profile criteria and current repository contracts with the readiness stack. |
 | `41475969aec` | Preserve optional-profile startup while applying profile-required criteria. |
+| `6d02550698f` | Satisfy current config-tier, import-cycle, and generated-protocol contracts. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
