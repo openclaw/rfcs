@@ -364,20 +364,20 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `813104950f5` from
+It is based on readiness head `ac04dca2b21` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains seventeen profile-only commits at exact head `d191c89203e`.
+and contains eighteen profile-only commits at exact head `479ff9b4898`.
 
 | Slice | Intended scope |
 | --- | --- |
 | Standard selection and predicates | Add opt-in selection, precedence, machine-readable projection, and `local`, `container`, and `reverse-proxy` conditions. |
 | Node mode | Add product-neutral pairing, connected-target, canonical command-policy, and control-channel conditions. |
-| Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, and bound profile evaluation. |
+| Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, preserve attribution on failed evaluation, and bound pairing recovery work. |
 | Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, and unprofiled compatibility. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
-seventeen profile commits. After PR 104018 lands, the same PR naturally reduces to
+eighteen profile commits. After PR 104018 lands, the same PR naturally reduces to
 the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
 preserves that profile-only comparison view in the meantime. Fork PRs
 [#18](https://github.com/giodl73-repo/openclaw/pull/18),
