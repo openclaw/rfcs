@@ -114,6 +114,8 @@ An illustrative package is:
 github-triage/
 |-- package.json
 |-- CLAW.md
+|-- profiles/
+|   `-- openclaw.yml
 `-- workspace/
     |-- AGENTS.md
     |-- SOUL.md
@@ -121,9 +123,11 @@ github-triage/
         `-- triage-policy.md
 ```
 
-All manifest paths and referenced workspace sources must resolve inside the
-unpacked package root. A registry must verify that every declared source exists
-in the uploaded artifact before accepting a version.
+All manifest paths, profiles referenced by metadata pointer keys the validating
+implementation recognizes, and workspace sources must resolve inside the
+unpacked package root. A registry must verify that every such declared source
+exists in the uploaded artifact before accepting a version.
+The applying harness validates the schema of a profile it recognizes.
 
 ## Portable Path Rules
 
@@ -138,8 +142,8 @@ registries must reject:
 - components with trailing spaces or dots;
 - two paths that collide after slash normalization, Unicode NFC normalization,
   and case folding;
-- a manifest path or workspace source whose canonical realpath escapes the
-  package root;
+- a manifest path, harness profile, or workspace source whose canonical
+  realpath escapes the package root;
 - symlinks, hardlinks, device files, sockets, and every other entry that is not
   an ordinary directory or regular file.
 
@@ -180,8 +184,9 @@ A conforming registry must validate a publication in this order:
 4. Resolve `openclaw.claw` inside the package root.
 5. Parse the selected `CLAW.md` or JSON document.
 6. Validate the strict schema version 1 manifest.
-7. Verify that every workspace source exists and is a safe regular file, and
-   that any local avatar resolves through a declared workspace destination.
+7. Verify that every profile referenced by a recognized metadata pointer and
+   every workspace source exists as a safe regular file, and that any local
+   avatar resolves through a declared workspace destination.
 8. Apply registry ownership, visibility, moderation, malware, and security
    scanning rules.
 9. Compute and retain the immutable artifact digest over the exact distributed
@@ -215,9 +220,11 @@ trusted registry or signed feed binds that digest to package identity; the
 digest alone proves byte equality, not publisher identity, review, or safety.
 
 A local development source must be materialized as one immutable planning
-snapshot containing the exact manifest bytes and every referenced workspace
-source path and byte sequence. Its development digest must cover that complete
-snapshot plus the canonical source location. Hashing only the manifest is not
+snapshot containing the exact manifest bytes, every profile path and byte
+sequence referenced by a metadata pointer the harness recognizes, and every
+referenced workspace source path and byte sequence. Its development digest must
+cover that complete snapshot plus
+the canonical source location. Hashing only the manifest is not
 sufficient. Development and registry digests identify different trust layers
 and must not be presented as interchangeable proofs.
 
@@ -236,9 +243,17 @@ A registry such as ClawHub owns:
 - safe search/detail summaries;
 - exact artifact resolution and hosted feed entries.
 
+Registry validation covers recognized harness-profile structure, including an
+OpenClaw profile identifier and modifier shape, but does not copy or freeze a
+harness's evolving built-in profile registry. A
+registry may therefore accept a structurally valid profile selection that an
+older applying client does not recognize. The applying client must reject that
+selection before planning mutation.
+
 OpenClaw owns:
 
 - local package and manifest validation;
+- resolution of profile selections through its current built-in registry;
 - read-only planning and operator consent;
 - creation of the new agent and workspace;
 - delegation to skill, plugin, MCP, agent, workspace, and scheduler owners;
@@ -264,8 +279,9 @@ authoritative full declaration; a summary must not replace or contradict it.
 
 ## Read-Only Planning and Consent
 
-Inspection validates package metadata and the manifest without reading or
-mutating local lifecycle state. Add dry-run resolves the final local agent id,
+Inspection validates package metadata, the manifest, and every recognized
+metadata-referenced profile without reading or mutating local lifecycle state.
+Add dry-run resolves the final local agent id,
 workspace, dependencies, MCP servers, files, scheduled work, local credential
 prerequisites, and every external executable or downloadable artifact. It
 reports all actions, retained resources, conflicts, blockers, and post-add
@@ -285,6 +301,31 @@ surface, or recurring work requires a distinct machine-readable record and
 human-readable disclosure rather than being hidden in ordinary content
 reconciliation. The same classification applies during add and update; an
 owner must not invent a weaker capability-specific approval.
+
+OpenClaw profile tool selections come from the applying harness's canonical
+built-in registry, not package-defined policy objects. Planning must
+show the selected profile and modifiers. Update planning must resolve inherited
+profiles and filesystem defaults, expand built-in profiles to tool capabilities,
+and compare wildcard profiles as supersets; it must not treat profile labels as
+opaque. Adding `alsoAllow`, removing effective workspace-only confinement,
+enabling canonical `memory.search`, enabling cross-conversation memory, or
+adding the `memory` or `sessions` source is an escalation. Restricting
+filesystem tools to the agent workspace, disabling memory search or
+cross-conversation memory, or removing a source is a reduction. The `sessions`
+source requires an explicit cross-conversation memory opt-in. Update
+classification resolves inherited memory defaults through the applying
+harness's canonical context-sensitive resolver, including session- or
+binding-derived defaults, rather than a Claw-local copy.
+
+The applying host's global policy remains an upper bound. A package must not
+carry custom tool-profile definitions, local credentials or bindings, provider
+configuration, or local memory paths. Unsupported portable settings block the
+complete plan rather than being dropped.
+
+Within the OpenClaw profile, `tools.fs.workspaceOnly` is restrictive-only. A
+package may set it to `true`; `false` is invalid; omission inherits host policy.
+Applying clients
+must reject `false` before planning so a Claw cannot weaken host confinement.
 
 An application profile may satisfy capability and content consent with one
 confirmation only when the plan represents the capability set separately and
@@ -417,9 +458,10 @@ deleted.
 
 ## Resource Limits
 
-A consumer must reject a Claw manifest larger than 1 MiB and package metadata
-larger than 256 KiB before parsing. Reads must remain bounded if a file grows
-after an initial metadata check. Existing canonical extraction, workspace-file,
+A consumer must reject a Claw manifest larger than 1 MiB, package metadata
+larger than 256 KiB, or an OpenClaw profile larger than 256 KiB before parsing.
+Reads must remain bounded if a file grows after an initial metadata check.
+Existing canonical extraction, workspace-file,
 aggregate-workspace, and plan-output limits continue to apply.
 
 ## Remove Semantics
@@ -495,10 +537,20 @@ reject links, and referenced workspace sources remain regular, non-linked
 files.
 
 Export creates a new package directory and must fail if the output directory
-already exists. It emits `package.json`, `CLAW.md`, and confined
-workspace sources. Export includes only portable supported state and excludes
+already exists. It emits `package.json`, `CLAW.md`, confined workspace sources,
+and `profiles/openclaw.yml` when supported OpenClaw settings are present.
+The manifest references that profile through `metadata.openclaw.config` using
+forward-slash path separators, and its exact bytes participate in derivative
+package integrity. Export includes only portable supported state and excludes
 secrets, resolved environment values, models, providers, bindings, sessions,
 logs, caches, and unrelated global configuration.
+
+The portable `agent` object contains identity only. The referenced OpenClaw
+profile may preserve a registered built-in tool-profile selection, `allow` or
+`alsoAllow`, `deny`, `fs.workspaceOnly`, and memory-search `enabled`,
+`rememberAcrossConversations`, and `sources`. It must exclude custom profile
+definitions and all other tool or memory-search configuration. The manifest
+and profile must pass their strict validators before being returned.
 
 Export may preserve an original package name and version only by returning the
 byte-for-byte original artifact with the same digest. Any regenerated package,
@@ -513,9 +565,10 @@ Package v1 is identified by a manifest with `schemaVersion: 1` and the metadata
 contract above. Registry transport may evolve independently as long as it still
 delivers the exact identity, version, digest, and package bytes.
 
-Package and manifest v1 define the OpenClaw application profile. A different
-harness may inspect the portable data or implement that complete profile, and a
-future specification may define additional harness profiles. A consumer must
+Package and manifest v1 define a portable core plus metadata-addressed harness
+profiles. A different harness may consume the core, ignore OpenClaw's
+namespaced pointer, or define its own profile without interpreting OpenClaw
+settings. A consumer must
 not claim v1 application conformance if it drops, translates approximately, or
 cannot own a declared component. It may inspect such a package, but add must
 fail the complete plan rather than silently degrade the Claw.
@@ -548,6 +601,7 @@ A conforming applying client must:
 - delegate resources to canonical owners and record provenance;
 - fail closed on collisions, unsupported components, and unsafe paths;
 - distinguish applied state from local operational readiness;
+- preserve host policy as the upper bound for portable agent settings;
 - preserve drifted or independently owned state during update and remove;
 - derive managed and referenced relationships from canonical owner state;
 - retain referenced resources by default and bind any operator-selected

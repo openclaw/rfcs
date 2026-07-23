@@ -122,7 +122,8 @@ The top-level value must be an object with these fields:
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
 | `schemaVersion` | integer | Yes | Must be exactly `1`. |
-| `agent` | object | Yes | Portable configuration for the one new agent. |
+| `agent` | object | Yes | Portable identity for the one new agent. |
+| `metadata` | string map | No | Namespaced consumer hints and package-relative profile pointers. Defaults to empty. |
 | `workspace` | object | No | Bootstrap and supporting files. Defaults to empty. |
 | `packages` | array | No | Exact skill and plugin dependencies. Defaults to empty. |
 | `mcpServers` | object | No | Portable MCP declarations keyed by server name. Defaults to empty. |
@@ -137,6 +138,21 @@ its kind and canonical owner state as specified by the package lifecycle. This
 prevents package authors from claiming deletion authority over pre-existing or
 shared host resources. Operator-selected referenced cleanup is remove-plan
 input, not portable package content.
+## Metadata and Harness Profiles
+
+`metadata` is a string-to-string map following the portability precedent of
+[Agent Skills metadata](https://agentskills.io/specification#metadata-field).
+Keys should be globally unique or harness-namespaced. Values are opaque strings
+to consumers that do not recognize the key; metadata must not contain a second
+serialized manifest or executable configuration.
+
+OpenClaw recognizes `openclaw.config` as a pointer to an optional package-local
+OpenClaw profile. The value must be a safe package-relative path ending in
+`.yml` or `.yaml`, with forward slashes as separators. Backslashes are invalid.
+The conventional exported path is
+`profiles/openclaw.yml`, but the pointer, not that filename, is normative.
+Grouped JSON uses the same pointer and does not embed the profile.
+
 
 ## Agent
 
@@ -156,18 +172,57 @@ The portable agent object is:
 | `identity.theme` | string | No | Non-empty after trimming. |
 | `identity.emoji` | string | No | Non-empty after trimming. |
 | `identity.avatar` | string | No | Non-empty portable avatar described below. |
+
+The portable agent object is strict. Runtime policy, credentials, bindings,
+provider configuration, and harness-specific behavior are not portable agent fields.
+
+## OpenClaw Profile
+
+When `metadata.openclaw.config` is present, OpenClaw must load and validate the
+referenced profile before inspection or planning succeeds. The file is
+JSON-compatible YAML with this strict top-level shape:
+
+```yaml
+schemaVersion: 1
+agent: {}
+```
+
+The profile may contain these OpenClaw per-agent settings:
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
 | `groupChat.mentionPatterns` | string array | No | At least one non-empty string when present. |
 | `sandbox.mode` | enum | No | `off`, `non-main`, or `all`. |
 | `sandbox.scope` | enum | No | `session`, `agent`, or `shared`. |
 | `sandbox.workspaceAccess` | enum | No | `none`, `ro`, or `rw`. |
-| `tools.allow` | string array | No | At least one non-empty string when present. |
+| `tools.profile` | string | No | Must resolve through the applying OpenClaw version's canonical built-in profile registry. |
+| `tools.allow` | string array | No | At least one non-empty string when present; mutually exclusive with `tools.alsoAllow`. |
+| `tools.alsoAllow` | string array | No | At least one non-empty string when present; extends a selected profile and is mutually exclusive with `tools.allow`. |
 | `tools.deny` | string array | No | At least one non-empty string when present. |
-| `heartbeat` | object | No | Exact portable heartbeat object below. |
-| `humanDelay` | object | No | Exact portable human-delay object below. |
+| `tools.fs.workspaceOnly` | literal `true` | No | Restricts filesystem tools to the new agent's workspace. `false` is invalid; omission inherits host policy. |
+| `memory.search.enabled` | boolean | No | Enables or disables memory search for the new agent. |
+| `memory.search.rememberAcrossConversations` | boolean | No | Explicitly permits relevant context from the agent's other private conversations. |
+| `memory.search.sources` | enum array | No | Non-empty array containing only `memory` and `sessions`; `sessions` requires `rememberAcrossConversations: true`. |
+| `heartbeat` | object | No | Exact OpenClaw heartbeat object below. |
+| `humanDelay` | object | No | Exact OpenClaw human-delay object below. |
 
-All objects are strict. Consumers may accept empty optional objects, but
-canonical producers must omit an optional object when none of its members are
-present.
+The profile is part of the Claw package and source integrity, but it is not
+copied to OpenClaw's ordinary configuration path. It must be at most 256 KiB,
+must be a regular non-symlinked and non-hardlinked file inside the package, and
+must reject duplicate keys, anchors, aliases, merge keys, explicit tags,
+unknown fields, and unsupported schema versions.
+
+The `memory.search` path is canonical; this profile defines no `memorySearch`
+alias. OpenClaw resolves inherited memory behavior through its canonical
+context-sensitive resolver before planning or classifying an update.
+`tools.fs.workspaceOnly` is restrictive-only. Host policy remains authoritative.
+The profile cannot carry custom profile definitions, provider-specific or
+sender-specific tool policy, elevated access, executable settings, memory
+providers or credentials, remote endpoints, local paths, or storage tuning.
+
+The package `ref` for a skill is not necessarily its canonical runtime skill
+identity. Version 1 therefore does not set `agent.skills`; declared workspace
+skills are discovered normally and inherited operator allowlists remain intact.
 
 `heartbeat` may contain only:
 
@@ -179,7 +234,6 @@ present.
 | `activeHours.timezone` | string | Non-empty IANA timezone recognized by the scheduler. |
 | `lightContext` | boolean | No additional constraint. |
 | `isolatedSession` | boolean | No additional constraint. |
-| `skipWhenBusy` | boolean | No additional constraint. |
 | `timeoutSeconds` | integer | Greater than zero. |
 
 `humanDelay` may contain only `mode`, `minMs`, and `maxMs`. `mode`, when
@@ -340,11 +394,8 @@ agent:
   id: github-triage
   name: GitHub Triage
   description: Reviews incoming issues and prepares a daily summary.
-  tools:
-    allow: [read, write, web_fetch]
-    deny: [exec]
-  heartbeat:
-    every: 30m
+metadata:
+  openclaw.config: profiles/openclaw.yml
 workspace:
   bootstrapFiles:
     AGENTS.md:
@@ -386,18 +437,41 @@ cronJobs:
 Adds one GitHub triage agent and the reviewed resources it needs.
 ```
 
+The same package includes `profiles/openclaw.yml`:
+
+```yaml
+schemaVersion: 1
+agent:
+  tools:
+    profile: coding
+    alsoAllow: [cron]
+    deny: [exec]
+    fs:
+      workspaceOnly: true
+  memory:
+    search:
+      enabled: true
+      rememberAcrossConversations: true
+      sources: [memory, sessions]
+  heartbeat:
+    every: 30m
+```
+
 ## JSON Compatibility
 
 The package contract may point `openclaw.claw` at a JSON file containing the
 grouped top-level object. JSON input passes through the same strict schema,
 defaults, diagnostics, and lifecycle. `CLAW.md` and JSON are two serializations
-of the same schema version, not different capability levels.
+of the same portable schema version, and both use metadata pointers for
+harness-specific profiles.
 
 ## Compatibility and Evolution
 
-Schema evolution requires a new integer `schemaVersion`. Consumers must reject
-unsupported versions rather than partially apply them. New optional fields must
-not be added to version 1 because strict v1 consumers reject unknown fields.
+This addendum finalizes the experimental schema version 1 field set before
+graduation. Consumers must reject unsupported versions rather than partially
+apply them. After graduation, new optional fields require a new integer
+`schemaVersion` because strict v1 consumers reject unknown fields. Omission of
+the OpenClaw profile pointer preserves existing inherited behavior.
 
 There is no canonical byte serialization. Producers should emit stable field
 ordering and formatting for reviewable diffs, but semantic equality is based on
@@ -425,6 +499,14 @@ A conforming consumer must:
 - reject duplicate YAML keys and unknown schema fields;
 - validate all identifiers, exact versions, paths, environment references,
   cron expressions, timezones, and uniqueness constraints;
+- treat unknown metadata keys as opaque string hints;
+- load `metadata.openclaw.config` only from a safe package-relative YAML path,
+  using forward-slash separators, bind its exact bytes into source integrity,
+  and reject missing, linked, oversized, malformed, or schema-invalid
+  profiles;
+- resolve OpenClaw profile selections through the canonical built-in profile
+  registry and reject an unknown profile before planning mutation;
+- reject `tools.allow` combined with `tools.alsoAllow` in that profile;
 - ignore the Markdown body for runtime behavior;
 - preserve original bytes for integrity calculations;
 - reject a `CLAW.md` file larger than 1 MiB before parsing, including when it
@@ -445,4 +527,9 @@ A conforming producer must:
   timezones;
 - place human explanation, not executable declarations, in the Markdown body;
 - exclude credentials and operator-owned runtime choices;
-- validate the result against this specification before publication or export.
+- keep the portable agent object free of harness-specific runtime settings;
+- place supported OpenClaw settings in a referenced package profile rather
+  than serializing them into metadata or the portable agent object;
+- bind every profile referenced through a profile-pointer key it recognizes or
+  emits into package integrity;
+- validate the manifest and every emitted profile before publication or export.
