@@ -366,15 +366,16 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream draft PR with four ordered commits at exact head
-`17b34f792d8`, rebased onto OpenClaw `main` at `4e78d91c0f9`, with exact-head
-tests and package-installed Docker proof. The final package proves `/ready` and
-`/readyz` transition `200 -> 503 -> 200` for a
-selected workspace failure and recovery, `/healthz` remains live, and
-`openclaw ready --json` exits `0 -> 1 -> 0` with the same canonical condition.
-A published-package upgrade lane also proves that existing installations do
-not silently acquire opt-in criteria. Reviewers should use that PR for the
-proposed landing shape and current validation state.
+It is one upstream PR with four ordered commits at exact head `d1450aeb7f9`,
+rebased onto OpenClaw `main` at `eccf02f04ac`. The refreshed branch passes
+220 focused readiness, Gateway, status, config, plugin-SDK, CLI, and config-help
+tests; formatting, documentation indexing, SDK surface, and SDK API-baseline
+checks also pass. The package-installed Docker lane proves `/ready` and
+`/readyz` transition `200 -> 503 -> 200` for a selected workspace failure
+and recovery, `/healthz` remains live, and `openclaw ready --json` exits
+`0 -> 1 -> 0` with the same canonical condition. Exact-head remote container
+and published-upgrade proof must be refreshed before landing. Reviewers should
+use that PR for the proposed landing shape and current validation state.
 
 The fork PRs below expose the same four commits as optional smaller review
 slices. They are supporting review aids, not alternative landing PRs:
