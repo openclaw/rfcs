@@ -363,9 +363,9 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `788a58e612f` from
+It is based on readiness head `a8e61ac0691` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains fifteen profile-only commits at exact head `9392d02b452`.
+and contains fifteen profile-only commits at exact head `218fff215e4`.
 
 | Slice | Intended scope |
 | --- | --- |
