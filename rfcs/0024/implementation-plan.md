@@ -56,6 +56,10 @@ deterministic CI detect the stale target, run trusted asynchronous generation
 and validation, and open a generated pull request. Later owners adopt that lane
 only for their declared families, namespaces, or directories, with both the
 scoped gate and owner-owned refresh configured in the same adoption slice.
+Its review branch contains `F01`, the exact five-file `F03` ownership delta,
+and the 17-file exemplar; unrelated updater, TUI, Gateway, and approval runtime
+ancestry is excluded. Landing preparation may drop the carried `F03` commits
+after that documentation slice merges.
 Draft OpenClaw PR
 [#112801](https://github.com/openclaw/openclaw/pull/112801) implements `G47` as
 a separate build-time guard so a newly introduced product-string surface cannot
