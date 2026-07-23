@@ -417,29 +417,29 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `27fa73911d5` from
+It is based on readiness head `5e7a713545a` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains thirteen profile-only commits at exact head `963ce437219`:
+and contains thirteen profile-only commits at exact head `2336ee23999`:
 
 | Commit | Intended scope |
 | --- | --- |
-| `f3a6e854eee` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
-| `25a7a5a61a9` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
-| `2bd38eaa76a` | Attribute profile results to logical runtime and incarnation IDs. |
-| `aff71e14531` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
-| `d7867a2ae4b` | Validate profile startup inputs before destructive lifecycle actions. |
-| `02d0073f5a6` | Prove writable host-provisioned workspace behavior and storage recovery. |
-| `44f64a55545` | Prove the existing node approval flow transitions node-mode to ready. |
-| `c0bb2fc92c1` | Make profile activation explicit and prove unprofiled upgrade compatibility. |
-| `98e983d7c51` | Document profile selection, predicates, host inputs, and support boundaries. |
-| `4bc6273391c` | Align profile criteria and current repository contracts with the readiness stack. |
-| `76d93e38dcc` | Preserve optional-profile startup while applying profile-required criteria. |
-| `4e9ddc6c2f1` | Satisfy current config-tier and import-cycle contracts. |
-| `963ce437219` | Evaluate node-mode approval against the canonical node command policy. |
+| `1fa9428ebb8` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
+| `32ebc761b1e` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
+| `ca4da0b3bfe` | Attribute profile results to logical runtime and incarnation IDs. |
+| `ae634a05432` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
+| `388a894443a` | Validate profile startup inputs before destructive lifecycle actions. |
+| `6265a75912c` | Prove writable host-provisioned workspace behavior and storage recovery. |
+| `1048b52e937` | Prove the existing node approval flow transitions node-mode to ready. |
+| `9ccaec363e4` | Make profile activation explicit and prove unprofiled upgrade compatibility. |
+| `8681995fd94` | Document profile selection, predicates, host inputs, and support boundaries. |
+| `f51a723ed36` | Align profile criteria and current repository contracts with the readiness stack. |
+| `079f28e7a69` | Preserve optional-profile startup while applying profile-required criteria. |
+| `bdef0fb3c2d` | Satisfy current config-tier and import-cycle contracts. |
+| `2336ee23999` | Evaluate node-mode approval against the canonical node command policy. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
-nine profile commits. After PR 104018 lands, the same PR naturally reduces to
+thirteen profile commits. After PR 104018 lands, the same PR naturally reduces to
 the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
 preserves that profile-only comparison view in the meantime. Fork PRs
 [#18](https://github.com/giodl73-repo/openclaw/pull/18),
