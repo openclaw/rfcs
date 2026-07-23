@@ -377,12 +377,14 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with eleven ordered commits at exact head `813104950f5`,
-rebased onto OpenClaw `main` at `4f4d89574a9`. The refreshed branch passes
+It is one upstream PR with twelve ordered commits at exact head `ac04dca2b21`,
+rebased onto OpenClaw `main` at `b8a47b23384`. The refreshed branch passes
 focused readiness, Gateway, status, health, CLI, and method-metadata tests;
-production typing also passes. Timed-out plugin checks remain single-flight
+production typing and unused-export checks also pass. Timed-out plugin checks remain single-flight
 until the original callback settles, even when the plugin ignores cancellation;
-provider output is bounded, validated, and redacted. A prior package-installed
+provider output is bounded, validated, and redacted. Config publication fences
+provider and workspace evidence by runtime generation, including recovery when
+a retired filesystem probe never settles. A prior package-installed
 Docker lane proved `/ready` and `/readyz`
 transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
 `/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with
