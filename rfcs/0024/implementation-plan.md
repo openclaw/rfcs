@@ -104,6 +104,9 @@ locale-invariant. Delete the replaced updater presentation path.
 
 Adopt one owner-approved family such as status or recovery. Do not combine this
 with command metadata, skills, plugins, channels, or a whole-TUI migration.
+For process-scoped human prose, prove the documented `OPENCLAW_LOCALE`, host
+locale, and English-fallback precedence while keeping identifiers and any
+structured output locale-invariant.
 
 ### Independent owner tracks
 

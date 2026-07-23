@@ -466,6 +466,13 @@ is not required for runtime conformance and does not establish completion.
 
 ## CLI Resolution
 
+This process-locale contract applies to process-scoped human CLI and TUI prose
+only when the surface owner declares the host locale as a legitimate input. It
+does not authorize localization of structured output, protocol fields, logs,
+or machine-consumed status values. A surface that requires explicit opt-in may
+omit platform inputs under the general precedence rule, but it must document
+that narrower contract.
+
 The existing onboarding source order remains valid:
 
 ```text
