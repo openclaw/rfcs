@@ -218,6 +218,44 @@ string-bearing area slice includes its scoped `G45` gate and `G46` refresh
 adoption (or evidence that its existing owner workflow already conforms), while
 `G47` prevents newly enumerated surfaces from remaining outside that decision.
 
+## September 1, 2026 Delivery Packages
+
+The delivery target is a product-completion decision on September 1, 2026.
+This forecast packages related registry entries for implementation and review;
+a package is not one large pull request. Contract, consumer, generated-catalog,
+and evidence changes remain independently reviewable and land in dependency
+order inside the package.
+
+Patrick Erichsen is the primary stack reviewer. Semantic, protocol, security,
+platform, and publication owners still approve their own boundaries. Those
+owner decisions are front-loaded during the foundation package rather than
+discovered in the scheduled implementation week.
+
+| Window | Delivery packages | Registry entries | Required outcome |
+| --- | --- | --- | --- |
+| July 22-24 | `PK0` architecture, foundation, and automation | `F01`, `F03`, `G45`, `G46`, `G47` | Accept RFC direction; land the kernel, contributor contract, shared per-repo gates, trusted refresh exemplar, and new-surface disposition gate; supervise the first credentialed generated-PR run. |
+| July 27-31 | `PK1` initial operator consumers; `PK2` first Gateway edge; `PK3` wizard/setup | `F02`, `F04`, `O07`, `O15`; `F05`, `O06`; `O08`, `O09` | Finish updater and TUI families, approval-not-found plus its generated UI catalog, and remaining owner-bounded wizard/setup families. |
+| August 3-7 | `PK4` CLI shell/agent; `PK5` sessions/tasks/Doctor; `PK6` Gateway families | `O10`, `O11`; `O12`, `O13`, `O14`; `R16`, `R17`, `R18`, `R19` | Land reusable CLI adapters and bounded consumers, then expand only reviewed Gateway discriminator tuples. |
+| August 10-14 | `PK7` runtime safety; `PK8` command metadata; `PK9` skill/plugin metadata | `R20`, `R21`, `R22`, `R23`, `R24`; `M25`, `M26`, `M27`, `M28`; `M29`, `M30`, `M31`, `M32` | Complete approval/runtime safety boundaries and land public metadata contracts before their projections. |
+| August 17-21 | `PK10` channel notices; `PK11` Control UI; `PK12` native apps | `M33`, `M34`, `M35`, `M36`; `P37`, `P38`; `P39`, `P40` | Finish adapter-owned channel dispositions and extend existing UI/native owner pipelines without replacing them. |
+| August 24-28 | `PK13` documentation; `PK14` coverage aggregation and catch-up | `P41`, `P42`; `E43` | Land or prove the docs publishing paths, close any slipped package, and publish coverage from landed owner declarations. |
+| August 31-September 1 | `PK15` evidence promotion | `E44` | Ingest current named-review evidence and generated artifacts, disclose accepted platform constraints, and make the qualified or full product claim. |
+
+The packages cover all 47 current entries exactly once. The target operating
+cadence is roughly three completed packages per full week with no more than
+three packages in active implementation at once. Generated locale follow-ups
+belong to the same package as their source family even when repository policy
+requires a separate pull request.
+
+For this target, an entry is done only when it is `landed`, source audit proves
+it `deleted`, or an existing owner pipeline has current conformance evidence.
+`projected`, `draft`, `blocked`, an open generated follow-up, or a schedule-only
+`deferred` state is not done. A genuine external platform constraint may close
+only with named owner acceptance, fallback evidence, and disclosure in `E44`.
+If an owner decision misses its package window, the registry records the
+blocker and Patrick reorders independent packages; the blocked entry does not
+silently disappear from the September 1 claim.
+
 ## Review Findings Applied
 
 The projected registry was evaluated through four tension lenses:

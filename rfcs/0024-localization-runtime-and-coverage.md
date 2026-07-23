@@ -135,6 +135,14 @@ completion:
 4. **Product claim promoted:** the release report evaluates only landed,
    owner-declared evidence and may make a qualified or full localization claim.
 
+The execution target is a product-completion decision on September 1, 2026.
+The projected registry groups all 47 current entries into 16 dependency-safe
+delivery packages from July 22 through September 1, at roughly three completed
+packages per full week. This is a delivery forecast, not a change to normative
+runtime behavior. A package may contain several small source, consumer, or
+generated-catalog pull requests; it reuses shared per-repository gates rather
+than creating a separate automation system for each slice.
+
 The current 15-surface, 315-cell portfolio is a delivery target and release
 policy snapshot. It is not an RFC-acceptance condition, a localization-core
 type restriction, or a requirement that one PR fill an entire cohort.

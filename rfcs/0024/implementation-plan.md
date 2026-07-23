@@ -164,6 +164,20 @@ Completion names are tracking cohorts, not single PRs or a linear stack:
 | Authoring automation | Shared tooling plus each adopting owner | `G45`-`G46` prove scoped deterministic enforcement and trusted generated-PR refresh; `G47` requires a disposition for newly introduced product-string surfaces. |
 | Release promotion | Product-wide | `E43`-`E44` aggregate only landed scoped evidence and produce an honest release claim. |
 
+### September 1 delivery target
+
+The non-normative delivery forecast in the
+[projected owner slice registry](projected-owner-slice-registry.md#september-1-2026-delivery-packages)
+assigns every current entry to one of 16 dependency-safe packages. The target
+cadence is approximately three completed packages per full week from July 27
+through August 28, followed by evidence promotion on September 1. Packages
+share the per-repository authoring, disposition, and trusted-refresh machinery;
+they do not create a separate gate or translation service for each slice.
+
+The schedule front-loads public-contract, safety, platform, and publication
+owner decisions. Missing owner approval may reorder independent work, but it
+does not count the blocked entry as complete or permit a schedule-only deferral.
+
 The current product-policy target is all 313 OpenClaw-controlled cells complete.
 `docs/fa` and `docs/th` must either gain an approved publishing path or remain
 the only two disclosed external platform constraints. An unqualified
@@ -493,7 +507,10 @@ The foundation is shipped when:
 
 ### Product completion
 
-Product completion is a later release-policy decision. It requires an honest
-coverage report, current generated artifacts, scoped named review, disclosure
-of any platform constraints, and the chosen 313/315 or 315/315 target. It is
-not required to accept the RFC or ship the runtime foundation.
+The delivery target is a product-completion decision on September 1, 2026. It
+requires an honest coverage report, current generated artifacts, scoped named
+review, disclosure of any accepted platform constraints, and the chosen
+313/315 or 315/315 target. Every current registry entry must be landed, deleted
+by source proof, or covered by a conforming existing owner pipeline; drafts,
+open generated follow-ups, and schedule-only deferrals do not count. Product
+completion is not required to accept the RFC or ship the runtime foundation.
