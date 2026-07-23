@@ -164,8 +164,10 @@ surface. The profile does not impose product, tenant, or one-target-per-agent
 semantics. Evaluation is bounded by the canonical readiness deadline and uses
 the current pairing generation and pairing-bound connected-session state; it
 does not perform network discovery or wait for a target during a readiness poll.
-Pairing-store reads remain single-flight after timeout, and store exceptions are
-projected as stable redacted reasons rather than raw error text.
+Pairing-store reads are single-flight until timeout. A later poll may start one
+replacement read so a recovered store can become ready, but no more than two
+reads may remain in flight. Store exceptions are projected as stable redacted
+reasons rather than raw error text.
 
 ## Selection And Precedence
 
