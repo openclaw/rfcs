@@ -366,7 +366,7 @@ single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
 It is based on readiness head `ac04dca2b21` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains eighteen profile-only commits at exact head `479ff9b4898`.
+and contains nineteen profile-only commits at exact head `6f9c158509b`.
 
 | Slice | Intended scope |
 | --- | --- |
@@ -377,7 +377,7 @@ and contains eighteen profile-only commits at exact head `479ff9b4898`.
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
-eighteen profile commits. After PR 104018 lands, the same PR naturally reduces to
+nineteen profile commits. After PR 104018 lands, the same PR naturally reduces to
 the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
 preserves that profile-only comparison view in the meantime. Fork PRs
 [#18](https://github.com/giodl73-repo/openclaw/pull/18),
