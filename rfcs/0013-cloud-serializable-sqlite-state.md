@@ -234,7 +234,7 @@ These sidecars do not change `openclaw backup sqlite`. They do not make every
 ordinary snapshot a portable recovery point, add a continuity-specific storage
 provider, or make Lobster part of the core contract.
 
-Draft OpenClaw implementation evidence is available for the two owner-side
+Draft OpenClaw implementation evidence is available for the three owner-side
 slices exercised by these sidecars:
 
 - [openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385)
@@ -245,11 +245,16 @@ slices exercised by these sidecars:
   is a draft stacked on #112385. It adds one hidden offline final
   capture operation with durable intent, exact committed-result replay, and
   fail-closed quarantine for conflicting or incomplete attempts.
+- [openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
+  is a draft stacked on #112865. It restores one exact accepted aggregate to
+  fresh canonical paths, holds when required owner evidence is absent, and
+  keeps Gateway work admission closed through scheduler reconciliation and
+  owner readiness.
 
 These drafts are evidence for owner review, not normative dependencies. They do
 not move Gateway suspension, external ingress fencing, clean process shutdown,
-durable host acceptance, publication, restore admission, or source destruction
-into OpenClaw.
+durable host acceptance, publication, host wake, or source destruction into
+OpenClaw.
 
 The intended observable outcome of the complete host composition is:
 
@@ -261,9 +266,9 @@ The intended observable outcome of the complete host composition is:
 - the source generation is not destroyed before exact durable acceptance; and
 - replacement readiness names the accepted recovery point it restored.
 
-The first two OpenClaw drafts prove only the owner-side recovery-point and final
-capture slices. Host acceptance, retained ingress, wake, destruction, and
-restored-start integration remain separate review and implementation work.
+The three OpenClaw drafts prove only the owner-side recovery-point, final
+capture, and restored-admission slices. Host acceptance, retained ingress,
+wake, and destruction remain separate review and implementation work.
 
 OpenClaw `main` already provides the host-neutral
 `gateway.suspend.prepare|status|resume` contract from

@@ -6,6 +6,22 @@ evidence required before a restored Gateway can receive work.
 
 Status: draft, tied to RFC 0013.
 
+## Draft Implementation Evidence
+
+[openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
+is the OpenClaw draft evidence slice for exact fresh-target restore and
+readiness-gated admission, stacked on final-capture draft
+[openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865).
+It reuses the RFC 0013 SQLite provider, durably binds the restore receipt and
+private startup descriptor, reconciles the canonical scheduler, and opens work
+admission only after owner readiness.
+
+The draft deliberately holds when required external or reconstructed
+obligations lack accepted owner evidence. It does not add wake routing,
+placement, idle policy, host acceptance, or a public restore-hook registry.
+This pull request is implementation evidence; this specification remains the
+normative responsibility boundary.
+
 ## Scope
 
 This specification defines:
