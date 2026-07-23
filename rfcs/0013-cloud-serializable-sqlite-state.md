@@ -3,7 +3,7 @@ title: SQLite Snapshot Backup Artifacts
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 status: completed
 issue: https://github.com/openclaw/openclaw/pull/105718
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -55,6 +55,7 @@ The first landed implementation uses SQLite `VACUUM INTO` to capture committed W
 - This RFC does not require OpenClaw to own upload, tenant routing, retention, or encryption policy.
 - This RFC does not require hot writes over a network filesystem.
 - This RFC does not define WAL bundles, leases, promotion, fencing, or standby orchestration.
+- This RFC does not define another Gateway pause, drain, or suspension API.
 - This RFC does not change `openclaw backup create` archive behavior.
 
 ## Proposal
@@ -172,6 +173,113 @@ flowchart LR
 
 The diagram is a responsibility split. The default local runtime can ignore the host box entirely. Hosted deployments can use the snapshot directory as the sync boundary without copying live SQLite sidecars.
 
+### Optional Follow-On Composition
+
+RFC 0013 is the completed one-database artifact contract. It is also the
+owner-authored substrate for optional recovery workflows, but those workflows
+must compose the landed command rather than reinterpret live SQLite files or
+duplicate snapshot creation, verification, repository, or restore behavior.
+
+#### Why a recovery lifecycle is needed
+
+Per-user and event-driven hosts can stop paying for resident compute only when
+they can retire one Gateway generation and later admit work on a replacement
+without losing accepted state. A SQLite snapshot alone cannot prove that
+transaction. It does not identify the complete set of state owners, prove that
+the host durably accepted every required byte, authorize retirement of the
+source generation, or prove that the replacement restored the same recovery
+point before accepting work.
+
+Without those semantics, hosts must choose between keeping idle Gateways warm
+or maintaining private shutdown, copying, restore-ordering, and readiness
+inference paths. Managed-host experience has exposed the resulting failure
+classes: accepted ingress can outlive the compute that should process it,
+scheduled wake can race idle retirement, replacement can lose scheduler
+continuity, and a cold runtime can appear ready before its required owner state
+is restored.
+
+Infrastructure platforms already provide the compute lifecycle primitives:
+
+- [Fly Machines](https://fly.io/docs/launch/autostop-autostart/) can stop all
+  Machines and autostart them for traffic.
+- [E2B](https://e2b.dev/docs/sandbox/auto-resume) pauses and automatically
+  resumes persistent sandboxes.
+- [Daytona](https://www.daytona.io/docs/en/persistence/) preserves sandbox
+  files across stop/start and offers archive or VM pause/resume paths.
+- [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/scale-app)
+  scales to zero and wakes from configured event sources.
+- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)
+  hibernate while retaining wakeable WebSocket delivery.
+
+Those platforms do not know OpenClaw's owner inventory, SQLite invariants,
+scheduler state, or readiness boundary. The follow-on contracts define that
+application-consistent layer. A host remains responsible for retained ingress,
+wake registration, compute placement, and external durability; OpenClaw and
+its state owners provide the exact recovery point and restored-admission proof
+that make those host primitives safe to use.
+
+The draft implementer-facing follow-on contracts are:
+
+- [Recovery Point Components v1](0013/recovery-point-components-v1-spec.md):
+  compose verified SQLite snapshots with explicit non-SQLite owner artifacts
+  and external or reconstruction obligations.
+- [Portable Handoff v1](0013/portable-handoff-v1-spec.md): combine the existing
+  cooperative Gateway suspension fence with final owner capture, durable host
+  acceptance, and generation-bound source destruction authority.
+- [Restored Admission v1](0013/restored-admission-v1-spec.md): restore exact
+  accepted components into fresh paths and keep admission closed until
+  scheduler and required owner readiness complete.
+
+These sidecars do not change `openclaw backup sqlite`. They do not make every
+ordinary snapshot a portable recovery point, add a continuity-specific storage
+provider, or make Lobster part of the core contract.
+
+Draft OpenClaw implementation evidence is available for the three owner-side
+slices exercised by these sidecars:
+
+- [openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385)
+  composes verified global and owner-selected per-agent RFC 0013 snapshots into
+  one deterministic `host-protected` recovery point and exact acceptance byte
+  inventory.
+- [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865)
+  is a draft stacked on #112385. It adds one hidden offline final
+  capture operation with durable intent, exact committed-result replay, and
+  fail-closed quarantine for conflicting or incomplete attempts.
+- [openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
+  is a draft stacked on #112865. It restores one exact accepted aggregate to
+  fresh canonical paths, holds when required owner evidence is absent, and
+  keeps Gateway work admission closed through scheduler reconciliation and
+  owner readiness.
+
+These drafts are evidence for owner review, not normative dependencies. They do
+not move Gateway suspension, external ingress fencing, clean process shutdown,
+durable host acceptance, publication, host wake, or source destruction into
+OpenClaw.
+
+The intended observable outcome of the complete host composition is:
+
+- idle compute may reach zero without treating a raw live filesystem copy as a
+  recovery point;
+- accepted ingress remains retained until restored admission succeeds;
+- autonomous scheduled work does not require an unrelated user message to
+  recover from absent compute;
+- the source generation is not destroyed before exact durable acceptance; and
+- replacement readiness names the accepted recovery point it restored.
+
+The three OpenClaw drafts prove only the owner-side recovery-point, final
+capture, and restored-admission slices. Host acceptance, retained ingress,
+wake, and destruction remain separate review and implementation work.
+
+OpenClaw `main` already provides the host-neutral
+`gateway.suspend.prepare|status|resume` contract from
+[openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
+with the validation and import-boundary repair from
+[openclaw/openclaw#103925](https://github.com/openclaw/openclaw/pull/103925).
+A follow-on handoff must reuse that cooperative tracked-work fence. It must not
+introduce another Gateway pause API. The existing contract intentionally leaves
+external ingress, third-party Channel transports, unregistered background work,
+and full process/filesystem consistency to the host.
+
 ### Snapshot Semantics
 
 The unit of snapshotting is one existing OpenClaw-owned SQLite database:
@@ -267,6 +375,16 @@ The original contributor prototype was [openclaw/openclaw#94805](https://github.
 
 The stress harness remains tracked separately in [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967). Broader state ownership and continuity work remains related to [openclaw/openclaw#101290](https://github.com/openclaw/openclaw/issues/101290).
 
+Adjacent shipped lifecycle foundations are:
+
+- [openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
+  which added cooperative host suspension; and
+- [openclaw/openclaw#103925](https://github.com/openclaw/openclaw/pull/103925),
+  which restored its architecture and validation gates.
+
+The optional follow-on sidecars consume those contracts as implemented on
+current `main`.
+
 ## Rationale
 
 This approach solves the reliability problem at the correct boundary. SQLite remains local and authoritative while OpenClaw is running. Durability is handled by verified artifacts, manifests, and explicit restore procedures.
@@ -288,3 +406,6 @@ Deferring WAL bundles is intentional. Full snapshots provide the first correct r
 - restore-on-boot host integration
 - leases, promotion, fencing, and managed failover
 - dedicated snapshot targets for future owner stores
+
+The three RFC 0013 sidecars narrow the first portable follow-on without
+promoting those future items into this completed SQLite contract.
