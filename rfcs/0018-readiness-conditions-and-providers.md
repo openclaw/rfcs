@@ -366,18 +366,19 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with four ordered commits at exact head `d1450aeb7f9`,
+It is one upstream PR with five ordered commits at exact head `208dc2db604`,
 rebased onto OpenClaw `main` at `eccf02f04ac`. The refreshed branch passes
-220 focused readiness, Gateway, status, config, plugin-SDK, CLI, and config-help
-tests; formatting, documentation indexing, SDK surface, and SDK API-baseline
-checks also pass. The package-installed Docker lane proves `/ready` and
-`/readyz` transition `200 -> 503 -> 200` for a selected workspace failure
-and recovery, `/healthz` remains live, and `openclaw ready --json` exits
-`0 -> 1 -> 0` with the same canonical condition. Exact-head remote container
-and published-upgrade proof must be refreshed before landing. Reviewers should
-use that PR for the proposed landing shape and current validation state.
+focused readiness, Gateway, status, health, CLI, and method-metadata tests;
+production and test type checks, dead-export checks, deprecation guards,
+documentation indexing, changed-file lint, and plugin-SDK surface checks also
+pass. A prior package-installed Docker lane proved `/ready` and `/readyz`
+transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
+`/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with
+the same canonical condition. Exact-head remote container and published-upgrade
+proof must be refreshed before landing. Reviewers should use that PR for the
+proposed landing shape and current validation state.
 
-The fork PRs below expose the same four commits as optional smaller review
+The fork PRs below expose the implementation as optional smaller review
 slices. They are supporting review aids, not alternative landing PRs:
 
 | Slice | Draft PR | Intended scope |
