@@ -239,10 +239,12 @@ The initial public shape is grouped by OpenClaw ownership boundary:
       "deny": ["exec", "browser", "nodes"],
       "fs": { "workspaceOnly": true }
     },
-    "memorySearch": {
-      "enabled": true,
-      "rememberAcrossConversations": true,
-      "sources": ["memory", "sessions"]
+    "memory": {
+      "search": {
+        "enabled": true,
+        "rememberAcrossConversations": true,
+        "sources": ["memory", "sessions"]
+      }
     },
     "heartbeat": {
       "every": "30m",
@@ -375,12 +377,15 @@ profile definition. Global and operator policy continue to constrain the
 resulting tool surface and cannot be widened by a Claw.
 
 `tools.allow` is an explicit allowlist. `tools.alsoAllow` extends a selected
-profile, so a single tools object must not contain both. Update preview resolves
-built-in profiles to their effective tool sets before classifying a profile
-change as an escalation or reduction. Enabling memory search, enabling
-`rememberAcrossConversations`, or adding a source is a capability escalation;
-disabling either behavior or removing a source is a reduction. A portable
-declaration of the `sessions` source requires
+profile, so a single tools object must not contain both. Adding an
+`alsoAllow` grant is an escalation. Update preview resolves inherited tool
+profiles and filesystem defaults, expands built-in profiles to their effective
+tool sets, and treats the `full` wildcard as a superset before classifying a
+change. Removing workspace-only confinement is therefore an escalation when the
+effective host default permits broader filesystem access. Enabling
+`memory.search`, enabling `rememberAcrossConversations`, or adding a source
+is a capability escalation; disabling either behavior or removing a source is
+a reduction. A portable declaration of the `sessions` source requires
 `rememberAcrossConversations: true` so it cannot silently normalize to ordinary
 workspace memory.
 
@@ -422,10 +427,12 @@ defaults and agents:
           "deny": ["exec", "browser", "nodes"],
           "fs": { "workspaceOnly": true }
         },
-        "memorySearch": {
-          "enabled": true,
-          "rememberAcrossConversations": true,
-          "sources": ["memory", "sessions"]
+        "memory": {
+          "search": {
+            "enabled": true,
+            "rememberAcrossConversations": true,
+            "sources": ["memory", "sessions"]
+          }
         },
         "heartbeat": {
           "every": "30m",
@@ -700,12 +707,15 @@ servers, and cron jobs owned by the installed Claw. Local modifications become
 manual conflicts. Operator defaults, models, providers, credentials, bindings,
 and unrelated config remain untouched.
 
-Portable tool-profile changes are compared using the built-in profile registry's
-resolved capabilities rather than opaque profile labels. Tool additions,
-memory-search enablement, cross-conversation memory, and added memory sources
-require distinct capability consent. Restricting filesystem access, disabling
-memory search or cross-conversation memory, or removing sources is reported as a
-reduction. Update compares inherited memory defaults before classification.
+Portable tool-profile changes are compared using inherited host defaults and the
+built-in profile registry's resolved capabilities rather than opaque profile
+labels. Wildcard profiles are compared as supersets. Tool additions, including
+`alsoAllow`, removal of effective workspace-only confinement, memory-search
+enablement, cross-conversation memory, and added memory sources require distinct
+capability consent. Restricting filesystem access, disabling memory search or
+cross-conversation memory, or removing sources is reported as a reduction.
+Update compares canonical `memory.search` settings and inherited memory
+defaults before classification.
 
 Consented update rebuilds the read-only plan immediately before mutation. Each
 owner uses its strongest available concurrency boundary: workspace content

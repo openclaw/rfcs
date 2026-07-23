@@ -165,9 +165,9 @@ The portable agent object is:
 | `tools.alsoAllow` | string array | No | At least one non-empty string when present; extends a selected profile and is mutually exclusive with `tools.allow`. |
 | `tools.deny` | string array | No | At least one non-empty string when present. |
 | `tools.fs.workspaceOnly` | boolean | No | Restricts filesystem tools to the new agent's workspace. |
-| `memorySearch.enabled` | boolean | No | Enables or disables memory search for the new agent. |
-| `memorySearch.rememberAcrossConversations` | boolean | No | Explicitly permits relevant context from the agent's other private conversations. |
-| `memorySearch.sources` | enum array | No | Non-empty array containing only `memory` and `sessions`; `sessions` requires `rememberAcrossConversations: true`. |
+| `memory.search.enabled` | boolean | No | Enables or disables memory search for the new agent. |
+| `memory.search.rememberAcrossConversations` | boolean | No | Explicitly permits relevant context from the agent's other private conversations. |
+| `memory.search.sources` | enum array | No | Non-empty array containing only `memory` and `sessions`; `sessions` requires `rememberAcrossConversations: true`. |
 | `heartbeat` | object | No | Exact portable heartbeat object below. |
 | `humanDelay` | object | No | Exact portable human-delay object below. |
 
@@ -175,7 +175,9 @@ All objects are strict. Consumers may accept empty optional objects, but
 canonical producers must omit an optional object when none of its members are
 present.
 
-These fields map directly to existing per-agent OpenClaw configuration. The
+The `memory.search` path is the canonical OpenClaw per-agent configuration
+shape; v1 defines no `memorySearch` alias. These fields map directly to
+existing per-agent OpenClaw configuration. The
 host's global tool and runtime policy remains authoritative. A Claw cannot carry
 custom profile definitions, provider-specific or sender-specific tool policy,
 elevated access, executable settings, memory providers or credentials, remote
@@ -362,10 +364,11 @@ agent:
     deny: [exec]
     fs:
       workspaceOnly: true
-  memorySearch:
-    enabled: true
-    rememberAcrossConversations: true
-    sources: [memory, sessions]
+  memory:
+    search:
+      enabled: true
+      rememberAcrossConversations: true
+      sources: [memory, sessions]
   heartbeat:
     every: 30m
 workspace:

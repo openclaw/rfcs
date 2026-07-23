@@ -295,14 +295,16 @@ owner must not invent a weaker capability-specific approval.
 
 Portable agent tool profiles are selections from the applying harness's
 canonical built-in registry, not package-defined policy objects. Planning must
-show the selected profile and modifiers. Update planning must resolve built-in
-profiles to tool capabilities before classifying a profile change; it must not
-treat profile labels as opaque. Enabling memory search, enabling
-cross-conversation memory, or adding the `memory` or `sessions` source is an
-escalation. Restricting filesystem tools to the agent workspace, disabling
-memory search or cross-conversation memory, or removing a source is a reduction.
-The `sessions` source requires an explicit cross-conversation memory opt-in.
-Update classification resolves inherited memory defaults before comparison.
+show the selected profile and modifiers. Update planning must resolve inherited
+profiles and filesystem defaults, expand built-in profiles to tool capabilities,
+and compare wildcard profiles as supersets; it must not treat profile labels as
+opaque. Adding `alsoAllow`, removing effective workspace-only confinement,
+enabling canonical `memory.search`, enabling cross-conversation memory, or
+adding the `memory` or `sessions` source is an escalation. Restricting
+filesystem tools to the agent workspace, disabling memory search or
+cross-conversation memory, or removing a source is a reduction. The `sessions`
+source requires an explicit cross-conversation memory opt-in. Update
+classification resolves inherited memory defaults before comparison.
 
 The applying host's global policy remains an upper bound. A package must not
 carry custom tool-profile definitions, local credentials or bindings, provider
