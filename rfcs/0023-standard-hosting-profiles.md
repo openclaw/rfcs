@@ -417,25 +417,25 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `21cbc1bcf6c` from
+It is based on readiness head `27fa73911d5` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains thirteen profile-only commits at exact head `92eef761d99`:
+and contains thirteen profile-only commits at exact head `963ce437219`:
 
 | Commit | Intended scope |
 | --- | --- |
-| `993e2e36640` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
-| `f381eaf03fb` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
-| `3a4619bcc7c` | Attribute profile results to logical runtime and incarnation IDs. |
-| `eda9ba49b6b` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
-| `4197676d67f` | Validate profile startup inputs before destructive lifecycle actions. |
-| `19b416be648` | Prove writable host-provisioned workspace behavior and storage recovery. |
-| `0954eb586c2` | Prove the existing node approval flow transitions node-mode to ready. |
-| `0da071cc44b` | Make profile activation explicit and prove unprofiled upgrade compatibility. |
-| `274c09a9bd8` | Document profile selection, predicates, host inputs, and support boundaries. |
-| `44fb70aefc6` | Align profile criteria and current repository contracts with the readiness stack. |
-| `5f854eb2a76` | Preserve optional-profile startup while applying profile-required criteria. |
-| `ac8e64e46f6` | Satisfy current config-tier, import-cycle, and generated-protocol contracts. |
-| `92eef761d99` | Evaluate node-mode approval against the canonical node command policy. |
+| `f3a6e854eee` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
+| `25a7a5a61a9` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
+| `2bd38eaa76a` | Attribute profile results to logical runtime and incarnation IDs. |
+| `aff71e14531` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
+| `d7867a2ae4b` | Validate profile startup inputs before destructive lifecycle actions. |
+| `02d0073f5a6` | Prove writable host-provisioned workspace behavior and storage recovery. |
+| `44f64a55545` | Prove the existing node approval flow transitions node-mode to ready. |
+| `c0bb2fc92c1` | Make profile activation explicit and prove unprofiled upgrade compatibility. |
+| `98e983d7c51` | Document profile selection, predicates, host inputs, and support boundaries. |
+| `4bc6273391c` | Align profile criteria and current repository contracts with the readiness stack. |
+| `76d93e38dcc` | Preserve optional-profile startup while applying profile-required criteria. |
+| `4e9ddc6c2f1` | Satisfy current config-tier and import-cycle contracts. |
+| `963ce437219` | Evaluate node-mode approval against the canonical node command policy. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
