@@ -143,8 +143,12 @@ This readiness condition validates the effective auth configuration. Existing
 Gateway trusted-proxy request handling remains responsible for rejecting
 untrusted or forged identity ingress; readiness does not replay a request on
 every poll. Source syntax and listener/source compatibility use the same network
-matching semantics as request authentication. Loopback is valid only when a
-colocated proxy is explicitly allowed.
+matching semantics as request authentication. `True` means the static
+configuration contains a usable source range for the listener topology; it
+does not guarantee that every address in that range is an eligible request
+source. Request-time authentication still rejects the Gateway's own local
+interface addresses and applies required-header and identity checks. Loopback
+is valid only when a colocated proxy is explicitly allowed.
 
 ### Node Mode
 
