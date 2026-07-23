@@ -33,7 +33,8 @@ remain draft implementation evidence until their named owners approve them:
 ## End State Of RFC Acceptance And The Five Drafts
 
 RFC acceptance approves contracts and owner gates; it does not change runtime
-behavior. Landing `F01` through `F05` in dependency order provides:
+behavior. Landing `F01`, then independently landing owner-approved `F02`
+through `F05`, provides:
 
 - an internal locale/context kernel whose JavaScript and TypeScript ICU
   formatting delegates to `intl-messageformat`;

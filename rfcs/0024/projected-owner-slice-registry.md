@@ -65,8 +65,9 @@ and reason.
 
 ## A. Current Foundation Evidence
 
-These five drafts are the first registry entries. Their review deltas are
-owner-bounded even though GitHub displays them cumulatively while stacked.
+These five drafts are the first registry entries. `F02` through `F05` branch
+independently from `F01`, so each review contains the shared foundation plus
+only its own owner-bounded delta.
 
 | ID | Owner registry | Slice and edge | State | Exit and deletion proof |
 | --- | --- | --- | --- | --- |

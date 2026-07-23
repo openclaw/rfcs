@@ -82,11 +82,13 @@ new external plugin runtime-catalog API.
 The five open foundation drafts are the first bounded entries in the projected
 owner slice registry. Their review deltas now isolate the minimal kernel,
 updater dry-run, contributor guidance, TUI status, and one Gateway approval
-descriptor. GitHub displays the stack cumulatively, but each intended delta is
+descriptor. `F02` through `F05` now branch independently from `F01`; none
+carries another follow-up owner's runtime or documentation delta. Each is
 reviewed and landed only by its named semantic and rendering owners.
 
-Accepting the RFC changes no runtime by itself. If the five drafts land in
-dependency order, OpenClaw has the internal locale/context and formatting
+Accepting the RFC changes no runtime by itself. If `F01` lands and the four
+independent owner slices follow, OpenClaw has the internal locale/context and
+formatting
 foundation, the existing wizard consumer, localized updater dry-run and TUI
 status families, one reviewed Gateway/Control UI approval-error edge, and the
 contributor guide. The coverage specification then defines how adopted owners
