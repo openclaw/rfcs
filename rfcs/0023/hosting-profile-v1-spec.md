@@ -127,7 +127,8 @@ inspect Docker, Kubernetes, ECS, Nomad, or another scheduler API.
 
 - effective auth mode is `trusted-proxy`;
 - a user identity header is configured; and
-- at least one trusted proxy source is configured; and
+- at least one syntactically valid trusted proxy source is configured; and
+- a loopback-only listener has a loopback trusted proxy source; and
 - when that source includes loopback, the explicit trusted-proxy loopback
   allowance is enabled.
 
@@ -141,7 +142,9 @@ Stable non-ready reasons are:
 This readiness condition validates the effective auth configuration. Existing
 Gateway trusted-proxy request handling remains responsible for rejecting
 untrusted or forged identity ingress; readiness does not replay a request on
-every poll. Loopback is valid only when a colocated proxy is explicitly allowed.
+every poll. Source syntax and listener/source compatibility use the same network
+matching semantics as request authentication. Loopback is valid only when a
+colocated proxy is explicitly allowed.
 
 ### Node Mode
 
@@ -159,8 +162,10 @@ satisfy the set; independent targets cannot satisfy different rows.
 A target may be a desktop, sandbox, VM, pod, browser, or another execution
 surface. The profile does not impose product, tenant, or one-target-per-agent
 semantics. Evaluation is bounded by the canonical readiness deadline and uses
-the current pairing and connected-session state; it does not perform network
-discovery or wait for a target during a readiness poll.
+the current pairing generation and pairing-bound connected-session state; it
+does not perform network discovery or wait for a target during a readiness poll.
+Pairing-store reads remain single-flight after timeout, and store exceptions are
+projected as stable redacted reasons rather than raw error text.
 
 ## Selection And Precedence
 
