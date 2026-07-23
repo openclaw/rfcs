@@ -956,7 +956,7 @@ second format-specific gate. Search, detail, and feed APIs expose bounded
 summaries and immutable artifact coordinates; the applying client reviews the
 full declaration from the resolved artifact.
 
-### Planned Control UI implementation stack
+### Current Control UI implementation stack
 
 Control UI support is a non-blocking follow-up to the experimental CLI and
 ClawHub tracks. The UI must consume the same plan, provenance, status, doctor,
@@ -966,16 +966,35 @@ mutation path.
 
 The follow-up is intentionally limited to two ordered PRs:
 
-1. **Read-only Claw lifecycle UI.** Add an experimental-gated Claw inventory
-   and agent detail surface showing package identity and version, applied
-   status, drift and doctor findings, and managed or referenced provenance.
-   This slice performs no Claw mutation and does not require ClawHub discovery.
-2. **Plan-backed lifecycle and discovery UI.** Add ClawHub search and package
-   detail, then render the canonical add, update, and remove previews with
-   capability escalation, affected resources, blockers, and partial outcomes.
-   Confirmation must submit the exact plan-integrity value produced by the
-   shared lifecycle planner. This slice depends on the ClawHub discovery APIs
-   and invokes the same lifecycle owners as the CLI.
+1. [#112808](https://github.com/openclaw/openclaw/pull/112808) - read-only,
+   experimental-gated Claw inventory and agent detail showing package identity
+   and version, applied status, drift and doctor findings, and managed or
+   referenced provenance. This slice performs no Claw mutation and does not
+   require ClawHub discovery.
+2. [#112828](https://github.com/openclaw/openclaw/pull/112828) - ClawHub search
+   and exact-release detail plus canonical add, update, and remove previews,
+   capability consent, blockers, partial outcomes, and confirmation. This
+   slice depends on the ClawHub discovery APIs and invokes the same lifecycle
+   planners and executors as the CLI.
+
+The second slice resolves an exact ClawHub package and version, applies the
+existing ClawHub trust gate, verifies the immutable artifact digest, and uses
+the existing fs-safe extraction path. Preview leaves no durable source; apply
+caches the verified source under the OpenClaw state directory so provenance can
+support later update and status operations. The browser receives only bounded
+catalog metadata and a redacted plan projection, not the manifest or source.
+
+The confirmation token is a digest of the redacted projection bound to the
+canonical planner's full internal `planIntegrity`. Therefore a change in file
+content, configuration, provenance, capability effects, or live target state
+invalidates confirmation even when the visible action labels are unchanged.
+The Gateway rebuilds and verifies both layers before invoking mutation.
+
+Catalog reads and lifecycle previews require `operator.read`. Add, update, and
+remove apply require `operator.admin` and use the existing control-plane write
+budget. Remove retains referenced resources by default; selecting unused
+referenced cleanup rebuilds the plan and remains limited to resources with no
+owner outside the selected Claw.
 
 Both slices remain behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`. Hiding navigation is
 not the security boundary: disabled direct routes and backend operations must
