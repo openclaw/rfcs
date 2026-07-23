@@ -366,12 +366,14 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with five ordered commits at exact head `208dc2db604`,
+It is one upstream PR with six ordered commits at exact head `21cbc1bcf6c`,
 rebased onto OpenClaw `main` at `eccf02f04ac`. The refreshed branch passes
 focused readiness, Gateway, status, health, CLI, and method-metadata tests;
 production and test type checks, dead-export checks, deprecation guards,
 documentation indexing, changed-file lint, and plugin-SDK surface checks also
-pass. A prior package-installed Docker lane proved `/ready` and `/readyz`
+pass. Timed-out plugin checks are cached for their bounded TTL and then retried,
+even when the plugin ignored cancellation. A prior package-installed Docker
+lane proved `/ready` and `/readyz`
 transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
 `/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with
 the same canonical condition. Exact-head remote container and published-upgrade
