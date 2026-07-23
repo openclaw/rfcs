@@ -419,7 +419,7 @@ single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
 It is based on readiness head `21cbc1bcf6c` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains twelve profile-only commits at exact head `ac8e64e46f6`:
+and contains thirteen profile-only commits at exact head `92eef761d99`:
 
 | Commit | Intended scope |
 | --- | --- |
@@ -435,6 +435,7 @@ and contains twelve profile-only commits at exact head `ac8e64e46f6`:
 | `44fb70aefc6` | Align profile criteria and current repository contracts with the readiness stack. |
 | `5f854eb2a76` | Preserve optional-profile startup while applying profile-required criteria. |
 | `ac8e64e46f6` | Satisfy current config-tier, import-cycle, and generated-protocol contracts. |
+| `92eef761d99` | Evaluate node-mode approval against the canonical node command policy. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
@@ -447,7 +448,7 @@ preserves that profile-only comparison view in the meantime. Fork PRs
 [#21](https://github.com/giodl73-repo/openclaw/pull/21) expose the major design
 slices as review aids; they are not alternative landing requests.
 
-The refreshed stack passes 205 focused profile, Gateway, config, CLI,
+The refreshed stack passes 206 focused profile, Gateway, config, CLI,
 Docker-plan, and release-wiring assertions. Production typing, dead-export and
 deprecation guards, changed-file lint, plugin-SDK surface checks, line-count
 ratchets, and documentation indexing also pass. A prior package-installed
