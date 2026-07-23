@@ -8,6 +8,18 @@ the SQLite snapshot contract.
 
 Status: draft, tied to RFC 0013.
 
+## Draft Implementation Evidence
+
+[openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385)
+is the paired draft evidence slice. It implements the V1 global and
+owner-selected per-agent SQLite composition path, deterministic recovery-point
+and acceptance-set identities, exact owner-manifest and artifact binding,
+closed obligation validation, and the `host-protected` classification.
+
+The pull request is evidence for review of this contract. Its types and file
+layout are not normative, and the specification does not require that pull
+request to merge before the ownership decisions can be accepted.
+
 ## Scope
 
 This specification defines:

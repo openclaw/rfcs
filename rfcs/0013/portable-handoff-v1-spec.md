@@ -6,6 +6,21 @@ suspension contract with final owner capture and durable host acceptance.
 
 Status: draft, tied to RFC 0013.
 
+## Draft Implementation Evidence
+
+[giodl73-repo/openclaw#152](https://github.com/giodl73-repo/openclaw/pull/152)
+is the fork-only OpenClaw evidence slice for final owner capture, stacked on
+[openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385).
+It uses the existing RFC 0013 SQLite provider, binds the exact runtime lineage,
+source generation, handoff identity, selected-agent inventory, and
+host-supplied closure evidence, and durably replays one committed recovery
+point after response loss.
+
+The operation is deliberately offline and host-invoked. It does not suspend or
+stop Gateway, fence external ingress, accept or publish bytes, or authorize
+source destruction. The pull request is implementation evidence; this
+specification remains the normative responsibility boundary.
+
 ## Scope
 
 This specification defines:

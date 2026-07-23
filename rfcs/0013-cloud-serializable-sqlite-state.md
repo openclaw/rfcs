@@ -3,7 +3,7 @@ title: SQLite Snapshot Backup Artifacts
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 status: completed
 issue: https://github.com/openclaw/openclaw/pull/105718
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -195,6 +195,23 @@ The draft implementer-facing follow-on contracts are:
 These sidecars do not change `openclaw backup sqlite`. They do not make every
 ordinary snapshot a portable recovery point, add a continuity-specific storage
 provider, or make Lobster part of the core contract.
+
+Draft OpenClaw implementation evidence is available for the two owner-side
+slices exercised by these sidecars:
+
+- [openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385)
+  composes verified global and owner-selected per-agent RFC 0013 snapshots into
+  one deterministic `host-protected` recovery point and exact acceptance byte
+  inventory.
+- [giodl73-repo/openclaw#152](https://github.com/giodl73-repo/openclaw/pull/152)
+  is a fork-only draft stacked on #112385. It adds one hidden offline final
+  capture operation with durable intent, exact committed-result replay, and
+  fail-closed quarantine for conflicting or incomplete attempts.
+
+These drafts are evidence for owner review, not normative dependencies. They do
+not move Gateway suspension, external ingress fencing, clean process shutdown,
+durable host acceptance, publication, restore admission, or source destruction
+into OpenClaw.
 
 OpenClaw `main` already provides the host-neutral
 `gateway.suspend.prepare|status|resume` contract from
