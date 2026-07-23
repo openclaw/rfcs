@@ -1,0 +1,191 @@
+# Localized Metadata v1 Specification
+
+This document defines locale-aware display metadata for commands, skills, and
+other cataloged OpenClaw capabilities.
+
+Status: draft, tied to RFC 0024.
+
+This specification defines the reusable additive shape. It does not by itself
+authorize a command-catalog, skill-manifest, plugin SDK, or platform adapter
+schema change. Each owning maintainer must approve that public surface and its
+compatibility plan before activation.
+
+## Scope
+
+V1 covers:
+
+- slash/chat command descriptions;
+- Control UI and TUI command descriptions;
+- Telegram and Discord native command-menu descriptions;
+- skill display names and descriptions; and
+- bundled plugin-provided command or skill metadata.
+
+It does not translate executable names, invocation tokens, IDs, or paths.
+
+## Localized Text
+
+```ts
+type LocalizedText = {
+  default: string;
+  localizations?: Readonly<Record<string, string>>;
+};
+```
+
+Rules:
+
+- `default` is required English.
+- Core and bundled metadata locale keys resolve through the shared product
+  locale registry.
+- External packages may additionally use normalized valid BCP 47 tags that are
+  not product locales. Those entries are package-owned, do not alter the core
+  registry or completeness claims, and are projected only to surfaces or
+  platforms that request and support the exact tag.
+- Alias keys are accepted at authoring time only if normalization produces one
+  unambiguous canonical entry.
+- Two aliases that resolve to the same locale with different text are invalid.
+- Core/bundled metadata follows the product locale fallback chain.
+- External metadata matches an exact normalized tag, then progressively
+  truncates to an exact package-owned language key, then uses `default`.
+  Product language-default inference does not silently map unrelated regional
+  variants for an external package.
+- Empty localized strings are invalid.
+
+Validation occurs before activation and applies these v1 limits:
+
+- each `default` or localized value is at most 4,096 UTF-8 bytes;
+- each `LocalizedText.localizations` map contains at most 64 entries;
+- all localized metadata for one capability is at most 65,536 UTF-8 bytes; and
+- all localized metadata contributed by one package is at most 1,048,576 UTF-8
+  bytes.
+
+Aggregate size is the sum of the UTF-8 byte lengths of each default value,
+normalized locale tag, and localized value in the applicable capability or
+package. Core, bundled, and external metadata use the same calculation, so a
+package has one portable pass/fail result across conforming v1 hosts.
+
+Adapters may impose stricter platform limits. Oversized or invalid optional
+external metadata is rejected without disabling unrelated core capabilities.
+
+## Commands
+
+Command identity remains:
+
+```ts
+type LocalizedCommandMetadata = {
+  name: string;
+  description: string | LocalizedText;
+};
+```
+
+`name` is never translated. A plain string is the legacy English-only form.
+Platform adapters normalize either form internally and map
+`description.localizations` to native platform fields where supported.
+
+Existing command definitions with a plain English description remain valid and
+require no migration. They are interpreted as `default` with no
+`localizations`. Serializers preserve the plain-string form unless localized
+entries are added.
+
+Platform constraints are validated per adapter:
+
+- maximum length;
+- allowed characters;
+- locale code support;
+- duplicate normalized locale;
+- update/reconcile behavior; and
+- fallback when a platform does not support the locale.
+
+RFC 0017 owns the canonical command catalog. RFC 0024 adds the localized text
+shape and locale projection rules.
+
+## Skills
+
+```ts
+type LocalizedSkillMetadata = {
+  id: string;
+  displayName?: string | LocalizedText;
+  description?: string | LocalizedText;
+};
+```
+
+Rules:
+
+- `id`, directory name, invocation name, and tool identity remain stable.
+- Localized display names are presentation only.
+- Core and bundled skills may ship reviewed catalogs in-tree.
+- External skills package their own metadata.
+- OpenClaw validates shape and BCP 47 locale syntax but does not certify
+  translation quality for third-party packages.
+- Search may index localized display text, but installation and policy continue
+  to use stable IDs.
+- Every currently published skill with no localized fields remains valid with
+  no required package or manifest change.
+- Existing plain-string display names and descriptions are interpreted as
+  English defaults and retain their legacy serialized shape until
+  localizations are added.
+
+## Plugin Ownership
+
+Plugins may register localized metadata only for capabilities they own. They
+cannot overwrite core or another plugin's keys.
+
+Namespace ownership is enforced by catalog validation and the blocking
+`namespace-ownership` coverage check.
+
+Metadata is activation-pinned with the plugin registry snapshot. Reload
+atomically replaces the plugin's metadata set.
+
+Capability owners retain semantic ownership of command and skill identity,
+execution meaning, and the default English description. Each consuming surface
+owns locale selection, platform projection, truncation, and reconcile behavior.
+Localization metadata must not become an alternate authority for command
+behavior, skill prompts, policy, or invocation.
+
+External runtime-message catalogs are not registered through arbitrary
+callbacks or translation-provider hooks. V1 external localization is limited
+to the metadata defined in this specification. A post-v1 Plugin SDK seam may
+accept a declarative package-owned catalog under the plugin's namespace,
+validate it before activation, and replace it atomically with the plugin
+snapshot.
+
+Before external packages serialize the object form, the plugin/package owner
+must define host capability or minimum-version negotiation. Unsupported hosts
+must either consume the legacy English string or reject installation with an
+actionable version requirement; they must not fail later during activation.
+
+## Product Coverage Ownership
+
+The command, skill, channel-menu, and bundled-plugin owners publish their
+product surface declarations for the localization coverage report. The
+localization-core package validates those declarations generically; it does not
+enumerate a closed metadata-surface union.
+
+External package metadata remains package-owned evidence. It does not create a
+required OpenClaw product surface or alter product completeness unless a future
+RFC explicitly promotes that package into the product release portfolio.
+
+## Security
+
+- Localized text is untrusted display data.
+- UI rendering escapes it.
+- It cannot contain executable command tokens that replace the stable name.
+- It cannot change permissions, tool schema, approval policy, or routing.
+- Logs and audit events record stable IDs, optionally alongside localized
+  display text.
+
+## Conformance
+
+A metadata implementation conforms when:
+
+- command and skill identity remain stable across locales;
+- semantic capability ownership remains separate from surface rendering and
+  projection ownership;
+- native platform projections preserve reconcile behavior;
+- fallback is deterministic;
+- duplicate aliases are rejected;
+- localized metadata cannot alter execution or policy; and
+- one catalog can feed CLI, UI, and supported channel projections;
+- public diagnostics omit localized descriptions and literal capability data by
+  default; and
+- English-only duplicate presentation paths replaced by the metadata contract
+  are deleted or retained only as named compatibility fallbacks.
