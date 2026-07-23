@@ -310,6 +310,11 @@ Publishing a replacement plugin registry or effective config snapshot aborts
 the prior generation, clears its cache, and prevents late settlement from
 entering the active result.
 
+Workspace probes use the same generation fence but permit one replacement
+probe when the effective workspace changes, so a blocked retired filesystem
+does not pin the new workspace. At most two workspace probes may remain in
+flight; further generations fail closed until capacity returns.
+
 In-process timers cannot interrupt synchronous JavaScript that blocks the event
 loop. Providers therefore may not perform blocking synchronous I/O. Process or
 worker isolation for malicious plugins is outside this RFC.
@@ -377,14 +382,15 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with twelve ordered commits at exact head `ac04dca2b21`,
+It is one upstream PR with thirteen ordered commits at exact head `8fbc1210762`,
 rebased onto OpenClaw `main` at `b8a47b23384`. The refreshed branch passes
 focused readiness, Gateway, status, health, CLI, and method-metadata tests;
 production typing and unused-export checks also pass. Timed-out plugin checks remain single-flight
 until the original callback settles, even when the plugin ignores cancellation;
 provider output is bounded, validated, and redacted. Config publication fences
 provider and workspace evidence by runtime generation, including recovery when
-a retired filesystem probe never settles. A prior package-installed
+a retired filesystem probe never settles, while retaining a strict two-probe
+ceiling across repeated generation changes. A prior package-installed
 Docker lane proved `/ready` and `/readyz`
 transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
 `/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with

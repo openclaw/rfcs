@@ -323,6 +323,11 @@ entries immediately. Admission, drain, startup, channel, and event-loop
 snapshots are not made stale by this cache. A late result from an invalidated
 generation is discarded.
 
+A changed workspace identity may start one replacement probe while a retired
+probe remains blocked. No more than two workspace probes may remain in flight;
+additional generations fail closed with `WorkspaceProbeTimedOut` until probe
+capacity returns.
+
 ## Projections
 
 All projections consume the same canonical result.
