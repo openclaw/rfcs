@@ -310,6 +310,15 @@ macOS 14 recipients see no typed runs, so the same message lands as the
 plaintext projection. Both outcomes are correct under the contract, and neither
 shows a stray marker.
 
+The same two states delivered to a live device confirm the mock. Both messages
+went to real iMessage through the normal send path: step 1 is the plaintext
+downgrade, step 2 is the same prompt sent with the typed-run ranges that
+`extractMarkdownFormatRuns` produces from the bold-label markdown. The command
+text, including the `"%{http_code}"` quoting, survives byte-for-byte in both;
+only the five bold spans differ.
+
+![The step-1 and step-2 renders delivered to a real iMessage device](0002/imessage-live-render.png)
+
 ### Emphasis over generated content
 
 Core copy such as `Approval required.` or `Pending command:` is fixed and safe
