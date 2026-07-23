@@ -216,8 +216,9 @@ type RuntimeActivationSummary = {
 };
 ```
 
-Launchers may provide identity through startup arguments or environment. Local
-runs may receive generated defaults.
+Launchers may provide identity through startup arguments or environment.
+Absent values receive runtime-owned defaults: the logical runtime ID is
+`local`, and the incarnation ID is unique to the current process activation.
 Explicit invalid identity must fail startup instead of silently falling back.
 
 Logical runtime identity may survive replacement. Incarnation identity must be

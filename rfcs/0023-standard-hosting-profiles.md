@@ -219,7 +219,8 @@ resolves:
 - a unique incarnation ID for the current process/container activation.
 
 Launchers may provide identities through startup arguments or environment.
-Local runs receive safe generated defaults.
+Absent values receive runtime-owned defaults: the logical runtime ID is
+`local`, and the incarnation ID is unique to the current process activation.
 Invalid explicit identities fail startup rather than silently falling back.
 
 The activation summary is redacted and references, rather than copies, inputs
