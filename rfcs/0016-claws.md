@@ -359,7 +359,6 @@ agent:
       end: "18:00"
     lightContext: true
     isolatedSession: true
-    skipWhenBusy: true
     timeoutSeconds: 120
   humanDelay:
     mode: natural
@@ -454,7 +453,6 @@ defaults and agents:
           },
           "lightContext": true,
           "isolatedSession": true,
-          "skipWhenBusy": true,
           "timeoutSeconds": 120
         },
         "humanDelay": {

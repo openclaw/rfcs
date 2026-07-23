@@ -148,7 +148,8 @@ serialized manifest or executable configuration.
 
 OpenClaw recognizes `openclaw.config` as a pointer to an optional package-local
 OpenClaw profile. The value must be a safe package-relative path ending in
-`.yml` or `.yaml`. The conventional exported path is
+`.yml` or `.yaml`, with forward slashes as separators. Backslashes are invalid.
+The conventional exported path is
 `profiles/openclaw.yml`, but the pointer, not that filename, is normative.
 Grouped JSON uses the same pointer and does not embed the profile.
 
@@ -233,7 +234,6 @@ skills are discovered normally and inherited operator allowlists remain intact.
 | `activeHours.timezone` | string | Non-empty IANA timezone recognized by the scheduler. |
 | `lightContext` | boolean | No additional constraint. |
 | `isolatedSession` | boolean | No additional constraint. |
-| `skipWhenBusy` | boolean | No additional constraint. |
 | `timeoutSeconds` | integer | Greater than zero. |
 
 `humanDelay` may contain only `mode`, `minMs`, and `maxMs`. `mode`, when
@@ -501,8 +501,9 @@ A conforming consumer must:
   cron expressions, timezones, and uniqueness constraints;
 - treat unknown metadata keys as opaque string hints;
 - load `metadata.openclaw.config` only from a safe package-relative YAML path,
-  bind its exact bytes into source integrity, and reject missing, linked,
-  oversized, malformed, or schema-invalid profiles;
+  using forward-slash separators, bind its exact bytes into source integrity,
+  and reject missing, linked, oversized, malformed, or schema-invalid
+  profiles;
 - resolve OpenClaw profile selections through the canonical built-in profile
   registry and reject an unknown profile before planning mutation;
 - reject `tools.allow` combined with `tools.alsoAllow` in that profile;

@@ -539,9 +539,9 @@ files.
 Export creates a new package directory and must fail if the output directory
 already exists. It emits `package.json`, `CLAW.md`, confined workspace sources,
 and `profiles/openclaw.yml` when supported OpenClaw settings are present.
-The manifest references that profile through `metadata.openclaw.config`, and
-its exact bytes participate in derivative package integrity. Export includes
-only portable supported state and excludes
+The manifest references that profile through `metadata.openclaw.config` using
+forward-slash path separators, and its exact bytes participate in derivative
+package integrity. Export includes only portable supported state and excludes
 secrets, resolved environment values, models, providers, bindings, sessions,
 logs, caches, and unrelated global configuration.
 
