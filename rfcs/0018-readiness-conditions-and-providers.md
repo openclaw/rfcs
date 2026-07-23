@@ -3,7 +3,7 @@ title: Readiness Conditions and Providers
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-15
+last_updated: 2026-07-23
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -158,7 +158,7 @@ justifies them.
 | `ReadinessEvaluationComplete` | Required when emitted | The bounded canonical evaluation completed. This failure-only guard condition is emitted when the evaluator cannot produce its normal condition set. | `ReadinessEvaluationTimedOut`, `ReadinessEvaluationFailed` |
 | `GatewayResponding` | Required when observed remotely | The current operation successfully reached the live Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `ConfigLoaded` | Required | The validated effective runtime config snapshot is installed. | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
-| `WorkspaceWritable` | Required or advisory when selected | The effective workspace passes a bounded write, flush, and cleanup probe. It is not a new universal blocker by default. | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
+| `WorkspaceWritable` | Required or advisory when selected | The effective workspace exists and passes a bounded write, flush, and cleanup probe. It is not a new universal blocker by default. | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `PluginsLoaded` | Advisory | The activation-pinned plugin registry is available and selected plugins have no activation errors. | `PluginLoadFailures`, `PluginStatusUnavailable` |
 
 Changing an advisory core condition to required is a compatibility-sensitive
@@ -226,9 +226,10 @@ bound to the activated plugin registry snapshot. Reload replaces the complete
 provider set atomically with the next activation; stale callbacks do not remain
 registered.
 
-Provider descriptors are enumerable without exposing callbacks. Status and
-future diagnostics can list provider identity, description, owning plugin, and
-activation generation without executing the provider.
+Provider descriptors are enumerable without invoking callbacks. The active
+registry exposes provider identity, description, owning plugin, and source; the
+registry snapshot itself is the activation-generation boundary. Future status
+or diagnostics may project that descriptor catalog without executing providers.
 
 Providers must be:
 
@@ -242,6 +243,12 @@ Providers must be:
 Core owns namespacing, validation, invocation, deadlines, cancellation,
 coalescing, caching, error conversion, and result ordering. A provider cannot
 alter another provider's condition or any core condition.
+
+Provider `reason` values use a bounded machine-readable token grammar. Public
+messages must be non-empty, contain no NUL bytes, and fit within 512 UTF-8
+bytes after core redaction. Invalid output becomes
+`CriterionInvalidResult=Unknown`; raw provider output never bypasses these
+checks.
 
 ### Operator-selected readiness conditions
 
@@ -264,11 +271,12 @@ hosting profile:
 }
 ```
 
-Provider criteria are advisory unless selected as required. Unknown selected
-IDs fail validation or produce required `Unknown` during activation; they
-cannot be silently ignored. Configuration changes are applied through the
-normal validated config lifecycle. This RFC does not add a policy language or
-a way to redefine criteria semantics.
+Provider criteria are advisory unless selected as required. Selector syntax is
+validated in config. A syntactically valid ID that is not present in the active
+registry produces `CriterionNotRegistered=Unknown` with its selected
+requirement; it cannot be silently ignored. Configuration changes are applied
+through the normal validated config lifecycle. This RFC does not add a policy
+language or a way to redefine criteria semantics.
 
 This explicit list is a complete standalone use of RFC 0018. An operator can
 say exactly which additional observations must pass for its deployment without
@@ -298,6 +306,9 @@ Core retains ownership of a provider invocation after its deadline. If a
 provider ignores cancellation and remains pending, later readiness polls reuse
 the stable timeout result and do not start another invocation. A new invocation
 may begin only after the original callback settles and the result cache expires.
+Publishing a replacement plugin registry or effective config snapshot aborts
+the prior generation, clears its cache, and prevents late settlement from
+entering the active result.
 
 In-process timers cannot interrupt synchronous JavaScript that blocks the event
 loop. Providers therefore may not perform blocking synchronous I/O. Process or
@@ -366,14 +377,13 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with seven ordered commits at exact head `5e7a713545a`,
-rebased onto OpenClaw `main` at `f7d61b43529`. The refreshed branch passes
+It is one upstream PR with nine ordered commits at exact head `788a58e612f`,
+rebased onto OpenClaw `main` at `29d5dcfac6a`. The refreshed branch passes
 focused readiness, Gateway, status, health, CLI, and method-metadata tests;
-production and test type checks, dead-export checks, deprecation guards,
-documentation indexing, changed-file lint, and plugin-SDK surface checks also
-pass. Timed-out plugin checks are cached for their bounded TTL and then retried,
-even when the plugin ignored cancellation. A prior package-installed Docker
-lane proved `/ready` and `/readyz`
+production typing also passes. Timed-out plugin checks remain single-flight
+until the original callback settles, even when the plugin ignores cancellation;
+provider output is bounded, validated, and redacted. A prior package-installed
+Docker lane proved `/ready` and `/readyz`
 transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
 `/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with
 the same canonical condition. Exact-head remote container and published-upgrade

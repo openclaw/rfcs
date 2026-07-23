@@ -158,7 +158,7 @@ The initial public core criteria are:
 | Not selectable | `ChannelRuntimeSuppressed` | Advisory when present | `ChannelRuntimeSuppressed` |
 | Not selectable | `EventLoopHealthy` | Advisory | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
 | Not selectable | `ConfigLoaded` | Universal required | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
-| `openclaw.workspace-writable` | `WorkspaceWritable` | Selectable | `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
+| `openclaw.workspace-writable` | `WorkspaceWritable` | Selectable | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | Not selectable | `PluginsLoaded` | Advisory | `PluginLoadFailures`, `PluginStatusUnavailable` |
 
 Each condition is `True` only when the runtime observes the corresponding
@@ -226,19 +226,27 @@ A provider must not mutate config, reload plugins, acquire or rotate secrets,
 send model requests, change admission state, invoke tools, or alter another
 condition.
 
+Provider `reason` must match `^[A-Za-z][A-Za-z0-9._-]{0,127}$`. Provider
+`message` must be non-empty after trimming, contain no NUL bytes, and be at
+most 512 UTF-8 bytes after core redaction. Output that violates these rules
+becomes `CriterionInvalidResult=Unknown`; no raw provider exception or
+unvalidated message is projected.
+
 ### Activation Lifecycle
 
 The registered provider set is bound to one activation-pinned plugin registry
-snapshot. Plugin reload builds a complete replacement set and publishes it
-atomically with the new activation. Publication aborts in-flight callbacks from
-the prior generation, invalidates their cached results, and prevents late
-settlement from entering the active result. Core must keep retained state
-bounded when a callback ignores cancellation; an abandoned callback must not
-retain an active registry or become selectable after replacement.
+and effective config snapshot. Plugin or config reload publishes replacement
+snapshot identities. Publication aborts in-flight callbacks from the prior
+generation, invalidates their cached results, and prevents late settlement from
+entering the active result. Core must keep retained state bounded when a
+callback ignores cancellation; an abandoned callback must not retain an active
+registry or become selectable after replacement.
 
 Provider descriptors must be enumerable without invoking callbacks. At minimum
-the descriptor contains the namespaced ID, description, owning plugin, and
-activation generation.
+the active registry entry contains the namespaced ID, description, owning
+plugin, and source. The registry snapshot identity is the activation-generation
+boundary; a future projection may expose the descriptor catalog without
+executing providers.
 
 ## Operator Selection
 
@@ -260,10 +268,10 @@ core or plugin criteria without selecting a hosting profile:
 ```
 
 Selection uses namespaced criterion IDs. The same ID must not appear in both
-lists. Unknown IDs in either list must fail configuration validation when the
-provider registry is known. During activation uncertainty, an unknown selected
-ID produces `Unknown` with the requirement of its containing list. Unknown IDs
-must never be silently ignored.
+lists. Configuration validates selector syntax. A syntactically valid selected
+ID absent from the active registry produces `CriterionNotRegistered=Unknown`
+with the requirement of its containing list. Unknown IDs must never be silently
+ignored.
 
 Registration alone does not activate a plugin criterion. Only explicitly
 selected criteria participate: `advisoryCriteria` selects them as advisory and
@@ -309,11 +317,11 @@ result and must not start another invocation. A new invocation may start only
 after the prior callback settles and the cache expires.
 
 Successful and failed provider or workspace observations may be cached for at
-most five seconds. Config generation, plugin activation generation, effective
-workspace identity, or selected-criterion changes invalidate affected entries
-immediately. Admission, drain, startup, channel, and event-loop snapshots are
-not made stale by this cache. A late result from an invalidated generation is
-discarded.
+most five seconds. Replacement effective-config or plugin-registry snapshots,
+effective workspace identity, or selected-criterion changes invalidate affected
+entries immediately. Admission, drain, startup, channel, and event-loop
+snapshots are not made stale by this cache. A late result from an invalidated
+generation is discarded.
 
 ## Projections
 
