@@ -715,7 +715,13 @@ enablement, cross-conversation memory, and added memory sources require distinct
 capability consent. Restricting filesystem access, disabling memory search or
 cross-conversation memory, or removing sources is reported as a reduction.
 Update compares canonical `memory.search` settings and inherited memory
-defaults before classification.
+defaults before classification using the applying harness's canonical
+context-sensitive resolver, including session- or binding-derived defaults.
+Claw lifecycle code must not duplicate those defaults locally.
+
+Portable `tools.fs.workspaceOnly` is restrictive-only. A Claw may set it to
+`true`; `false` is invalid; omission inherits host policy. Validation rejects
+`false` before planning so a Claw cannot weaken host confinement.
 
 Consented update rebuilds the read-only plan immediately before mutation. Each
 owner uses its strongest available concurrency boundary: workspace content

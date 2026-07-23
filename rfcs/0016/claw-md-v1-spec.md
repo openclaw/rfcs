@@ -164,7 +164,7 @@ The portable agent object is:
 | `tools.allow` | string array | No | At least one non-empty string when present; mutually exclusive with `tools.alsoAllow`. |
 | `tools.alsoAllow` | string array | No | At least one non-empty string when present; extends a selected profile and is mutually exclusive with `tools.allow`. |
 | `tools.deny` | string array | No | At least one non-empty string when present. |
-| `tools.fs.workspaceOnly` | boolean | No | Restricts filesystem tools to the new agent's workspace. |
+| `tools.fs.workspaceOnly` | literal `true` | No | Restricts filesystem tools to the new agent's workspace. `false` is invalid; omission inherits host policy. |
 | `memory.search.enabled` | boolean | No | Enables or disables memory search for the new agent. |
 | `memory.search.rememberAcrossConversations` | boolean | No | Explicitly permits relevant context from the agent's other private conversations. |
 | `memory.search.sources` | enum array | No | Non-empty array containing only `memory` and `sessions`; `sessions` requires `rememberAcrossConversations: true`. |
@@ -177,8 +177,13 @@ present.
 
 The `memory.search` path is the canonical OpenClaw per-agent configuration
 shape; v1 defines no `memorySearch` alias. These fields map directly to
-existing per-agent OpenClaw configuration. The
-host's global tool and runtime policy remains authoritative. A Claw cannot carry
+existing per-agent OpenClaw configuration. The applying harness resolves
+inherited memory behavior through its canonical
+context-sensitive resolver before planning or classifying an update.
+`tools.fs.workspaceOnly` is restrictive-only: producers may emit `true`, must
+omit the field instead of emitting `false`, and consumers must reject `false`
+before planning. The host's global tool and runtime policy remains
+authoritative. A Claw cannot carry
 custom profile definitions, provider-specific or sender-specific tool policy,
 elevated access, executable settings, memory providers or credentials, remote
 endpoints, local memory paths, or indexing/storage tuning.

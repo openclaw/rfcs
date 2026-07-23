@@ -304,12 +304,18 @@ adding the `memory` or `sessions` source is an escalation. Restricting
 filesystem tools to the agent workspace, disabling memory search or
 cross-conversation memory, or removing a source is a reduction. The `sessions`
 source requires an explicit cross-conversation memory opt-in. Update
-classification resolves inherited memory defaults before comparison.
+classification resolves inherited memory defaults through the applying
+harness's canonical context-sensitive resolver, including session- or
+binding-derived defaults, rather than a Claw-local copy.
 
 The applying host's global policy remains an upper bound. A package must not
 carry custom tool-profile definitions, local credentials or bindings, provider
 configuration, or local memory paths. Unsupported portable settings block the
 complete plan rather than being dropped.
+
+Portable `tools.fs.workspaceOnly` is restrictive-only. A package may set it to
+`true`; `false` is invalid; omission inherits host policy. Applying clients
+must reject `false` before planning so a Claw cannot weaken host confinement.
 
 An application profile may satisfy capability and content consent with one
 confirmation only when the plan represents the capability set separately and
