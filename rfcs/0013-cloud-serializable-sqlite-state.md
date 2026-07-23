@@ -180,6 +180,44 @@ owner-authored substrate for optional recovery workflows, but those workflows
 must compose the landed command rather than reinterpret live SQLite files or
 duplicate snapshot creation, verification, repository, or restore behavior.
 
+#### Why a recovery lifecycle is needed
+
+Per-user and event-driven hosts can stop paying for resident compute only when
+they can retire one Gateway generation and later admit work on a replacement
+without losing accepted state. A SQLite snapshot alone cannot prove that
+transaction. It does not identify the complete set of state owners, prove that
+the host durably accepted every required byte, authorize retirement of the
+source generation, or prove that the replacement restored the same recovery
+point before accepting work.
+
+Without those semantics, hosts must choose between keeping idle Gateways warm
+or maintaining private shutdown, copying, restore-ordering, and readiness
+inference paths. Managed-host experience has exposed the resulting failure
+classes: accepted ingress can outlive the compute that should process it,
+scheduled wake can race idle retirement, replacement can lose scheduler
+continuity, and a cold runtime can appear ready before its required owner state
+is restored.
+
+Infrastructure platforms already provide the compute lifecycle primitives:
+
+- [Fly Machines](https://fly.io/docs/launch/autostop-autostart/) can stop all
+  Machines and autostart them for traffic.
+- [E2B](https://e2b.dev/docs/sandbox/auto-resume) pauses and automatically
+  resumes persistent sandboxes.
+- [Daytona](https://www.daytona.io/docs/en/persistence/) preserves sandbox
+  files across stop/start and offers archive or VM pause/resume paths.
+- [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/scale-app)
+  scales to zero and wakes from configured event sources.
+- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)
+  hibernate while retaining wakeable WebSocket delivery.
+
+Those platforms do not know OpenClaw's owner inventory, SQLite invariants,
+scheduler state, or readiness boundary. The follow-on contracts define that
+application-consistent layer. A host remains responsible for retained ingress,
+wake registration, compute placement, and external durability; OpenClaw and
+its state owners provide the exact recovery point and restored-admission proof
+that make those host primitives safe to use.
+
 The draft implementer-facing follow-on contracts are:
 
 - [Recovery Point Components v1](0013/recovery-point-components-v1-spec.md):
@@ -212,6 +250,20 @@ These drafts are evidence for owner review, not normative dependencies. They do
 not move Gateway suspension, external ingress fencing, clean process shutdown,
 durable host acceptance, publication, restore admission, or source destruction
 into OpenClaw.
+
+The intended observable outcome of the complete host composition is:
+
+- idle compute may reach zero without treating a raw live filesystem copy as a
+  recovery point;
+- accepted ingress remains retained until restored admission succeeds;
+- autonomous scheduled work does not require an unrelated user message to
+  recover from absent compute;
+- the source generation is not destroyed before exact durable acceptance; and
+- replacement readiness names the accepted recovery point it restored.
+
+The first two OpenClaw drafts prove only the owner-side recovery-point and final
+capture slices. Host acceptance, retained ingress, wake, destruction, and
+restored-start integration remain separate review and implementation work.
 
 OpenClaw `main` already provides the host-neutral
 `gateway.suspend.prepare|status|resume` contract from
