@@ -3,7 +3,7 @@ title: Managed Configuration
 authors:
   - Gio Lodi
 created: 2026-07-10
-last_updated: 2026-07-13
+last_updated: 2026-07-23
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/34
@@ -16,8 +16,10 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/34
 Add an opt-in way to start OpenClaw from an ordered list of ordinary
 configuration documents.
 
-Each document is parsed and validated through OpenClaw's existing configuration
-pipeline. OpenClaw then folds the documents in declared order. The first layer
+Each document is independently parsed, include-resolved, environment-resolved,
+and checked for a valid object root. OpenClaw then folds the documents in
+declared order and applies schema defaults and plugin-aware validation once to
+the composed source. The first layer
 to declare an exact path controls it; later layers may omit it or repeat the
 same value, but may not replace it. A small closed set of fields can use
 OpenClaw-owned monotonic rules instead.
@@ -28,6 +30,8 @@ provenance API.
 
 The implementer-facing v1 contract is defined in
 [Managed Configuration v1 Core Specification](0019/managed-configuration-v1-spec.md).
+That sidecar is normative for V1; if this explanatory RFC and the sidecar
+conflict, the sidecar controls.
 
 ## Motivation
 
@@ -221,7 +225,8 @@ When layered mode is active:
 - agent create, update, and delete are rejected before workspace side effects;
 - config persistence targeting the layered Gateway's canonical path rejects
   writes;
-- a source change takes effect only after Gateway restart.
+- a source change takes effect only after a full Gateway process restart or
+  replacement.
 
 Read surfaces use the composed snapshot where they would otherwise reread the
 canonical config file.
@@ -411,8 +416,8 @@ generic composition rules independently inside each cell.
 
 The V1 Gateway feature does not add or change Fleet commands. A later Fleet
 integration only needs to mount the applicable documents into each cell, pass
-the repeated `--config-layer` arguments, and replace or restart the cell when
-those inputs change. Cells that rely on interactive in-cell configuration
+the repeated `--config-layer` arguments, and replace or fully restart the
+Gateway process when those inputs change. Cells that rely on interactive in-cell configuration
 should continue using ordinary mutable config instead of opting into layered
 mode.
 
@@ -438,9 +443,10 @@ Evidence available during RFC review:
 - broad fork prototype: https://github.com/giodl73-repo/openclaw/pull/33
 - simplified upstream draft implementation:
   https://github.com/openclaw/openclaw/pull/107026
-- a Lobster fork adapter materializes Scout, tenant, and operator documents and
-  passes them as repeated flags;
-- 63 focused OpenClaw tests cover recursive composition, exact conflicts,
+- a Lobster fork adapter demonstrates materializing Scout, tenant, and operator
+  documents and passing them as repeated flags; its production lifecycle and
+  rollout proof remain adoption work;
+- 63 focused tests on the recorded implementation heads cover recursive composition, exact conflicts,
   bounded tool policies, config loading, immutable write ownership, and early
   agent-mutation rejection;
 - a foreground lifecycle proof demonstrates successful three-layer startup,
@@ -449,7 +455,8 @@ Evidence available during RFC review:
 - fresh-state and existing-state Gateway proofs demonstrate that layered startup
   neither creates a missing canonical config nor changes an existing canonical
   config or its legacy metadata;
-- final Codex review reported no actionable correctness regression.
+- exact-head core conformance, upstream CI, and host-supervisor integration
+  evidence remain required before either implementation is called complete.
 
 The broad prototype was useful evidence, not the proposed V1. It showed that
 writable layers, provenance, reload, and rollback substantially expand the
@@ -461,8 +468,8 @@ than carried as speculative framework.
 ### PR 1: OpenClaw V1
 
 The implementation draft at
-https://github.com/openclaw/openclaw/pull/107026 delivers the complete V1
-contract in one reviewable change:
+https://github.com/openclaw/openclaw/pull/107026 implements the proposed V1 core
+slice in one reviewable change:
 
 - pure recursive composition;
 - exact ownership and bounded tool-policy checks;
@@ -473,7 +480,9 @@ contract in one reviewable change:
 
 The implementation PR records a foreground Gateway proof showing successful
 three-layer startup, composed reads, rejected conflict startup, and rejected
-runtime mutation. Before moving from draft, it must have green upstream CI.
+runtime mutation. Before it can claim V1 core conformance, it must be rebased to
+current main, have green exact-head upstream CI, and map every core conformance
+case below to an automated test or named proof.
 
 ### PR 2: Lobster adoption and deletion
 

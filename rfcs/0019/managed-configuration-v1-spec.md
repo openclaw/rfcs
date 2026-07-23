@@ -167,6 +167,29 @@ V1 defines bounded rules only for these exact paths:
 Comparisons must use OpenClaw's runtime tool-policy meaning, including exact
 tool names, groups, wildcard patterns, and the meaning of an empty allow list.
 
+The following vectors are normative for V1. `accept` means the later value is
+proven monotonic; `reject` includes indeterminate containment.
+
+| Path | Earlier value | Later value | Result | Reason |
+| --- | --- | --- | --- | --- |
+| `tools.allow` | `[]` | `["read"]` | accept | Empty allow is unrestricted; a non-empty allow narrows it |
+| `tools.allow` | `["read", "write"]` | `["read"]` | accept | Exact subset |
+| `tools.allow` | `["write"]` | `["apply_patch"]` | accept | The runtime `write` alias includes `apply_patch` |
+| `tools.allow` | `["read"]` | `["write"]` | reject | Adds authority |
+| `tools.allow` | `["read*"]` | `["read_file"]` | accept | The earlier wildcard matches the later exact name |
+| `tools.allow` | `["read*"]` | `["read?"]` | reject | Expression-to-expression containment is not proven |
+| `tools.allow` | `["group:fs"]` | `["group:fs"]` | accept | Identical group expression |
+| `tools.allow` | `["group:fs"]` | `["group:web"]` | reject | Different group containment is not proven |
+| `tools.deny` | `[]` | `["exec"]` | accept | Adds a denial |
+| `tools.deny` | `["exec"]` | `["exec", "browser"]` | accept | Exact superset |
+| `tools.deny` | `["apply_patch"]` | `["write"]` | accept | The runtime `write` alias continues denying `apply_patch` |
+| `tools.deny` | `["write"]` | `["apply_patch"]` | reject | Would stop denying the distinct `write` name |
+
+Runtime matcher evolution must preserve these results. A matcher change that
+changes whether an existing layered input is accepted requires a contract
+revision, even when the matcher change is otherwise compatible for ordinary
+single-config use.
+
 A comparator must fail closed. If containment between expressions cannot be
 proven, the later declaration is rejected. Syntactic difference alone is not
 proof of either tightening or weakening.
@@ -332,9 +355,12 @@ The following require an explicit contract revision:
 - changing full-process versus in-process restart behavior;
 - treating canonical config as part of the layered stack.
 
-## Minimum Conformance Suite
+## Minimum Conformance Suites
 
-A conforming implementation must cover these cases.
+A conforming OpenClaw core implementation must cover the invocation,
+composition, validation, and lifecycle cases below. Host-supervisor
+conformance is separate because process, state, credential, mount, and network
+isolation are host responsibilities rather than OpenClaw core behavior.
 
 ### Invocation And Preparation
 
@@ -377,6 +403,9 @@ A conforming implementation must cover these cases.
 
 ### Hosted Cell
 
+A conforming host integration must cover these cases. They are not prerequisites
+for OpenClaw core conformance.
+
 - two cells may reuse one global source with different tenant sources;
 - each cell receives only its own effective config and state;
 - the global bounded policy cannot be weakened by either tenant source;
@@ -396,7 +425,7 @@ An OpenClaw implementation is v1 conformant when it:
 - scopes immutability to the canonical config path and server lifetime;
 - prevents persistent side effects before mutation rejection;
 - documents restart-to-apply behavior and the lack of tenant isolation;
-- passes the minimum conformance suite.
+- passes the OpenClaw core portions of the minimum conformance suites.
 
 A host supervisor is v1 compatible when it:
 
@@ -406,4 +435,5 @@ A host supervisor is v1 compatible when it:
 - uses one stack per Gateway trust domain;
 - replaces or fully restarts the process to activate changes;
 - does not depend on write-through, reload, provenance, or special role
-  semantics.
+  semantics;
+- passes the hosted-cell conformance suite.
