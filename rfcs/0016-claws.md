@@ -194,11 +194,13 @@ The Claw manifest therefore does not repeat a top-level publisher, package slug,
 package version, display name, or description. A local unpackaged manifest may
 be inspected during development, but mutating local add must synthesize an
 explicit development identity and record its canonical source path and digest.
+That development digest covers the manifest, every profile referenced by a
+metadata pointer the harness recognizes, and every referenced workspace source.
 
 The experimental implementation accepts the strict grouped JSON representation
-and `CLAW.md`, in which YAML frontmatter carries the same typed manifest and the
-Markdown body is documentation only. Export emits `CLAW.md`; JSON remains a
-fully supported serialization of the same grouped schema.
+and `CLAW.md`, in which YAML frontmatter carries the same typed portable
+manifest and the Markdown body is documentation only. Both forms use metadata
+pointers for harness profiles. Export emits `CLAW.md`; JSON remains supported.
 
 Both representations are covered by the existing
 `OPENCLAW_EXPERIMENTAL_CLAWS=1` gate. `CLAW.md` adds only reader/export format
@@ -224,42 +226,10 @@ The initial public shape is grouped by OpenClaw ownership boundary:
     "identity": {
       "name": "Triage",
       "emoji": "🔎"
-    },
-    "groupChat": {
-      "mentionPatterns": ["@triage", "@github-triage"]
-    },
-    "sandbox": {
-      "mode": "all",
-      "scope": "agent",
-      "workspaceAccess": "rw"
-    },
-    "tools": {
-      "profile": "coding",
-      "alsoAllow": ["cron"],
-      "deny": ["exec", "browser", "nodes"],
-      "fs": { "workspaceOnly": true }
-    },
-    "memory": {
-      "search": {
-        "enabled": true,
-        "rememberAcrossConversations": true,
-        "sources": ["memory", "sessions"]
-      }
-    },
-    "heartbeat": {
-      "every": "30m",
-      "activeHours": {
-        "start": "08:00",
-        "end": "18:00"
-      },
-      "lightContext": true,
-      "isolatedSession": true,
-      "skipWhenBusy": true,
-      "timeoutSeconds": 120
-    },
-    "humanDelay": {
-      "mode": "natural"
     }
+  },
+  "metadata": {
+    "openclaw.config": "profiles/openclaw.yml"
   },
   "workspace": {
     "bootstrapFiles": {
@@ -339,22 +309,63 @@ component and still call the agent complete.
 
 ### Agent settings boundary
 
-Portable agent settings describe the job and its safe operating posture. The
-initial allowlist should be drawn from existing OpenClaw agent configuration and
-can include:
+The portable `agent` object describes the job without selecting one harness's
+runtime policy. It contains only `id`, `name`, `description`, and identity
+presentation.
 
-- `id`, `name`, and `description`;
-- agent identity presentation;
-- group-chat mention patterns;
-- sandbox boundaries;
+OpenClaw-specific operating posture belongs in the package-local profile
+referenced by `metadata.openclaw.config`. That strict profile may contain:
+
+- group-chat mention patterns and sandbox boundaries;
 - a built-in tool profile registered by the applying OpenClaw version;
 - tool `allow` or `alsoAllow`, `deny`, and `fs.workspaceOnly` policy;
 - memory-search enablement, explicit cross-conversation memory opt-in, and the
-  portable `memory` and `sessions` sources;
-- heartbeat behavior;
-- human-delay behavior.
+  `memory` and `sessions` sources;
+- heartbeat and human-delay behavior.
 
-The following remain operator controlled and are rejected in a Claw manifest:
+`metadata` is a string map, not an inline extension object. Other harnesses may
+ignore `openclaw.config` and consume the portable core. OpenClaw loads the
+referenced YAML before planning, validates it strictly, and binds its exact
+bytes into package integrity. The conventional export path is
+`profiles/openclaw.yml`; the metadata pointer is authoritative.
+
+The package-local `profiles/openclaw.yml` contains the OpenClaw application
+profile and participates in package integrity:
+
+```yaml
+schemaVersion: 1
+agent:
+  groupChat:
+    mentionPatterns: ["@triage", "@github-triage"]
+  sandbox:
+    mode: all
+    scope: agent
+    workspaceAccess: rw
+  tools:
+    profile: coding
+    alsoAllow: [cron]
+    deny: [exec, browser, nodes]
+    fs:
+      workspaceOnly: true
+  memory:
+    search:
+      enabled: true
+      rememberAcrossConversations: true
+      sources: [memory, sessions]
+  heartbeat:
+    every: 30m
+    activeHours:
+      start: "08:00"
+      end: "18:00"
+    lightContext: true
+    isolatedSession: true
+    skipWhenBusy: true
+    timeoutSeconds: 120
+  humanDelay:
+    mode: natural
+```
+
+The following remain operator controlled and are rejected in Claw package configuration:
 
 - model, provider, thinking level, and runtime implementation;
 - API keys, OAuth state, credentials, or secret values;
@@ -370,10 +381,11 @@ The following remain operator controlled and are rejected in a Claw manifest:
 The generated `agents.list[]` entry inherits operator defaults. Add appends one
 entry and does not rewrite existing list members or defaults.
 
-A profile name is valid only when the applying OpenClaw version resolves it
-through the canonical built-in profile registry. The Claw schema must not copy a
-fixed list of profile names. A Claw carries a profile selection, not a custom
-profile definition. Global and operator policy continue to constrain the
+An OpenClaw profile name is valid only when the applying version resolves it
+through the canonical built-in profile registry. The portable schema must not
+copy a fixed list of profile names. A Claw carries a selection in its OpenClaw
+profile, not a custom profile definition. Global and operator policy constrain
+the
 resulting tool surface and cannot be widened by a Claw.
 
 `tools.allow` is an explicit allowlist. `tools.alsoAllow` extends a selected
@@ -385,7 +397,7 @@ change. Removing workspace-only confinement is therefore an escalation when the
 effective host default permits broader filesystem access. Enabling
 `memory.search`, enabling `rememberAcrossConversations`, or adding a source
 is a capability escalation; disabling either behavior or removing a source is
-a reduction. A portable declaration of the `sessions` source requires
+a reduction. An OpenClaw profile declaration of the `sessions` source requires
 `rememberAcrossConversations: true` so it cannot silently normalize to ordinary
 workspace memory.
 
@@ -642,8 +654,9 @@ openclaw claws remove <claw-or-agent> --yes --plan-integrity <digest> [cleanup s
 openclaw claws export <agent> --out <path>
 ```
 
-`inspect` validates package metadata and the grouped manifest without reading or
-mutating local lifecycle state. `add --dry-run` resolves the final agent id,
+`inspect` validates package metadata, the grouped manifest, and every recognized
+metadata-referenced profile without reading or mutating local lifecycle state.
+`add --dry-run` resolves the final agent id,
 workspace, packages, MCP servers, and cron jobs and emits the complete action
 plan. `add` without `--dry-run` requires `--yes` and the exact
 `--plan-integrity` digest from that dry run. Update uses the source recorded in
@@ -655,7 +668,7 @@ the choice is included in the plan digest. `--yes` alone never broadens a plan.
 Add ordering is transactional where owner APIs permit it and resumable where
 external installers or the scheduler cannot share one transaction:
 
-1. Validate package metadata and manifest.
+1. Validate package metadata, manifest, and recognized harness profiles.
 2. Resolve exact dependencies and run install safety checks.
 3. Resolve the final unused agent id and workspace.
 4. Preflight all config, file, MCP, and cron collisions.
@@ -702,12 +715,13 @@ Update always targets the installed agent created by the Claw. It never changes
 another agent merely because a target manifest now uses the same id. Update has
 a read-only plan and a separately consented apply.
 
-Update may add or change portable agent fields, files, package dependencies, MCP
-servers, and cron jobs owned by the installed Claw. Local modifications become
+Update may add or change portable agent identity, OpenClaw profile settings,
+files, package dependencies, MCP servers, and cron jobs owned by the installed
+Claw. Local modifications become
 manual conflicts. Operator defaults, models, providers, credentials, bindings,
 and unrelated config remain untouched.
 
-Portable tool-profile changes are compared using inherited host defaults and the
+OpenClaw profile tool changes are compared using inherited host defaults and the
 built-in profile registry's resolved capabilities rather than opaque profile
 labels. Wildcard profiles are compared as supersets. Tool additions, including
 `alsoAllow`, removal of effective workspace-only confinement, memory-search
@@ -719,7 +733,7 @@ defaults before classification using the applying harness's canonical
 context-sensitive resolver, including session- or binding-derived defaults.
 Claw lifecycle code must not duplicate those defaults locally.
 
-Portable `tools.fs.workspaceOnly` is restrictive-only. A Claw may set it to
+OpenClaw profile `tools.fs.workspaceOnly` is restrictive-only. A Claw may set it to
 `true`; `false` is invalid; omission inherits host policy. Validation rejects
 `false` before planning so a Claw cannot weaken host confinement.
 
@@ -820,9 +834,10 @@ runtime-owned registry into publication validation.
   exact plan confirmation may acknowledge that warning; an internal
   `acknowledge` parameter must not make the warning disappear from preview.
 - Claws do not introduce capability-specific resource quotas. Existing
-  canonical owner limits apply. Claw manifests are limited to 1 MiB and package
-  metadata to 256 KiB; extraction, managed workspace, and plan limits remain
-  parser and resource-safety policy.
+  canonical owner limits apply. Claw manifests are limited to 1 MiB, package
+  metadata to 256 KiB, and OpenClaw profiles to 256 KiB. Every bounded read
+  must remain bounded if a file grows during the read; extraction, managed
+  workspace, and plan limits remain parser and resource-safety policy.
 
 ## Rationale
 
@@ -864,7 +879,7 @@ Implementation should widen the trust boundary in reviewable slices:
    uninstall when Claws reference an artifact.
 5. **MCP servers.** Add validated top-level MCP configuration, collision checks,
    redacted digest provenance, status, and cleanup.
-6. **Heartbeat and cron jobs.** Apply portable heartbeat config and create
+6. **Heartbeat and cron jobs.** Apply OpenClaw profile heartbeat config and create
    scheduler records pinned to the new agent id with status/disable/remove proof.
 7. **Status, doctor, and remove.** Diagnose complete and partial agents, drift,
    orphaned resources, and conservative cleanup.
@@ -1109,9 +1124,9 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
     `remove-if-unused` and explicitly selected referenced cleanup, warns about
     every known affected Claw or direct owner, and preserves modified or
     unrelated state.
-16. Export emits `CLAW.md`, excludes secrets and operator runtime settings,
-    retains grouped JSON read compatibility, and can be added in a fresh state
-    directory as a new equivalent agent.
+16. Export emits portable `CLAW.md` plus a referenced OpenClaw profile when
+    supported settings exist, excludes secrets and operator runtime settings,
+    retains grouped JSON compatibility, and round-trips to an equivalent agent.
 17. Feed approval does not bypass dependency policy or install safety checks.
 18. Every implementation stage documents its newly available surface without
     claiming commands or ownership behavior from a later stage.
