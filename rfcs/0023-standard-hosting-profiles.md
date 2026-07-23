@@ -3,7 +3,7 @@ title: Standard Hosting Profiles
 authors:
   - Gio
 created: 2026-07-14
-last_updated: 2026-07-15
+last_updated: 2026-07-23
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/37
@@ -16,8 +16,8 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/37
 Define a small catalog of named, release-tested OpenClaw runtime postures:
 `local`, `container`, `reverse-proxy`, and `node-mode`. A selected profile
 composes canonical readiness conditions into a support contract, identifies the
-runtime activation being evaluated, and can be validated against packaged
-release evidence.
+runtime activation being evaluated, and has a matching packaged release
+scenario.
 
 This RFC depends on the separate Readiness Conditions and Providers RFC. That
 RFC is directly usable: operators may explicitly select additional required or
@@ -68,9 +68,7 @@ standard catalog.
 - Report the selected profile through readiness, health, and status.
 - Identify the logical runtime and unique process/container incarnation whose
   profile result is being reported.
-- Let operator profiles extend, but never weaken, a standard profile.
-- Bind packaged conformance evidence to an immutable OpenClaw artifact and
-  profile contract version.
+- Exercise every standard profile through a packaged release scenario lane.
 - Keep host orchestration and OpenClaw runtime ownership separate.
 
 ## Non-Goals
@@ -87,14 +85,16 @@ standard catalog.
 - Guarantee checkpoint durability, restore compatibility, or safe destruction.
 - Claim that every possible OpenClaw configuration belongs to a standard
   profile.
+- Define named operator profiles, inheritance, host assertions, immutable
+  conformance records, or signed artifact attestations in V1.
 
 ## Proposal
 
 The implementer-facing v1 contract is captured in
 [`0023/hosting-profile-v1-spec.md`](0023/hosting-profile-v1-spec.md). This RFC
 remains the design rationale, support argument, and rollout plan; the sidecar is
-the concise profile catalog, selection, activation, extension, projection, and
-conformance reference for OpenClaw runtime and release implementations.
+the concise profile catalog, selection, activation, projection, and packaged
+scenario reference for OpenClaw runtime and release implementations.
 
 ### Dependency on canonical readiness
 
@@ -117,8 +117,8 @@ RFC 0018 direct use:
   universal conditions + operator-selected criteria -> readiness
 
 RFC 0023 profile use:
-  universal conditions + standard profile preset + operator additions
-  -> readiness + OpenClaw support/conformance claim
+  universal conditions + standard profile preset + optional RFC 0018 additions
+  -> readiness + an OpenClaw-tested support posture
 ```
 
 ### Standard profile catalog
@@ -127,7 +127,7 @@ RFC 0023 profile use:
 | --- | --- | --- |
 | `local` | Explicit local or foreground Gateway posture | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable` |
 | `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady` |
-| `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady`; loopback remains valid for a same-host proxy |
+| `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady`; loopback requires the explicit trusted-proxy loopback allowance |
 | `node-mode` | Gateway controlling one or more execution targets | `local` plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` |
 
 A profile names runtime posture, not packaging. Docker behind an identity proxy
@@ -146,10 +146,10 @@ contract and existing OpenClaw runtime owners.
 
 | Condition | Profile | True when | Stable non-ready reasons |
 | --- | --- | --- | --- |
-| `ProfileSelected` | All | Selection precedence resolves to a valid standard or configured operator profile. | Invalid explicit values fail startup validation. |
-| `RuntimeActivationIdentified` | All | Non-empty logical-runtime and unique-incarnation identities are resolved. | `RuntimeIdentityInvalid`, `IncarnationIdentityInvalid`, `ActivationIdentityUnavailable` |
-| `ContainerStateReady` | `container` | Effective Gateway mode is local and resolved listener host is not loopback. | `ContainerGatewayRemote`, `ContainerGatewayLoopback`, `ContainerBindNotResolved` |
-| `TrustedProxyReady` | `reverse-proxy` | Auth mode is `trusted-proxy`, a user header and trusted source are configured, and active ingress honors asserted identity only from validated trusted sources. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing`, `TrustedProxyIngressUnsafe` |
+| `ProfileSelected` | All | Selection precedence resolves to a valid standard profile. | Invalid explicit values fail startup validation. |
+| `RuntimeActivationIdentified` | All | Non-empty logical-runtime and unique-incarnation identities are resolved. | Invalid explicit values fail startup validation. |
+| `ContainerStateReady` | `container` | The resolved listener host is not loopback. | `ContainerGatewayLoopback` |
+| `TrustedProxyReady` | `reverse-proxy` | Auth mode is `trusted-proxy`, a user header and trusted source are configured, and loopback sources are explicitly allowed. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing`, `TrustedProxyIngressUnsafe` |
 | `NodePairingReady` | `node-mode` | Pairing state is readable and contains an approved pairing. | `NodePairingUnavailable`, `NodePairingTimedOut`, `NodePairingPending`, `NodePairingMissing` |
 | `ControlledTargetsReady` | `node-mode` | At least one connected target is correlated to an approved pairing. | `ControlledTargetsDisconnected` |
 | `CommandApprovalReady` | `node-mode` | A connected paired target advertises a command permitted by effective grants. | `CommandApprovalMissing` |
@@ -160,6 +160,10 @@ browser, or another execution surface. OpenClaw does not assume one node maps to
 exactly one product or tenant. One correlated approved pairing, connected
 target, effective command grant, and live session must satisfy all four
 conditions; independent targets cannot satisfy different rows.
+
+`TrustedProxyReady` validates the effective auth configuration. Existing
+Gateway request handling remains responsible for rejecting forged or untrusted
+identity ingress; readiness does not issue a synthetic request on every poll.
 
 Common runtime conditions such as `ConfigLoaded`, `WorkspaceWritable`,
 `GatewayResponding`, and conditionally required plugin, secret, or model-route
@@ -200,9 +204,8 @@ openclaw gateway run --hosting-profile container
 
 When selected, the effective profile, selection source, and condition result
 are reported by readiness, health, and status. An unprofiled runtime omits
-`ProfileSelected` and profile-only requirements. Hosts may assert an expected
-profile when probing, but expectation is an assertion over the running result,
-not another selection source.
+`ProfileSelected`, activation identity, top-level profile fields, and
+profile-only requirements.
 
 Profiles validate effective runtime state. They do not generate or repair the
 underlying Gateway, proxy, plugin, model, node, or storage config.
@@ -215,8 +218,8 @@ resolves:
 - a logical runtime ID that may remain stable across process replacement; and
 - a unique incarnation ID for the current process/container activation.
 
-Launchers may provide identities through startup arguments, environment, or a
-mounted activation descriptor. Local runs receive safe generated defaults.
+Launchers may provide identities through startup arguments or environment.
+Local runs receive safe generated defaults.
 Invalid explicit identities fail startup rather than silently falling back.
 
 The activation summary is redacted and references, rather than copies, inputs
@@ -226,51 +229,21 @@ owned by other contracts:
 type RuntimeActivationSummary = {
   runtimeId: string;
   incarnationId: string;
-  profile?: string;
-  configGeneration?: string;
-  hostIntegrationGeneration?: string;
-  restoreGeneration?: string;
+  profile: string;
 };
 ```
-
-Managed Configuration, Hosted Integration, and Runtime State Continuity own
-their generations and evidence. A profile only requires and reports the
-resolved references needed for its support posture.
 
 This is not an OCC instance resource. OCC may supply desired identity and
 profile selection, but OpenClaw evaluates the live activation in the runtime
 plane.
 
-### Operator profiles
+### Operator extensions
 
-An operator profile extends one standard profile and adds required or advisory
-condition IDs:
-
-```json5
-{
-  hosting: {
-    profile: "acme/managed",
-    profiles: {
-      "acme/managed": {
-        extends: "container",
-        requiredCriteria: ["plugin.storage.backend"],
-        advisoryCriteria: ["plugin.metrics.exporter"],
-      },
-    },
-  },
-}
-```
-
-V1 operator profiles are additive:
-
-- exactly one standard profile is inherited;
-- inherited required conditions cannot be removed or weakened;
-- standard profile IDs and core condition IDs are reserved;
-- unknown required provider IDs fail closed; and
-- the operator or plugin owner owns the added support promise.
-
-OpenClaw supports and release-tests the inherited standard baseline. It does
-not claim release conformance for operator-added conditions.
+V1 supports only the four OpenClaw-owned standard profile names. Operators may
+select additional required or advisory criteria through RFC 0018's
+`gateway.readiness` config, including while a profile is selected. Named
+operator profiles and inheritance are possible follow-up work, not an implied
+V1 contract.
 
 ### Host-visible result
 
@@ -283,11 +256,14 @@ HTTP/1.1 503 Service Unavailable
 
 ```json
 {
+  "profileContractVersion": 1,
   "profile": "container",
+  "profileSource": "config",
   "ready": false,
   "activation": {
     "runtimeId": "worker-17",
-    "incarnationId": "01J..."
+    "incarnationId": "01J...",
+    "profile": "container"
   },
   "conditions": [
     {
@@ -306,42 +282,12 @@ After the listener becomes reachable, the same endpoint returns `200`. Docker,
 Kubernetes, systemd, or OCC can consume the ordinary readiness endpoint without
 interpreting a profile-specific API.
 
-### Packaged profile conformance
+### Packaged profile scenarios
 
 A standard profile is a support promise only if the release process tests it.
-Conformance produces an immutable record bound to the exact package or image:
-
-```ts
-type HostingProfileConformanceRecord = {
-  schemaVersion: 1;
-  profileContractVersion: 1;
-  artifact: {
-    openclawVersion: string;
-    packageIdentity: string;
-    digest: string;
-  };
-  profile: "local" | "container" | "reverse-proxy" | "node-mode";
-  conditionContractVersion: number;
-  requiredConditionTypes: string[];
-  result: "passed" | "failed";
-  suiteIdentity: string;
-  completedAt: string;
-  provenance?: {
-    builder?: string;
-    sourceRevision?: string;
-    attestationRef?: string;
-  };
-};
-```
-
-Readiness may project artifact identity and matching profile-conformance status,
-but it reads packaged metadata; it never reruns release tests. Source and
-development runs may report conformance as advisory `Unknown`.
-
-If a host supplies an immutable expected artifact identity, mismatch is a
-required `ArtifactIdentityMatches=False` readiness failure with reason
-`ArtifactIdentityMismatch`. This prevents a different build from satisfying a
-deployment's support claim.
+V1 adds one Docker E2E lane to the release-check matrix. It starts the packaged
+OpenClaw entrypoint and validates the ordinary canonical `/readyz` result;
+runtime readiness does not rerun release tests or claim artifact attestation.
 
 The initial profile matrix must execute package-installed scenarios for:
 
@@ -351,10 +297,10 @@ The initial profile matrix must execute package-installed scenarios for:
 - node-mode unpaired failure and paired/approved recovery; and
 - workspace-full failure and recovery without restart.
 
-Making this matrix release-blocking is a governance decision attached to
-accepting the profile contract. The draft conformance PR demonstrates the
-blocking package-acceptance wiring so reviewers can evaluate the complete
-support promise; it should not land ahead of the profile contract.
+The implementation wires this lane into package acceptance. Upgrade survival,
+cross-surface parity, direct-ingress security scenarios, immutable records, and
+signed attestations can strengthen the support program later without expanding
+the V1 runtime contract.
 
 ### Support ownership and compatibility
 
@@ -364,7 +310,7 @@ OpenClaw owns:
 - profile-specific condition predicates and reasons;
 - selection precedence and result projection;
 - activation identity semantics; and
-- packaged conformance for the standard catalog.
+- the packaged scenario lane for the standard catalog.
 
 Hosts own:
 
@@ -373,7 +319,7 @@ Hosts own:
 - probe timing, retries, and restart policy;
 - placement, routing, tenants, and rollout;
 - telemetry sinks and fleet alerts; and
-- support for operator-added conditions.
+- any additional operator-selected RFC 0018 criteria.
 
 Adding a required condition, changing a stable reason, or changing an advisory
 condition to required can alter host behavior and needs compatibility review,
@@ -417,29 +363,20 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
 [openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `5e7a713545a` from
+It is based on readiness head `788a58e612f` from
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains thirteen profile-only commits at exact head `2336ee23999`:
+and contains fifteen profile-only commits at exact head `9392d02b452`.
 
-| Commit | Intended scope |
+| Slice | Intended scope |
 | --- | --- |
-| `1fa9428ebb8` | Add selection, `local`, `container`, and `reverse-proxy` compositions and predicates. |
-| `32ebc761b1e` | Add product-neutral node pairing, target, approval, and control-channel conditions. |
-| `ca4da0b3bfe` | Attribute profile results to logical runtime and incarnation IDs. |
-| `ae634a05432` | Demonstrate the profile matrix and proposed blocking package-acceptance gate. |
-| `388a894443a` | Validate profile startup inputs before destructive lifecycle actions. |
-| `6265a75912c` | Prove writable host-provisioned workspace behavior and storage recovery. |
-| `1048b52e937` | Prove the existing node approval flow transitions node-mode to ready. |
-| `9ccaec363e4` | Make profile activation explicit and prove unprofiled upgrade compatibility. |
-| `8681995fd94` | Document profile selection, predicates, host inputs, and support boundaries. |
-| `f51a723ed36` | Align profile criteria and current repository contracts with the readiness stack. |
-| `079f28e7a69` | Preserve optional-profile startup while applying profile-required criteria. |
-| `bdef0fb3c2d` | Satisfy current config-tier and import-cycle contracts. |
-| `2336ee23999` | Evaluate node-mode approval against the canonical node command policy. |
+| Standard selection and predicates | Add opt-in selection, precedence, machine-readable projection, and `local`, `container`, and `reverse-proxy` conditions. |
+| Node mode | Add product-neutral pairing, connected-target, canonical command-policy, and control-channel conditions. |
+| Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, and bound profile evaluation. |
+| Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, and unprofiled compatibility. |
 
 PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
 its aggregate GitHub diff includes the readiness dependency followed by the
-thirteen profile commits. After PR 104018 lands, the same PR naturally reduces to
+fifteen profile commits. After PR 104018 lands, the same PR naturally reduces to
 the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
 preserves that profile-only comparison view in the meantime. Fork PRs
 [#18](https://github.com/giodl73-repo/openclaw/pull/18),
@@ -448,10 +385,8 @@ preserves that profile-only comparison view in the meantime. Fork PRs
 [#21](https://github.com/giodl73-repo/openclaw/pull/21) expose the major design
 slices as review aids; they are not alternative landing requests.
 
-The refreshed stack passes 206 focused profile, Gateway, config, CLI,
-Docker-plan, and release-wiring assertions. Production typing, dead-export and
-deprecation guards, changed-file lint, plugin-SDK surface checks, line-count
-ratchets, and documentation indexing also pass. A prior package-installed
+The refreshed stack passes 156 focused profile, Gateway, config, and CLI
+assertions, production typing, and protocol generation/compatibility checks. A prior package-installed
 Docker matrix proved all four profiles plus listener,
 trusted-proxy, node-approval, workspace-full, recovery, and unprofiled `200`
 compatibility using image
@@ -477,9 +412,9 @@ and release cost rather than debating the underlying readiness API again.
 
 ## Unresolved questions
 
-- Should operator profiles be part of the first implementation or follow after
-  the standard catalog proves stable?
-- Which activation references are required in V1 beyond runtime and
-  incarnation identity?
-- Should packaged conformance be visible only through status, or also as
-  advisory conditions in readiness?
+- Is `hosting.profile` the preferred config home for the opt-in standard
+  catalog?
+- Should the packaged scenario lane be release-blocking immediately or begin as
+  an advisory release check?
+- After the standard catalog proves stable, is there enough demand for named
+  operator profiles beyond direct RFC 0018 criterion selection?

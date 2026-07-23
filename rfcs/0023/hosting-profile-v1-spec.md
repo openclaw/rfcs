@@ -3,8 +3,8 @@
 This document is the implementer-facing specification for RFC 0023, Standard
 Hosting Profiles. The RFC explains the motivation, support model, and rollout
 plan. This file defines the v1 standard profile catalog, condition composition,
-selection precedence, activation identity, operator extension, host-visible
-result, and packaged conformance contract.
+selection precedence, activation identity, host-visible result, and packaged
+scenario gate.
 
 Status: draft, tied to RFC 0023 and dependent on RFC 0018.
 
@@ -17,9 +17,8 @@ This specification defines:
 - opt-in selection through config, environment, or startup arguments;
 - exact profile predicates and stable non-ready reasons;
 - logical runtime and unique incarnation identity;
-- additive operator profiles;
 - readiness, health, and status projection; and
-- packaged release conformance records and minimum scenarios.
+- a packaged release scenario lane for the standard catalog.
 
 This specification does not define:
 
@@ -28,6 +27,8 @@ This specification does not define:
 - scheduler retry intervals, placement, routing, tenants, or rollout;
 - OCC resources or the AgentHarness event protocol;
 - checkpoint durability or safe destruction; or
+- operator-defined profiles, profile inheritance, host assertions, artifact
+  identity, or signed conformance records; or
 - support for arbitrary OpenClaw configurations outside the standard catalog.
 
 ## Dependencies
@@ -42,9 +43,7 @@ runtime. Selecting a profile adds the contract in this specification.
 ## Terminology
 
 - **Standard profile**: an OpenClaw-owned, named runtime posture with stable
-  predicates and packaged release conformance.
-- **Operator profile**: an operator-owned additive extension of exactly one
-  standard profile.
+  predicates and packaged release scenarios.
 - **Universal baseline**: RFC 0018 conditions that apply with or without a
   profile.
 - **Profile criterion**: a reusable readiness criterion selected by a profile.
@@ -52,8 +51,6 @@ runtime. Selecting a profile adds the contract in this specification.
   container replacement.
 - **Incarnation ID**: identity unique to one running process or container
   activation.
-- **Conformance record**: immutable evidence that one artifact passed one
-  standard profile contract version.
 
 ## Compatibility And Evolution
 
@@ -65,22 +62,21 @@ Hosting Profile v1 uses these compatibility rules:
   selectors, and stable reasons are compatibility contracts;
 - adding or strengthening a required criterion changes host behavior and
   requires compatibility review, release notes, and conformance coverage;
-- operator profiles may strengthen but never weaken a standard profile;
 - unknown explicit profile values fail startup validation; and
 - new standard profiles require a separately reviewable support posture and
   release conformance scenario.
 
 ## Standard Profile Catalog
 
-The v1 standard catalog composes this exact ordered set of additional required
-condition types over the RFC 0018 universal baseline:
+The v1 standard catalog requires these conditions over the RFC 0018 universal
+baseline:
 
-| Profile ID | Runtime posture | Additional required condition types, in order |
+| Profile ID | Runtime posture | Required profile criteria |
 | --- | --- | --- |
-| `local` | Explicit local or foreground Gateway | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable` |
-| `container` | Gateway directly reachable through a container listener | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable`, `ContainerStateReady` |
-| `reverse-proxy` | Gateway behind a trusted identity proxy | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable`, `TrustedProxyReady` |
-| `node-mode` | Gateway controlling one or more paired execution targets | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable`, `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` |
+| `local` | Explicit local or foreground Gateway | `WorkspaceWritable`, `ProfileSelected`, `RuntimeActivationIdentified` |
+| `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady` |
+| `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady` |
+| `node-mode` | Gateway controlling one or more paired execution targets | `local` plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` |
 
 A profile describes runtime posture, not packaging. A container behind an
 identity proxy selects `reverse-proxy`; a container with a directly reachable
@@ -93,45 +89,34 @@ replaced, or weakened by a profile.
 `openclaw.workspace-writable`. The remaining additional condition types are
 profile-owned predicates and are not independently operator-selectable in v1.
 
+Canonical condition ordering remains owned by RFC 0018: `ConfigLoaded` and
+`WorkspaceWritable` precede `ProfileSelected`, `RuntimeActivationIdentified`,
+and the profile-specific conditions listed above; `GatewayResponding` and
+`PluginsLoaded` follow them.
+
 ## Profile Criteria
 
 ### Profile Selection
 
 `ProfileSelected` is `True` when selection precedence resolves to a valid
-standard or configured operator profile. Invalid explicit values fail startup
-validation rather than becoming a running false condition.
+standard profile. Invalid explicit values fail startup validation rather than
+becoming a running false condition.
 
 ### Runtime Activation Identity
 
 `RuntimeActivationIdentified` is `True` when both logical runtime and unique
 incarnation identities are non-empty and valid.
 
-Stable non-ready reasons are:
-
-- `RuntimeIdentityInvalid`;
-- `IncarnationIdentityInvalid`; and
-- `ActivationIdentityUnavailable`.
-
-### Host Assertions
-
-Hosts may assert expected profile and immutable artifact identity. These
-conditions follow the standard profile set when configured:
-
-| Condition type | True when | Stable non-true reasons |
-| --- | --- | --- |
-| `ProfileExpectationMatches` | The selected profile equals the host assertion. | `ExpectedProfileMismatch`, `ExpectedProfileNotSelected` |
-| `ArtifactIdentityMatches` | The running immutable artifact identity equals the host assertion. | `ArtifactIdentityMismatch`, `ArtifactIdentityNotChecked` |
+Invalid explicit values fail startup validation, so V1 does not emit a running
+non-ready activation condition.
 
 ### Container
 
-`ContainerStateReady` is `True` when the effective Gateway mode is local and
-the resolved listener host is not loopback.
+`ContainerStateReady` is `True` when the resolved listener host is not loopback.
 
 Stable non-ready reasons are:
 
-- `ContainerGatewayRemote`;
-- `ContainerGatewayLoopback`; and
-- `ContainerBindNotResolved`.
+- `ContainerGatewayLoopback`.
 
 This criterion validates OpenClaw's effective listener state. It does not
 inspect Docker, Kubernetes, ECS, Nomad, or another scheduler API.
@@ -143,18 +128,20 @@ inspect Docker, Kubernetes, ECS, Nomad, or another scheduler API.
 - effective auth mode is `trusted-proxy`;
 - a user identity header is configured; and
 - at least one trusted proxy source is configured; and
-- the active Gateway ingress contract accepts asserted identity only from a
-  validated trusted source and does not honor a client-supplied identity header
-  on direct or untrusted ingress.
+- when that source includes loopback, the explicit trusted-proxy loopback
+  allowance is enabled.
 
 Stable non-ready reasons are:
 
 - `TrustedProxyAuthMissing`;
-- `TrustedProxyHeaderMissing`; and
+- `TrustedProxyHeaderMissing`;
 - `TrustedProxySourcesMissing`; and
 - `TrustedProxyIngressUnsafe`.
 
-Loopback is valid when a trusted proxy is colocated with the Gateway.
+This readiness condition validates the effective auth configuration. Existing
+Gateway trusted-proxy request handling remains responsible for rejecting
+untrusted or forged identity ingress; readiness does not replay a request on
+every poll. Loopback is valid only when a colocated proxy is explicitly allowed.
 
 ### Node Mode
 
@@ -171,8 +158,9 @@ satisfy the set; independent targets cannot satisfy different rows.
 
 A target may be a desktop, sandbox, VM, pod, browser, or another execution
 surface. The profile does not impose product, tenant, or one-target-per-agent
-semantics. Evaluation consumes a bounded activation snapshot; readiness polling
-must not scan unbounded pairing or session stores.
+semantics. Evaluation is bounded by the canonical readiness deadline and uses
+the current pairing and connected-session state; it does not perform network
+discovery or wait for a target during a readiness poll.
 
 ## Selection And Precedence
 
@@ -201,17 +189,12 @@ OPENCLAW_HOSTING_PROFILE=container openclaw gateway run
 openclaw gateway run --hosting-profile container
 ```
 
-An absent value means unprofiled operation; it must not imply `local`. Every
-supplied value is validated, then the highest-precedence valid source wins.
-Different valid lower-precedence values are ordinary overrides and do not fail
-startup. Empty, malformed, or unknown explicit values fail validation before
-destructive lifecycle actions.
+An absent value means unprofiled operation; it must not imply `local`. The
+highest-precedence supplied source is validated and wins; shadowed
+lower-precedence values are not evaluated. An empty, malformed, or unknown
+winning value fails validation before destructive lifecycle actions.
 
-The effective result records the profile and winning selection source. A probe
-may assert an expected profile, but that assertion does not select or mutate the
-running profile. When supplied, mismatch or absence emits required
-`ProfileExpectationMatches=False` with reason `ExpectedProfileMismatch` or
-`ExpectedProfileNotSelected`.
+The effective result records the profile and winning selection source.
 
 Profiles validate effective runtime state. They do not generate or repair the
 underlying Gateway, proxy, plugin, model, node, or storage configuration.
@@ -225,56 +208,24 @@ type RuntimeActivationSummary = {
   runtimeId: string;
   incarnationId: string;
   profile: string;
-  configGeneration?: string;
-  hostIntegrationGeneration?: string;
-  restoreGeneration?: string;
 };
 ```
 
-Launchers may provide identity through startup arguments, environment, or a
-mounted activation descriptor. Local runs may receive generated defaults.
+Launchers may provide identity through startup arguments or environment. Local
+runs may receive generated defaults.
 Explicit invalid identity must fail startup instead of silently falling back.
-
-The activation summary is redacted. Generation values reference contracts
-owned by Managed Configuration, Hosted Integration, and Runtime State
-Continuity; the profile does not copy their evidence or redefine their meaning.
 
 Logical runtime identity may survive replacement. Incarnation identity must be
 unique for each process/container activation. OCC may supply these values, but
 the OpenClaw runtime plane evaluates and reports the live activation.
 
-## Operator Profiles
+## Operator Extensions
 
-An operator profile extends exactly one standard profile and adds canonical
-criterion IDs:
-
-```json5
-{
-  hosting: {
-    profile: "acme/managed",
-    profiles: {
-      "acme/managed": {
-        extends: "container",
-        requiredCriteria: ["plugin.storage.backend"],
-        advisoryCriteria: ["plugin.metrics.exporter"],
-      },
-    },
-  },
-}
-```
-
-V1 operator profiles follow these rules:
-
-- `extends` names exactly one standard profile;
-- required and advisory lists use RFC 0018 namespaced criterion IDs;
-- inherited required conditions cannot be removed or weakened;
-- the same ID cannot appear in both lists;
-- standard profile IDs and core criterion IDs are reserved;
-- unknown required provider IDs fail closed; and
-- the operator or plugin owner owns added support semantics.
-
-OpenClaw release conformance covers the inherited standard baseline, not
-operator additions. V1 does not permit operator-profile inheritance chains.
+V1 supports only the four OpenClaw-owned standard profile names. Operators may
+add required or advisory RFC 0018 criteria directly through
+`gateway.readiness`, including while a standard profile is selected. Named
+operator profiles and inheritance may be proposed later; they are not part of
+this contract and cannot be inferred from arbitrary config.
 
 ## Host-Visible Result
 
@@ -286,7 +237,6 @@ type ProfiledReadinessResult = ReadinessResult & {
   profile: string;
   profileSource: "argument" | "environment" | "config";
   activation: RuntimeActivationSummary;
-  conformance?: HostingProfileConformanceSummary;
 };
 ```
 
@@ -325,73 +275,29 @@ probe API.
 Unauthenticated remote projections may redact profile source, activation, and
 condition detail while preserving the correct status code.
 
-## Packaged Conformance
+## Packaged Scenario Gate
 
-A standard profile is an OpenClaw support promise only when the release process
-tests the exact packaged artifact. The v1 record is:
-
-```ts
-type HostingProfileConformanceRecord = {
-  schemaVersion: 1;
-  profileContractVersion: 1;
-  artifact: {
-    openclawVersion: string;
-    packageIdentity: string;
-    digest: string;
-  };
-  profile: "local" | "container" | "reverse-proxy" | "node-mode";
-  conditionContractVersion: number;
-  requiredConditionTypes: string[];
-  result: "passed" | "failed";
-  suiteIdentity: string;
-  completedAt: string;
-  provenance?: {
-    builder?: string;
-    sourceRevision?: string;
-    attestationRef?: string;
-  };
-};
-
-type HostingProfileConformanceSummary = {
-  artifactDigest?: string;
-  profileContractVersion: number;
-  profile: string;
-  result: "passed" | "failed" | "unknown";
-  conditionContractVersion?: number;
-};
-```
-
-Runtime readiness may read and project packaged conformance metadata. It must
-not rerun release tests. Source and development runs may report conformance as
-advisory `Unknown`. The record is release evidence, not by itself a security
-attestation. A distribution that makes an authenticated provenance claim must
-publish and verify a signed attestation referenced by `attestationRef`.
-
-If a host supplies an immutable expected artifact identity, a mismatch is a
-required `ArtifactIdentityMatches=False` condition with reason
-`ArtifactIdentityMismatch`; unavailable verification is required `Unknown`
-with reason `ArtifactIdentityNotChecked`. The expectation must not be satisfied
-by mutable version text alone.
+A standard profile is a credible support promise only when the packaged
+release path exercises it. V1 adds one Docker E2E lane to the release-check
+matrix. The lane starts the packaged OpenClaw entrypoint and probes the same
+canonical `/readyz` result used by hosts; runtime readiness does not rerun the
+release tests or claim artifact attestation.
 
 ### Minimum V1 Matrix
 
 The packaged matrix must prove:
 
-- unchanged unprofiled readiness after upgrade;
+- unchanged unprofiled readiness;
 - explicit `local` success and writable-workspace failure/recovery;
 - `container` success and loopback-listener failure;
-- `reverse-proxy` success, missing-auth failure, direct-ingress rejection, and
-  forged identity-header rejection;
-- `node-mode` unpaired failure, wrong-target correlation failure, and
-  paired/approved recovery;
-- activation identity presence and incarnation replacement; and
-- exact profile condition sets, profile contract version, and expected-artifact
-  mismatch behavior; and
-- agreement among `/ready`, `/readyz`, health, status, and any readiness CLI.
+- `reverse-proxy` success and missing-auth failure;
+- `node-mode` unpaired/unapproved failure and paired/approved recovery;
+- activation identity and machine-readable profile fields; and
+- exact profile condition status and profile contract version on `/readyz`.
 
-Records must bind the exact artifact digest, profile ID, profile contract
-version, condition contract version, required criterion set, suite identity,
-completion time, and available build provenance.
+Upgrade survival, direct-ingress security tests, cross-surface parity, immutable
+artifact records, and signed attestations are valuable follow-up gates, not V1
+runtime semantics.
 
 ## Ownership
 
@@ -401,7 +307,7 @@ OpenClaw owns:
 - profile-specific predicates and stable reasons;
 - selection precedence and projection;
 - activation identity semantics; and
-- packaged conformance for the standard catalog.
+- the packaged scenario lane for the standard catalog.
 
 Hosts own:
 
@@ -410,7 +316,7 @@ Hosts own:
 - probe timing, retries, and restart policy;
 - placement, routing, tenants, and rollout;
 - telemetry sinks and fleet alerts; and
-- support for operator-added criteria.
+- any additional operator-selected RFC 0018 criteria.
 
 ## Conformance Checklist
 
@@ -420,10 +326,10 @@ An implementation conforms to Hosting Profile v1 when it proves:
 - each selection source works and precedence is deterministic;
 - invalid explicit profile or identity fails startup validation;
 - every standard profile composes the exact documented criteria;
-- operator profiles are additive and cannot weaken their standard parent;
 - profiled results identify logical runtime and unique incarnation;
 - profile failures use stable reasons and canonical readiness aggregation;
 - all host-visible surfaces describe the same activation and profile result;
-- packaged evidence binds an immutable artifact and contract version; and
+- the packaged scenario lane exercises every standard profile and its primary
+  failure/recovery path; and
 - unprofiled deployments retain RFC 0018 behavior without profile-only
   conditions.
