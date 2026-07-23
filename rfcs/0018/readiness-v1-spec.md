@@ -235,8 +235,8 @@ unvalidated message is projected.
 ### Activation Lifecycle
 
 The registered provider set is bound to one activation-pinned plugin registry
-and effective config snapshot. Plugin or config reload publishes replacement
-snapshot identities. Publication aborts in-flight callbacks from the prior
+and effective config snapshot. Plugin or config reload atomically publishes one
+replacement config-and-registry snapshot identity. Publication aborts in-flight callbacks from the prior
 generation, invalidates their cached results, and prevents late settlement from
 entering the active result. Core must keep retained state bounded when a
 callback ignores cancellation; an abandoned callback must not retain an active
@@ -348,7 +348,7 @@ must not synthesize success. Descriptor enumeration must not execute providers.
 An `openclaw ready` command, when implemented, is a client of the live Gateway
 result:
 
-- human output lists non-true conditions;
+- human output lists all conditions with pass, fail, or warning classification;
 - `--json` preserves the canonical result; and
 - exit status is nonzero for required failure, required unknown, transport
   failure, or absence of a supported readiness contract.

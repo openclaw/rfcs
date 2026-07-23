@@ -377,7 +377,7 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with nine ordered commits at exact head `a8e61ac0691`,
+It is one upstream PR with eleven ordered commits at exact head `813104950f5`,
 rebased onto OpenClaw `main` at `4f4d89574a9`. The refreshed branch passes
 focused readiness, Gateway, status, health, CLI, and method-metadata tests;
 production typing also passes. Timed-out plugin checks remain single-flight
