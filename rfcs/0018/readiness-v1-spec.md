@@ -146,7 +146,7 @@ The condition array must use this v1 order when present:
 3. `ConfigLoaded` and `WorkspaceWritable`;
 4. profile-owned conditions in the order defined by RFC 0023;
 5. `GatewayResponding` and `PluginsLoaded`; and
-6. remaining plugin conditions sorted by namespaced criterion ID.
+6. remaining selected core and plugin conditions sorted by condition type.
 
 `failures` and `advisories` follow condition order and contain no duplicates.
 
@@ -166,12 +166,26 @@ The initial public core criteria are:
 | Not selectable | `EventLoopHealthy` | Advisory | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
 | Not selectable | `ConfigLoaded` | Universal required | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
 | `openclaw.workspace-writable` | `WorkspaceWritable` | Selectable | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
+| `openclaw.config-current` | `ConfigCurrent` | Selectable | `ConfigRestartRequired` |
+| `openclaw.model-route-ready` | `ModelRouteReady` | Selectable | `ModelRouteUnavailable`, `ModelAuthUnavailable` |
+| `openclaw.secrets-ready` | `SecretsReady` | Selectable | `SecretOwnersUnavailable` |
+| `openclaw.session-storage-ready` | `SessionStorageReady` | Selectable | `SessionStorageMissing`, `SessionStorageFull`, `SessionStorageNotWritable`, `SessionStorageProbeFailed`, `SessionStorageProbeTimedOut`, `SessionStorageNotChecked` |
+| `openclaw.context-engine-ready` | `ContextEngineReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.tool-catalog-ready` | `ToolCatalogReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.mcp-runtime-ready` | `McpRuntimeReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.sandbox-ready` | `SandboxReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.harness-ready` | `HarnessReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.state-ready` | `StateReady` | Selectable | Owner-defined bounded state reasons. |
+| `openclaw.delivery-runtime-ready` | `DeliveryRuntimeReady` | Selectable | Owner-defined bounded delivery reasons. |
+| `openclaw.scheduler-ready` | `SchedulerReady` | Selectable | Owner-defined bounded scheduler reasons. |
 | Not selectable | `PluginsLoaded` | Advisory | `PluginLoadFailures`, `PluginStatusUnavailable` |
 
 Each condition is `True` only when the runtime observes the corresponding
-startup, admission, channel, event-loop, config, workspace, or plugin predicate
-described by RFC 0018. A successful condition uses a stable success reason that
-normally matches its condition type.
+startup, admission, channel, event-loop, config, activation, workspace,
+execution-capability, state, background-service, or plugin predicate described
+by RFC 0018. A successful condition uses a stable success reason that normally
+matches its condition type. Selectable owner criteria must observe existing
+snapshots and must not initiate the subsystem work they report.
 
 The evaluator may emit these failure-only guard conditions:
 

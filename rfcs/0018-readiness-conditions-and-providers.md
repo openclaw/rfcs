@@ -162,16 +162,21 @@ justifies them.
 | `ConfigLoaded` | Required | The validated effective runtime config snapshot is installed. | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
 | `WorkspaceWritable` | Required or advisory when selected | The effective workspace exists and passes a bounded write, flush, and cleanup probe. It is not a new universal blocker by default. | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `PluginsLoaded` | Advisory | The activation-pinned plugin registry is available and selected plugins have no activation errors. | `PluginLoadFailures`, `PluginStatusUnavailable` |
+| `ConfigCurrent` | Required or advisory when selected | The accepted effective config does not require restart. | `ConfigRestartRequired` |
+| `ModelRouteReady` | Required or advisory when selected | The selected model route has usable provider authentication. | `ModelRouteUnavailable`, `ModelAuthUnavailable` |
+| `SecretsReady` | Required or advisory when selected | Required secret owners resolved during activation. | `SecretOwnersUnavailable` |
+| `SessionStorageReady` | Required or advisory when selected | Session storage passes its bounded write, flush, and cleanup probe. | `SessionStorageMissing`, `SessionStorageFull`, `SessionStorageNotWritable`, `SessionStorageProbeFailed`, `SessionStorageProbeTimedOut` |
+| `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady`, `HarnessReady` | Required or advisory when selected | Each configured execution capability has activation evidence from its owning subsystem. An intentionally unconfigured optional capability is satisfied. | Owner-specific unavailable, failed, or unobserved reasons. |
+| `StateReady`, `DeliveryRuntimeReady`, `SchedulerReady` | Required or advisory when selected | Existing state and background-service snapshots report their current observed status. | Owner-specific unavailable, degraded, or unobserved reasons. |
 
 Changing an advisory core condition to required is a compatibility-sensitive
 behavior change. It requires focused review and release notes because it can
 change `/ready` from `200` to `503` for an existing deployment.
 
-Further startup facts such as required plugin activation, required secret
-availability, or resolved model routing should use the same condition model,
-but only after their owners expose bounded, redacted activation snapshots.
-Readiness polling must not reload plugins, reacquire secrets, or issue a model
-request.
+These selectable core conditions consume bounded, redacted observations from
+their owning subsystems. Readiness polling must not reload plugins, reacquire
+secrets, issue a model request, connect MCP servers, start a sandbox or harness,
+open the state database, or start a scheduler.
 
 ### Readiness providers
 
@@ -410,6 +415,16 @@ transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
 the same canonical condition. Exact-head remote container and published-upgrade
 proof must be refreshed before landing. Reviewers should use that PR for the
 proposed landing shape and current validation state.
+
+The first core-owner adoption is consolidated in
+[openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421),
+stacked at exact readiness head `c21cf2903f4`. It adds selectable activation,
+execution-capability, session-storage, state, delivery, and scheduler
+observations without selecting any of them by default. Fork PRs
+[#153](https://github.com/giodl73-repo/openclaw/pull/153),
+[#154](https://github.com/giodl73-repo/openclaw/pull/154), and
+[#155](https://github.com/giodl73-repo/openclaw/pull/155) preserve the three
+owner-area review slices; PR 113421 is the intended merge unit.
 
 The fork PRs below expose the implementation as optional smaller review
 slices. They are supporting review aids, not alternative landing PRs:
