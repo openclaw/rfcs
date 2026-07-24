@@ -384,15 +384,16 @@ The maintenance workflow follows a dependency-guard-style state machine:
 
 | Phase | Trigger | Behavior |
 | --- | --- | --- |
-| `detect` | English source pull request | Runs without provider credentials. For a ready same-repository PR, fails with the exact missing or stale targets until refresh output is present. Drafts and branches the repository cannot update remain advisory. It never publishes translations from pull-request code. |
-| `refresh` | Maintainer dispatch for a ready same-repository PR, or trusted `main` push after a fork/cross-repository source merge | Runs protected-base tooling against an exact source revision, generates and validates all affected locale candidates as one batch, then either commits them to the unchanged source branch under an exact-head lease or opens/updates one generated fallback PR. Failed generation or validation aborts publication. |
+| `detect` | English source pull request | Runs without provider credentials. For a ready same-repository PR targeting the default branch, fails with the exact missing or stale targets until refresh output is present. Drafts, non-default bases, and branches the repository cannot update remain advisory. It never publishes translations from pull-request code. |
+| `refresh` | Maintainer dispatch for a ready same-repository, default-base PR, or trusted `main` push after a fork/cross-repository source merge | Runs protected-base tooling against an exact source revision, generates and validates all affected locale candidates as one batch, then either commits them to the unchanged source branch under an exact-head lease or opens/updates one generated fallback PR. Failed generation or validation aborts publication. |
 | `enforce` | Pull request and release | Blocks invalid catalogs and any `complete` claim whose source, artifacts, or required review are stale. |
 
 The refresh workflow must execute workflow and generator code from a protected
 base-repository revision. A source PR's registry and English catalogs are read
 only as validated data; its scripts, actions, dependencies, and hooks are never
 executed with provider or publisher credentials. Before an in-place push the
-workflow rechecks that the PR is open, ready, same-repository, and still at the
+workflow rechecks that the PR is open, ready, same-repository, targets the
+default branch, and is still at the
 resolved source SHA, then uses a scoped application identity and an exact-head
 lease. Generated changes retain source, glossary, workflow, provider/model,
 and catalog-revision provenance.

@@ -181,7 +181,7 @@ flowchart TB
 | --- | --- |
 | English source PR | `"wizard.completion.enable": "Enable {shell} shell completion for {cli}?"` |
 | PR gate | Fails with `zh-CN/wizard-core` and `zh-TW/wizard-core` stale |
-| Trusted action | Maintainer dispatch against the ready same-repository PR's resolved exact head |
+| Trusted action | Maintainer dispatch against the ready same-repository, default-base PR's resolved exact head |
 | In-place update | `"wizard.completion.enable": "为 {cli} 启用 {shell} shell completion？"` plus source-pinned evidence is committed to the source PR |
 | Shipped runtime output | After that PR merges and the owner artifact ships, `t("wizard.completion.enable", { shell: "zsh", cli: "openclaw" })` → `为 openclaw 启用 zsh shell completion？` |
 
@@ -277,7 +277,8 @@ translation system for every slice:
 2. Enroll one owner surface by updating its source, inventory, catalog or
    conforming-pipeline disposition, and owner guidance in the same slice.
 3. Run credential-free detection on pull requests; fail a ready
-   same-repository PR when its adopted source makes targets stale.
+   same-repository PR targeting the default branch when its adopted source
+   makes targets stale.
 4. Let the maintainer-authorized owner workflow update that same PR from
    trusted tooling, or open one post-merge generated PR when it cannot update
    the source branch.
