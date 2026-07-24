@@ -395,10 +395,10 @@ The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
 Its upgrade boundary keeps unconfigured probes on the legacy checker and makes
 the presence of `gateway.readiness` the explicit canonical activation signal.
-It is one upstream PR with fifteen ordered commits at exact head `e49485d1c79`.
-The opt-in compatibility amendment passes 130 focused readiness, live Gateway,
-HTTP/RPC, health, selector, and CLI assertions; type-aware lint, formatting, and
-diff checks pass. Timed-out plugin checks remain single-flight
+It is one upstream PR with fourteen ordered commits at exact head `c21cf2903f4`.
+The opt-in compatibility amendment passes 154 focused readiness, live Gateway,
+HTTP/RPC, health, selector, registry, and CLI assertions; type-aware lint,
+formatting, and diff checks pass. Timed-out plugin checks remain single-flight
 until the original callback settles, even when the plugin ignores cancellation;
 provider output is bounded, validated, and redacted. Config publication fences
 provider and workspace evidence by runtime generation, including recovery when
