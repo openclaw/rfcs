@@ -40,24 +40,104 @@ Supporting material:
 
 ## System At A Glance
 
-The model maps directly to checked-in OpenClaw files, CI jobs, workflows, and
-runtime types:
+Each product surface enrolls independently. For a surface using the shared
+catalog path, one adoption slice updates three code locations together: the
+owner source, `localization/surfaces.json`, and `localization/catalogs.json`.
+A surface with an existing conforming pipeline names that pipeline instead;
+an English-only, deferred, or platform-constrained surface records a rationale.
+The same slice also lands its public workflow index and nearest owner guidance.
 
 ```mermaid
 flowchart TB
-  ONE["1. REGISTER<br/>localization/surfaces.json assigns owner + disposition<br/>localization/catalogs.json maps English source → locale targets"]
-  TWO["2. CHECK + REFRESH<br/>CI job: localization-catalogs<br/>Workflow: Localization Catalog Refresh → generated PR"]
-  THREE["3. RENDER<br/>@openclaw/localization-core • LocalizationContext<br/>localized prose; codes / commands / IDs / JSON unchanged"]
+  subgraph SURFACES["1. Choose one owner-declared product surface"]
+    direction TB
+    subgraph OPERATOR["Operator surfaces"]
+      direction LR
+      WIZARD["wizard"]
+      UPDATER["updater"]
+      CLI["cli"]
+      TUI["tui"]
+      DOCTOR["doctor"]
+    end
+    subgraph RUNTIME["Runtime and metadata surfaces"]
+      direction LR
+      GATEWAY["gateway-error"]
+      APPROVAL["approval"]
+      COMMAND["command-catalog"]
+      SKILL["skill"]
+      PLUGIN["plugin"]
+    end
+    subgraph CLIENTS["Client and publication surfaces"]
+      direction LR
+      CHANNEL["channel.&lt;adapter&gt;"]
+      CONTROL["control-ui"]
+      ANDROID["native.android"]
+      APPLE["native.apple"]
+      DOCS["docs"]
+    end
+  end
 
-  ONE --> TWO --> THREE
+  ADOPT["Adopt this surface"]
+  WIZARD --> ADOPT
+  UPDATER --> ADOPT
+  CLI --> ADOPT
+  TUI --> ADOPT
+  DOCTOR --> ADOPT
+  GATEWAY --> ADOPT
+  APPROVAL --> ADOPT
+  COMMAND --> ADOPT
+  SKILL --> ADOPT
+  PLUGIN --> ADOPT
+  CHANNEL --> ADOPT
+  CONTROL --> ADOPT
+  ANDROID --> ADOPT
+  APPLE --> ADOPT
+  DOCS --> ADOPT
+
+  subgraph REGISTRATION["2. Register it in the same slice"]
+    direction LR
+    SOURCE["A. Owner source<br/>reviewed English + owner renderer/catalog"]
+    INVENTORY["B. localization/surfaces.json<br/>id • owner • source • disposition"]
+    DISPOSITION{"C. Disposition"}
+    CATALOG["adopted<br/>localization/catalogs.json<br/>source • targets • protected literals"]
+    PIPELINE["conforming-pipeline<br/>named owner workflow"]
+    EXCEPTION["deferred / english-only / platform-constrained<br/>named rationale"]
+    GUIDANCE["Same slice<br/>docs/reference/localization.md<br/>nearest AGENTS.md + CLAUDE.md alias"]
+
+    INVENTORY --> DISPOSITION
+    DISPOSITION --> CATALOG
+    DISPOSITION --> PIPELINE
+    DISPOSITION --> EXCEPTION
+  end
+
+  ADOPT --> SOURCE
+  ADOPT --> INVENTORY
+  ADOPT --> GUIDANCE
+
+  subgraph MAINTENANCE["3. Enforce and maintain"]
+    direction LR
+    SURFACE_CHECK["localization:surfaces:check"]
+    CATALOG_CHECK["CI job: localization-catalogs<br/>catalogs:check / catalogs:detect"]
+    REFRESH["Localization Catalog Refresh<br/>generated PR"]
+    OWNER_FLOW["owner pipeline<br/>check + refresh"]
+    RESULT["Owner renderer + coverage evidence<br/>machine semantics unchanged"]
+  end
+
+  SOURCE --> SURFACE_CHECK
+  INVENTORY --> SURFACE_CHECK
+  CATALOG --> CATALOG_CHECK
+  SURFACE_CHECK --> CATALOG_CHECK
+  CATALOG_CHECK --> REFRESH --> RESULT
+  PIPELINE --> OWNER_FLOW --> RESULT
+  EXCEPTION --> SURFACE_CHECK
+  GUIDANCE --> RESULT
 ```
 
-In one sentence: owners register their sources and targets, the shared
-`localization-catalogs` CI job runs `localization:surfaces:check` plus
-`localization:catalogs:check` or `localization:catalogs:detect`, the trusted
-`Localization Catalog Refresh` workflow opens generated pull requests, and
-`LocalizationContext` drives final human-prose rendering without changing
-machine semantics.
+The shared path uses `@openclaw/localization-core` and `LocalizationContext`
+where the owning JavaScript or TypeScript renderer adopts them. Control UI,
+native, and documentation surfaces retain their existing formats and owner
+pipelines while satisfying the same disposition, evidence, and reporting
+contract. No path translates codes, commands, IDs, or structured output.
 
 ## Decision
 
