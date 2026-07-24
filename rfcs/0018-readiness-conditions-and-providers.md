@@ -416,6 +416,40 @@ The earlier consolidated draft remains useful behavior evidence, but it is not
 the proposed landing shape. The slices above can land without accepting profile
 names, profile selection, runtime activation identity, or release conformance.
 
+#### Follow-on condition adoption
+
+The framework should not grow through one PR per condition. Follow-on adoption
+is grouped by the OpenClaw owners that already maintain the underlying runtime
+facts. Each bucket is one reviewable implementation unit; individual conditions
+may be deferred when their owner does not yet expose a bounded activation
+snapshot.
+
+| Bucket | Candidate conditions | Existing owner evidence | Proposed PR scope |
+| --- | --- | --- | --- |
+| Runtime activation integrity | `SecretsReady`, `ModelRouteReady`, `ConfigCurrent`, stronger `PluginsLoaded` semantics | Degraded secret-owner snapshots, model-auth and route resolution state, runtime config/reloader state, plugin activation and configured-unavailable state | Project activation-pinned facts into selectable or advisory conditions. Do not resolve secrets, contact a model, or reload plugins during readiness evaluation. |
+| Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady` | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. |
+| State and background services | `StateReady`, `RestoreComplete`, `DeliveryRuntimeReady`, `SchedulerReady` | State/store activation, restore fencing, delivery runtime and queue state, cron lifecycle state | Report whether configured stateful services can accept new work. Historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. |
+| Hosted dependencies | `EgressReady`, `ManagedConfigApplied`, `HostBindingsReady` | Brokered transport state, effective config generation, and host-integration binding owners | Allow hosted integrations to contribute ordinary readiness conditions through the same provider contract. Keep Lobster, OCC, tenant, and deployment policy out of the core condition schema. |
+
+These buckets are adoption work over the v1 framework, not prerequisites for
+accepting it. They do not change the v1 aggregation algorithm or make a newly
+implemented condition required by default. A condition becomes required only
+through explicit `gateway.readiness` selection or a separately accepted Hosting
+Profile composition.
+
+Every adoption PR must preserve the owner boundary:
+
+1. expose or reuse a redacted, activation-scoped status fact;
+2. map that fact to `True`, `False`, or `Unknown` without mutation;
+3. bound evaluation through the v1 provider and outer-evaluator deadlines;
+4. test ready, failed, unknown, timeout, recovery, and generation replacement;
+5. prove that HTTP, RPC, health, status, and CLI project the same result.
+
+Readiness evaluation must not perform model inference, credential acquisition,
+unbounded network discovery, migration, repair, restore, or queue draining.
+Those operations remain owner workflows; readiness only observes their current
+activation state.
+
 ## Rationale
 
 This extends a surface OpenClaw already owns. It does not add a new health
