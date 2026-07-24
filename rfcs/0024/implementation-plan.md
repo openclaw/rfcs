@@ -141,10 +141,18 @@ one semantic owner
 + one deleted presentation workaround
 + one scoped authoring gate and owner-owned generated refresh path when the
   slice adds or migrates deterministic product strings
++ one updated checked-in inventory entry, public workflow-index entry, and
+  nearest owner-internal guidance, plus any additional public contract guidance
 ```
 
 The PR description or focused tests record the corresponding conformance
-evidence. Shared localization machinery is not acceptance by itself.
+evidence. Guidance and inventory land progressively with the owning slice;
+they are not deferred to product completion. Every adopted surface is indexed
+in the public contributor workflow guide. A slice may record that no additional
+public contract documentation changes when it introduces no public contract,
+but it still updates the nearest owner guidance when maintainers gain a new
+obligation.
+Shared localization machinery is not acceptance by itself.
 
 Stop the slice when no owner can approve stable meaning, no legitimate locale
 exists, safety review is missing, stable machine output would change, or the
@@ -246,10 +254,14 @@ After the exemplar lands, every subsequent slice that adds or migrates
 deterministic product strings must leave its area enrolled end to end. The PR
 defines the adopted family, namespace, or directory; enables its blocking
 credential-free gate; and configures the area's trusted asynchronous refresh,
-validation, evidence, and generated-PR path. Existing Control UI, native, or
-docs pipelines satisfy this requirement by proving conformance, not by being
-replaced. A schema-only, explicitly English-only, or deferred slice records why
-no translated catalog is enrolled.
+validation, evidence, and generated-PR path. The same slice updates its
+checked-in inventory disposition, public contributor workflow index, nearest
+owner-internal guidance, and any additional public contract documentation so
+the new maintenance contract is usable at merge time. Existing Control UI,
+native, or docs pipelines satisfy this
+requirement by proving conformance, not by being replaced. A schema-only,
+explicitly English-only, or deferred slice records why no translated catalog
+is enrolled and documents the resulting owner obligation.
 
 ## Workstream 1: Minimal Localization Core
 
@@ -502,7 +514,11 @@ The foundation is shipped when:
 - reviewed English fallback templates are rendered at the edge;
 - right-to-left literal isolation and missing-key fallback are proven;
 - adopted slices include accepted, fallback/failure, compatibility, privacy,
-  rollback, and deletion evidence; and
+  rollback, and deletion evidence;
+- `G47`/`PK0` registers its pre-inventory PK0 entries, indexes their workflows
+  publicly, and backfills their nearest owner-internal guidance; `F02`, `F04`,
+  `F05`, and every later slice land those artifacts in their own adoption
+  packages; and
 - public diagnostics remain bounded and content-free by default.
 
 ### Product completion
@@ -514,3 +530,7 @@ review, disclosure of any accepted platform constraints, and the chosen
 by source proof, or covered by a conforming existing owner pipeline; drafts,
 open generated follow-ups, and schedule-only deferrals do not count. Product
 completion is not required to accept the RFC or ship the runtime foundation.
+
+The `P41`-`P42` documentation cohort localizes documentation as a product
+surface. It is not a catch-all phase for documenting earlier runtime slices;
+those slices must already have landed their contributor and owner guidance.

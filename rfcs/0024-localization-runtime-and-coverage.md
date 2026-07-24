@@ -66,8 +66,10 @@ Accepting this RFC approves these product contracts:
    runtime kernel.
 6. A migrated surface satisfies the localization-ready ownership standard:
    semantic meaning, locale authority, catalog/rendering, compatibility,
-   privacy, conformance evidence, and deletion of the superseded presentation
-   path all have named owners and proof.
+   privacy, conformance evidence, current checked-in inventory, a public
+   workflow-index entry, owner-internal guidance, any additional public
+   contract documentation, and deletion of the superseded presentation path
+   all have named owners and proof.
 7. Owner workflows may publish one source-pinned translation-run evidence
    contract:
    exact source revision, locale, source and glossary revisions, generator and
@@ -103,7 +105,12 @@ and `G46` together as the bounded core/tooling exemplar: a routine English
 source edit trips deterministic CI, then a trusted exact-source workflow
 generates and validates a locale candidate and opens a generated pull request.
 Each later surface opts in only for its owner-declared families, namespaces, or
-directories and must bring both halves of that loop.
+directories and must bring both halves of that loop. Its inventory disposition,
+public workflow-index entry, and owner-internal guidance land in the same
+adoption slice,
+not in a documentation cleanup at product completion. The later documentation
+cohort localizes docs as a product surface; it does not defer documentation of
+earlier maintainer obligations.
 
 The current delivery audit identifies 47 projected owner slices. The first
 audit had 44; owner review exposed the authoring-gate and generated-refresh
@@ -117,6 +124,11 @@ locale-authority, public-contract, or publication boundary. Coverage and
 release state consume only landed owner declarations; the planning registry is
 never loaded by the runtime.
 
+Because the `F01`, `F03`, `G45`, and `G46` PK0 entries predate the disposition
+inventory, `G47`/`PK0` also backfills their public workflow-index entries and
+nearest owner-internal guidance. `F02`, `F04`, `F05`, and later slices carry
+those artifacts in their own scheduled adoption packages.
+
 ### Acceptance and delivery milestones
 
 RFC 0024 separates architecture acceptance from implementation and product
@@ -127,7 +139,7 @@ completion:
    recipient-locale surface remains gated on its named owner.
 2. **Foundation shipped:** a minimal kernel and one existing owner-controlled
    consumer land with accepted, fallback, compatibility, privacy, and deletion
-   proof.
+   proof, current inventory, and applicable public/internal owner guidance.
 3. **Owner cohorts complete:** operator, runtime-safety, channel/capability, and
    native/docs owners migrate bounded message families through independent,
    reviewable PRs and generated catalog waves tracked in the projected owner
