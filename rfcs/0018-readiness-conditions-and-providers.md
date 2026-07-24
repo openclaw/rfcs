@@ -441,10 +441,10 @@ snapshot.
 | --- | --- | --- | --- |
 | Runtime activation integrity | `SecretsReady`, `ModelRouteReady`, `ConfigCurrent`, stronger `PluginsLoaded` semantics | Degraded secret-owner snapshots, model-auth and route resolution state, runtime config/reloader state, plugin activation and configured-unavailable state | Project activation-pinned facts into selectable or advisory conditions. Do not resolve secrets, contact a model, or reload plugins during readiness evaluation. |
 | Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady` | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. |
-| State and background services | `StateReady`, `RestoreComplete`, `DeliveryRuntimeReady`, `SchedulerReady` | State/store activation, restore fencing, delivery runtime and queue state, cron lifecycle state | Report whether configured stateful services can accept new work. Historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. |
+| State and background services | `StateReady`, `DeliveryRuntimeReady`, `SchedulerReady`; defer `RestoreComplete` until a restore fence exists | State/store activation, delivery runtime ownership, cron lifecycle and startup recovery state | Report whether configured stateful services can accept new work. Historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. Do not infer restore completion from database-open, fleet-restore, or config-migration state. |
 | Hosted dependencies | `EgressReady`, `ManagedConfigApplied`, `HostBindingsReady` | Brokered transport state, effective config generation, and host-integration binding owners | Allow hosted integrations to contribute ordinary readiness conditions through the same provider contract. Keep Lobster, OCC, tenant, and deployment policy out of the core condition schema. |
 
-The first two buckets have fork evidence slices stacked directly on the exact
+The first three buckets have fork evidence slices stacked directly on the exact
 head of the primary readiness implementation. They remain optional follow-on
 work and are not prerequisites for accepting this RFC:
 
@@ -456,11 +456,20 @@ work and are not prerequisites for accepting this RFC:
   conditions. MCP discovery is captured for every configured agent when the
   Gateway accepts a runtime configuration; readiness evaluation does not
   connect to MCP servers or start any execution surface.
+- [State and background services PR 155](https://github.com/giodl73-repo/openclaw/pull/155)
+  adds selectable state-database, durable session-delivery, and scheduler
+  lifecycle conditions. Owners publish synchronous process-local snapshots;
+  readiness does not open SQLite, install delivery recovery, import or start
+  cron, scan queues, or run recovery. `RestoreComplete` remains deferred until
+  OpenClaw owns a generic restore generation and admission fence.
 
-The capability slice passes 14 focused assertions, production and source-test
-typechecks, type-aware lint, formatting, and diff checks. Its review found and
-fixed an initial default-agent-only MCP snapshot so the final evidence covers
-all configured agent workspaces.
+The capability slice passes 14 focused assertions and the state/background
+slice passes 145 focused assertions. Both pass production and source-test
+typechecks, type-aware lint, formatting, and diff checks. Capability review
+found and fixed an initial default-agent-only MCP snapshot so the final evidence
+covers all configured agent workspaces. State/background review verified
+disabled, starting, recovery-pending, active, stopped, failed, repaired, and
+stale-generation transitions without adding probe-side I/O.
 
 These buckets are adoption work over the v1 framework, not prerequisites for
 accepting it. They do not change the v1 aggregation algorithm or make a newly
