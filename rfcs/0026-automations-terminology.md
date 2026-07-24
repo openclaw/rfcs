@@ -6,7 +6,7 @@ created: 2026-07-23
 last_updated: 2026-07-23
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/50
 ---
 
 # Proposal: Automations Terminology and Configurable Feature Naming
