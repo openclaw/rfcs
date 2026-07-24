@@ -163,7 +163,7 @@ The initial public core criteria are:
 | Not selectable | `GatewayAcceptingWork` | Universal required | `GatewayDraining`, `GatewayAdmissionNotChecked` |
 | Not selectable | `ChannelRuntimeReady` | Universal required | `ChannelRuntimeUnavailable`, `ChannelRuntimeNotChecked` |
 | Not selectable | `ChannelRuntimeSuppressed` | Advisory when present | `ChannelRuntimeSuppressed` |
-| Not selectable | `EventLoopHealthy` | Advisory | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
+| `openclaw.event-loop-healthy` | `EventLoopHealthy` | Advisory unless selected as required | `EventLoopDegraded`, `EventLoopStatusUnavailable`, `CriterionEvaluationUnavailable` |
 | Not selectable | `ConfigLoaded` | Universal required | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
 | `openclaw.workspace-writable` | `WorkspaceWritable` | Selectable | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
 | `openclaw.config-current` | `ConfigCurrent` | Selectable | `ConfigRestartRequired` |
@@ -178,7 +178,7 @@ The initial public core criteria are:
 | `openclaw.state-ready` | `StateReady` | Selectable | Owner-defined bounded state reasons. |
 | `openclaw.delivery-runtime-ready` | `DeliveryRuntimeReady` | Selectable | Owner-defined bounded delivery reasons. |
 | `openclaw.scheduler-ready` | `SchedulerReady` | Selectable | Owner-defined bounded scheduler reasons. |
-| Not selectable | `PluginsLoaded` | Advisory | `PluginLoadFailures`, `PluginStatusUnavailable` |
+| `openclaw.plugins-loaded` | `PluginsLoaded` | Advisory unless selected as required | `PluginLoadFailures`, `PluginStatusUnavailable`, `CriterionEvaluationUnavailable` |
 
 Each condition is `True` only when the runtime observes the corresponding
 startup, admission, channel, event-loop, config, activation, workspace,
@@ -231,6 +231,13 @@ type RegisterReadinessCriterion = (
 Registration through `api.registerReadinessCriterion` is scoped to the current
 plugin activation. Core publishes the resulting ID as
 `plugin.<plugin-id>.<provider-id>`.
+
+The bundled Policy plugin demonstrates this contract with
+`plugin.policy.conformant`. It reuses the plugin's existing policy evaluation,
+returns only bounded summary text, and is not evaluated until selected through
+`gateway.readiness`. Advisory selection does not affect the overall readiness
+decision; required selection fails closed for findings, disabled evaluation,
+provider failure, or timeout.
 
 ### Provider Requirements
 

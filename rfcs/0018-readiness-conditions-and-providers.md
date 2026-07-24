@@ -156,12 +156,12 @@ justifies them.
 | `GatewayAcceptingWork` | Required | The Gateway is not draining and can admit new work. | `GatewayDraining` |
 | `ChannelRuntimeReady` | Required | No selected channel has an unsuppressed runtime-health failure under existing channel policy. | `ChannelRuntimeUnavailable` |
 | `ChannelRuntimeSuppressed` | Advisory when present | A channel runtime failure is intentionally suppressed by existing autostart/crash-loop policy. | `ChannelRuntimeSuppressed` |
-| `EventLoopHealthy` | Advisory initially | Existing event-loop health is within its healthy threshold. | `EventLoopDegraded`, `EventLoopStatusUnavailable` |
+| `EventLoopHealthy` | Advisory by default; selectable | Existing event-loop health is within its healthy threshold. | `EventLoopDegraded`, `EventLoopStatusUnavailable`, `CriterionEvaluationUnavailable` |
 | `ReadinessEvaluationComplete` | Required when emitted | The bounded canonical evaluation completed. This failure-only guard condition is emitted when the evaluator cannot produce its normal condition set. | `ReadinessEvaluationTimedOut`, `ReadinessEvaluationFailed` |
 | `GatewayResponding` | Required when observed remotely | The current operation successfully reached the live Gateway. | `GatewayUnavailable`, `GatewayNotChecked` |
 | `ConfigLoaded` | Required | The validated effective runtime config snapshot is installed. | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
 | `WorkspaceWritable` | Required or advisory when selected | The effective workspace exists and passes a bounded write, flush, and cleanup probe. It is not a new universal blocker by default. | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
-| `PluginsLoaded` | Advisory | The activation-pinned plugin registry is available and selected plugins have no activation errors. | `PluginLoadFailures`, `PluginStatusUnavailable` |
+| `PluginsLoaded` | Advisory by default; selectable | The activation-pinned plugin registry is available and selected plugins have no activation errors. | `PluginLoadFailures`, `PluginStatusUnavailable`, `CriterionEvaluationUnavailable` |
 | `ConfigCurrent` | Required or advisory when selected | The accepted effective config does not require restart. | `ConfigRestartRequired` |
 | `ModelRouteReady` | Required or advisory when selected | The selected model route has usable provider authentication. | `ModelRouteUnavailable`, `ModelAuthUnavailable` |
 | `SecretsReady` | Required or advisory when selected | Required secret owners resolved during activation. | `SecretOwnersUnavailable` |
@@ -233,6 +233,14 @@ bound to the activated plugin registry snapshot. Reload replaces the complete
 provider set atomically with the next activation; stale callbacks do not remain
 registered.
 
+The bundled Policy plugin is the concrete v1 example. When activated, it
+registers `plugin.policy.conformant`, reuses its existing policy evaluator, and
+reports `True` when evaluation has no findings, `False` with a bounded finding
+count when findings exist, and `Unknown` when policy checks are disabled. The
+provider remains inert until an operator selects it. Selecting it as advisory
+exposes drift without changing `/readyz` from `200`; selecting it as required
+makes nonconformance block readiness.
+
 Provider descriptors are enumerable without invoking callbacks. The active
 registry exposes provider identity, description, owning plugin, and source; the
 registry snapshot itself is the activation-generation boundary. Future status
@@ -272,7 +280,11 @@ hosting profile:
         "openclaw.workspace-writable",
         "plugin.storage.backend",
       ],
-      advisoryCriteria: ["plugin.metrics.exporter"],
+      advisoryCriteria: [
+        "openclaw.event-loop-healthy",
+        "plugin.metrics.exporter",
+        "plugin.policy.conformant",
+      ],
     },
   },
 }
@@ -454,7 +466,7 @@ snapshot.
 
 | Bucket | Candidate conditions | Existing owner evidence | Proposed PR scope |
 | --- | --- | --- | --- |
-| Runtime activation integrity | `SecretsReady`, `ModelRouteReady`, `ConfigCurrent`, stronger `PluginsLoaded` semantics | Degraded secret-owner snapshots, model-auth and route resolution state, runtime config/reloader state, plugin activation and configured-unavailable state | Project activation-pinned facts into selectable or advisory conditions. Do not resolve secrets, contact a model, or reload plugins during readiness evaluation. |
+| Runtime activation integrity | `SecretsReady`, `ModelRouteReady`, `ConfigCurrent`, selectable `PluginsLoaded`, selectable `EventLoopHealthy` | Degraded secret-owner snapshots, model-auth and route resolution state, runtime config/reloader state, plugin activation and configured-unavailable state, Gateway event-loop snapshot | Project activation-pinned facts and existing canonical Gateway facts into selectable or advisory conditions. Do not resolve secrets, contact a model, reload plugins, or create a second event-loop probe during readiness evaluation. |
 | Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady`; defer `SkillsReady` until bounded owner evidence exists | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. Do not rebuild the skill inventory in the readiness path. |
 | State and background services | `StateReady`, `SessionStorageReady`, `DeliveryRuntimeReady`, `SchedulerReady`; defer `RestoreComplete` until a restore fence exists | State/store activation, bounded persistence-location probes, delivery runtime ownership, cron lifecycle and startup recovery state | Report whether configured stateful services can accept new work. A selected storage probe may perform a capped write/fsync/unlink check, but historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. Do not infer restore completion from database-open, fleet-restore, or config-migration state. |
 | Hosted dependencies | `HostBindingsReady`; defer `EgressReady` and `ManagedConfigApplied` until their owners publish authoritative facts | RFC 0020 host-integration bundle and owner-generation evidence | Project required host bindings through the ordinary readiness selector. Keep network probing, config inference, Lobster, OCC, tenant, and deployment policy out of the condition evaluator. |
