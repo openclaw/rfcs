@@ -40,56 +40,17 @@ Supporting material:
 
 ## System At A Glance
 
-Each product surface keeps ownership of its English source, catalogs, final
-rendering, publication, and review policy. Shared repository machinery supplies
-the locale contract, catches adopted-scope drift, runs trusted translation
-refreshes, and aggregates evidence without becoming a central catalog owner.
+The model is deliberately simple: product owners own the words, shared
+machinery automates their upkeep, and the runtime ships localized human prose
+without changing machine semantics.
 
 ```mermaid
 flowchart TB
-  subgraph OWNERS["Product surfaces keep ownership"]
-    direction LR
-    SURFACES["CLI / TUI • Gateway / channels<br/>Control UI / native • docs"]
-    ASSETS["Per-surface English source + catalogs<br/>renderer + publication + review policy"]
-    SURFACES --- ASSETS
-  end
+  ONE["1. OWN<br/>Each surface owns its English, catalogs,<br/>rendering, publication, and review"]
+  TWO["2. AUTOMATE<br/>G47 enrolls surfaces • G45 blocks drift<br/>G46 opens trusted translation PRs"]
+  THREE["3. SHIP<br/>LocalizationContext renders human prose<br/>machine semantics stay stable • E43/E44 report status"]
 
-  subgraph CAPABILITIES["Reusable capabilities"]
-    direction LR
-    subgraph CONTRACT["Shared localization contract — no product-copy ownership"]
-      direction TB
-      REGISTRY["Locale registry<br/>aliases • fallback • direction"]
-      CONTEXT["LocalizationContext<br/>locale • provenance • audience"]
-      VALIDATION["Catalog + descriptor validation<br/>keys • ICU • params • literals"]
-      REGISTRY --> CONTEXT
-    end
-
-    subgraph AUTOMATION["Shared repository automation — reused by every slice"]
-      direction TB
-      G47["G47<br/>new-surface disposition"]
-      G45["G45<br/>credential-free authoring + drift"]
-      G46["G46<br/>trusted refresh → generated PR"]
-    end
-  end
-
-  subgraph OUTCOMES["Runtime and release outcomes"]
-    direction LR
-    HUMAN["Localized human-facing prose"]
-    MACHINE["Invariant machine semantics<br/>codes • commands • IDs • JSON"]
-    EVIDENCE["E43 / E44<br/>coverage + review evidence"]
-  end
-
-  CONTEXT --> ASSETS
-  VALIDATION --> ASSETS
-  ASSETS --> G47
-  ASSETS --> G45
-  G46 --> ASSETS
-  ASSETS --> HUMAN
-  CONTEXT --> HUMAN
-  VALIDATION -. protects .-> MACHINE
-  ASSETS --> EVIDENCE
-  G47 --> EVIDENCE
-  G46 --> EVIDENCE
+  ONE --> TWO --> THREE
 ```
 
 In one sentence: owners author reviewed English and keep their rendering and
