@@ -3,7 +3,7 @@ title: Readiness Conditions and Providers
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-23
+last_updated: 2026-07-24
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -443,6 +443,24 @@ snapshot.
 | Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady` | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. |
 | State and background services | `StateReady`, `RestoreComplete`, `DeliveryRuntimeReady`, `SchedulerReady` | State/store activation, restore fencing, delivery runtime and queue state, cron lifecycle state | Report whether configured stateful services can accept new work. Historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. |
 | Hosted dependencies | `EgressReady`, `ManagedConfigApplied`, `HostBindingsReady` | Brokered transport state, effective config generation, and host-integration binding owners | Allow hosted integrations to contribute ordinary readiness conditions through the same provider contract. Keep Lobster, OCC, tenant, and deployment policy out of the core condition schema. |
+
+The first two buckets have fork evidence slices stacked directly on the exact
+head of the primary readiness implementation. They remain optional follow-on
+work and are not prerequisites for accepting this RFC:
+
+- [Runtime activation integrity PR 153](https://github.com/giodl73-repo/openclaw/pull/153)
+  adds selectable `ConfigCurrent`, `ModelRouteReady`, and `SecretsReady`
+  conditions plus quarantine-aware plugin activation evidence.
+- [Agent execution capabilities PR 154](https://github.com/giodl73-repo/openclaw/pull/154)
+  adds selectable context-engine, tool-catalog, MCP, sandbox, and harness
+  conditions. MCP discovery is captured for every configured agent when the
+  Gateway accepts a runtime configuration; readiness evaluation does not
+  connect to MCP servers or start any execution surface.
+
+The capability slice passes 14 focused assertions, production and source-test
+typechecks, type-aware lint, formatting, and diff checks. Its review found and
+fixed an initial default-agent-only MCP snapshot so the final evidence covers
+all configured agent workspaces.
 
 These buckets are adoption work over the v1 framework, not prerequisites for
 accepting it. They do not change the v1 aggregation algorithm or make a newly
