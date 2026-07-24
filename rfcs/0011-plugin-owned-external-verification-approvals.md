@@ -3,9 +3,9 @@ title: Plugin-Owned External Verification for Approval Resolution
 authors:
   - Pablo Guardiola
 created: 2026-06-13
-last_updated: 2026-07-21
-status: draft
-issue:
+last_updated: 2026-07-24
+status: accepted
+issue: https://github.com/openclaw/openclaw/issues/82336
 rfc_pr: https://github.com/openclaw/rfcs/pull/15
 ---
 
