@@ -139,6 +139,41 @@ native, and documentation surfaces retain their existing formats and owner
 pipelines while satisfying the same disposition, evidence, and reporting
 contract. No path translates codes, commands, IDs, or structured output.
 
+### Example: one English wizard string, end to end
+
+The wizard authoring exemplar in OpenClaw PR
+[#112784](https://github.com/openclaw/openclaw/pull/112784), together with the
+surface-inventory follow-up
+[#112801](https://github.com/openclaw/openclaw/pull/112801), makes the shared
+path concrete. This is one actual message from that implementation, not a new
+hypothetical API:
+
+```mermaid
+flowchart TB
+  EN["1. Owner writes reviewed English<br/><code>src/wizard/i18n/catalogs/en.json</code><br/><code>wizard.completion.enable</code>"]
+  REGISTER["2. The same surface is registered<br/><code>surfaces.json</code>: wizard-core is adopted<br/><code>catalogs.json</code>: English source + zh-CN/zh-TW targets"]
+  DETECT["3. A source PR runs the shared gates<br/><code>localization:surfaces:check</code><br/><code>localization:catalogs:detect</code>"]
+  REFRESH["4. Trusted refresh opens a generated PR<br/><code>generated/zh-CN.json</code><br/>strict <code>localization:catalogs:check</code>"]
+  LOAD["5. The wizard loads its catalog family<br/><code>catalogFamily(..., &quot;wizard.completion&quot;)</code>"]
+  RENDER["6. The owner renders at the presentation edge<br/><code>LocalizationContext(locale = zh-CN)</code><br/><code>shell = zsh</code> • <code>cli = openclaw</code>"]
+
+  EN --> REGISTER --> DETECT --> REFRESH --> LOAD --> RENDER
+```
+
+| Point in the path | Actual value |
+| --- | --- |
+| Reviewed English source | `Enable {shell} shell completion for {cli}?` |
+| Generated `zh-CN` catalog entry | `为 {cli} 启用 {shell} shell completion？` |
+| Wizard call site | `t("wizard.completion.enable", { shell, cli })` |
+| Rendered result for `zsh` and `openclaw` | `为 openclaw 启用 zsh shell completion？` |
+
+The checked-in `zh-CN` exemplar is explicitly marked `bootstrap-reviewed` with
+a human provider. The first credentialed post-merge `Localization Catalog
+Refresh` run is still a supervised rollout gate; after that gate succeeds,
+future English edits to this area follow the detect, generated-PR, strict-check,
+and owner-rendering loop above. Message parameters survive unchanged, and the
+wizard—not the shared core—still chooses where the final string is presented.
+
 ## Decision
 
 Accepting this RFC approves these product contracts:
