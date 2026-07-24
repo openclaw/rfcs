@@ -34,6 +34,17 @@ The detailed contracts are normative and live in these focused sidecars:
 - [Projected owner slice registry](0024/projected-owner-slice-registry.md)
 - [GitHub issue catalog](0024/issue-catalog.md)
 
+## Current state
+
+The 315-cell matrix is the product target, not a claim about the current
+release. Control UI, native apps, documentation, and the onboarding wizard
+already have owner-specific localization systems at different maturity levels;
+the wizard currently covers English, Simplified Chinese, and Traditional
+Chinese. Many CLI, TUI, runtime, Gateway, channel, and metadata families remain
+English-only, partial, or unsupported. Until aggregate reporting lands in
+`E43` and `E44`, the live implementation tracker—not this RFC—is the delivery
+status source.
+
 ## System at a glance
 
 Each product surface enrolls independently. An adopted shared-catalog surface
@@ -155,9 +166,13 @@ flowchart TB
   REFRESH["4. That trusted <code>main</code> push starts<br/><code>Localization Catalog Refresh</code><br/>provider credentials are available only here"]
   GENERATED["5. Automation opens a generated translation PR<br/><code>generated/zh-CN.json</code> + <code>generated/zh-TW.json</code><br/>source revision + provider/model evidence"]
   CHECK["6. Generated PR runs strict checks and review<br/><code>localization:catalogs:check</code><br/>keys • ICU • placeholders • protected literals"]
-  RENDER["7. After merge, the owner renders<br/><code>LocalizationContext(locale = zh-CN)</code><br/>为 openclaw 启用 zsh shell completion？"]
+  SHIP["7. Generated PR merges and owner artifact ships<br/>the catalog becomes available to that surface"]
+  RENDER["8. The owner renders at its presentation edge<br/><code>LocalizationContext(locale = zh-CN)</code><br/>为 openclaw 启用 zsh shell completion？"]
+  FAIL["Failure or rejection<br/>publish nothing • English fallback stays live<br/>target cells remain partial and visible"]
 
-  EN --> DETECT --> MERGE --> REFRESH --> GENERATED --> CHECK --> RENDER
+  EN --> DETECT --> MERGE --> REFRESH --> GENERATED --> CHECK --> SHIP --> RENDER
+  REFRESH -. generation or validation fails .-> FAIL
+  CHECK -. checks or review reject .-> FAIL
 ```
 
 | Point in the path | Actual value |
@@ -166,14 +181,15 @@ flowchart TB
 | PR detection | `zh-CN/wizard-core` and `zh-TW/wizard-core` are stale |
 | Trusted trigger | Merge of the registered English source path to protected `main` |
 | Generated translation PR | `"wizard.completion.enable": "为 {cli} 启用 {shell} shell completion？"` plus source-pinned evidence |
-| Runtime output | `t("wizard.completion.enable", { shell: "zsh", cli: "openclaw" })` → `为 openclaw 启用 zsh shell completion？` |
+| Shipped runtime output | After the generated PR merges and the owner artifact ships, `t("wizard.completion.enable", { shell: "zsh", cli: "openclaw" })` → `为 openclaw 启用 zsh shell completion？` |
 
 The checked-in `zh-CN` exemplar is marked `bootstrap-reviewed` with a human
 provider. The first credentialed post-merge refresh is therefore still a
 supervised rollout gate. Once that gate succeeds, no contributor manually
 creates the translation PR: the English merge triggers the trusted refresh and
-generated-PR publisher. The same loop applies to every one of the 15 product
-surfaces, using its registered source and owner workflow.
+generated-PR publisher. The same control loop applies to every one of the 15
+product surfaces, but not necessarily through the same files or workflow name:
+Control UI, native, and docs keep their conforming owner workflows.
 
 ## Product target
 
