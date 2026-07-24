@@ -40,23 +40,24 @@ Supporting material:
 
 ## System At A Glance
 
-The model is deliberately simple: product owners own the words, shared
-machinery automates their upkeep, and the runtime ships localized human prose
-without changing machine semantics.
+The model maps directly to checked-in OpenClaw files, CI jobs, workflows, and
+runtime types:
 
 ```mermaid
 flowchart TB
-  ONE["1. OWN<br/>Each surface owns its English, catalogs,<br/>rendering, publication, and review"]
-  TWO["2. AUTOMATE<br/>G47 enrolls surfaces • G45 blocks drift<br/>G46 opens trusted translation PRs"]
-  THREE["3. SHIP<br/>LocalizationContext renders human prose<br/>machine semantics stay stable • E43/E44 report status"]
+  ONE["1. REGISTER<br/>localization/surfaces.json assigns owner + disposition<br/>localization/catalogs.json maps English source → locale targets"]
+  TWO["2. CHECK + REFRESH<br/>CI job: localization-catalogs<br/>Workflow: Localization Catalog Refresh → generated PR"]
+  THREE["3. RENDER<br/>@openclaw/localization-core • LocalizationContext<br/>localized prose; codes / commands / IDs / JSON unchanged"]
 
   ONE --> TWO --> THREE
 ```
 
-In one sentence: owners author reviewed English and keep their rendering and
-catalog pipelines; shared gates detect drift, a trusted workflow opens
-translation PRs, one locale context drives final rendering, and machine
-semantics never change.
+In one sentence: owners register their sources and targets, the shared
+`localization-catalogs` CI job runs `localization:surfaces:check` plus
+`localization:catalogs:check` or `localization:catalogs:detect`, the trusted
+`Localization Catalog Refresh` workflow opens generated pull requests, and
+`LocalizationContext` drives final human-prose rendering without changing
+machine semantics.
 
 ## Decision
 
