@@ -3,7 +3,26 @@
 This document defines the product-level inventory, maturity, validation, and
 release-reporting contract for RFC 0024.
 
-Status: draft, tied to RFC 0024.
+Status: accepted as part of RFC 0024; implementation lands progressively.
+
+## Contract At A Glance
+
+Use this specification to decide whether OpenClaw may claim a surface or the
+product is localized. The v1 release portfolio has 15 rows and 21 non-English
+targets, producing 315 target cells. Every required row is present even when
+its maturity is `unsupported`; only `complete` counts toward the unqualified
+product claim.
+
+Owner declarations may be more granular than release rows. Message families,
+packages, and channel adapters publish their own evidence, then the product
+aggregator derives the applicable release-row state. Adding a delivery slice
+or owner declaration does not silently change the 315-cell denominator;
+changing the required release-row set is an explicit product-policy decision.
+
+Runtime rendering rules live in the
+[runtime specification](localization-runtime-v1-spec.md). Locale-aware command,
+skill, and capability fields live in the
+[metadata specification](localized-metadata-v1-spec.md).
 
 ## Coverage Manifest
 
@@ -103,11 +122,11 @@ or declared locale support without a corresponding artifact. The generated
 manifest does not persist the declaration order field; order only makes the
 checked report deterministic.
 
-The current RFC 0024 release portfolio contains 15 owner-declared product
-surfaces. That portfolio and its 315 target cells are product release policy,
-not a closed type restriction in localization core. A future owner can publish
-a valid new surface without modifying generic core validation, while changing
-the required release portfolio remains an explicit product-policy change.
+The current RFC 0024 release portfolio contains 15 required release rows. That
+portfolio and its 315 target cells are product release policy, not a closed type
+restriction in localization core. A future owner can publish a valid granular
+declaration without modifying generic core validation, while changing the
+required release-row set remains an explicit product-policy change.
 
 `manifestRevision` is computed from the canonical checked-in manifest bytes and
 is not stored inside that manifest. Release reports and packaged status expose
@@ -162,29 +181,31 @@ string.
 
 ## Surface Set
 
-The initial product report covers:
+The initial product report uses these exact 15 release rows:
 
-- Control UI;
-- CLI onboarding;
-- channel and plugin setup flows;
-- remaining CLI commands and help;
-- TUI human-readable output;
-- core runtime messages, approvals, authentication, validation, and recovery
-  guidance;
-- Gateway errors;
-- server-rendered channel messages and notifications;
-- core and bundled command metadata;
-- bundled channel command-menu projections, tracked separately for each
-  adapter such as Telegram and Discord;
-- core and bundled skill metadata;
-- Android;
-- Apple platforms;
-- documentation.
+| Surface ID | Includes |
+| --- | --- |
+| `control-ui` | Browser UI copy and client-rendered known Gateway failures |
+| `cli-onboarding` | CLI onboarding wizard |
+| `channel-plugin-setup` | Channel and bundled-plugin setup flows |
+| `cli` | Remaining CLI commands, help, validation, and recovery copy |
+| `tui` | Human-readable terminal UI output |
+| `runtime` | Core runtime, approval, authentication, validation, and recovery copy |
+| `gateway-errors` | Protocol-owned known Gateway error descriptors |
+| `server-rendered-channels` | Channel messages, notifications, and approval presentation |
+| `command-metadata` | Core and bundled command display metadata |
+| `telegram-command-menu` | Telegram-native command-menu projection |
+| `discord-command-menu` | Discord-native command-menu projection |
+| `skill-metadata` | Core and bundled skill display metadata |
+| `android` | Android product catalogs |
+| `apple` | Apple-platform product catalogs |
+| `docs` | Published documentation |
 
-Surfaces can have different catalogs and supported locale sets. A shared
-metadata catalog and each product-owned platform projection are separate
-coverage surfaces because platform limits, locale support, and reconcile
-behavior can independently reject or drop localized text.
+Rows can have different catalogs and supported locale sets. More granular
+owner declarations feed these rows. For example, Telegram and Discord retain
+separate projection rows because their locale limits and reconcile behavior
+can fail independently; other adapter-specific message evidence contributes to
+`server-rendered-channels` until product policy adds another required row.
 Generated-content language is post-v1 and is not part of this initial coverage
 report or the product-localization completeness claim.
 

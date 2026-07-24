@@ -43,6 +43,12 @@ surface-owned catalogs and protocol-owned descriptor registries. Coverage
 aggregation reads landed owner declarations; it does not make this planning
 file executable.
 
+Owner registries below are delivery boundaries, not necessarily release-report
+rows. Updater and Doctor slices, for example, contribute to the `cli` release
+row; approval slices may contribute to `runtime`, `gateway-errors`, and
+`server-rendered-channels`. The exact 15-row product denominator is defined by
+the [coverage specification](localization-coverage-v1-spec.md#surface-set).
+
 After `G45` and `G46` land, every slice that adds or migrates deterministic
 product strings must also onboard its area to both halves of the maintenance
 contract before that area is complete: its declared scope runs the blocking,

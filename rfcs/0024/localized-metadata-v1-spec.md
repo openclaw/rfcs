@@ -3,12 +3,27 @@
 This document defines locale-aware display metadata for commands, skills, and
 other cataloged OpenClaw capabilities.
 
-Status: draft, tied to RFC 0024.
+Status: accepted as part of RFC 0024; each public schema still requires its
+owning maintainer's activation approval.
 
 This specification defines the reusable additive shape. It does not by itself
 authorize a command-catalog, skill-manifest, plugin SDK, or platform adapter
 schema change. Each owning maintainer must approve that public surface and its
 compatibility plan before activation.
+
+## Contract At A Glance
+
+Use this specification for localized display names and descriptions of stable
+capabilities. The capability identity and executable name never change;
+`LocalizedText` adds English-default presentation plus locale-keyed display
+values. Capability owners approve meaning, consuming surfaces own projection
+and fallback, and external package translations remain package-owned.
+
+This specification does not authorize a schema change by itself, register
+runtime message catalogs, or add external packages to OpenClaw's 315-cell
+product target. Runtime messages use the
+[runtime specification](localization-runtime-v1-spec.md); release maturity uses
+the [coverage specification](localization-coverage-v1-spec.md).
 
 ## Scope
 

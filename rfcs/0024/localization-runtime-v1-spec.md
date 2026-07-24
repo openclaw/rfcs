@@ -4,7 +4,26 @@ This document is the implementer-facing runtime specification for RFC 0024.
 It defines locale identity, resolution, message descriptors, rendering,
 fallback, Gateway error compatibility, and safety-message constraints.
 
-Status: draft, tied to RFC 0024.
+Status: accepted as part of RFC 0024; implementation lands progressively.
+
+## Contract At A Glance
+
+Use this specification when adding deterministic product-owned text to a
+runtime renderer. One operation resolves one immutable `LocalizationContext`,
+looks up a stable message key in an owner catalog, validates literal
+parameters, formats through the owner renderer, and falls back to reviewed
+English without changing machine semantics.
+
+| Responsibility | Owner |
+| --- | --- |
+| Locale identity, context, validation, and fallback primitives | Shared localization kernel |
+| Message meaning, stable key, parameters, and reviewed English | Semantic owner |
+| Catalog, locale authority, final rendering, and translation workflow | Presenting surface owner |
+| Surface/locale maturity and release claims | [Coverage specification](localization-coverage-v1-spec.md) |
+| Command, skill, and capability display fields | [Metadata specification](localized-metadata-v1-spec.md) |
+
+This specification does not enumerate the 15-row release portfolio or move
+copy ownership into the shared kernel.
 
 ## Scope
 

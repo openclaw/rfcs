@@ -44,47 +44,47 @@ also updates the public workflow index and nearest owner guidance.
 
 ```mermaid
 flowchart TB
-  subgraph SURFACES["1. Choose one owner-declared product surface"]
+  subgraph SURFACES["1. Choose one release-coverage surface"]
     direction TB
     subgraph OPERATOR["Operator surfaces"]
       direction LR
-      WIZARD["wizard"]
-      UPDATER["updater"]
+      WIZARD["cli-onboarding"]
+      SETUP["channel-plugin-setup"]
       CLI["cli"]
       TUI["tui"]
-      DOCTOR["doctor"]
     end
     subgraph RUNTIME["Runtime and metadata surfaces"]
       direction LR
-      GATEWAY["gateway-error"]
-      APPROVAL["approval"]
-      COMMAND["command-catalog"]
-      SKILL["skill"]
-      PLUGIN["plugin"]
+      CORE["runtime"]
+      GATEWAY["gateway-errors"]
+      CHANNELS["server-rendered-channels"]
+      COMMAND["command-metadata"]
+      SKILL["skill-metadata"]
     end
     subgraph CLIENTS["Client and publication surfaces"]
       direction LR
-      CHANNEL["channel.&lt;adapter&gt;"]
       CONTROL["control-ui"]
-      ANDROID["native.android"]
-      APPLE["native.apple"]
+      TELEGRAM["telegram-command-menu"]
+      DISCORD["discord-command-menu"]
+      ANDROID["android"]
+      APPLE["apple"]
       DOCS["docs"]
     end
   end
 
   ADOPT["Adopt this surface"]
   WIZARD --> ADOPT
-  UPDATER --> ADOPT
+  SETUP --> ADOPT
   CLI --> ADOPT
   TUI --> ADOPT
-  DOCTOR --> ADOPT
+  CORE --> ADOPT
   GATEWAY --> ADOPT
-  APPROVAL --> ADOPT
+  CHANNELS --> ADOPT
   COMMAND --> ADOPT
   SKILL --> ADOPT
-  PLUGIN --> ADOPT
-  CHANNEL --> ADOPT
   CONTROL --> ADOPT
+  TELEGRAM --> ADOPT
+  DISCORD --> ADOPT
   ANDROID --> ADOPT
   APPLE --> ADOPT
   DOCS --> ADOPT
@@ -132,6 +132,12 @@ Control UI, native, and documentation surfaces keep their existing formats and
 owner workflows while satisfying the same inventory, evidence, and coverage
 contract. A deferred or platform-constrained disposition remains visible as a
 product-completion blocker; it is not counted as localized.
+
+These are release-reporting rows, not delivery-slice names. For example,
+updater and Doctor work rolls into `cli`; approval work can affect `runtime`,
+`gateway-errors`, and `server-rendered-channels`; and adapter-specific evidence
+feeds the appropriate channel row. Adding an implementation slice does not
+silently add another row to the 315-cell product denominator.
 
 ### Example: one English wizard string, end to end
 
