@@ -442,11 +442,13 @@ snapshot.
 | Runtime activation integrity | `SecretsReady`, `ModelRouteReady`, `ConfigCurrent`, stronger `PluginsLoaded` semantics | Degraded secret-owner snapshots, model-auth and route resolution state, runtime config/reloader state, plugin activation and configured-unavailable state | Project activation-pinned facts into selectable or advisory conditions. Do not resolve secrets, contact a model, or reload plugins during readiness evaluation. |
 | Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady` | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. |
 | State and background services | `StateReady`, `DeliveryRuntimeReady`, `SchedulerReady`; defer `RestoreComplete` until a restore fence exists | State/store activation, delivery runtime ownership, cron lifecycle and startup recovery state | Report whether configured stateful services can accept new work. Historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. Do not infer restore completion from database-open, fleet-restore, or config-migration state. |
-| Hosted dependencies | `EgressReady`, `ManagedConfigApplied`, `HostBindingsReady` | Brokered transport state, effective config generation, and host-integration binding owners | Allow hosted integrations to contribute ordinary readiness conditions through the same provider contract. Keep Lobster, OCC, tenant, and deployment policy out of the core condition schema. |
+| Hosted dependencies | `HostBindingsReady`; defer `EgressReady` and `ManagedConfigApplied` until their owners publish authoritative facts | RFC 0020 host-integration bundle and owner-generation evidence | Project required host bindings through the ordinary readiness selector. Keep network probing, config inference, Lobster, OCC, tenant, and deployment policy out of the condition evaluator. |
 
-The first three buckets have fork evidence slices stacked directly on the exact
-head of the primary readiness implementation. They remain optional follow-on
-work and are not prerequisites for accepting this RFC:
+All four buckets now have fork evidence slices. The first three are stacked
+directly on the exact head of the primary readiness implementation. The fourth
+is stacked on an explicit composition of that readiness head with RFC 0020 host
+integration package 3. They remain optional follow-on work and are not
+prerequisites for accepting this RFC:
 
 - [Runtime activation integrity PR 153](https://github.com/giodl73-repo/openclaw/pull/153)
   adds selectable `ConfigCurrent`, `ModelRouteReady`, and `SecretsReady`
@@ -462,10 +464,22 @@ work and are not prerequisites for accepting this RFC:
   readiness does not open SQLite, install delivery recovery, import or start
   cron, scan queues, or run recovery. `RestoreComplete` remains deferred until
   OpenClaw owns a generic restore generation and admission fence.
+- [Hosted dependencies PR 156](https://github.com/giodl73-repo/openclaw/pull/156)
+  adds selectable `openclaw.host-bindings-ready` and projects the active RFC
+  0020 host-integration bundle plus owner-published generation evidence into
+  `HostBindingsReady`. Required bindings fail closed for missing,
+  incompatible, unresolved, stale, degraded, or unavailable state. Optional
+  binding failures remain visible without blocking the aggregate condition.
+  Evaluation is synchronous, in-memory, and bounded before inventory
+  projection. Generic `EgressReady` remains with concrete dispatcher and
+  traffic-policy owners; `ManagedConfigApplied` remains deferred until Managed
+  Config publishes an authoritative applied/effective generation.
 
-The capability slice passes 14 focused assertions and the state/background
-slice passes 145 focused assertions. Both pass production and source-test
-typechecks, type-aware lint, formatting, and diff checks. Capability review
+The capability slice passes 14 focused assertions, the state/background slice
+passes 145 focused assertions, and the hosted-binding composition passes 19
+focused unit assertions plus 69 Gateway readiness assertions. The first two
+pass production and source-test typechecks; all three pass lint, formatting,
+diff checks, and independent review. Capability review
 found and fixed an initial default-agent-only MCP snapshot so the final evidence
 covers all configured agent workspaces. State/background review verified
 disabled, starting, recovery-pending, active, stopped, failed, repaired, and
