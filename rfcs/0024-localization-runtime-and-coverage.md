@@ -149,27 +149,31 @@ path with an actual message:
 
 ```mermaid
 flowchart TB
-  EN["1. Reviewed English<br/><code>src/wizard/i18n/catalogs/en.json</code><br/><code>wizard.completion.enable</code>"]
-  REGISTER["2. Registered once<br/><code>surfaces.json</code>: wizard-core is adopted<br/><code>catalogs.json</code>: English + zh-CN/zh-TW targets"]
-  DETECT["3. Source PR gates<br/><code>localization:surfaces:check</code><br/><code>localization:catalogs:detect</code>"]
-  REFRESH["4. Trusted generated PR<br/><code>generated/zh-CN.json</code><br/><code>localization:catalogs:check</code>"]
-  LOAD["5. Owner loads the family<br/><code>catalogFamily(..., &quot;wizard.completion&quot;)</code>"]
-  RENDER["6. Owner renders<br/><code>LocalizationContext(locale = zh-CN)</code><br/><code>shell = zsh</code> • <code>cli = openclaw</code>"]
+  EN["1. Author opens an English-only source PR<br/><code>src/wizard/i18n/catalogs/en.json</code><br/><code>wizard.completion.enable</code>"]
+  DETECT["2. Credential-free PR checks detect drift<br/><code>localization:surfaces:check</code> confirms ownership<br/><code>localization:catalogs:detect</code> reports zh-CN + zh-TW stale"]
+  MERGE["3. Maintainer merges the reviewed English PR<br/>protected <code>main</code> now contains the exact source revision"]
+  REFRESH["4. That trusted <code>main</code> push starts<br/><code>Localization Catalog Refresh</code><br/>provider credentials are available only here"]
+  GENERATED["5. Automation opens a generated translation PR<br/><code>generated/zh-CN.json</code> + <code>generated/zh-TW.json</code><br/>source revision + provider/model evidence"]
+  CHECK["6. Generated PR runs strict checks and review<br/><code>localization:catalogs:check</code><br/>keys • ICU • placeholders • protected literals"]
+  RENDER["7. After merge, the owner renders<br/><code>LocalizationContext(locale = zh-CN)</code><br/>为 openclaw 启用 zsh shell completion？"]
 
-  EN --> REGISTER --> DETECT --> REFRESH --> LOAD --> RENDER
+  EN --> DETECT --> MERGE --> REFRESH --> GENERATED --> CHECK --> RENDER
 ```
 
 | Point in the path | Actual value |
 | --- | --- |
-| Reviewed English | `Enable {shell} shell completion for {cli}?` |
-| Generated `zh-CN` entry | `为 {cli} 启用 {shell} shell completion？` |
-| Wizard call | `t("wizard.completion.enable", { shell, cli })` |
-| Output for `zsh` and `openclaw` | `为 openclaw 启用 zsh shell completion？` |
+| English source PR | `"wizard.completion.enable": "Enable {shell} shell completion for {cli}?"` |
+| PR detection | `zh-CN/wizard-core` and `zh-TW/wizard-core` are stale |
+| Trusted trigger | Merge of the registered English source path to protected `main` |
+| Generated translation PR | `"wizard.completion.enable": "为 {cli} 启用 {shell} shell completion？"` plus source-pinned evidence |
+| Runtime output | `t("wizard.completion.enable", { shell: "zsh", cli: "openclaw" })` → `为 openclaw 启用 zsh shell completion？` |
 
 The checked-in `zh-CN` exemplar is marked `bootstrap-reviewed` with a human
 provider. The first credentialed post-merge refresh is therefore still a
-supervised rollout gate. Future English edits follow the detect,
-generated-PR, strict-check, and owner-rendering loop above.
+supervised rollout gate. Once that gate succeeds, no contributor manually
+creates the translation PR: the English merge triggers the trusted refresh and
+generated-PR publisher. The same loop applies to every one of the 15 product
+surfaces, using its registered source and owner workflow.
 
 ## Product target
 

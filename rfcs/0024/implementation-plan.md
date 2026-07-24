@@ -54,10 +54,11 @@ The five runtime PRs do not prove the reusable CI and translation-authoring
 loop. OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) implements `G45`
 and `G46` together: change one routine English source message, observe
-deterministic CI detect the stale target, run trusted asynchronous generation
-and validation, and open a generated pull request. Later owners adopt that lane
-only for their declared families, namespaces, or directories, with both the
-scoped gate and owner-owned refresh configured in the same adoption slice.
+credential-free CI detect the stale targets, merge the reviewed English source,
+then observe that trusted `main` push run asynchronous generation and validation
+and open a generated pull request. Later owners adopt that lane only for their
+declared families, namespaces, or directories, with both the scoped gate and
+owner-owned refresh configured in the same adoption slice.
 Its review branch contains `F01`, the exact five-file `F03` ownership delta,
 and the 17-file exemplar; unrelated updater, TUI, Gateway, and approval runtime
 ancestry is excluded. Because the branch shares the exact `F03` head, that
@@ -240,13 +241,15 @@ adoption. One routine, non-safety message family must prove:
 
 1. an English source edit is detected on an untrusted pull request without
    provider credentials;
-2. the migrated scope fails its deterministic gate while the target catalog is
-   missing, stale, malformed, or violates ICU/placeholders/protected literals;
-3. a trusted exact-source workflow generates one locale candidate;
-4. validation succeeds before publication and records source-pinned generation
-   evidence;
-5. the existing generated-PR publisher opens or updates a reviewable pull
-   request rather than pushing directly; and
+2. the pull-request check reports the exact stale target catalogs while
+   blocking malformed registration, source, ICU, placeholder, or
+   protected-literal changes;
+3. merging the reviewed English source to protected `main` automatically starts
+   a trusted exact-source workflow with provider and publisher credentials;
+4. that workflow generates locale candidates and opens or updates a separate
+   generated pull request rather than pushing directly;
+5. strict generated-catalog validation succeeds before publication and records
+   source-pinned generation evidence;
 6. failed or stale generation publishes nothing and leaves the affected cell
    partial.
 

@@ -384,8 +384,8 @@ The maintenance workflow follows a dependency-guard-style state machine:
 
 | Phase | Trigger | Behavior |
 | --- | --- | --- |
-| `detect` | Pull request | Runs without provider credentials. Reports changed English source, missing targets, stale revisions, fallback, and review drift. |
-| `refresh` | Trusted `main`, schedule, or manual dispatch | Generates candidate translations per locale, validates isolated artifacts, and opens or updates a generated pull request. Failed generation or validation aborts publication. |
+| `detect` | English source pull request | Runs without provider credentials. Reports the exact missing targets, stale revisions, fallback, and review drift. It does not publish translations from untrusted code. |
+| `refresh` | Trusted `main` push after the source PR merges, schedule, or manual dispatch | Generates candidate translations per locale, validates isolated artifacts, and opens or updates a generated pull request. Failed generation or validation aborts publication. |
 | `enforce` | Pull request and release | Blocks invalid catalogs and any `complete` claim whose source, artifacts, or required review are stale. |
 
 The refresh workflow must check out a trusted exact source revision reachable
@@ -393,6 +393,12 @@ from a protected base-repository ref, keep provider credentials unavailable to
 untrusted pull-request code, and publish through a scoped generated-PR
 application identity. Generated changes retain source, glossary, workflow,
 provider/model, and catalog-revision provenance.
+
+The normal contributor path needs no manual translation-PR setup: the source
+PR records the reviewed English change and drift, then its merge to protected
+`main` triggers the trusted refresh and generated-PR publisher. Repositories
+may also schedule or manually reconcile drift, but those are recovery paths,
+not the ordinary authoring loop.
 
 Detection and enforcement fail closed on malformed manifests, tool failure, or
 unreadable required evidence. A failed refresh leaves the prior catalogs and
