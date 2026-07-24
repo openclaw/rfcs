@@ -1,67 +1,60 @@
 # Signed Feed Trust v1 Addendum Specification
 
-This document is the implementer-facing trust addendum for RFC 0009 hosted
-feeds. It builds on `hosted-feed-v1-spec.md`, which defines the core feed
-document, entry, source-reference, refresh, fallback, and validation contract.
+This document defines signed transport and trust-anchor behavior for Hosted Feed
+v1. It builds on `hosted-feed-v1-spec.md`.
 
 Status: draft addendum, tied to RFC 0009.
+
+The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are normative.
 
 ## Scope
 
 This addendum defines:
 
-- signed feed envelopes;
-- payload media type binding;
-- Ed25519 signature verification;
-- configured and bundled publisher public-key trust;
-- fail-closed signed feed behavior;
-- key id and threshold rules;
-- ClawHub platform feed-signing bootstrap;
-- optional signed key-rotation documents;
-- diagnostics requirements for feed verification failures.
+- the signed feed envelope;
+- exact DSSE pre-authentication encoding;
+- Ed25519 verification and signature thresholds;
+- local and bundled publisher public-key trust;
+- expected feed-identity binding;
+- fail-closed refresh, snapshot, and key-rotation behavior;
+- bounded verification diagnostics.
 
-This addendum does not define:
-
-- package artifact signing or package malware scanning;
-- runtime tool policy;
-- account following or notifications;
-- organization-admin approval workflows;
-- a remote public-key bootstrap endpoint;
-- reuse of OpenClaw release-signing identities as feed-signing identities.
+It does not define package signing, malware scanning, runtime policy, account
+following, organization approval, a remote trust bootstrap endpoint, or reuse
+of release-signing identities as feed-signing identities.
 
 ## Trust Model
 
-A signed feed proves that the exact feed payload bytes were signed by a
-publisher key already trusted by the client or deployment. It does not prove
-that package code is safe, reviewed, organization-approved, or installable.
+A valid signature proves that trusted key material signed the exact decoded feed
+payload bytes for the declared payload type. It does not prove package safety,
+organization approval, artifact integrity, or runtime permission.
 
-Trust anchors come from one of these channels:
+An initial trust anchor MUST arrive through one of these channels:
 
-- a public key bundled with OpenClaw for the default ClawHub platform
-  feed-signing identity;
-- operator-managed local configuration for private, third-party, or development
-  feeds;
-- a signed key-rotation document that chains from an already trusted key.
+- a public key bundled with OpenClaw for a built-in platform feed;
+- operator-managed local configuration;
+- another authenticated software or configuration distribution channel.
 
-A feed host must not bootstrap its own initial trust by serving a key from an
-ordinary endpoint such as `/public-key`. Such endpoints may be informational for
-operators, but clients must not trust them unless the key is already bundled,
-locally configured, or delivered through a signed rotation chain.
+A feed endpoint MUST NOT bootstrap its own trust by advertising a key from an
+ordinary endpoint such as `/v1/feeds/public-key`. Compromise of that endpoint
+would otherwise compromise both content and trust.
+
+Publisher private keys MUST remain in publisher-owned secret storage. Feed keys
+MUST be distinct from OpenClaw release, package, TLS, account, and platform
+signing identities even when the same secret-management system operates them.
 
 ## Signed Envelope
 
-Signed feeds are served as an envelope containing the exact UTF-8 JSON feed
-payload bytes encoded as base64url and one or more signatures.
+The v1 envelope uses the standard DSSE JSON shape:
 
 ```json
 {
-  "type": "openclaw.signed-envelope.v1",
-  "payloadType": "application/vnd.openclaw.catalog-feed+json;v=1",
-  "payload": "base64url(exact UTF-8 feed JSON bytes)",
+  "payloadType": "openclaw.official-external-plugin-catalog-feed.v1",
+  "payload": "eyJzY2hlbWFWZXJzaW9uIjoxLC4uLn0",
   "signatures": [
     {
       "keyid": "clawhub-feed-2026-q3",
-      "sig": "base64:..."
+      "sig": "base64url-signature"
     }
   ]
 }
@@ -71,76 +64,76 @@ Envelope fields:
 
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
-| `type` | string | Yes | Must be `openclaw.signed-envelope.v1`. |
-| `payloadType` | string | Yes | Must identify the signed payload media type. |
-| `payload` | string | Yes | Base64url encoded exact payload bytes. |
-| `signatures` | array | Yes | One or more signatures over the envelope pre-authentication encoding. |
+| `payloadType` | string | Yes | MUST equal the exact type selected by the concrete feed contract and representation. The baseline catalog type is `openclaw.official-external-plugin-catalog-feed.v1`. |
+| `payload` | string | Yes | Base64 or unpadded base64url encoding of the exact UTF-8 feed bytes. |
+| `signatures` | array | Yes | Between 1 and 16 signature records. |
 
 Signature fields:
 
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
-| `keyid` | string | Yes | Publisher key id selected from trusted keys. |
-| `sig` | string | Yes | Base64 encoded signature bytes. |
+| `keyid` | string | Yes for Hosted Feed v1 | Non-empty configured publisher key id. DSSE permits omission, but this profile requires it to resolve an out-of-band trusted key. |
+| `sig` | string | Yes | Base64 or unpadded base64url Ed25519 signature over the DSSE PAE bytes. |
 
-Clients must verify the envelope before decoding and accepting the payload as a
-feed. Signing exact payload bytes avoids a second JSON canonicalization contract
-for feed documents.
+Ed25519 is selected by the trusted feed profile; the envelope does not carry an
+algorithm field. Duplicate `keyid` values make the envelope invalid. Producers
+MAY add fields and consumers MUST ignore unrecognized envelope and signature
+fields, as required by DSSE. Unknown fields MUST NOT be assigned trust meaning.
 
-## Signature Algorithm
+Signed HTTP responses MUST use `Content-Type: application/vnd.dsse+json`.
+After parsing optional media-type parameters, clients MUST reject another media
+type on an operation that requires a signed envelope. A producer SHOULD
+calculate `ETag` over the exact envelope bytes.
+`Last-Modified` MUST NOT be the sole validator for a signed representation:
+signing-key rotation can change envelope bytes without changing the stored
+payload publication time. After a `304 Not Modified`, a client MUST still
+reverify its retained envelope under the current trust policy before use.
 
-The initial signature algorithm is Ed25519.
+## DSSE Pre-Authentication Encoding
 
-OpenClaw's verifier uses DSSE-style pre-authentication encoding for signed
-payloads. Publishers should use the OpenClaw verifier, test vectors, or a
-compatibility harness before treating a signature as compatible.
+Signatures MUST be calculated over the DSSE v1 pre-authentication encoding of
+the decoded payload bytes, not over the base64 text in the envelope.
 
-## Verification Rules
+For UTF-8 `payloadType` bytes `T` and decoded payload bytes `P`, construct:
 
-Clients must:
+```text
+PAE("DSSEv1", T, P) =
+  "DSSEv1" || SP || decimal(byte_length(T)) || SP || T ||
+  SP || decimal(byte_length(P)) || SP || P
+```
 
-- reject unsupported envelope `type`;
-- reject unsupported `payloadType`;
-- reject malformed base64/base64url fields;
-- reject empty `signatures`;
-- bound the maximum signature count;
-- reject duplicate `keyid` values in one envelope;
-- resolve `keyid` only against locally trusted keys for the feed profile;
-- require the configured threshold to be met by distinct trusted keys;
-- reject signed feeds when only part of required key configuration is present;
-- decode and validate the feed payload only after signature verification;
-- compute and persist a local payload checksum after verification.
+For a selected payload type this is equivalent to:
 
-`verification.mode: "signed"` fails closed. A failure to fetch keys, malformed
-local key config, missing key id, invalid signature, unsupported envelope, or
-unsupported payload type means the hosted feed must not become install or search
-authority.
+```text
+"DSSEv1 " + utf8ByteLength(payloadType) + " " + payloadType +
+" " + payloadByteLength + " " + payloadBytes
+```
 
-This addendum is a verification layer, not a packaging requirement. Publishers
-can still host ordinary core feeds, and clients can still use local or unsigned
-development feeds through explicit local configuration. Signed verification
-becomes a requirement only for profiles configured with `mode: "signed"` or for
-default ClawHub-hosted feeds that OpenClaw treats as signed by platform policy.
+Lengths are unsigned decimal ASCII without leading signs or padding. `SP` is
+one ASCII space (`0x20`). The final component is the exact decoded payload byte
+sequence and may contain arbitrary bytes. Publishers SHOULD validate against
+OpenClaw's signed-envelope test vectors before production use.
 
-## Source Profile Verification Configuration
+## Local Configuration
 
-A feed profile can require signed verification.
+Custom signed feeds are configured under `marketplaces.feeds`:
 
 ```json
 {
-  "catalog": {
+  "marketplaces": {
     "feeds": {
-      "acme": {
-        "url": "https://packages.acme.example/openclaw/feed",
+      "partner-catalog": {
+        "url": "https://packages.example.com/openclaw/feed.json",
+        "feedId": "partner-official",
         "verification": {
           "mode": "signed",
-          "rootKeys": [
+          "keys": [
             {
-              "id": "acme-feed-2026-q3",
-              "publicKey": "base64:..."
+              "keyId": "partner-feed-2026-q3",
+              "publicKey": "base64url-raw-ed25519-key-or-pem"
             }
           ],
-          "rootThreshold": 1
+          "threshold": 1
         }
       }
     }
@@ -148,117 +141,150 @@ A feed profile can require signed verification.
 }
 ```
 
-`rootKeys` are public keys. They are not secrets. Private signing keys must stay
-outside OpenClaw client configuration.
+`feedId` is the expected signed payload identity. Signed profiles MUST bind the
+decoded payload's `id` to this configured or built-in expected value. The local
+profile name and payload feed id may differ; for example the built-in profile
+`clawhub-public` expects payload id `clawhub-official`.
 
-The default ClawHub platform feed should not require ordinary users to paste
-`rootKeys`. OpenClaw can ship the ClawHub public feed-signing key as part of the
-OpenClaw release. Explicit `rootKeys` remain useful for private ClawHub
-deployments, third-party publishers, development, emergency override, and
-operator-managed deployments.
+`keys` MUST contain distinct key ids and distinct normalized Ed25519 public key
+material. `threshold` defaults to 1, MUST be positive, and MUST NOT exceed the
+number of configured distinct keys. Private signing keys MUST NOT appear in
+OpenClaw configuration.
 
-## ClawHub Platform Signing
+## Verification
 
-ClawHub-hosted feeds can use a ClawHub platform feed-signing key. The same
-platform signing path can sign:
+Before accepting a signed refresh, a client MUST:
 
-- `clawhub-public`;
-- ClawHub named feeds;
-- ClawHub account feeds;
-- ClawHub organization feeds;
-- ClawHub-served composed feeds.
+1. Parse and validate the bounded envelope.
+2. Require the exact `payloadType` selected by the concrete feed contract and
+   requested representation.
+3. Decode `payload` and each candidate signature.
+4. Construct the exact DSSE PAE bytes above.
+5. Resolve signature key ids only against the selected profile's trusted keys.
+6. Count only valid signatures from distinct trusted public key material.
+7. Require the configured threshold.
+8. Dispatch only to the schema validator registered for that exact payload
+   type. The baseline catalog type parses as Hosted Feed v1; distribution
+   addendum types parse as their strict root, query, or change schema.
+9. Require the payload's `id` or `feedId`, as defined by that schema, to equal
+   the selected profile or endpoint's expected feed identity.
+10. Apply schema, source-profile, expiry, and monotonic sequence checks.
 
-OpenClaw verifies these feeds with the bundled ClawHub public key when the feed
-identity in the signed payload matches a ClawHub-hosted feed profile. ClawHub
-enforces ACLs before serving private or organization-scoped feeds; feed
-verification proves payload authenticity, not viewer authorization.
+Failure at any step MUST reject the new payload. A client MUST NOT retry the
+same bytes as unsigned content or silently replace the configured signed profile
+with an unsigned feed.
 
-ClawHub private signing material should live in ClawHub secret storage or a
-signing service. It must not be checked into feed documents, OpenClaw config, or
-public source.
+Supporting the envelope does not make every payload type acceptable. A client
+MUST maintain an explicit allowlist from endpoint or operation to exact payload
+type and validator. It MUST NOT select a validator from untrusted payload
+contents or treat an unknown but validly signed type as a catalog.
 
-The feed-signing key is a feed integrity key. It should not reuse OpenClaw
-release-signing identities, Apple Developer ID certificates, notarization
-credentials, npm tokens, GitHub tokens, or package-publishing credentials.
-Keeping these identities separate limits blast radius when a feed-signing key or
-package-publishing path needs emergency rotation.
+## Snapshots And Rollback Protection
 
-## Key Rotation
+An accepted signed snapshot SHOULD persist:
 
-If a publisher needs remote key rotation, it should publish a signed rotation
-document verified by an already trusted key. A rotation document is separate
-from an ordinary feed.
+- exact envelope bytes;
+- exact decoded payload bytes or their checksum;
+- payload feed id and sequence;
+- accepted signature key ids, count, and threshold;
+- verification time;
+- HTTP validators and fetch metadata.
 
-```json
-{
-  "type": "openclaw.feed-key-rotation.v1",
-  "feedId": "clawhub-public",
-  "sequence": 3,
-  "expiresAt": "2026-09-01T00:00:00.000Z",
-  "threshold": 1,
-  "feedKeys": [
-    {
-      "id": "clawhub-feed-2026-q4",
-      "publicKey": "base64:..."
-    }
-  ]
-}
-```
+Clients MUST reverify a stored signed snapshot before using it. A newly fetched
+valid feed with a lower sequence than the previously accepted feed id MUST be
+rejected as rollback. A verification-policy change MUST NOT make it impossible
+to compare a newly valid feed against metadata from the previously accepted
+snapshot; the old snapshot remains the rollback baseline even when it no longer
+satisfies the new key set.
 
-Clients that support rotation should persist accepted rotation sequence and
-expiry metadata to prevent rollback and freeze attacks. Emergency root
-replacement remains a local operator or OpenClaw release action.
+The old snapshot may be served as fallback only if it satisfies the currently
+configured verification policy. Otherwise the client MUST fail closed with a
+clear diagnostic.
 
-## Refresh And Snapshot Trust State
+## Bundled ClawHub Trust
 
-When a signed hosted feed is accepted, clients should persist bounded trust
-state with the cached snapshot:
+The official ClawHub feed uses a dedicated ClawHub feed-signing identity:
 
-- feed profile name;
-- feed id from the verified payload;
-- payload checksum;
-- feed sequence;
-- expiry;
-- verification mode;
-- signed/unsigned outcome;
-- signature count;
-- threshold;
-- accepted key ids or bounded key fingerprints;
-- verification failure category when rejected.
+- ClawHub stores and uses the private Ed25519 key;
+- OpenClaw bundles the matching public key and stable key id;
+- the built-in `clawhub-public` profile expects feed id `clawhub-official`;
+- normal users do not configure the official key manually;
+- an environment override MAY exist for development or staged rollout, but
+  MUST fail closed when only part of the key pair configuration is present.
 
-Diagnostics must not include private keys, raw bearer tokens, credential-bearing
-URLs, full payload bytes, or unbounded identity values.
+Bundling a public key is source-controlled trust distribution. It is not secret
+storage and it does not put the private key in the OpenClaw release.
 
-## Unsigned Feeds
+The same dedicated ClawHub feed-signing identity MAY sign multiple
+ClawHub-operated feed classes, including public catalog, publisher, named,
+organization, and composed feeds. Each feed class MUST define its own versioned
+payload type, expected identity binding, schema, and verifier before clients
+accept it. Sharing the platform feed-signing key does not permit one payload
+type or feed identity to be replayed as another, and it does not grant access,
+approval, or install authority.
 
-Unsigned remote feeds require explicit local opt-in through
-`verification.mode: "unsigned"`. Unsigned remote feeds should still require
-HTTPS unless a local development profile explicitly allows loopback or local
-file input.
+## Rotation And Revocation
 
-Clients must make unsigned state visible in diagnostics so operators can tell
-that a feed is accepted without signature verification.
+Signed Feed v1 does not define an in-band key-rotation document. Rotation uses
+the same authenticated channel that established the trust anchor.
 
-## Publisher Checklist
+A normal rotation SHOULD proceed as follows:
 
-A signed-feed publisher is compatible with this addendum when it:
+1. Generate a new dedicated feed-signing key.
+2. Add the new public key to bundled or operator-managed trust configuration.
+3. Publish envelopes signed by enough old trusted keys to satisfy the current
+   threshold, optionally also signed by the new key.
+4. Distribute the updated trust configuration.
+5. After the update window, sign with the new active set and remove retired keys
+   in a later configuration or release update.
 
-- signs exact feed payload bytes through the v1 envelope;
-- uses Ed25519 keys with stable key ids;
-- keeps private signing material outside feed documents and client config;
-- publishes test vectors for valid signatures and expected failures;
-- documents who owns key rotation and emergency revocation;
-- provides a rotation story before retiring old keys;
-- avoids using ordinary `/public-key` endpoints as trust bootstrap.
+Merely including a signature from one old key is insufficient when the current
+threshold is greater than one. Emergency revocation may intentionally make the
+last snapshot unusable; clients must fail closed and identify the revoked or
+missing trust state without revealing key material beyond public key ids.
 
-## Client Checklist
+Future in-band rotation requires a separately versioned payload type, exact wire
+schema, replay rules, and threshold transition semantics. Implementations MUST
+NOT invent incompatible rotation documents under this v1 payload type.
 
-An OpenClaw client is compatible with this addendum when it:
+## Diagnostics
 
-- verifies signed envelopes before decoding feed payloads;
-- fails closed for configured signed feeds;
-- rejects malformed, duplicate, or unbounded signature inputs;
-- verifies thresholds against distinct trusted keys;
-- supports bundled ClawHub public-key trust for default ClawHub feeds;
-- keeps direct public-key config as an operator override path;
-- records bounded verification diagnostics with accepted snapshots.
+Clients SHOULD distinguish:
+
+- malformed envelope;
+- unsupported payload type;
+- malformed feed payload;
+- expected feed-id mismatch;
+- unknown key id;
+- invalid signature;
+- duplicate key id or duplicate public key material;
+- threshold not met;
+- expired feed;
+- rollback sequence;
+- snapshot rejected under the current policy.
+
+Diagnostics MAY expose feed profile, expected and actual feed ids, sequence,
+public key ids, threshold, verification time, and fallback source. They MUST NOT
+expose private keys, bearer tokens, credential-bearing URLs, or payload bytes.
+
+## Publisher Conformance
+
+A signed v1 publisher:
+
+- signs the exact stored feed payload bytes using the DSSE PAE above;
+- uses the required envelope and payload type;
+- keeps sequence monotonic across deletion and demotion;
+- keeps private keys in publisher-owned secret storage;
+- publishes stable public key ids through an authenticated trust channel;
+- provides positive, tampered-payload, wrong-key, and rollback test vectors.
+
+## Client Conformance
+
+A signed v1 client:
+
+- obtains initial trust independently of the feed endpoint;
+- binds signed payload identity to the selected profile;
+- enforces distinct-key thresholds and fail-closed behavior;
+- stores and reverifies last-known-good signed snapshots;
+- preserves rollback metadata across verification-policy changes;
+- reports bounded, actionable verification diagnostics.
