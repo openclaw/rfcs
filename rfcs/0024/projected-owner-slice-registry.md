@@ -191,7 +191,7 @@ PRs remain separate where the repository policy requires it.
 | `P39` | `native.android` | Android catalog completeness and blocking quality advisories | Native workflow owner | Generated inventory/artifact parity, platform UI tests, named review; platform-native resources remain authoritative. |
 | `P40` | `native.apple` | Apple catalog completeness and blocking quality advisories | Native workflow owner | Generated inventory/artifact parity, platform UI tests, named review; platform-native resources remain authoritative. |
 | `P41` | `docs` | Swedish documentation source/navigation and generated publication | Docs owner and `openclaw/docs` workflow | Exact source/tool revision, glossary, links/anchors, published artifact evidence; no second docs translator. |
-| `P42` | `docs` | Persian and Thai publishing-path decision and implementation | Docs platform owner decision | Either verified artifacts or explicit `platform-constrained` rows with fallback and platform evidence. |
+| `P42` | `docs` | Persian and Thai publishing-path decision and implementation | Docs platform owner decision | Verified published artifacts; any interim `platform-constrained` row must carry fallback and platform evidence and remains a product-completion blocker. |
 
 ## F. Authoring Gates And Translation Automation
 
@@ -285,7 +285,7 @@ discovered in the scheduled implementation week.
 | August 10-14 | `PK7` runtime safety; `PK8` command metadata; `PK9` skill/plugin metadata | `R20`, `R21`, `R22`, `R23`, `R24`; `M25`, `M26`, `M27`, `M28`; `M29`, `M30`, `M31`, `M32` | Complete approval/runtime safety boundaries and land public metadata contracts before their projections. |
 | August 17-21 | `PK10` channel notices; `PK11` Control UI; `PK12` native apps | `M33`, `M34`, `M35`, `M36`; `P37`, `P38`; `P39`, `P40` | Finish adapter-owned channel dispositions and extend existing UI/native owner pipelines without replacing them. |
 | August 24-28 | `PK13` documentation product surface; `PK14` coverage aggregation and catch-up | `P41`, `P42`; `E43` | Land or prove the localized docs publishing paths, close any slipped package, and publish coverage from landed owner declarations; earlier slice guidance is already required at each slice's merge. |
-| August 31-September 1 | `PK15` evidence promotion | `E44` | Ingest current named-review evidence and generated artifacts, disclose accepted platform constraints, and make the qualified or full product claim. |
+| August 31-September 1 | `PK15` evidence promotion | `E44` | Ingest current named-review evidence and generated artifacts; make the full claim only at 315/315, otherwise publish the qualified blocker report and keep product completion open. |
 
 The packages cover all 47 current entries exactly once. The target operating
 cadence is roughly three completed packages per full week with no more than

@@ -224,11 +224,10 @@ locale additions can be prioritized by OpenClaw users and maintainers.
 The initial release-policy snapshot contains 15 English source rows plus 15
 product surfaces across 21 translation targets. Release completion is
 calculated over those 315 translation-target cells. This is not an
-RFC-acceptance gate. The product completion target is all 313 OpenClaw-controlled
-target cells at `complete`. `docs/fa` and `docs/th` must
-either gain an approved publishing path or remain the only disclosed
-`platform-constrained` cells. An unqualified `fully-localized` claim requires
-all 315 target cells to be complete.
+RFC-acceptance gate. The product-completion target and the unqualified
+`fully-localized` claim both require all 315 target cells to be `complete`.
+`docs/fa` and `docs/th` need an approved publishing path to reach that target;
+a `platform-constrained` row explains a blocker but does not count as complete.
 
 Pseudo-locales and bounded script fixtures are declared under
 `testFixtures`, not the release locale registry. They support expansion,

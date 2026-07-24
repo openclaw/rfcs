@@ -207,11 +207,11 @@ The schedule front-loads public-contract, safety, platform, and publication
 owner decisions. Missing owner approval may reorder independent work, but it
 does not count the blocked entry as complete or permit a schedule-only deferral.
 
-The current product-policy target is all 313 OpenClaw-controlled cells complete.
-`docs/fa` and `docs/th` must either gain an approved publishing path or remain
-the only two disclosed external platform constraints. An unqualified
-`fully-localized` claim requires all 315 cells to be complete. None of these
-counts is an RFC-acceptance condition.
+The product-completion target is all 315 translation-target cells complete.
+`docs/fa` and `docs/th` need an approved publishing path to reach that target.
+If either remains platform-constrained at the September 1 decision, the report
+must disclose the blocker and remain qualified; the cell does not count as
+complete. This target is not an RFC-acceptance condition.
 
 ## Continuous Translation Maintenance
 
@@ -546,11 +546,13 @@ The foundation is shipped when:
 
 The delivery target is a product-completion decision on September 1, 2026. It
 requires an honest coverage report, current generated artifacts, scoped named
-review, disclosure of any accepted platform constraints, and the chosen
-313/315 or 315/315 target. Every current registry entry must be landed, deleted
-by source proof, or covered by a conforming existing owner pipeline; drafts,
-open generated follow-ups, and schedule-only deferrals do not count. Product
-completion is not required to accept the RFC or ship the runtime foundation.
+review, and all 315 translation-target cells at `complete`. Every current
+registry entry must be landed, deleted by source proof, or covered by a
+conforming existing owner pipeline; drafts, open generated follow-ups,
+platform constraints, and schedule-only deferrals do not count as complete.
+If blockers remain, publish the qualified report and keep product completion
+open. Product completion is not required to accept the RFC or ship the runtime
+foundation.
 
 The `P41`-`P42` documentation cohort localizes documentation as a product
 surface. It is not a catch-all phase for documenting earlier runtime slices;
