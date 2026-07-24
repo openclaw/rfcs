@@ -86,12 +86,13 @@ The RFC 0018 universal baseline remains required and cannot be removed,
 replaced, or weakened by a profile.
 
 The shared required criteria are `openclaw.config-current`,
-`openclaw.model-route-ready`, `openclaw.secrets-ready`,
+`openclaw.model-route-ready`, `openclaw.plugins-loaded`,
+`openclaw.secrets-ready`,
 `openclaw.workspace-writable`, `openclaw.session-storage-ready`,
 `openclaw.context-engine-ready`, `openclaw.tool-catalog-ready`,
 `openclaw.mcp-runtime-ready`, `openclaw.sandbox-ready`, and
-`openclaw.harness-ready`. A selected profile also promotes `PluginsLoaded` to
-required. It selects `openclaw.state-ready`,
+`openclaw.harness-ready`. It selects `openclaw.event-loop-healthy`,
+`openclaw.state-ready`,
 `openclaw.delivery-runtime-ready`, and `openclaw.scheduler-ready` as advisory.
 The remaining additional condition types are profile-owned predicates and are
 not independently operator-selectable in v1.

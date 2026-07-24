@@ -167,11 +167,13 @@ identity ingress; readiness does not issue a synthetic request on every poll.
 
 Common runtime conditions remain owned by readiness and their source
 subsystems. Every selected profile requires current config, usable model
-routing/auth, resolved secrets, writable workspace, session storage, context
-engine, tool catalog, configured MCP/sandbox/harness capability, and successful
-plugin activation. State, delivery-runtime, and scheduler conditions are
-selected as advisory diagnostics. Profiles only declare requirement; they do
-not implement or invoke these observations.
+routing/auth, successful plugin activation, resolved secrets, writable
+workspace, session storage, context engine, tool catalog, and configured
+MCP/sandbox/harness capability. Event-loop health, state, delivery-runtime, and
+scheduler conditions are selected as advisory diagnostics. Profiles select the
+ordinary RFC 0018 IDs `openclaw.plugins-loaded` and
+`openclaw.event-loop-healthy`; they do not implement special profile-only
+versions of those observations.
 
 ### Selection and precedence
 
