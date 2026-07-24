@@ -465,20 +465,25 @@ prerequisites for accepting this RFC:
   cron, scan queues, or run recovery. `RestoreComplete` remains deferred until
   OpenClaw owns a generic restore generation and admission fence.
 - [Hosted dependencies PR 156](https://github.com/giodl73-repo/openclaw/pull/156)
-  adds selectable `openclaw.host-bindings-ready` and projects the active RFC
-  0020 host-integration bundle plus owner-published generation evidence into
-  `HostBindingsReady`. Required bindings fail closed for missing,
-  incompatible, unresolved, stale, degraded, or unavailable state. Optional
-  binding failures remain visible without blocking the aggregate condition.
-  Evaluation is synchronous, in-memory, and bounded before inventory
-  projection. Generic `EgressReady` remains with concrete dispatcher and
-  traffic-policy owners; `ManagedConfigApplied` remains deferred until Managed
-  Config publishes an authoritative applied/effective generation.
+  adds selectable `openclaw.host-bindings-ready` and connects RFC 0020 bundle
+  declarations to the active core/plugin criterion catalog. Selecting the
+  aggregate includes referenced criteria as advisory detail without requiring
+  operators to repeat the bundle's selectors. A required contribution fails
+  the aggregate for missing, incompatible, unresolved, stale, degraded, or
+  unavailable owner state, and when a declared criterion is absent, `False`,
+  or `Unknown`; optional contributions remain visible without blocking it.
+  Status and Doctor name unresolved selectors, recursive aggregate references
+  are prohibited, and manifests are capped at 64 unique selectors. Evaluation
+  uses one bounded in-memory bundle/evidence snapshot. Real endpoint coverage
+  proves `/ready` returns `200 -> 503 -> 200` across owner-generation failure
+  and recovery. Generic `EgressReady`, `ManagedConfigApplied`, and
+  `RestoreComplete` remain deferred until their owners publish authoritative
+  facts.
 
 The capability slice passes 14 focused assertions, the state/background slice
-passes 145 focused assertions, and the hosted-binding composition passes 19
-focused unit assertions plus 69 Gateway readiness assertions. The first two
-pass production and source-test typechecks; all three pass lint, formatting,
+passes 145 focused assertions, and the hosted-binding composition passes 142
+focused assertions including the real Gateway endpoint transition. The first
+two pass production and source-test typechecks; all three pass lint, formatting,
 diff checks, and independent review. Capability review
 found and fixed an initial default-agent-only MCP snapshot so the final evidence
 covers all configured agent workspaces. State/background review verified
