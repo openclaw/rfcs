@@ -29,7 +29,7 @@ Each entry tracks:
 - accepted, fallback/failure, compatibility, and privacy evidence;
 - the hardcoded, duplicated, or parsed-prose authority it deletes; and
 - a live state such as `projected`, `audited`, `owner-approved`, `draft`,
-  `ready-for-review`, `source-enrolled`, `generated-follow-up`, `landed`,
+  `ready-for-review`, `source-enrolled`, `candidate-ready`, `landed`,
   `blocked`, `deferred`, or `deleted`.
 
 The implementation tracker
@@ -53,7 +53,8 @@ After `G45` and `G46` land, every slice that adds or migrates deterministic
 product strings must also onboard its area to both halves of the maintenance
 contract before that area is complete: its declared scope runs the blocking,
 credential-free authoring/drift gate, and its owner workflow runs trusted
-asynchronous generation, validation, and generated-PR publication. An owner
+asynchronous generation and validation with an in-place update for an unchanged
+same-repository PR or a generated-PR fallback. An owner
 with an existing pipeline may prove that pipeline satisfies the contract rather
 than replace it. Schema-only, English-only, or deferred slices record why no
 translated catalog is being enrolled. `G47` separately ensures that newly
@@ -79,7 +80,7 @@ The normal delivery path is:
 
 ```text
 projected -> audited -> owner-approved -> ready-for-review
-  -> source-enrolled -> generated-follow-up -> landed
+  -> source-enrolled -> candidate-ready -> landed
 ```
 
 - `ready-for-review` means the bounded source or contract PR is prepared; it
@@ -87,16 +88,18 @@ projected -> audited -> owner-approved -> ready-for-review
 - `source-enrolled` means the source/runtime change plus its inventory, shared
   gate configuration, workflow index, and owner guidance have landed, while a
   required generated artifact or review is still outstanding.
-- `generated-follow-up` means the trusted owner workflow has opened or updated
-  the required candidate PR. An open generated PR is not done.
+- `candidate-ready` means the trusted owner workflow has updated the source PR
+  in place or opened/updated the required fallback PR. Passing structure checks
+  or an open generated PR is not done without required review.
 - `landed` means every source, generated-artifact, compatibility, deletion, and
   named review requirement in that registry entry's exit bar is present in
   accepted history.
 - `blocked`, `deferred`, `platform-constrained`, and `deleted` are explicit
   exits with the owner and evidence required elsewhere in this registry.
 
-Source and generated changes may use separate PRs without becoming separate
-planning slices. The slice remains incomplete until its full exit bar is met.
+Source and generated changes may use separate PRs when the source branch cannot
+be updated, without becoming separate planning slices. The slice remains
+incomplete until its full exit bar is met.
 
 ## Owner Registries
 
@@ -214,8 +217,8 @@ slices have landed.
 
 | ID | Owner registry | Projected slice | Gate | Required proof and deletion target |
 | --- | --- | --- | --- | --- |
-| `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until its source area is registered. Invalid source ICU, placeholder or protected-literal rules fail without provider credentials; ordinary source-only PRs report the exact stale targets. Any PR that changes generated paths runs the strict catalog check. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
-| `G46` | `catalog-automation` + first adopting owner | Trusted async catalog refresh and generated-PR reference lane | `G45`; approved provider secret on trusted `main`, schedule, or manual dispatch | Merging one English fixture change to protected `main` automatically produces isolated locale candidates, validates them, records source-pinned generation evidence, and opens or updates a generated PR through the existing publisher. Stale input or validation failure publishes nothing and leaves coverage partial. No direct protected-branch push, AI self-review, or automatic safety-copy promotion. Replaces hand-copied translation updates for the adopted fixture. |
+| `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until its source area is registered. Invalid source ICU, placeholder or protected-literal rules fail without provider credentials. A ready same-repository PR fails with the exact stale targets until refreshed; drafts and branches the repository cannot update remain advisory. Any PR that changes generated paths runs the strict catalog check. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
+| `G46` | `catalog-automation` + first adopting owner | Trusted async catalog refresh with in-place and generated-PR publication | `G45`; approved provider secret on protected-`main` workflow code | A maintainer dispatch resolves a ready same-repository PR head, runs only trusted generator code, produces and validates all affected locale candidates, and commits one batch to that unchanged branch under an exact-head lease. Fork/cross-repository merges and recovery runs open or update one generated follow-up PR. Stale input or validation failure publishes nothing. No protected-branch push, AI self-review, or automatic safety-copy promotion. Replaces hand-copied translation updates for the adopted fixture. |
 | `G47` | `catalog-automation` + surface-registry owners | [New product-string surface disposition gate](https://github.com/openclaw/openclaw/pull/112801) | `G45` and `G46`; one owner adapter that enumerates real surface registrations or declared product-facing source roots | Adding an enumerated surface or expanding a declared product-facing scope fails until it is adopted, mapped to a conforming owner pipeline, or explicitly English-only, platform-constrained, or deferred with a named owner and rationale. Existing unclassified scopes are baselined as legacy debt. No repository-wide literal heuristic, runtime registry, or classification requirement for tests, logs, developer diagnostics, or model-authored text. Replaces review-only discovery of newly introduced localization debt. |
 
 The exemplar is deliberately routine product copy. Safety catalogs may reuse
@@ -243,7 +246,7 @@ F01 kernel
 
 F01 kernel + F03 contributor contract
   -> G45 scoped authoring gate
-  -> G46 trusted async refresh exemplar
+  -> G46 trusted in-place refresh + generated-PR fallback exemplar
   -> G47 new-surface disposition gate
 
 F05 Gateway approval descriptor
@@ -285,7 +288,7 @@ discovered in the scheduled implementation week.
 
 | Window | Delivery packages | Registry entries | Required outcome |
 | --- | --- | --- | --- |
-| July 22-24 | `PK0` architecture, foundation, and automation | `F01`, `F03`, `G45`, `G46`, `G47` | Accept RFC direction; land the kernel, contributor contract, shared per-repo gates, trusted refresh exemplar, and new-surface disposition gate; backfill foundation inventory, public workflow indexing, and nearest owner guidance; supervise the first credentialed generated-PR run. |
+| July 22-24 | `PK0` architecture, foundation, and automation | `F01`, `F03`, `G45`, `G46`, `G47` | Accept RFC direction; land the kernel, contributor contract, shared per-repo gates, trusted refresh exemplar, and new-surface disposition gate; backfill foundation inventory, public workflow indexing, and nearest owner guidance; supervise the first credentialed in-place run and generated-PR fallback. |
 | July 27-31 | `PK1` initial operator consumers; `PK2` first Gateway edge; `PK3` wizard/setup | `F02`, `F04`, `O07`, `O15`; `F05`, `O06`; `O08`, `O09` | Finish updater and TUI families, approval-not-found plus its generated UI catalog, and remaining owner-bounded wizard/setup families; land each slice's inventory, public workflow index, and nearest owner guidance. |
 | August 3-7 | `PK4` CLI shell/agent; `PK5` sessions/tasks/Doctor; `PK6` Gateway families | `O10`, `O11`; `O12`, `O13`, `O14`; `R16`, `R17`, `R18`, `R19` | Land reusable CLI adapters and bounded consumers, then expand only reviewed Gateway discriminator tuples. |
 | August 10-14 | `PK7` runtime safety; `PK8` command metadata; `PK9` skill/plugin metadata | `R20`, `R21`, `R22`, `R23`, `R24`; `M25`, `M26`, `M27`, `M28`; `M29`, `M30`, `M31`, `M32` | Complete approval/runtime safety boundaries and land public metadata contracts before their projections. |

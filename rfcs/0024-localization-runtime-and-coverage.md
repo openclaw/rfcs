@@ -124,7 +124,7 @@ flowchart TB
     direction LR
     SURFACE_CHECK["localization:surfaces:check"]
     CATALOG_CHECK["CI job: localization-catalogs<br/>catalogs:check / catalogs:detect"]
-    REFRESH["Localization Catalog Refresh<br/>generated PR"]
+    REFRESH["Localization Catalog Refresh<br/>same PR when possible • generated PR fallback"]
     OWNER_FLOW["owner pipeline<br/>check + refresh"]
     RESULT["Owner renderer + coverage evidence<br/>machine semantics unchanged"]
   end
@@ -160,34 +160,38 @@ path with an actual message:
 
 ```mermaid
 flowchart TB
-  EN["1. Author opens an English-only source PR<br/><code>src/wizard/i18n/catalogs/en.json</code><br/><code>wizard.completion.enable</code>"]
-  DETECT["2. Credential-free PR checks detect drift<br/><code>localization:surfaces:check</code> confirms ownership<br/><code>localization:catalogs:detect</code> reports zh-CN + zh-TW stale"]
-  MERGE["3. Maintainer merges the reviewed English PR<br/>protected <code>main</code> now contains the exact source revision"]
-  REFRESH["4. That trusted <code>main</code> push starts<br/><code>Localization Catalog Refresh</code><br/>provider credentials are available only here"]
-  GENERATED["5. Automation opens a generated translation PR<br/><code>generated/zh-CN.json</code> + <code>generated/zh-TW.json</code><br/>source revision + provider/model evidence"]
-  CHECK["6. Generated PR runs strict checks and review<br/><code>localization:catalogs:check</code><br/>keys • ICU • placeholders • protected literals"]
-  SHIP["7. Generated PR merges and owner artifact ships<br/>the catalog becomes available to that surface"]
+  EN["1. Author opens a ready English source PR<br/><code>src/wizard/i18n/catalogs/en.json</code><br/><code>wizard.completion.enable</code>"]
+  DETECT["2. Credential-free PR gate fails on drift<br/><code>localization:surfaces:check</code> confirms ownership<br/><code>localization:catalogs:detect --fail-on-drift</code> names zh-CN + zh-TW"]
+  ACTION["3. Maintainer runs <code>Localization Catalog Refresh</code><br/>against that PR's exact head<br/>trusted <code>main</code> tooling owns provider credentials"]
+  UPDATE["4. Automation commits translations to the same PR<br/><code>generated/zh-CN.json</code> + <code>generated/zh-TW.json</code><br/>an exact-head lease rejects a moved branch"]
+  CHECK["5. The same PR reruns strict checks and review<br/><code>localization:catalogs:check</code><br/>keys • ICU • placeholders • protected literals"]
+  MERGE["6. A maintainer merges the complete review unit<br/>same-repo: English + translations together<br/>fallback: generated follow-up after English"]
+  SHIP["7. The owner artifact ships<br/>the catalog becomes available to that surface"]
   RENDER["8. The owner renders at its presentation edge<br/><code>LocalizationContext(locale = zh-CN)</code><br/>为 openclaw 启用 zsh shell completion？"]
+  FORK["Fork or cross-repository source PR<br/>merge reviewed English first<br/>trusted <code>main</code> refresh opens one generated follow-up PR"]
   FAIL["Failure or rejection<br/>publish nothing • English fallback stays live<br/>target cells remain partial and visible"]
 
-  EN --> DETECT --> MERGE --> REFRESH --> GENERATED --> CHECK --> SHIP --> RENDER
-  REFRESH -. generation or validation fails .-> FAIL
+  EN --> DETECT --> ACTION --> UPDATE --> CHECK --> MERGE --> SHIP --> RENDER
+  EN -. cannot update source branch .-> FORK --> CHECK
+  ACTION -. generation or validation fails .-> FAIL
   CHECK -. checks or review reject .-> FAIL
 ```
 
 | Point in the path | Actual value |
 | --- | --- |
 | English source PR | `"wizard.completion.enable": "Enable {shell} shell completion for {cli}?"` |
-| PR detection | `zh-CN/wizard-core` and `zh-TW/wizard-core` are stale |
-| Trusted trigger | Merge of the registered English source path to protected `main` |
-| Generated translation PR | `"wizard.completion.enable": "为 {cli} 启用 {shell} shell completion？"` plus source-pinned evidence |
-| Shipped runtime output | After the generated PR merges and the owner artifact ships, `t("wizard.completion.enable", { shell: "zsh", cli: "openclaw" })` → `为 openclaw 启用 zsh shell completion？` |
+| PR gate | Fails with `zh-CN/wizard-core` and `zh-TW/wizard-core` stale |
+| Trusted action | Maintainer dispatch against the ready same-repository PR's resolved exact head |
+| In-place update | `"wizard.completion.enable": "为 {cli} 启用 {shell} shell completion？"` plus source-pinned evidence is committed to the source PR |
+| Shipped runtime output | After that PR merges and the owner artifact ships, `t("wizard.completion.enable", { shell: "zsh", cli: "openclaw" })` → `为 openclaw 启用 zsh shell completion？` |
 
 The checked-in `zh-CN` exemplar is marked `bootstrap-reviewed` with a human
-provider. The first credentialed post-merge refresh is therefore still a
+provider. The first credentialed in-place refresh is therefore still a
 supervised rollout gate. Once that gate succeeds, no contributor manually
-creates the translation PR: the English merge triggers the trusted refresh and
-generated-PR publisher. The same control loop applies to every one of the 15
+creates translation commits: the failing check tells them to request the
+trusted action, automation updates the same branch, and the check turns green.
+Fork and cross-repository sources use the post-merge generated-PR fallback.
+The same control loop applies to every one of the 15
 product surfaces, but not necessarily through the same files or workflow name:
 Control UI, native, and docs keep their conforming owner workflows.
 
@@ -272,16 +276,19 @@ translation system for every slice:
 1. Land the locale/context/runtime foundation and one real consumer.
 2. Enroll one owner surface by updating its source, inventory, catalog or
    conforming-pipeline disposition, and owner guidance in the same slice.
-3. Run credential-free detection on ordinary pull requests.
-4. Let the trusted owner workflow generate candidate catalogs and open a
-   generated pull request.
+3. Run credential-free detection on pull requests; fail a ready
+   same-repository PR when its adopted source makes targets stale.
+4. Let the maintainer-authorized owner workflow update that same PR from
+   trusted tooling, or open one post-merge generated PR when it cannot update
+   the source branch.
 5. Validate keys, placeholders, protected literals, provenance, formatting,
    fallback, and required human review.
 6. Land the source and generated artifacts, then update the coverage report.
 
-A source PR may be separate from its generated-catalog PR, but the adoption
-slice is not complete until both land with required review. Translation
-credentials never run against untrusted pull-request code, and AI-generated
+The source and generated catalogs normally share one PR. Fork and
+cross-repository paths may use a separate generated-catalog PR, but the
+adoption slice is not complete until all required artifacts and review land.
+Translation credentials never run against pull-request code, and AI-generated
 copy never approves itself.
 
 The current source audit contains 47 projected slices grouped into 16

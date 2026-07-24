@@ -384,21 +384,26 @@ The maintenance workflow follows a dependency-guard-style state machine:
 
 | Phase | Trigger | Behavior |
 | --- | --- | --- |
-| `detect` | English source pull request | Runs without provider credentials. Reports the exact missing targets, stale revisions, fallback, and review drift. It does not publish translations from untrusted code. |
-| `refresh` | Trusted `main` push after the source PR merges, schedule, or manual dispatch | Generates candidate translations per locale, validates isolated artifacts, and opens or updates a generated pull request. Failed generation or validation aborts publication. |
+| `detect` | English source pull request | Runs without provider credentials. For a ready same-repository PR, fails with the exact missing or stale targets until refresh output is present. Drafts and branches the repository cannot update remain advisory. It never publishes translations from pull-request code. |
+| `refresh` | Maintainer dispatch for a ready same-repository PR, or trusted `main` push after a fork/cross-repository source merge | Runs protected-base tooling against an exact source revision, generates and validates all affected locale candidates as one batch, then either commits them to the unchanged source branch under an exact-head lease or opens/updates one generated fallback PR. Failed generation or validation aborts publication. |
 | `enforce` | Pull request and release | Blocks invalid catalogs and any `complete` claim whose source, artifacts, or required review are stale. |
 
-The refresh workflow must check out a trusted exact source revision reachable
-from a protected base-repository ref, keep provider credentials unavailable to
-untrusted pull-request code, and publish through a scoped generated-PR
-application identity. Generated changes retain source, glossary, workflow,
-provider/model, and catalog-revision provenance.
+The refresh workflow must execute workflow and generator code from a protected
+base-repository revision. A source PR's registry and English catalogs are read
+only as validated data; its scripts, actions, dependencies, and hooks are never
+executed with provider or publisher credentials. Before an in-place push the
+workflow rechecks that the PR is open, ready, same-repository, and still at the
+resolved source SHA, then uses a scoped application identity and an exact-head
+lease. Generated changes retain source, glossary, workflow, provider/model,
+and catalog-revision provenance.
 
-The normal contributor path needs no manual translation-PR setup: the source
-PR records the reviewed English change and drift, then its merge to protected
-`main` triggers the trusted refresh and generated-PR publisher. Repositories
-may also schedule or manually reconcile drift, but those are recovery paths,
-not the ordinary authoring loop.
+The normal same-repository path keeps one review unit: a ready source PR fails
+the scoped gate, tells the author to request the maintainer-authorized refresh,
+receives one bot commit containing every affected target, and reruns to green.
+The original author and reviewers remain responsible for the now-complete PR;
+automation never approves or merges it. Fork and cross-repository paths merge
+reviewed English first, then use one generated follow-up PR. A trusted `main`
+refresh also reconciles residual drift as a recovery path.
 
 Detection and enforcement fail closed on malformed manifests, tool failure, or
 unreadable required evidence. A failed refresh leaves the prior catalogs and
@@ -407,7 +412,8 @@ maturity state unchanged while reporting the unresolved drift.
 The projected delivery registry proves this contract with three explicit slices.
 `G45` adds deterministic, credential-free detect/enforce checks for one
 owner-declared routine message family. `G46` adds the trusted exact-source
-refresh, validation, evidence, and generated-PR path for the same fixture. They
+refresh, validation, evidence, in-place update, and generated-PR fallback for
+the same fixture. They
 may land together in one bounded core/tooling exemplar PR, after which each
 surface adopts the checks only for its own declared families, namespaces, or
 directories. `G47` adds a build-time disposition gate for newly enumerated
@@ -419,12 +425,12 @@ informative; the state-machine contract above remains normative.
 
 After the exemplar exists, a migrated string-bearing area does not satisfy the
 maintenance contract until both phases are wired for its declared scope:
-credential-free detect/enforce on pull requests and trusted refresh through a
-generated pull request. Existing owner workflows may provide this evidence;
+credential-free detect/enforce on pull requests and trusted in-place refresh
+with a generated-PR fallback. Existing owner workflows may provide this evidence;
 the RFC does not require replacing a conforming pipeline.
 
-The gate may automatically repair missing low-risk catalog entries in a
-generated pull request. It must not:
+The trusted refresh may repair missing low-risk catalog entries in the source
+PR or a generated fallback PR. It must not:
 
 - push generated translations directly to a protected branch;
 - promote its own output to `complete`;

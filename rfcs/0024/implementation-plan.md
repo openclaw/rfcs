@@ -53,10 +53,11 @@ reporting begin later in `E43`; review evidence and release promotion follow in
 The five runtime PRs do not prove the reusable CI and translation-authoring
 loop. OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) implements `G45`
-and `G46` together: change one routine English source message, observe
-credential-free CI detect the stale targets, merge the reviewed English source,
-then observe that trusted `main` push run asynchronous generation and validation
-and open a generated pull request. Later owners adopt that lane only for their
+and `G46` together: change one routine English source message, observe the
+credential-free ready-PR gate fail on stale targets, run the maintainer-authorized
+refresh against the exact PR head, and observe automation update that same PR so
+strict validation can turn green. Fork and cross-repository sources retain the
+trusted post-merge generated-PR fallback. Later owners adopt that lane only for their
 declared families, namespaces, or directories, with both the scoped gate and
 owner-owned refresh configured in the same adoption slice.
 Its review branch contains `F01`, the exact five-file `F03` ownership delta,
@@ -164,17 +165,18 @@ translation service for every message family.
 
 | Change in an adopted or newly introduced scope | Required enforcement | Boundary |
 | --- | --- | --- |
-| Add or change a reviewed English catalog key | `G45` credential-free authoring/drift gate | Reject stale targets, invalid ICU, placeholder or protected-literal drift, and hand-edited generated output. |
+| Add or change a reviewed English catalog key | `G45` credential-free authoring/drift gate | Fail a ready same-repository PR on stale targets; reject invalid ICU, placeholder or protected-literal drift, and hand-edited generated output. Keep drafts and non-updatable branches advisory. |
 | Add a product-facing source registration, file family, or declared source root | `G47` disposition gate | Require adoption, a conforming existing owner pipeline, or a named English-only, platform-constrained, or deferred disposition. |
 | Add a raw product-owned literal inside a family, namespace, or narrow directory already declared migrated | Owner-scoped hardcoded-string inventory such as blocking `L10N001` | Block only for the declared migrated scope. `G47` does not heuristically scan every repository literal. |
-| Generate or publish a translation candidate | `G46` trusted exact-source workflow | Run only with trusted credentials, validate before publication, and open or update a generated pull request. |
+| Generate or publish a translation candidate | `G46` trusted exact-source workflow | Run only protected-base tooling with trusted credentials, validate before publication, then update the exact same-repository PR head or open/update one generated fallback PR. |
 | Reuse Control UI, native, or docs automation | Owner-pipeline conformance record | Map its detection, generation, validation, evidence, publication, and review behavior to `G45`/`G46`; do not replace a conforming pipeline. |
 | Promote a locale/surface maturity or product claim | `E43`/`E44` aggregation and review evidence | Consume only landed declarations, generated artifacts, and current required review evidence. |
 
-One logical slice may therefore span a source/adoption pull request and a
-generated-catalog pull request. Landing only the source half can enroll the
-scope, but it does not complete an entry whose exit bar requires generated
-artifacts or named language/security review.
+One logical slice normally keeps source/adoption and generated catalogs in one
+pull request. A fork or cross-repository path may span a source PR and a
+generated fallback PR. Landing only the source half can enroll the scope, but
+it does not complete an entry whose exit bar requires generated artifacts or
+named language/security review.
 
 Stop the slice when no owner can approve stable meaning, no legitimate locale
 exists, safety review is missing, stable machine output would change, or the
@@ -191,7 +193,7 @@ Completion names are tracking cohorts, not single PRs or a linear stack:
 | Runtime safety | Bounded user-facing runtime and Gateway errors | `F05` and `R16`-`R24` use owner-approved descriptors, edge rendering, and compatible English fallback. |
 | Channels and capabilities | Server-rendered channels, command menus, command metadata, and skill/plugin metadata | `M25`-`M36` land each public contract and locale authority independently. |
 | Native and docs | Android, Apple, and documentation | `P39`-`P42` extend existing owner pipelines and record the Persian/Thai disposition. |
-| Authoring automation | Shared tooling plus each adopting owner | `G45`-`G46` prove scoped deterministic enforcement and trusted generated-PR refresh; `G47` requires a disposition for newly introduced product-string surfaces. |
+| Authoring automation | Shared tooling plus each adopting owner | `G45`-`G46` prove scoped deterministic enforcement, trusted in-place refresh, and generated-PR fallback; `G47` requires a disposition for newly introduced product-string surfaces. |
 | Release promotion | Product-wide | `E43`-`E44` aggregate only landed scoped evidence and produce an honest release claim. |
 
 ### September 1 delivery target
@@ -239,19 +241,19 @@ Provider secrets are never exposed to untrusted pull-request code.
 `G45` and `G46` establish the reusable reference path before broad owner
 adoption. One routine, non-safety message family must prove:
 
-1. an English source edit is detected on an untrusted pull request without
+1. an English source edit is detected on a pull request without
    provider credentials;
-2. the pull-request check reports the exact stale target catalogs while
+2. a ready same-repository pull-request check fails with the exact stale target catalogs while
    blocking malformed registration, source, ICU, placeholder, or
    protected-literal changes;
-3. merging the reviewed English source to protected `main` automatically starts
-   a trusted exact-source workflow with provider and publisher credentials;
-4. that workflow generates locale candidates and opens or updates a separate
-   generated pull request rather than pushing directly;
+3. a maintainer dispatch starts protected-`main` workflow and generator code
+   against the source PR's resolved exact head, without executing PR-owned code;
+4. that workflow generates locale candidates and commits them to the unchanged
+   source branch under an exact-head lease;
 5. strict generated-catalog validation succeeds before publication and records
    source-pinned generation evidence;
-6. failed or stale generation publishes nothing and leaves the affected cell
-   partial.
+6. failed or stale generation publishes nothing, while fork or cross-repository
+   sources use one trusted post-merge generated follow-up PR.
 
 The exemplar proves plumbing, not linguistic completion. Its generated output
 does not approve itself, and safety families require their stricter owner and
@@ -277,8 +279,8 @@ passes after a valid disposition is added.
 After the exemplar lands, every subsequent slice that adds or migrates
 deterministic product strings must leave its area enrolled end to end. The PR
 defines the adopted family, namespace, or directory; enables its blocking
-credential-free gate; and configures the area's trusted asynchronous refresh,
-validation, evidence, and generated-PR path. The same slice updates its
+credential-free gate; and configures the area's trusted in-place refresh plus
+post-merge generated-PR fallback, validation, and evidence. The same slice updates its
 checked-in inventory disposition, public contributor workflow index, nearest
 owner-internal guidance, and any additional public contract documentation so
 the new maintenance contract is usable at merge time. Existing Control UI,
