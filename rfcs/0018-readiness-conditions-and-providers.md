@@ -440,8 +440,8 @@ snapshot.
 | Bucket | Candidate conditions | Existing owner evidence | Proposed PR scope |
 | --- | --- | --- | --- |
 | Runtime activation integrity | `SecretsReady`, `ModelRouteReady`, `ConfigCurrent`, stronger `PluginsLoaded` semantics | Degraded secret-owner snapshots, model-auth and route resolution state, runtime config/reloader state, plugin activation and configured-unavailable state | Project activation-pinned facts into selectable or advisory conditions. Do not resolve secrets, contact a model, or reload plugins during readiness evaluation. |
-| Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady` | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. |
-| State and background services | `StateReady`, `DeliveryRuntimeReady`, `SchedulerReady`; defer `RestoreComplete` until a restore fence exists | State/store activation, delivery runtime ownership, cron lifecycle and startup recovery state | Report whether configured stateful services can accept new work. Historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. Do not infer restore completion from database-open, fleet-restore, or config-migration state. |
+| Agent execution capabilities | `ContextEngineReady`, `ToolCatalogReady`, `McpRuntimeReady`, `SandboxReady` or `HarnessReady`; defer `SkillsReady` until bounded owner evidence exists | Context-engine and tool-schema quarantine records, MCP runtime ownership, sandbox and harness runtime state | Let each selected execution owner publish a bounded condition. Optional capabilities remain advisory unless explicitly selected as required. Do not rebuild the skill inventory in the readiness path. |
+| State and background services | `StateReady`, `SessionStorageReady`, `DeliveryRuntimeReady`, `SchedulerReady`; defer `RestoreComplete` until a restore fence exists | State/store activation, bounded persistence-location probes, delivery runtime ownership, cron lifecycle and startup recovery state | Report whether configured stateful services can accept new work. A selected storage probe may perform a capped write/fsync/unlink check, but historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. Do not infer restore completion from database-open, fleet-restore, or config-migration state. |
 | Hosted dependencies | `HostBindingsReady`; defer `EgressReady` and `ManagedConfigApplied` until their owners publish authoritative facts | RFC 0020 host-integration bundle and owner-generation evidence | Project required host bindings through the ordinary readiness selector. Keep network probing, config inference, Lobster, OCC, tenant, and deployment policy out of the condition evaluator. |
 
 All four buckets now have fork evidence slices. The first three are stacked
@@ -457,13 +457,18 @@ prerequisites for accepting this RFC:
   adds selectable context-engine, tool-catalog, MCP, sandbox, and harness
   conditions. MCP discovery is captured for every configured agent when the
   Gateway accepts a runtime configuration; readiness evaluation does not
-  connect to MCP servers or start any execution surface.
+  connect to MCP servers or start any execution surface. `SkillsReady` remains
+  deferred because the current skill inventory path is not a bounded readiness
+  source; the skills owner must first publish an activation snapshot or index.
 - [State and background services PR 155](https://github.com/giodl73-repo/openclaw/pull/155)
-  adds selectable state-database, durable session-delivery, and scheduler
-  lifecycle conditions. Owners publish synchronous process-local snapshots;
-  readiness does not open SQLite, install delivery recovery, import or start
-  cron, scan queues, or run recovery. `RestoreComplete` remains deferred until
-  OpenClaw owns a generic restore generation and admission fence.
+  adds selectable state-database, session-storage, durable session-delivery,
+  and scheduler lifecycle conditions. Owners publish synchronous process-local
+  snapshots. The selected storage condition uses a one-second, target-capped,
+  concurrency-capped, generation-safe write/fsync/unlink probe over resolved
+  persistence parents; failures are redacted. Readiness does not open SQLite,
+  install delivery recovery, import or start cron, scan queues, or run recovery.
+  `RestoreComplete` remains deferred until OpenClaw owns a generic restore
+  generation and admission fence.
 - [Hosted dependencies PR 156](https://github.com/giodl73-repo/openclaw/pull/156)
   adds selectable `openclaw.host-bindings-ready` and connects RFC 0020 bundle
   declarations to the active core/plugin criterion catalog. Selecting the
