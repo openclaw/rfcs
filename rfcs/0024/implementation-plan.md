@@ -17,12 +17,13 @@ follow-up review added the new-surface adoption gate as `G47`.
 The number is not fixed. Source audit may delete, split, or add entries without
 changing the runtime contract.
 
-## Existing Drafts
+## Existing Implementation PRs
 
-The five current drafts have been reduced to bounded intended deltas. They
-remain draft implementation evidence until their named owners approve them:
+The five current implementation PRs have been reduced to bounded intended
+deltas. They remain implementation evidence until their named owners approve
+and land them:
 
-| Registry entry | Draft | Intended review delta | Delivery disposition |
+| Registry entry | PR | Intended review delta | Delivery disposition |
 | --- | --- | --- | --- |
 | `F01` | [#111541](https://github.com/openclaw/openclaw/pull/111541) | Minimal kernel and onboarding consumer | Land only after core and wizard owner review; no coverage or public metadata contract. |
 | `F02` | [#111542](https://github.com/openclaw/openclaw/pull/111542) | Updater human dry-run preview | Preserve JSON and operational literals; updater owner approves the final edge. |
@@ -30,7 +31,7 @@ remain draft implementation evidence until their named owners approve them:
 | `F04` | [#111544](https://github.com/openclaw/openclaw/pull/111544) | TUI status summary and relative ages | Keep other TUI, CLI, Gateway, metadata, and channel families separate. |
 | `F05` | [#111545](https://github.com/openclaw/openclaw/pull/111545) | One protocol-owned approval-not-found descriptor and Control UI edge | Generated target catalogs follow separately through the Control UI workflow; product readiness remains deferred. |
 
-## End State Of RFC Acceptance And The Five Drafts
+## End State Of RFC Acceptance And The Five Implementation PRs
 
 RFC acceptance approves contracts and owner gates; it does not change runtime
 behavior. Landing `F01`, then independently landing owner-approved `F02`
@@ -44,13 +45,13 @@ through `F05`, provides:
 - contributor guidance for adding later owner-scoped families.
 
 The coverage specification defines the eventual language-by-surface reporting
-shape, but these drafts neither install a closed global reporting matrix nor
+shape, but these PRs neither install a closed global reporting matrix nor
 claim completion for unadopted surfaces. Owner declarations and aggregate
 reporting begin later in `E43`; review evidence and release promotion follow in
 `E44`.
 
-The five runtime drafts do not prove the reusable CI and translation-authoring
-loop. Draft OpenClaw PR
+The five runtime PRs do not prove the reusable CI and translation-authoring
+loop. OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) implements `G45`
 and `G46` together: change one routine English source message, observe
 deterministic CI detect the stale target, run trusted asynchronous generation
@@ -61,7 +62,7 @@ Its review branch contains `F01`, the exact five-file `F03` ownership delta,
 and the 17-file exemplar; unrelated updater, TUI, Gateway, and approval runtime
 ancestry is excluded. Because the branch shares the exact `F03` head, that
 dependency collapses normally after the documentation slice merges.
-Draft OpenClaw PR
+OpenClaw PR
 [#112801](https://github.com/openclaw/openclaw/pull/112801) implements `G47` as
 a separate build-time guard so a newly introduced product-string surface cannot
 bypass that decision by never entering an owner registry.
@@ -153,6 +154,26 @@ public contract documentation changes when it introduces no public contract,
 but it still updates the nearest owner guidance when maintainers gain a new
 obligation.
 Shared localization machinery is not acceptance by itself.
+
+### Gate responsibility by change type
+
+The repository reuses shared checks and workflows. A slice adds owner-scoped
+registry/configuration rows and fixtures; it does not create a new CI system or
+translation service for every message family.
+
+| Change in an adopted or newly introduced scope | Required enforcement | Boundary |
+| --- | --- | --- |
+| Add or change a reviewed English catalog key | `G45` credential-free authoring/drift gate | Reject stale targets, invalid ICU, placeholder or protected-literal drift, and hand-edited generated output. |
+| Add a product-facing source registration, file family, or declared source root | `G47` disposition gate | Require adoption, a conforming existing owner pipeline, or a named English-only, platform-constrained, or deferred disposition. |
+| Add a raw product-owned literal inside a family, namespace, or narrow directory already declared migrated | Owner-scoped hardcoded-string inventory such as blocking `L10N001` | Block only for the declared migrated scope. `G47` does not heuristically scan every repository literal. |
+| Generate or publish a translation candidate | `G46` trusted exact-source workflow | Run only with trusted credentials, validate before publication, and open or update a generated pull request. |
+| Reuse Control UI, native, or docs automation | Owner-pipeline conformance record | Map its detection, generation, validation, evidence, publication, and review behavior to `G45`/`G46`; do not replace a conforming pipeline. |
+| Promote a locale/surface maturity or product claim | `E43`/`E44` aggregation and review evidence | Consume only landed declarations, generated artifacts, and current required review evidence. |
+
+One logical slice may therefore span a source/adoption pull request and a
+generated-catalog pull request. Landing only the source half can enroll the
+scope, but it does not complete an entry whose exit bar requires generated
+artifacts or named language/security review.
 
 Stop the slice when no owner can approve stable meaning, no legitimate locale
 exists, safety review is missing, stable machine output would change, or the

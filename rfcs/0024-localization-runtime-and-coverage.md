@@ -81,8 +81,8 @@ This RFC does not authorize broad exception/log extraction, runtime model
 translation, translation of commands or protocol values, AI self-review, or a
 new external plugin runtime-catalog API.
 
-The five open foundation drafts are the first bounded entries in the projected
-owner slice registry. Their review deltas now isolate the minimal kernel,
+The five open foundation implementation PRs are the first bounded entries in
+the projected owner slice registry. Their review deltas now isolate the minimal kernel,
 updater dry-run, contributor guidance, TUI status, and one Gateway approval
 descriptor. `F02` through `F05` now branch independently from `F01`; none
 carries another follow-up owner's runtime or documentation delta. Each is
@@ -94,12 +94,12 @@ formatting
 foundation, the existing wizard consumer, localized updater dry-run and TUI
 status families, one reviewed Gateway/Control UI approval-error edge, and the
 contributor guide. The coverage specification then defines how adopted owners
-can report language-by-surface state, but these drafts do not install a closed
+can report language-by-surface state, but these PRs do not install a closed
 global matrix or claim that other cells are localized. Owner declarations and
 aggregate product reporting remain the later `E43` and `E44` slices.
 
-The five runtime drafts do not install the reusable authoring gate or
-asynchronous translation lane. Draft OpenClaw PR
+The five runtime implementation PRs do not install the reusable authoring gate
+or asynchronous translation lane. OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) implements `G45`
 and `G46` together as the bounded core/tooling exemplar: a routine English
 source edit trips deterministic CI, then a trusted exact-source workflow
@@ -111,6 +111,13 @@ adoption slice,
 not in a documentation cleanup at product completion. The later documentation
 cohort localizes docs as a product surface; it does not defer documentation of
 earlier maintainer obligations.
+
+One logical adoption slice may use separate source and generated-catalog pull
+requests when repository policy requires it. The source pull request enrolls
+the scope and its maintenance contract; the slice is not complete until its
+required generated artifacts and owner, language, or safety review have also
+landed. The implementation plan defines which shared gate catches each change
+type; `G47` is deliberately not a repository-wide raw-string scanner.
 
 The current delivery audit identifies 47 projected owner slices. The first
 audit had 44; owner review exposed the authoring-gate and generated-refresh
@@ -934,7 +941,7 @@ are rejected without disabling unrelated core catalogs.
 
 ### Implementation evidence and refinements
 
-The five foundation drafts have provided cross-cutting implementation evidence
+The five foundation PRs have provided cross-cutting implementation evidence
 across the shared kernel, runtime safety, process-scoped CLI/TUI rendering,
 updater and service presentation, Gateway/UI errors, channel approvals,
 metadata, native/docs convergence, RTL interpolation, and product-level release

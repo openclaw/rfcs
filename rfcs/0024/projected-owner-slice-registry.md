@@ -29,7 +29,14 @@ Each entry tracks:
 - accepted, fallback/failure, compatibility, and privacy evidence;
 - the hardcoded, duplicated, or parsed-prose authority it deletes; and
 - a live state such as `projected`, `audited`, `owner-approved`, `draft`,
-  `landed`, `generated-follow-up`, `blocked`, `deferred`, or `deleted`.
+  `ready-for-review`, `source-enrolled`, `generated-follow-up`, `landed`,
+  `blocked`, `deferred`, or `deleted`.
+
+The implementation tracker
+[openclaw#113105](https://github.com/openclaw/openclaw/issues/113105) is the
+live delivery ledger. State values in this planning document are a reviewed
+snapshot and should not be treated as a substitute for live PR and generated
+artifact state.
 
 The registry lives in RFC and project planning. Runtime lookup remains in
 surface-owned catalogs and protocol-owned descriptor registries. Coverage
@@ -60,6 +67,31 @@ later `P41`-`P42` documentation package localizes documentation as a user-facing
 product surface;
 it does not defer documentation of earlier owner obligations.
 
+## Slice Lifecycle
+
+The normal delivery path is:
+
+```text
+projected -> audited -> owner-approved -> ready-for-review
+  -> source-enrolled -> generated-follow-up -> landed
+```
+
+- `ready-for-review` means the bounded source or contract PR is prepared; it
+  does not advance product coverage.
+- `source-enrolled` means the source/runtime change plus its inventory, shared
+  gate configuration, workflow index, and owner guidance have landed, while a
+  required generated artifact or review is still outstanding.
+- `generated-follow-up` means the trusted owner workflow has opened or updated
+  the required candidate PR. An open generated PR is not done.
+- `landed` means every source, generated-artifact, compatibility, deletion, and
+  named review requirement in that registry entry's exit bar is present in
+  accepted history.
+- `blocked`, `deferred`, `platform-constrained`, and `deleted` are explicit
+  exits with the owner and evidence required elsewhere in this registry.
+
+Source and generated changes may use separate PRs without becoming separate
+planning slices. The slice remains incomplete until its full exit bar is met.
+
 ## Owner Registries
 
 | Registry | Owns | Does not own |
@@ -77,17 +109,17 @@ it does not defer documentation of earlier owner obligations.
 
 ## A. Current Foundation Evidence
 
-These five drafts are the first registry entries. `F02` through `F05` branch
-independently from `F01`, so each review contains the shared foundation plus
-only its own owner-bounded delta.
+These five implementation PRs are the first registry entries. `F02` through
+`F05` branch independently from `F01`, so each review contains the shared
+foundation plus only its own owner-bounded delta.
 
 | ID | Owner registry | Slice and edge | State | Exit and deletion proof |
 | --- | --- | --- | --- | --- |
-| `F01` | `core-locale` + `wizard` | Minimal kernel and onboarding consumer ([#111541](https://github.com/openclaw/openclaw/pull/111541)) | `draft` | Kernel/catalog tests, unchanged English wizard behavior, missing-key fallback, no runtime I/O; replaces wizard-local resolution duplication where adopted. |
-| `F02` | `updater` | Human `update --dry-run` preview ([#111542](https://github.com/openclaw/openclaw/pull/111542)) | `draft` | JSON equality, literal command/path/version preservation, English and non-English proof; deletes updater-owned hardcoded preview labels. |
-| `F03` | contributor/docs owners | Ownership and contribution guide ([#111543](https://github.com/openclaw/openclaw/pull/111543)) | `draft` | Docs map, glossary, source-safe validation, and working links; replaces undocumented cross-surface guesswork, not owner workflows. |
-| `F04` | `tui` | TUI status summary and relative ages ([#111544](https://github.com/openclaw/openclaw/pull/111544)) | `draft` | Formatter and PTY proof, documented `OPENCLAW_LOCALE`/host-locale/English precedence, literal IDs/paths/models/events, exact English compatibility; deletes status-owned English assembly. |
-| `F05` | `gateway-error` + `control-ui` + `approval` | `APPROVAL_NOT_FOUND` descriptor and approval-page edge ([#111545](https://github.com/openclaw/openclaw/pull/111545)) | `draft` | Stable tuple, bounded metadata, legacy English, unknown-key denial, protocol/UI tests; deletes the two Gateway emitter variants as independent descriptor authorities. |
+| `F01` | `core-locale` + `wizard` | Minimal kernel and onboarding consumer ([#111541](https://github.com/openclaw/openclaw/pull/111541)) | `ready-for-review` | Kernel/catalog tests, unchanged English wizard behavior, missing-key fallback, no runtime I/O; replaces wizard-local resolution duplication where adopted. |
+| `F02` | `updater` | Human `update --dry-run` preview ([#111542](https://github.com/openclaw/openclaw/pull/111542)) | `ready-for-review` | JSON equality, literal command/path/version preservation, English and non-English proof; deletes updater-owned hardcoded preview labels. |
+| `F03` | contributor/docs owners | Ownership and contribution guide ([#111543](https://github.com/openclaw/openclaw/pull/111543)) | `ready-for-review` | Docs map, glossary, source-safe validation, and working links; replaces undocumented cross-surface guesswork, not owner workflows. |
+| `F04` | `tui` | TUI status summary and relative ages ([#111544](https://github.com/openclaw/openclaw/pull/111544)) | `ready-for-review` | Formatter and PTY proof, documented `OPENCLAW_LOCALE`/host-locale/English precedence, literal IDs/paths/models/events, exact English compatibility; deletes status-owned English assembly. |
+| `F05` | `gateway-error` + `control-ui` + `approval` | `APPROVAL_NOT_FOUND` descriptor and approval-page edge ([#111545](https://github.com/openclaw/openclaw/pull/111545)) | `ready-for-review` | Stable tuple, bounded metadata, legacy English, unknown-key denial, protocol/UI tests; deletes the two Gateway emitter variants as independent descriptor authorities. |
 
 ## B. Operator Surface Follow-Ups
 
@@ -168,10 +200,10 @@ together in one bounded core exemplar PR because they share tooling ownership
 and one test fixture, but adopted surfaces opt in independently and retain their
 own source, catalog, generation, review, and publication policy.
 
-Draft OpenClaw PR
+OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) is the reference
 implementation for both slices, using the wizard completion family as the first
-adopted area. Its draft status is implementation evidence, not a claim that the
+adopted area. Its open status is implementation evidence, not a claim that the
 slices have landed.
 
 | ID | Owner registry | Projected slice | Gate | Required proof and deletion target |
