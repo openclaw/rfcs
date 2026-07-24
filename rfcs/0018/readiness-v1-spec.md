@@ -39,7 +39,8 @@ This specification does not define:
   criterion.
 - **Requirement**: whether a non-true condition blocks readiness.
 - **Universal condition**: a core lifecycle condition that always participates
-  and cannot be removed by operator configuration.
+  once canonical readiness is activated and cannot be removed by operator
+  configuration.
 - **Canonical result**: the single aggregated result consumed by all readiness
   projections.
 - **Projection**: an HTTP, health, status, or CLI representation of the
@@ -49,6 +50,12 @@ This specification does not define:
 
 Readiness v1 uses these compatibility rules:
 
+- absence of both `gateway.readiness` and another separately accepted
+  activation contract preserves the legacy Gateway readiness decision path and
+  does not execute the canonical runtime evaluator;
+- presence of `gateway.readiness`, including an empty object, activates v1;
+- a separately accepted Standard Hosting Profile may activate v1 through its
+  profile-selection contract;
 - condition `type` and `reason` values are stable machine contracts;
 - `message` is redacted operator guidance and is not stable machine identity;
 - adding an advisory criterion is backward compatible;
@@ -173,9 +180,9 @@ The evaluator may emit these failure-only guard conditions:
 | `ReadinessEvaluationComplete` | Required | The bounded canonical evaluation completed; otherwise `ReadinessEvaluationTimedOut` or `ReadinessEvaluationFailed`. |
 | `GatewayResponding` | Required when the operation is remote | The caller reached the live Gateway; otherwise `GatewayUnavailable` or `GatewayNotChecked`. |
 
-Implementations must preserve existing Gateway readiness behavior while these
-observations are normalized. `workspace-writable` remains unselected unless an
-operator or a separately accepted profile selects it.
+Implementations must preserve existing unconfigured Gateway readiness behavior
+while these observations are normalized. `workspace-writable` remains
+unselected unless an operator or a separately accepted profile selects it.
 
 ## Plugin Readiness Providers
 
@@ -330,7 +337,10 @@ capacity returns.
 
 ## Projections
 
-All projections consume the same canonical result.
+Once v1 is activated, all projections consume the same canonical result. When
+neither direct readiness configuration nor another separately accepted
+activation contract is present, `/ready` and `/readyz` retain the legacy Gateway
+decision path and must not invoke providers or the canonical runtime evaluator.
 
 ### HTTP
 
@@ -363,15 +373,23 @@ The CLI must not implement condition evaluation independently.
 ## Legacy Projection
 
 Existing `ready`, `failing`, `suppressed`, `eventLoop`, and `uptimeMs` fields
-remain compatibility projections during migration. Implementations must first
-emit canonical conditions beside legacy fields, then move every surface to the
-canonical evaluator. Legacy removal requires a separate compatibility review.
+remain compatibility projections during migration. Implementations preserve the
+legacy path before activation, emit canonical conditions beside legacy fields
+after activation, then move every activated surface to the canonical evaluator.
+Legacy removal requires a separate compatibility review.
 
 ## Conformance Checklist
 
 An implementation conforms to readiness v1 when it proves:
 
 - existing unconfigured readiness behavior is unchanged;
+- unconfigured probes do not execute providers or the canonical runtime
+  evaluator;
+- an explicit empty `gateway.readiness` object activates canonical evaluation
+  without selecting additional criteria;
+- implementations that support Standard Hosting Profiles prove that profile
+  selection activates canonical evaluation without requiring a separate
+  `gateway.readiness` section;
 - universal startup, admission, and selected-channel failures return `503`;
 - additional criteria do not become required without explicit selection;
 - required `False` and `Unknown` return `503`;

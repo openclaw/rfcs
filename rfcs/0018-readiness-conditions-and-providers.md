@@ -13,11 +13,13 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/33
 
 ## Summary
 
-Modernize OpenClaw's existing Gateway readiness evaluator into one canonical,
-structured condition result. Existing startup, drain, channel, and event-loop
+Add an opt-in canonical, structured condition result around OpenClaw's existing
+Gateway readiness evaluator. Existing startup, drain, channel, and event-loop
 observations become core conditions; activated plugins may register bounded,
-observational readiness providers; and `/ready`, `/readyz`, health, status, and
-an optional CLI project the same result.
+observational readiness providers; and configured `/ready`, `/readyz`, health,
+status, and an optional CLI project the same result. Without readiness
+configuration or another separately accepted activation contract, the existing
+Gateway decision path remains authoritative.
 
 This RFC does not define hosting profiles. Standard Hosting Profiles are a
 separate proposal that may compose conditions from this RFC into named support
@@ -52,8 +54,8 @@ core Gateway observations
 
 Required `False` or `Unknown` conditions fail readiness. Advisory conditions
 remain visible without causing an outage. Existing installations preserve their
-current readiness behavior unless an operator explicitly requires an additional
-provider condition.
+current readiness path unless an operator adds `gateway.readiness` or selects a
+separately accepted Standard Hosting Profile.
 
 ### Evidence from existing issues
 
@@ -342,18 +344,27 @@ The CLI must not implement a second evaluator.
 
 ### Compatibility
 
+Canonical readiness evaluation is opt-in. When `gateway.readiness` and any
+separately accepted activation contract are both absent, the Gateway invokes
+only its legacy lifecycle and channel checker; provider or runtime-evaluator
+failure cannot create a new `503`. Presence of `gateway.readiness`, including
+an empty object, activates bounded canonical evaluation. A separately accepted
+Standard Hosting Profile may also activate canonical evaluation as part of
+profile selection.
+
 Existing `ready`, `failing`, `suppressed`, `eventLoop`, and `uptimeMs` fields
 remain compatibility projections during migration. New consumers use
 `conditions`, `failures`, and `advisories`.
 
 The migration order is:
 
-1. emit canonical conditions beside legacy fields;
-2. make every projection consume the same canonical evaluator;
-3. migrate internal and external consumers; and
-4. consider legacy-field removal only through a separate compatibility review.
+1. preserve the legacy decision path when canonical readiness is not activated;
+2. emit canonical conditions beside legacy fields after activation;
+3. make every activated projection consume the same canonical evaluator;
+4. migrate internal and external consumers; and
+5. consider legacy-field removal only through a separate compatibility review.
 
-Existing installations gain structured output but do not gain new required
+Activated installations gain structured output but do not gain new required
 workspace or plugin dependencies. Registering or implementing an additional
 criterion does not make it required. Only explicit operator configuration or a
 separately selected standard profile changes the additional readiness gate.
@@ -382,10 +393,12 @@ runtime activation identity, or a release support matrix.
 
 The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-It is one upstream PR with fourteen ordered commits at exact head `c1919669c3f`,
-rebased onto OpenClaw `main` at `b8a47b23384`. The refreshed branch passes
-focused readiness, Gateway, status, health, CLI, and method-metadata tests;
-production typing and unused-export checks also pass. Timed-out plugin checks remain single-flight
+Its upgrade boundary keeps unconfigured probes on the legacy checker and makes
+the presence of `gateway.readiness` the explicit canonical activation signal.
+It is one upstream PR with fifteen ordered commits at exact head `e49485d1c79`.
+The opt-in compatibility amendment passes 130 focused readiness, live Gateway,
+HTTP/RPC, health, selector, and CLI assertions; type-aware lint, formatting, and
+diff checks pass. Timed-out plugin checks remain single-flight
 until the original callback settles, even when the plugin ignores cancellation;
 provider output is bounded, validated, and redacted. Config publication fences
 provider and workspace evidence by runtime generation, including recovery when
