@@ -46,31 +46,50 @@ the locale contract, catches adopted-scope drift, runs trusted translation
 refreshes, and aggregates evidence without becoming a central catalog owner.
 
 ```mermaid
-flowchart LR
-  NEW["New product-string surface"] --> G47{"G47: disposition recorded?"}
-  G47 -->|adopt| EN
-  G47 -->|existing conforming pipeline| OWN
-  G47 -->|English-only, constrained, or deferred| DISP["Named owner + rationale"]
-
-  subgraph SURFACE["Each product surface keeps ownership"]
-    EN["Reviewed English source<br/>+ stable message keys"]
-    OWN["Surface catalogs<br/>rendering + publication + review policy"]
+flowchart TB
+  subgraph OWNERS["Product surfaces keep ownership"]
+    direction LR
+    SURFACES["CLI / TUI • Gateway / channels<br/>Control UI / native • docs"]
+    ASSETS["Per-surface English source + catalogs<br/>renderer + publication + review policy"]
+    SURFACES --- ASSETS
   end
 
-  EN --> G45["G45: shared credential-free CI<br/>registration + ICU + literals + drift"]
-  G45 -->|exact source lands| G46["G46: trusted async refresh<br/>provider credentials stay off PR code"]
-  G46 --> GPR["Generated locale PR"]
-  GPR --> REVIEW["Owner + language<br/>+ safety review when required"]
-  REVIEW --> OWN
+  subgraph CAPABILITIES["Reusable capabilities"]
+    direction LR
+    subgraph CONTRACT["Shared localization contract — no product-copy ownership"]
+      direction TB
+      REGISTRY["Locale registry<br/>aliases • fallback • direction"]
+      CONTEXT["LocalizationContext<br/>locale • provenance • audience"]
+      VALIDATION["Catalog + descriptor validation<br/>keys • ICU • params • literals"]
+      REGISTRY --> CONTEXT
+    end
 
-  CTX["Shared LocalizationContext<br/>locale + fallback + provenance"] --> RENDER["Surface-owned final renderer"]
-  EN -->|reviewed English fallback| RENDER
-  OWN --> RENDER
-  RENDER --> USER["Localized human-facing prose"]
-  RENDER -. never changes .-> MACHINE["Codes, commands, IDs,<br/>structured output"]
+    subgraph AUTOMATION["Shared repository automation — reused by every slice"]
+      direction TB
+      G47["G47<br/>new-surface disposition"]
+      G45["G45<br/>credential-free authoring + drift"]
+      G46["G46<br/>trusted refresh → generated PR"]
+    end
+  end
 
-  OWN --> EVIDENCE["E43/E44: coverage<br/>+ review evidence + release claim"]
-  DISP --> EVIDENCE
+  subgraph OUTCOMES["Runtime and release outcomes"]
+    direction LR
+    HUMAN["Localized human-facing prose"]
+    MACHINE["Invariant machine semantics<br/>codes • commands • IDs • JSON"]
+    EVIDENCE["E43 / E44<br/>coverage + review evidence"]
+  end
+
+  CONTEXT --> ASSETS
+  VALIDATION --> ASSETS
+  ASSETS --> G47
+  ASSETS --> G45
+  G46 --> ASSETS
+  ASSETS --> HUMAN
+  CONTEXT --> HUMAN
+  VALIDATION -. protects .-> MACHINE
+  ASSETS --> EVIDENCE
+  G47 --> EVIDENCE
+  G46 --> EVIDENCE
 ```
 
 In one sentence: owners author reviewed English and keep their rendering and
