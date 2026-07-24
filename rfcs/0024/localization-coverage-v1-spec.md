@@ -384,7 +384,7 @@ The maintenance workflow follows a dependency-guard-style state machine:
 
 | Phase | Trigger | Behavior |
 | --- | --- | --- |
-| `detect` | English source pull request | Runs without provider credentials. For a ready same-repository PR targeting the default branch, fails with the exact missing or stale targets until refresh output is present. Drafts, non-default bases, and branches the repository cannot update remain advisory. It never publishes translations from pull-request code. |
+| `detect` | Ready English source pull request | Runs without provider credentials. For a same-repository PR targeting the default branch, fails with the exact missing or stale targets until refresh output is present. Non-default bases and branches the repository cannot update remain advisory. Drafts do not run this lane. It never publishes translations from pull-request code. |
 | `refresh` | Maintainer dispatch for a ready same-repository, default-base PR, or trusted `main` push after a fork/cross-repository source merge | Runs protected-base tooling against an exact source revision, generates and validates all affected locale candidates as one batch, then either commits them to the unchanged source branch under an exact-head lease or opens/updates one generated fallback PR. Failed generation or validation aborts publication. |
 | `enforce` | Pull request and release | Blocks invalid catalogs and any `complete` claim whose source, artifacts, or required review are stale. |
 

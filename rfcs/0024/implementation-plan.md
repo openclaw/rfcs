@@ -165,7 +165,7 @@ translation service for every message family.
 
 | Change in an adopted or newly introduced scope | Required enforcement | Boundary |
 | --- | --- | --- |
-| Add or change a reviewed English catalog key | `G45` credential-free authoring/drift gate | Fail a ready same-repository PR targeting the default branch on stale targets; reject invalid ICU, placeholder or protected-literal drift, and hand-edited generated output. Keep drafts and non-updatable or non-default-base branches advisory. |
+| Add or change a reviewed English catalog key | `G45` credential-free authoring/drift gate | Drafts do not run the lane. Once ready, fail a same-repository PR targeting the default branch on stale targets; reject invalid ICU, placeholder or protected-literal drift, and hand-edited generated output. Keep non-updatable or non-default-base branches advisory. |
 | Add a product-facing source registration, file family, or declared source root | `G47` disposition gate | Require adoption, a conforming existing owner pipeline, or a named English-only, platform-constrained, or deferred disposition. |
 | Add a raw product-owned literal inside a family, namespace, or narrow directory already declared migrated | Owner-scoped hardcoded-string inventory such as blocking `L10N001` | Block only for the declared migrated scope. `G47` does not heuristically scan every repository literal. |
 | Generate or publish a translation candidate | `G46` trusted exact-source workflow | Run only protected-base tooling with trusted credentials, validate before publication, then update the exact same-repository PR head or open/update one generated fallback PR. |
