@@ -38,6 +38,46 @@ Supporting material:
 - [Implementation plan](0024/implementation-plan.md)
 - [Projected owner slice registry](0024/projected-owner-slice-registry.md)
 
+## System At A Glance
+
+Each product surface keeps ownership of its English source, catalogs, final
+rendering, publication, and review policy. Shared repository machinery supplies
+the locale contract, catches adopted-scope drift, runs trusted translation
+refreshes, and aggregates evidence without becoming a central catalog owner.
+
+```mermaid
+flowchart LR
+  NEW["New product-string surface"] --> G47{"G47: disposition recorded?"}
+  G47 -->|adopt| EN
+  G47 -->|existing conforming pipeline| OWN
+  G47 -->|English-only, constrained, or deferred| DISP["Named owner + rationale"]
+
+  subgraph SURFACE["Each product surface keeps ownership"]
+    EN["Reviewed English source<br/>+ stable message keys"]
+    OWN["Surface catalogs<br/>rendering + publication + review policy"]
+  end
+
+  EN --> G45["G45: shared credential-free CI<br/>registration + ICU + literals + drift"]
+  G45 -->|exact source lands| G46["G46: trusted async refresh<br/>provider credentials stay off PR code"]
+  G46 --> GPR["Generated locale PR"]
+  GPR --> REVIEW["Owner + language<br/>+ safety review when required"]
+  REVIEW --> OWN
+
+  CTX["Shared LocalizationContext<br/>locale + fallback + provenance"] --> RENDER["Surface-owned final renderer"]
+  EN -->|reviewed English fallback| RENDER
+  OWN --> RENDER
+  RENDER --> USER["Localized human-facing prose"]
+  RENDER -. never changes .-> MACHINE["Codes, commands, IDs,<br/>structured output"]
+
+  OWN --> EVIDENCE["E43/E44: coverage<br/>+ review evidence + release claim"]
+  DISP --> EVIDENCE
+```
+
+In one sentence: owners author reviewed English and keep their rendering and
+catalog pipelines; shared gates detect drift, a trusted workflow opens
+translation PRs, one locale context drives final rendering, and machine
+semantics never change.
+
 ## Decision
 
 Accepting this RFC approves these product contracts:
