@@ -165,10 +165,13 @@ conditions; independent targets cannot satisfy different rows.
 Gateway request handling remains responsible for rejecting forged or untrusted
 identity ingress; readiness does not issue a synthetic request on every poll.
 
-Common runtime conditions such as `ConfigLoaded`, `WorkspaceWritable`,
-`GatewayResponding`, and conditionally required plugin, secret, or model-route
-activation remain owned by readiness and their source subsystems. Profiles only
-declare when they are required for the supported posture.
+Common runtime conditions remain owned by readiness and their source
+subsystems. Every selected profile requires current config, usable model
+routing/auth, resolved secrets, writable workspace, session storage, context
+engine, tool catalog, configured MCP/sandbox/harness capability, and successful
+plugin activation. State, delivery-runtime, and scheduler conditions are
+selected as advisory diagnostics. Profiles only declare requirement; they do
+not implement or invoke these observations.
 
 ### Selection and precedence
 
@@ -363,10 +366,12 @@ generation-fenced safe destruction remain Runtime State Continuity concerns.
 
 After the readiness-only stack is established, the profile implementation is a
 single dependent series in
-[openclaw/openclaw#107765](https://github.com/openclaw/openclaw/pull/107765).
-It is based on readiness head `c1919669c3f` from
+[openclaw/openclaw#113422](https://github.com/openclaw/openclaw/pull/113422).
+It depends on the readiness framework in
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-and contains nineteen profile-only commits at exact head `40b5b2e59d9`.
+and the core-owner criteria in
+[openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421).
+The exact profile head is `fcf4100bdcb`.
 
 | Slice | Intended scope |
 | --- | --- |
@@ -375,24 +380,22 @@ and contains nineteen profile-only commits at exact head `40b5b2e59d9`.
 | Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, preserve attribution on failed evaluation, and bound pairing recovery work. |
 | Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, and unprofiled compatibility. |
 
-PR 107765 is a stacked upstream draft against `main`. Until PR 104018 lands,
-its aggregate GitHub diff includes the readiness dependency followed by the
-nineteen profile commits. After PR 104018 lands, the same PR naturally reduces to
-the profile-only diff. [Fork PR 94](https://github.com/giodl73-repo/openclaw/pull/94)
-preserves that profile-only comparison view in the meantime. Fork PRs
+PR 113422 is a stacked upstream draft against `main`. Until PRs 104018 and
+113421 land, its aggregate GitHub diff includes both dependencies followed by
+the profile commits. After both land, the same PR reduces to the profile-only
+diff. [Fork PR 157](https://github.com/giodl73-repo/openclaw/pull/157)
+preserves that exact profile-only comparison view. Fork PRs
 [#18](https://github.com/giodl73-repo/openclaw/pull/18),
 [#19](https://github.com/giodl73-repo/openclaw/pull/19),
 [#42](https://github.com/giodl73-repo/openclaw/pull/42), and
 [#21](https://github.com/giodl73-repo/openclaw/pull/21) expose the major design
 slices as review aids; they are not alternative landing requests.
 
-The refreshed stack passes 156 focused profile, Gateway, config, and CLI
-assertions, production typing, and protocol generation/compatibility checks. A prior package-installed
-Docker matrix proved all four profiles plus listener,
-trusted-proxy, node-approval, workspace-full, recovery, and unprofiled `200`
-compatibility using image
-`sha256:20d507b613b346e1165add88234eb00390ea6d1b086970dd3589dd3f41654175`.
-Exact-head remote container proof must be refreshed before landing.
+The refreshed stack passes focused profile, readiness, Gateway, config-help,
+CLI, and Docker-plan tests; type-aware lint, formatting, and independent review
+are clean. Package build and tarball-integrity stages pass. The exact-head
+package-installed Docker matrix remains a landing gate because the available
+local Docker Linux engine did not become ready.
 
 ## Rationale
 

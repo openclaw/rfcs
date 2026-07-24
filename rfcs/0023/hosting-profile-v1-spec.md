@@ -73,7 +73,7 @@ baseline:
 
 | Profile ID | Runtime posture | Required profile criteria |
 | --- | --- | --- |
-| `local` | Explicit local or foreground Gateway | `WorkspaceWritable`, `ProfileSelected`, `RuntimeActivationIdentified` |
+| `local` | Explicit local or foreground Gateway | Shared required criteria, `ProfileSelected`, `RuntimeActivationIdentified` |
 | `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady` |
 | `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady` |
 | `node-mode` | Gateway controlling one or more paired execution targets | `local` plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` |
@@ -85,14 +85,21 @@ listener selects `container`.
 The RFC 0018 universal baseline remains required and cannot be removed,
 replaced, or weakened by a profile.
 
-`WorkspaceWritable` is selected through the RFC 0018 criterion ID
-`openclaw.workspace-writable`. The remaining additional condition types are
-profile-owned predicates and are not independently operator-selectable in v1.
+The shared required criteria are `openclaw.config-current`,
+`openclaw.model-route-ready`, `openclaw.secrets-ready`,
+`openclaw.workspace-writable`, `openclaw.session-storage-ready`,
+`openclaw.context-engine-ready`, `openclaw.tool-catalog-ready`,
+`openclaw.mcp-runtime-ready`, `openclaw.sandbox-ready`, and
+`openclaw.harness-ready`. A selected profile also promotes `PluginsLoaded` to
+required. It selects `openclaw.state-ready`,
+`openclaw.delivery-runtime-ready`, and `openclaw.scheduler-ready` as advisory.
+The remaining additional condition types are profile-owned predicates and are
+not independently operator-selectable in v1.
 
-Canonical condition ordering remains owned by RFC 0018: `ConfigLoaded` and
+Canonical condition ordering remains owned by RFC 0018. `ConfigLoaded` and
 `WorkspaceWritable` precede `ProfileSelected`, `RuntimeActivationIdentified`,
 and the profile-specific conditions listed above; `GatewayResponding` and
-`PluginsLoaded` follow them.
+`PluginsLoaded` follow them, followed by the remaining selected criteria.
 
 ## Profile Criteria
 
