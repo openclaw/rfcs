@@ -374,7 +374,7 @@ It depends on the readiness framework in
 at exact head `13b0acaa00f3`
 and the core-owner criteria in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-at exact head `dbd540b18a0b`. The exact profile head is `fb1e60db1795`.
+at exact head `dbd540b18a0b`. The exact profile head is `b58e109a11e2`.
 
 | Slice | Intended scope |
 | --- | --- |
