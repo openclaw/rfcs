@@ -4,7 +4,9 @@ This document is the implementer-facing specification for RFC 0018, Readiness
 Conditions and Providers. The RFC explains the motivation, compatibility
 strategy, and rollout plan. This file defines the v1 condition model, provider
 lifecycle, operator selection, bounded evaluation, aggregation, and projection
-contract that OpenClaw runtimes, plugins, and hosts can build against.
+contract that OpenClaw runtimes, plugins, and hosts can build against. The
+focused subject identity and reconciliation contract is defined in
+[`readiness-subjects-v1-spec.md`](readiness-subjects-v1-spec.md).
 
 Status: draft, tied to RFC 0018.
 
@@ -13,7 +15,7 @@ Status: draft, tied to RFC 0018.
 This specification defines:
 
 - the canonical readiness condition and result shapes;
-- stable identity and reason requirements;
+- stable condition, subject identity, and reason requirements;
 - required and advisory aggregation;
 - the core condition namespace and baseline lifecycle conditions;
 - plugin readiness-provider registration and activation lifecycle;
@@ -43,6 +45,8 @@ This specification does not define:
   configuration.
 - **Canonical result**: the single aggregated result consumed by all readiness
   projections.
+- **Subject**: one core- or plugin-owned runtime object observed by conditions.
+- **Producer**: the subject that assembled and owns one readiness decision.
 - **Projection**: an HTTP, health, status, or CLI representation of the
   canonical result; a projection is not a second evaluator.
 
@@ -76,6 +80,9 @@ type ReadinessRequirement = "required" | "advisory";
 
 type ReadinessCondition = {
   type: string;
+  subjectRef: string;
+  relatedSubjectRefs?: string[];
+  observedAtMs?: number;
   status: ReadinessConditionStatus;
   requirement: ReadinessRequirement;
   reason: string;
@@ -83,6 +90,8 @@ type ReadinessCondition = {
 };
 
 type ReadinessResult = {
+  evaluatedAtMs: number;
+  identity: ReadinessIdentity;
   ready: boolean;
   conditions: ReadinessCondition[];
   failures: string[];
@@ -90,12 +99,13 @@ type ReadinessResult = {
 };
 ```
 
-Implementations may add optional metadata, but the fields above retain their
-v1 meaning.
+`ReadinessIdentity` and subject reconciliation are normative in the focused
+subject sidecar. Implementations may add optional metadata, but the fields above
+retain their v1 meaning.
 
 ### Identity
 
-Condition `type` values must be stable and unique within one result. Core uses
+The pair `(subjectRef, type)` must be stable and unique within one result. Core uses
 the public condition types defined below, such as `WorkspaceWritable`. A plugin
 condition uses this namespace:
 
@@ -117,6 +127,13 @@ must be valid text of at most 512 UTF-8 bytes after redaction. Reason and messag
 values must not contain secrets, paths with credentials, raw exception text, or
 tenant content. Core validates these bounds before caching or projection;
 invalid output becomes `CriterionInvalidResult`.
+
+Every primary, related, parent, and producer reference must resolve in the
+result identity package. Subjects are declared once and deterministically
+ordered. Core owns the `openclaw/*` namespace; plugins receive
+`plugin.<plugin-id>/*`. Identity declarations, conflict behavior, bounds,
+Gateway serving-incarnation lifetime, and diff semantics are defined by
+[`readiness-subjects-v1-spec.md`](readiness-subjects-v1-spec.md).
 
 ### Status
 
@@ -208,6 +225,9 @@ The v1 plugin SDK contract is:
 
 ```ts
 type PluginReadinessResult = {
+  subjectRef?: string;
+  relatedSubjectRefs?: string[];
+  observedAtMs?: number;
   status: "True" | "False" | "Unknown";
   reason: string;
   message: string;
@@ -220,6 +240,7 @@ type PluginReadinessProvider = {
     config: OpenClawConfig;
     pluginConfig: unknown;
     signal: AbortSignal;
+    subjects: PluginReadinessSubjectCollector;
   }): Promise<PluginReadinessResult> | PluginReadinessResult;
 };
 
@@ -318,7 +339,7 @@ The initial v1 limits are:
 - an independent two-second outer deadline for the complete result.
 
 Core owns deadlines, cancellation, coalescing, caching, error conversion, and
-result ordering. A timed-out criterion becomes `Unknown` with a stable timeout
+subject reconciliation, and result ordering. A timed-out criterion becomes `Unknown` with a stable timeout
 reason. Unexpected exceptions become `Unknown`; raw exception text is not
 copied into public output.
 
@@ -423,6 +444,11 @@ An implementation conforms to readiness v1 when it proves:
 - reload atomically replaces provider descriptors and callbacks, discards late
   results, and remains bounded across repeated never-settling providers;
 - unknown selected criteria fail closed;
+- every condition and relationship resolves to one reconciled subject;
+- plugin subject declarations are namespaced, bounded, deterministic, and
+  conflict-safe;
+- one live Gateway serving lifecycle retains one producer identity across
+  repeated evaluations and receives a new identity after restart;
 - `/ready`, `/readyz`, health, status, and CLI do not disagree about the same
   observed activation; and
 - public output contains no raw exceptions, secrets, credentials, or tenant

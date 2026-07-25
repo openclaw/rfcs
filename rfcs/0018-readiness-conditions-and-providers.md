@@ -3,7 +3,7 @@ title: Readiness Conditions and Providers
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-24
+last_updated: 2026-07-25
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -16,8 +16,9 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/33
 Add an opt-in canonical, structured condition result around OpenClaw's existing
 Gateway readiness evaluator. Existing startup, drain, channel, and event-loop
 observations become core conditions; activated plugins may register bounded,
-observational readiness providers; and configured `/ready`, `/readyz`, health,
-status, and an optional CLI project the same result. Without readiness
+observational readiness providers; every condition identifies the runtime
+subject it observed; and configured `/ready`, `/readyz`, health, status, and an
+optional CLI project the same result. Without readiness
 configuration or another separately accepted activation contract, the existing
 Gateway decision path remains authoritative.
 
@@ -32,6 +33,8 @@ answers important questions about startup, channel runtime health, drain state,
 and event-loop health, but it is not an extensible readiness contract:
 
 - existing observations do not share an iterable condition shape;
+- a result cannot identify whether a failed fact belongs to the Gateway,
+  configuration generation, plugin, node, storage backend, or another subject;
 - plugins cannot contribute bounded readiness observations;
 - operators cannot promote a known plugin dependency to required;
 - health and status can omit facts or describe them differently; and
@@ -70,6 +73,8 @@ separately accepted Standard Hosting Profile.
 ## Goals
 
 - Define one stable readiness-condition shape and aggregation rule.
+- Define one bounded identity package so conditions can reference core- and
+  plugin-owned subjects without copying identity fields into every condition.
 - Normalize existing Gateway readiness observations into core conditions.
 - Preserve existing response fields as compatibility projections.
 - Add activation-scoped plugin readiness providers through the plugin SDK.
@@ -98,11 +103,13 @@ separately accepted Standard Hosting Profile.
 
 ## Proposal
 
-The implementer-facing v1 contract is captured in
-[`0018/readiness-v1-spec.md`](0018/readiness-v1-spec.md). This RFC remains the
-design rationale, compatibility argument, and rollout plan; the sidecar is the
-concise schema, provider-lifecycle, evaluation, projection, and conformance
-reference for OpenClaw runtime and plugin implementations.
+The implementer-facing v1 contracts are captured in
+[`0018/readiness-v1-spec.md`](0018/readiness-v1-spec.md) and the focused
+[`0018/readiness-subjects-v1-spec.md`](0018/readiness-subjects-v1-spec.md)
+sidecar. This RFC remains the design rationale, compatibility argument, and
+rollout plan; the sidecars are the concise schema, identity, provider-lifecycle,
+evaluation, projection, and conformance references for OpenClaw runtime and
+plugin implementations.
 
 ### Canonical condition model
 
@@ -114,6 +121,9 @@ type ReadinessRequirement = "required" | "advisory";
 
 type ReadinessCondition = {
   type: string;
+  subjectRef: string;
+  relatedSubjectRefs?: string[];
+  observedAtMs?: number;
   status: ReadinessConditionStatus;
   requirement: ReadinessRequirement;
   reason: string;
@@ -121,6 +131,8 @@ type ReadinessCondition = {
 };
 
 type ReadinessResult = {
+  evaluatedAtMs: number;
+  identity: ReadinessIdentity;
   ready: boolean;
   conditions: ReadinessCondition[];
   failures: string[];
@@ -128,9 +140,10 @@ type ReadinessResult = {
 };
 ```
 
-`type` is stable machine identity. `reason` is a stable machine-readable state
-or failure reason. `message` is redacted operator guidance and is not part of
-machine matching.
+`type` identifies the condition contract. The stable comparison key is
+`(subjectRef, type)`. `reason` is a stable machine-readable state or failure
+reason. `message` is redacted operator guidance and is not part of machine
+matching.
 
 Aggregation is deliberately simple:
 
@@ -143,6 +156,44 @@ An unobserved required fact is `Unknown`, never inferred as `True`. Duplicate
 condition identities, invalid statuses, or malformed provider results are
 converted to stable `Unknown` conditions or reject provider registration; they
 must not disappear from the result.
+
+### Subject identity
+
+Readiness is an aggregate over independently owned runtime objects. A Gateway
+serving incarnation, active configuration generation, plugin activation,
+paired node, model route, storage backend, sandbox, and harness do not share one
+useful lifetime. The canonical result therefore declares subjects once and lets
+conditions reference them:
+
+```ts
+type ReadinessSubject = {
+  ref: string;
+  kind: string;
+  id?: string;
+  generation?: string;
+  parentRef?: string;
+};
+
+type ReadinessIdentity = {
+  producerRef: string;
+  subjects: ReadinessSubject[];
+};
+```
+
+`subjectRef` names the primary object whose state the condition describes.
+`relatedSubjectRefs` names bounded dependencies without changing condition
+ownership. An aggregate condition uses an explicit aggregate subject and lists
+its members as related subjects. Atomic per-subject conditions remain preferred
+when individual failures matter.
+
+Core reserves `openclaw/*` references. A plugin declares local `kind` and `key`
+values; core derives `plugin.<plugin-id>/<kind>/<key>`, validates every
+reference, collapses identical declarations, and rejects conflicting
+declarations. Subject `ref` is the stable role used for comparison; `id` and
+`generation` identify what currently occupies that role. Subjects and
+conditions are deterministically ordered. The focused identity and
+reconciliation contract is normative in
+[`0018/readiness-subjects-v1-spec.md`](0018/readiness-subjects-v1-spec.md).
 
 ### Core conditions
 
@@ -186,6 +237,9 @@ may reference provider IDs; they cannot inject callbacks through config.
 
 ```ts
 type PluginReadinessResult = {
+  subjectRef?: string;
+  relatedSubjectRefs?: string[];
+  observedAtMs?: number;
   status: "True" | "False" | "Unknown";
   reason: string;
   message: string;
@@ -198,6 +252,7 @@ type PluginReadinessProvider = {
     config: OpenClawConfig;
     pluginConfig: unknown;
     signal: AbortSignal;
+    subjects: PluginReadinessSubjectCollector;
   }): Promise<PluginReadinessResult> | PluginReadinessResult;
 };
 
@@ -212,14 +267,21 @@ Example:
 api.registerReadinessCriterion({
   id: "backend",
   description: "Reports whether the plugin backend can accept work.",
-  async check({ pluginConfig, signal }) {
+  async check({ pluginConfig, signal, subjects }) {
+    const backend = subjects.declare({
+      kind: "backend",
+      key: "primary",
+      identity: { id: "configured-backend" },
+    });
     return (await probeBackend(pluginConfig, { signal }))
       ? {
+          subjectRef: backend,
           status: "True",
           reason: "BackendReady",
           message: "Backend is reachable.",
         }
       : {
+          subjectRef: backend,
           status: "False",
           reason: "BackendUnavailable",
           message: "Backend is unreachable.",
@@ -232,6 +294,15 @@ Core publishes the condition as `plugin.<plugin-id>.backend`. Registration is
 bound to the activated plugin registry snapshot. Reload replaces the complete
 provider set atomically with the next activation; stale callbacks do not remain
 registered.
+
+Each invocation receives a fresh subject collector bound to the activated
+plugin namespace. `declare` returns a canonical subject reference and records a
+bounded declaration for reconciliation. A provider may reference documented
+core subjects but cannot declare or replace them. If a provider omits
+`subjectRef`, core assigns the criterion's default plugin-owned subject. Invalid,
+unresolved, conflicting, or excessive declarations become
+`CriterionInvalidResult=Unknown`; partial raw identity output is never
+projected.
 
 The bundled Policy plugin is the concrete v1 example. When activated, it
 registers `plugin.policy.conformant`, reuses its existing policy evaluator, and
@@ -402,9 +473,10 @@ support promise. It cannot change condition evaluation, provider lifecycle, or
 aggregation. Operators that do not need that support contract use
 `gateway.readiness` directly.
 
-This separation allows OpenClaw to accept structured readiness and provider
-extensibility without committing to profile names, profile selection config,
-runtime activation identity, or a release support matrix.
+This separation allows OpenClaw to accept structured, subject-aware readiness
+and provider extensibility without committing to profile names, profile
+selection config, or a release support matrix. Profiles reuse the identity
+package rather than adding a profile-only activation envelope.
 
 ### Implementation plan
 
