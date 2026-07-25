@@ -520,6 +520,7 @@ slices. They are supporting review aids, not alternative landing PRs:
 | Workspace readiness | [PR 22](https://github.com/giodl73-repo/openclaw/pull/22) | Add the bounded `WorkspaceWritable` condition without profile behavior. |
 | Readiness providers | [PR 23](https://github.com/giodl73-repo/openclaw/pull/23) | Add activation-scoped provider registration and operator-required criteria, without custom profiles. |
 | Canonical readiness CLI | [PR 27](https://github.com/giodl73-repo/openclaw/pull/27) | Add a thin CLI projection of the live result. |
+| Readiness subjects | [PR 161](https://github.com/giodl73-repo/openclaw/pull/161) | Add the shared producer/subject identity package and condition attribution used by core and plugins. |
 
 Profile selection, node-mode composition, profile subject attribution, and packaged
 profile release conformance move to the Standard Hosting Profiles RFC and its
