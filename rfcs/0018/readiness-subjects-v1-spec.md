@@ -165,7 +165,9 @@ type PluginReadinessSubjectCollector = {
 `declare` validates the local name, constructs and returns the canonical `ref`,
 and records the declaration for the current invocation. Providers use that
 returned value as `subjectRef` or `relatedSubjectRefs`. A provider may reference
-documented core subjects but may not declare, replace, or mutate them.
+documented core subjects and may parent its subjects to its own or a documented
+core subject. It may not declare, replace, mutate, or parent into another
+plugin's namespace.
 
 If a provider emits no explicit primary subject, core assigns:
 
@@ -183,9 +185,11 @@ projection:
 
 1. Validate all references, kinds, IDs, generations, and parent references.
 2. Reject declarations outside the caller's namespace.
-3. Collapse byte-equivalent duplicate declarations.
-4. Reject conflicting declarations for the same `ref`; never use last-writer
-   wins.
+3. Merge compatible declarations for the same `ref` when one declaration only
+   fills an absent `id`, `generation`, or `parentRef`; this lets an owner enrich
+   a core placeholder without changing its canonical reference.
+4. Reject different kinds or conflicting non-empty identity fields for the
+   same `ref`; never use last-writer wins.
 5. Require every primary, related, parent, and producer reference to resolve.
 6. Omit unreferenced subjects except the producer and its parent chain.
 7. Sort subjects by `ref`, related references lexicographically, and conditions
@@ -237,7 +241,8 @@ An implementation conforms when it proves:
 - all condition and related references resolve;
 - `(subjectRef, type)` is unique;
 - plugin namespaces cannot collide with core or another plugin;
-- duplicate equal declarations collapse and conflicts fail closed;
+- compatible declarations merge and conflicting non-empty declarations fail
+  closed;
 - missing, malformed, cyclic, or excessive declarations return bounded
   structured failure;
 - deterministic ordering is stable across equivalent provider completion
