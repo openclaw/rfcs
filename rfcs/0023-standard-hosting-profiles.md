@@ -3,7 +3,7 @@ title: Standard Hosting Profiles
 authors:
   - Gio
 created: 2026-07-14
-last_updated: 2026-07-23
+last_updated: 2026-07-25
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/37
@@ -16,7 +16,7 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/37
 Define a small catalog of named, release-tested OpenClaw runtime postures:
 `local`, `container`, `reverse-proxy`, and `node-mode`. A selected profile
 composes canonical readiness conditions into a support contract, identifies the
-runtime activation being evaluated, and has a matching packaged release
+profile and runtime subjects being evaluated, and has a matching packaged release
 scenario.
 
 This RFC depends on the separate Readiness Conditions and Providers RFC. That
@@ -48,7 +48,7 @@ Standard profiles turn that open-ended claim into a small product contract:
 OpenClaw supports these named runtime postures.
 Each posture composes stable readiness conditions.
 Each release executes the matching conformance scenarios.
-The running process reports which posture and activation it represents.
+The running process reports which posture and observed subjects it represents.
 ```
 
 This helps maintainers reproduce issues against a supported subset without
@@ -66,8 +66,8 @@ standard catalog.
 - Compose profiles from reusable canonical readiness conditions.
 - Define exact predicates and stable reasons for profile-specific conditions.
 - Report the selected profile through readiness, health, and status.
-- Identify the logical runtime and unique process/container incarnation whose
-  profile result is being reported.
+- Attribute profile and topology conditions to the shared readiness subjects
+  defined by RFC 0018.
 - Exercise every standard profile through a packaged release scenario lane.
 - Keep host orchestration and OpenClaw runtime ownership separate.
 
@@ -85,7 +85,8 @@ standard catalog.
 - Guarantee checkpoint durability, restore compatibility, or safe destruction.
 - Claim that every possible OpenClaw configuration belongs to a standard
   profile.
-- Define named operator profiles, inheritance, host assertions, immutable
+- Define a second runtime-activation identity envelope, named operator
+  profiles, inheritance, host assertions, immutable
   conformance records, or signed artifact attestations in V1.
 
 ## Proposal
@@ -93,7 +94,7 @@ standard catalog.
 The implementer-facing v1 contract is captured in
 [`0023/hosting-profile-v1-spec.md`](0023/hosting-profile-v1-spec.md). This RFC
 remains the design rationale, support argument, and rollout plan; the sidecar is
-the concise profile catalog, selection, activation, projection, and packaged
+the concise profile catalog, selection, subject attribution, projection, and packaged
 scenario reference for OpenClaw runtime and release implementations.
 
 ### Dependency on canonical readiness
@@ -125,7 +126,7 @@ RFC 0023 profile use:
 
 | Profile | Runtime posture | Additional required condition types |
 | --- | --- | --- |
-| `local` | Explicit local or foreground Gateway posture | `ProfileSelected`, `RuntimeActivationIdentified`, `WorkspaceWritable` |
+| `local` | Explicit local or foreground Gateway posture | `ProfileSelected`, `WorkspaceWritable` |
 | `container` | Gateway directly reachable through a container listener | `local` plus `ContainerStateReady` |
 | `reverse-proxy` | Gateway behind a trusted identity proxy | `local` plus `TrustedProxyReady`; loopback requires the explicit trusted-proxy loopback allowance |
 | `node-mode` | Gateway controlling one or more execution targets | `local` plus `NodePairingReady`, `ControlledTargetsReady`, `CommandApprovalReady`, `ControlChannelReady` |
@@ -147,7 +148,6 @@ contract and existing OpenClaw runtime owners.
 | Condition | Profile | True when | Stable non-ready reasons |
 | --- | --- | --- | --- |
 | `ProfileSelected` | All | Selection precedence resolves to a valid standard profile. | Invalid explicit values fail startup validation. |
-| `RuntimeActivationIdentified` | All | Non-empty logical-runtime and unique-incarnation identities are resolved. | Invalid explicit values fail startup validation. |
 | `ContainerStateReady` | `container` | The resolved listener host is not loopback. | `ContainerGatewayLoopback` |
 | `TrustedProxyReady` | `reverse-proxy` | Auth mode is `trusted-proxy`, a user header and trusted source are configured, and loopback sources are explicitly allowed. | `TrustedProxyAuthMissing`, `TrustedProxyHeaderMissing`, `TrustedProxySourcesMissing`, `TrustedProxyIngressUnsafe` |
 | `NodePairingReady` | `node-mode` | Pairing state is readable and contains an approved pairing. | `NodePairingUnavailable`, `NodePairingTimedOut`, `NodePairingPending`, `NodePairingMissing` |
@@ -209,39 +209,30 @@ openclaw gateway run --hosting-profile container
 
 When selected, the effective profile, selection source, and condition result
 are reported by readiness, health, and status. An unprofiled runtime omits
-`ProfileSelected`, activation identity, top-level profile fields, and
+`ProfileSelected`, profile identity, top-level profile fields, and
 profile-only requirements.
 
 Profiles validate effective runtime state. They do not generate or repair the
 underlying Gateway, proxy, plugin, model, node, or storage config.
 
-### Runtime activation identity
+### Readiness subject attribution
 
-A readiness result must be attributable to one runtime activation. OpenClaw
-resolves:
+Profiles use RFC 0018's identity package instead of defining another runtime
+identity. A profiled result declares `openclaw/hosting-profile/selected` with
+the selected profile as its opaque ID and the profile contract version as its
+generation. `ProfileSelected` targets that subject. Topology-specific
+conditions target the Gateway or node-controller subject and relate back to
+the selected profile.
 
-- a logical runtime ID that may remain stable across process replacement; and
-- a unique incarnation ID for the current process/container activation.
+Node mode additionally declares `openclaw/nodes/managed` and bounded child
+subjects for the paired nodes observed during that evaluation. Its aggregate
+conditions use the controller as their primary subject and list observed nodes
+as related subjects. Repeated results can therefore distinguish a changed
+condition from a replaced Gateway, changed profile, or changed node set.
 
-Launchers may provide identities through startup arguments or environment.
-Absent values receive runtime-owned defaults: the logical runtime ID is
-`local`, and the incarnation ID is unique to the current process activation.
-Invalid explicit identities fail startup rather than silently falling back.
-
-The activation summary is redacted and references, rather than copies, inputs
-owned by other contracts:
-
-```ts
-type RuntimeActivationSummary = {
-  runtimeId: string;
-  incarnationId: string;
-  profile: string;
-};
-```
-
-This is not an OCC instance resource. OCC may supply desired identity and
-profile selection, but OpenClaw evaluates the live activation in the runtime
-plane.
+The Gateway serving-lifecycle ID remains RFC 0018's concern. Hosts may supply
+its opaque ID through `OPENCLAW_INSTANCE_ID`; otherwise OpenClaw generates it.
+Profiles do not add `runtimeId`, `incarnationId`, or an activation envelope.
 
 ### Operator extensions
 
@@ -266,14 +257,23 @@ HTTP/1.1 503 Service Unavailable
   "profile": "container",
   "profileSource": "config",
   "ready": false,
-  "activation": {
-    "runtimeId": "worker-17",
-    "incarnationId": "01J...",
-    "profile": "container"
+  "identity": {
+    "producerRef": "openclaw/gateway/current",
+    "subjects": [
+      {
+        "ref": "openclaw/hosting-profile/selected",
+        "kind": "openclaw.hosting-profile",
+        "id": "container",
+        "generation": "1",
+        "parentRef": "openclaw/gateway/current"
+      }
+    ]
   },
   "conditions": [
     {
       "type": "ContainerStateReady",
+      "subjectRef": "openclaw/gateway/current",
+      "relatedSubjectRefs": ["openclaw/hosting-profile/selected"],
       "status": "False",
       "requirement": "required",
       "reason": "ContainerGatewayLoopback",
@@ -315,7 +315,7 @@ OpenClaw owns:
 - standard profile names and definitions;
 - profile-specific condition predicates and reasons;
 - selection precedence and result projection;
-- activation identity semantics; and
+- profile subject attribution semantics; and
 - the packaged scenario lane for the standard catalog.
 
 Hosts own:
@@ -333,9 +333,9 @@ release notes, and conformance coverage.
 
 ### OCC and AgentHarness alignment
 
-OCC may compile desired state into OpenClaw config, profile selection, runtime
-identity, and host policy. The runtime plane still evaluates readiness and
-reports the live activation.
+OCC may compile desired state into OpenClaw config, profile selection, Gateway
+instance identity, and host policy. The runtime plane still evaluates
+readiness and reports the live subjects.
 
 AgentHarness owns harness execution events. Hosting profiles do not carry
 assistant deltas, tool frames, approvals, patches, compaction events, or
@@ -343,10 +343,10 @@ harness protocol frames.
 
 ```text
 OCC/control plane
-  -> desired runtime identity and profile
+  -> desired Gateway identity and profile
 
 OpenClaw/runtime plane
-  -> live activation
+  -> live Gateway, profile, and topology subjects
   -> canonical readiness conditions
   -> selected profile result
 
@@ -371,10 +371,10 @@ single dependent series in
 [openclaw/openclaw#113422](https://github.com/openclaw/openclaw/pull/113422).
 It depends on the readiness framework in
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-at exact head `5861bcd70c6a`
+at exact head `13b0acaa00f3`
 and the core-owner criteria in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-at exact head `ce9ef81b24d6`. The exact profile head is `17149d7ecf15`.
+at exact head `dbd540b18a0b`. The exact profile head is `fb1e60db1795`.
 
 | Slice | Intended scope |
 | --- | --- |
@@ -408,7 +408,7 @@ reports, executable release evidence, and clear responsibility without taking
 configuration freedom away from operators.
 
 Profiles belong in OpenClaw because only the runtime can define the predicates
-that mean its Gateway, proxy, node, plugin, and activation state satisfy a
+that mean its Gateway, proxy, node, plugin, and observed state satisfy a
 supported posture. Hosts should select and operationalize the posture, not
 reverse-engineer its internal readiness semantics.
 
