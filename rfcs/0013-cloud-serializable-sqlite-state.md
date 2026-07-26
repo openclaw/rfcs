@@ -374,9 +374,12 @@ The bounded follow-on PR plan is:
    by default. The first host-side authority evidence is the fork-only draft
    [giodl/lobster#38](https://microsoft.ghe.com/giodl/lobster/pull/38)
    (Microsoft GHE access required); it binds a content-addressed projection to
-   final acceptance and destruction authority. Permanent `replaceAll` adoption
-   and temporary scheduler rehydration remain follow-on proof, so that draft
-   does not yet claim the complete adapter.
+   final acceptance and destruction authority. Stacked fork-only draft
+   [giodl/lobster#39](https://microsoft.ghe.com/giodl/lobster/pull/39)
+   (Microsoft GHE access required) adds permanent atomic `replaceAll`, stale
+   writer supersession, and recovery into Lobster's existing Redis scheduler.
+   Connecting the shipped OpenClaw hooks to that host journal remains the final
+   live adapter proof; neither draft claims that wiring yet.
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
