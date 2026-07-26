@@ -170,9 +170,12 @@ The implementation and release proof should include this matrix:
 | Process or container replacement | New process ID; host identity follows its documented boundary | Host decides restart and routing behavior. |
 | Plugin reload or node replacement | New owner ID or generation according to that owner's contract | Late provider output is discarded or represented as incomplete. |
 
-The exact packaged container restart matrix remains a landing proof item. Unit
-tests establish the schema and generation fences but do not replace that host
-integration evidence.
+The
+[exact packaged container matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30214165737)
+proves this restart boundary on dependent implementation head `e9c1988c5e59`:
+the same host workload retains its fingerprinted host identity while process
+and Gateway identities renew. Unit tests additionally establish schema and
+generation fences.
 
 ## Primary Sources
 
@@ -185,4 +188,3 @@ integration evidence.
 - [ASP.NET Core health checks](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks)
 - [Spring Boot Actuator endpoints and Kubernetes probes](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html#actuator.endpoints.kubernetes-probes)
 - [OpenTelemetry service resource conventions](https://opentelemetry.io/docs/specs/semconv/resource/service/)
-

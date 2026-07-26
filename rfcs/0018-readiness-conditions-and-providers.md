@@ -507,14 +507,18 @@ ceiling across repeated generation changes. A prior package-installed
 Docker lane proved `/ready` and `/readyz`
 transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
 `/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with
-the same canonical condition. Exact-head remote container and published-upgrade
-proof must be refreshed before landing. Reviewers should use that PR for the
-proposed landing shape and current validation state.
+the same canonical condition. The
+[exact-head package-installed profile matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30214165737)
+also proves the RFC 0018 surfaces, repeated-poll stability, and host-stable,
+process-and-Gateway-renewing container restart semantics on dependent head
+`e9c1988c5e59`. Standalone published-upgrade proof remains separate. Reviewers
+should use the primary PR for the proposed landing shape and current validation
+state.
 
 The first core-owner adoption is consolidated in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421),
 stacked at exact readiness head `6dce3555a511` and exact implementation head
-`3a450e8625a7`. It adds selectable core-owner criteria,
+`9cc02c5d89c`. It adds selectable core-owner criteria,
 execution-capability, session-storage, state, delivery, and scheduler
 observations without selecting any of them by default. Fork PRs
 [#153](https://github.com/giodl73-repo/openclaw/pull/153),
