@@ -371,7 +371,12 @@ The bounded follow-on PR plan is:
    `cron_reconciled` plus `cron_changed` projection pattern, durably replace the
    complete external wake set, and bind its accepted revision to the final
    recovery point and sleep authority. No new OpenClaw core surface is expected
-   by default.
+   by default. The first host-side authority evidence is the fork-only draft
+   [giodl/lobster#38](https://microsoft.ghe.com/giodl/lobster/pull/38)
+   (Microsoft GHE access required); it binds a content-addressed projection to
+   final acceptance and destruction authority. Permanent `replaceAll` adoption
+   and temporary scheduler rehydration remain follow-on proof, so that draft
+   does not yet claim the complete adapter.
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
