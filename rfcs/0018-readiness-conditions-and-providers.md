@@ -484,7 +484,7 @@ The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
 Its upgrade boundary keeps unconfigured probes on the legacy checker and makes
 the presence of `gateway.readiness` the explicit canonical activation signal.
-It is one upstream PR with sixteen ordered commits at exact head `13b0acaa00f3`.
+It is one upstream PR with sixteen ordered commits at exact head `ddadb96d0f64`.
 The opt-in compatibility amendment passes 154 focused readiness, live Gateway,
 HTTP/RPC, health, selector, registry, and CLI assertions; type-aware lint,
 formatting, and diff checks pass. Timed-out plugin checks remain single-flight
@@ -502,8 +502,8 @@ proposed landing shape and current validation state.
 
 The first core-owner adoption is consolidated in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421),
-stacked at exact readiness head `13b0acaa00f3` and exact implementation head
-`dbd540b18a0b`. It adds selectable core-owner criteria,
+stacked at exact readiness head `ddadb96d0f64` and exact implementation head
+`822d5a20d959`. It adds selectable core-owner criteria,
 execution-capability, session-storage, state, delivery, and scheduler
 observations without selecting any of them by default. Fork PRs
 [#153](https://github.com/giodl73-repo/openclaw/pull/153),
