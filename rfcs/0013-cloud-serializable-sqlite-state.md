@@ -3,7 +3,7 @@ title: SQLite Snapshot Backup Artifacts
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-07-22
+last_updated: 2026-07-26
 status: completed
 issue: https://github.com/openclaw/openclaw/pull/105718
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -180,6 +180,25 @@ owner-authored substrate for optional recovery workflows, but those workflows
 must compose the landed command rather than reinterpret live SQLite files or
 duplicate snapshot creation, verification, repository, or restore behavior.
 
+The scale-to-zero outcome and user evidence are tracked in
+[openclaw/openclaw#114145](https://github.com/openclaw/openclaw/issues/114145).
+This follow-on deliberately builds on, rather than replaces, work Vincent and
+Peter already added: Vincent's verified SQLite snapshots in
+[openclaw/openclaw#105718](https://github.com/openclaw/openclaw/pull/105718),
+Peter's cooperative host suspension in
+[openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
+and Vincent's suspension validation repair in
+[openclaw/openclaw#103925](https://github.com/openclaw/openclaw/pull/103925).
+It also composes with Josh Lehman's SQLite-backed session and transcript runtime
+in [openclaw/openclaw#98236](https://github.com/openclaw/openclaw/pull/98236)
+and restart-recovery admission behavior in
+[openclaw/openclaw#111869](https://github.com/openclaw/openclaw/pull/111869).
+
+The three implementation PRs linked below demonstrate one bounded composition;
+they are not a required decomposition. If maintainers prefer a smaller or
+different core seam that satisfies the same recovery and restored-admission
+outcomes, that is a valid resolution of the umbrella issue.
+
 #### Why a recovery lifecycle is needed
 
 Per-user and event-driven hosts can stop paying for resident compute only when
@@ -198,6 +217,25 @@ scheduled wake can race idle retirement, replacement can lose scheduler
 continuity, and a cold runtime can appear ready before its required owner state
 is restored.
 
+Existing reports ground those outcomes in OpenClaw operator needs:
+
+- [openclaw/openclaw#13616](https://github.com/openclaw/openclaw/issues/13616)
+  requests unified backup and restore for config, cron, and session state.
+- [openclaw/openclaw#63392](https://github.com/openclaw/openclaw/issues/63392)
+  requests per-agent backup and restore rather than whole-instance rollback.
+- [openclaw/openclaw#104412](https://github.com/openclaw/openclaw/issues/104412)
+  shows recurring cron work can be skipped silently while Gateway is stopped.
+- [openclaw/openclaw#101290](https://github.com/openclaw/openclaw/issues/101290)
+  shows why hosts need owner-safe snapshot boundaries instead of touching live
+  SQLite state from another process.
+- [openclaw/openclaw#107433](https://github.com/openclaw/openclaw/issues/107433)
+  requests explicit protected and reconstructable-state obligations.
+
+[openclaw/openclaw#113306](https://github.com/openclaw/openclaw/issues/113306)
+tracks adjacent crash-durability and identity hardening in the underlying
+SQLite snapshot implementation; the follow-on lifecycle does not claim to fix
+that separate issue.
+
 Infrastructure platforms already provide the compute lifecycle primitives:
 
 - [Fly Machines](https://fly.io/docs/launch/autostop-autostart/) can stop all
@@ -210,6 +248,9 @@ Infrastructure platforms already provide the compute lifecycle primitives:
   scales to zero and wakes from configured event sources.
 - [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)
   hibernate while retaining wakeable WebSocket delivery.
+- [Modal](https://modal.com/docs/guide/scale) scales Functions to zero by
+  default and offers
+  [Sandbox snapshots](https://modal.com/docs/guide/sandbox-snapshots).
 
 Those platforms do not know OpenClaw's owner inventory, SQLite invariants,
 scheduler state, or readiness boundary. The follow-on contracts define that
