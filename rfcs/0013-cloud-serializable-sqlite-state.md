@@ -383,9 +383,15 @@ The bounded follow-on PR plan is:
    (Microsoft GHE access required) makes prepare, commit, abort, and newer-
    attempt supersession contend in the same permanent CAS state, so transport
    disconnect is never treated as cancellation proof across fungible host
-   pods. Connecting the shipped OpenClaw hooks to that host protocol remains
-   the final live adapter proof; these drafts do not claim production endpoint,
-   authentication, storage-bootstrap, or rollout wiring yet.
+   pods. Stacked fork-only draft
+   [giodl/lobster#42](https://microsoft.ghe.com/giodl/lobster/pull/42)
+   (Microsoft GHE access required) connects the shipped OpenClaw hooks to the
+   bounded prepare/commit/abort protocol as an image-present, baked-disabled
+   plugin. It rereads complete scheduler state, projects no prompts, payloads,
+   cron expressions, credentials, or execution authority, and makes lifecycle
+   cancellation explicit. These drafts still do not claim the production
+   endpoint, authentication, permanent-store bootstrap, ECS activation, or
+   rollout wiring.
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
