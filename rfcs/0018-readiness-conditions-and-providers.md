@@ -324,8 +324,10 @@ makes nonconformance block readiness.
 
 Provider descriptors are enumerable without invoking callbacks. The active
 registry exposes provider identity, description, owning plugin, and source; the
-registry snapshot itself is the activation-generation boundary. Future status
-or diagnostics may project that descriptor catalog without executing providers.
+registry snapshot itself is the activation-generation boundary. A read-only
+catalog projection may expose the selectable core and plugin descriptors,
+current required/advisory selection, and selected-but-unregistered IDs without
+exposing source paths or executing providers.
 
 Providers must be:
 
@@ -551,10 +553,13 @@ consumers of this RFC, not additions to the evaluation model:
    remains observable. `--json` emits versioned JSON Lines. Fork
    [PR 167](https://github.com/giodl73-repo/openclaw/pull/167) is the first
    bounded implementation slice.
-2. **Inspect and wait.** Add read-only criterion/provider enumeration after
-   registry metadata is enumerable, and add a bounded startup wait convenience
-   over the same canonical result. Neither facility may create a second
-   evaluator.
+2. **Inspect and wait.** Add read-only criterion/provider enumeration and a
+   bounded startup wait convenience over the same canonical result. Neither
+   facility may create a second evaluator. Fork
+   [PR 169](https://github.com/giodl73-repo/openclaw/pull/169) implements the
+   catalog as `readiness.catalog` plus `openclaw ready criteria list|inspect`,
+   reading one activation-pinned config/registry snapshot without invoking a
+   provider.
 3. **Diagnose and operate.** Let existing Doctor, telemetry, support-bundle,
    and update owners consume snapshots and transitions for remediation,
    secret-safe evidence capture, transition telemetry, and pre/post-upgrade

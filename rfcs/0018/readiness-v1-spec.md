@@ -300,8 +300,40 @@ registry or become selectable after replacement.
 Provider descriptors must be enumerable without invoking callbacks. At minimum
 the active registry entry contains the namespaced ID, description, owning
 plugin, and source. The registry snapshot identity is the activation-generation
-boundary; a future projection may expose the descriptor catalog without
-executing providers.
+boundary.
+
+### Criterion Catalog Projection
+
+An authenticated read-only projection may enumerate configurable criteria from
+one activation-pinned config and registry snapshot. The v1 catalog has this
+shape:
+
+```ts
+type ReadinessCriterionCatalog = {
+  catalogVersion: 1;
+  criteria: Array<{
+    id: string;
+    description?: string;
+    owner:
+      | { kind: "core" }
+      | { kind: "plugin"; pluginId: string; pluginName?: string }
+      | { kind: "unresolved" };
+    registered: boolean;
+    selection: "required" | "advisory" | "unselected";
+  }>;
+};
+```
+
+The projection lists selectable core criteria and all descriptors in the active
+plugin registry. A selected ID absent from that registry remains visible with
+`registered: false` and unresolved ownership. Results are sorted by criterion
+ID. Registration source paths, plugin configuration, callback references, and
+provider results are not projected.
+
+Catalog enumeration is deterministic for one config/registry snapshot and must
+not invoke readiness evaluation, provider callbacks, probes, reload, repair, or
+network I/O. It remains available when canonical readiness is not selected so
+an operator can discover criteria before changing configuration.
 
 ## Operator Selection
 
@@ -420,6 +452,10 @@ result:
 
 The CLI must not implement condition evaluation independently.
 
+Criterion list and inspect commands are clients of the live catalog projection.
+They may filter descriptors for presentation but must not execute a criterion
+or infer registration from a readiness result.
+
 ## Legacy Projection
 
 Existing `ready`, `failing`, `suppressed`, `eventLoop`, and `uptimeMs` fields
@@ -451,6 +487,8 @@ An implementation conforms to readiness v1 when it proves:
   workspace, selection, and plugin-generation changes;
 - reload atomically replaces provider descriptors and callbacks, discards late
   results, and remains bounded across repeated never-settling providers;
+- catalog enumeration reflects one active config/registry snapshot, reports
+  selected missing IDs, and never invokes provider callbacks;
 - unknown selected criteria fail closed;
 - every condition and relationship resolves to one reconciled subject;
 - every canonical result has `contractVersion: 1` and satisfies the wire
