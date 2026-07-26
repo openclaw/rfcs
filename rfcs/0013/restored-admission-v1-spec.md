@@ -127,8 +127,8 @@ The restored-start binding must preserve:
 - destination runtime generation;
 - lifecycle owner generation;
 - component restore receipt identities;
-- scheduler reconciliation identity;
-- required owner-readiness identities;
+- stable, generation-bound scheduler-reconciliation evidence identity;
+- normalized required-owner readiness evidence identity;
 - Gateway incarnation identity;
 - one admission identity; and
 - one canonical readiness generation.
@@ -139,6 +139,14 @@ container generation, or local path cannot substitute for them.
 The durable completion record contains identities and bounded disposition
 metadata only. It must not contain credential values, raw artifact locations,
 message payloads, prompts, or arbitrary commands.
+
+V1 may derive the scheduler and readiness evidence identities only after the
+semantic owner operation succeeds. The derivation binds a versioned evidence
+label, the exact restore receipt, recovery-point and acceptance-set identities,
+the destination runtime generation, and the normalized outcome. It is not a
+digest of mutable scheduler status, does not claim to identify the complete
+scheduler definition set, and does not substitute for a richer owner-authored
+receipt when an owner later exposes one.
 
 ## Scheduler And Owner Readiness
 
@@ -170,8 +178,8 @@ Admission opens only after one canonical restored-ready record binds:
 - the accepted logical byte set;
 - destination and lifecycle generations;
 - component restore receipts;
-- scheduler reconciliation;
-- required owner readiness;
+- generation-bound scheduler-reconciliation evidence;
+- normalized required-owner readiness evidence;
 - Gateway readiness; and
 - the one-time admission identity.
 
