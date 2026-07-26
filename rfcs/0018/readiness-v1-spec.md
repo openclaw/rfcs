@@ -90,6 +90,7 @@ type ReadinessCondition = {
 };
 
 type ReadinessResult = {
+  contractVersion: 1;
   evaluatedAtMs: number;
   identity: ReadinessIdentity;
   ready: boolean;
@@ -161,9 +162,9 @@ The condition array must use this v1 order when present:
 2. `GatewayStartupComplete`, `GatewayAcceptingWork`, `ChannelRuntimeReady`,
    `ChannelRuntimeSuppressed`, and `EventLoopHealthy`;
 3. `ConfigLoaded` and `WorkspaceWritable`;
-4. profile-owned conditions in the order defined by RFC 0023;
-5. `GatewayResponding` and `PluginsLoaded`; and
-6. remaining selected core and plugin conditions sorted by condition type.
+4. `GatewayResponding` and `PluginsLoaded`; and
+5. remaining selected core, profile-contributed, and plugin conditions sorted
+   by condition type and then `subjectRef`.
 
 `failures` and `advisories` follow condition order and contain no duplicates.
 
@@ -252,6 +253,11 @@ type RegisterReadinessCriterion = (
 Registration through `api.registerReadinessCriterion` is scoped to the current
 plugin activation. Core publishes the resulting ID as
 `plugin.<plugin-id>.<provider-id>`.
+
+Each provider invocation emits exactly one condition. A plugin registers
+separate criteria for independently selectable resources or states; an
+unbounded collection is summarized by one aggregate subject and a bounded,
+deterministic set of related subjects.
 
 The bundled Policy plugin demonstrates this contract with
 `plugin.policy.conformant`. It reuses the plugin's existing policy evaluation,
@@ -362,8 +368,10 @@ If the outer deadline expires, the evaluator must return a required
 
 Core retains ownership of an invocation after its deadline. If a provider
 ignores cancellation and remains pending, later polls reuse the stable timeout
-result and must not start another invocation. A new invocation may start only
-after the prior callback settles and the cache expires.
+result and must not start another invocation, including after config or plugin
+registry replacement. The callback is quarantined by canonical criterion ID
+until it settles. A new invocation may start only after settlement and the
+applicable cache or replacement-generation rules permit it.
 
 Successful and failed provider or workspace observations may be cached for at
 most five seconds. Replacement effective-config or plugin-registry snapshots,
@@ -445,10 +453,14 @@ An implementation conforms to readiness v1 when it proves:
   results, and remains bounded across repeated never-settling providers;
 - unknown selected criteria fail closed;
 - every condition and relationship resolves to one reconciled subject;
+- every canonical result has `contractVersion: 1` and satisfies the wire
+  cardinality and string bounds;
 - plugin subject declarations are namespaced, bounded, deterministic, and
   conflict-safe;
 - one live Gateway serving lifecycle retains one producer identity across
   repeated evaluations and receives a new identity after restart;
+- process and optional host-workload parents renew independently at their own
+  lifecycle boundaries;
 - `/ready`, `/readyz`, health, status, and CLI do not disagree about the same
   observed activation; and
 - public output contains no raw exceptions, secrets, credentials, or tenant

@@ -131,6 +131,7 @@ type ReadinessCondition = {
 };
 
 type ReadinessResult = {
+  contractVersion: 1;
   evaluatedAtMs: number;
   identity: ReadinessIdentity;
   ready: boolean;
@@ -190,7 +191,12 @@ Core reserves `openclaw/*` references. A plugin declares local `kind` and `key`
 values; core derives `plugin.<plugin-id>/<kind>/<key>`, validates every
 reference, collapses identical declarations, and rejects conflicting
 declarations. Subject `ref` is the stable role used for comparison; `id` and
-`generation` identify what currently occupies that role. Subjects and
+`generation` identify what currently occupies that role. Identity follows
+owner renewal boundaries: an optional host workload may contain an OS process,
+which may create one or more Gateway serving lifecycles; each child receives a
+new ID when that lifecycle is replaced. A generation changes only when the
+same owner object is revised. Host-supplied correlation is a fingerprinted host
+subject and never overrides the generated Gateway identity. Subjects and
 conditions are deterministically ordered. The focused identity and
 reconciliation contract is normative in
 [`0018/readiness-subjects-v1-spec.md`](0018/readiness-subjects-v1-spec.md).
@@ -484,12 +490,13 @@ The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
 Its upgrade boundary keeps unconfigured probes on the legacy checker and makes
 the presence of `gateway.readiness` the explicit canonical activation signal.
-It is one upstream PR with eighteen ordered commits at exact head `28ad0cf76fa9`.
-The opt-in compatibility amendment passes 154 focused readiness, live Gateway,
-HTTP/RPC, health, selector, registry, and CLI assertions; type-aware lint,
-formatting, and diff checks pass. Timed-out plugin checks remain single-flight
-until the original callback settles, even when the plugin ignores cancellation;
-provider output is bounded, validated, and redacted. Config publication fences
+It is one upstream PR at exact head `673e7a8c1ef2`. Focused readiness, live
+Gateway, HTTP/RPC, health, selector, registry, subject, and CLI suites pass;
+type-aware lint, formatting, and diff checks pass. Timed-out plugin checks
+remain single-flight until the original callback settles, even across registry
+replacement when the plugin ignores cancellation. Provider output is bounded,
+validated, redacted, and accompanied by safe criterion-ID diagnostics. Config
+publication fences
 provider and workspace evidence by runtime generation, including recovery when
 a retired filesystem probe never settles, while retaining a strict two-probe
 ceiling across repeated generation changes. A prior package-installed
@@ -502,8 +509,8 @@ proposed landing shape and current validation state.
 
 The first core-owner adoption is consolidated in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421),
-stacked at exact readiness head `28ad0cf76fa9` and exact implementation head
-`debd3a56a098`. It adds selectable core-owner criteria,
+stacked at exact readiness head `673e7a8c1ef2` and exact implementation head
+`c398dd2c204c`. It adds selectable core-owner criteria,
 execution-capability, session-storage, state, delivery, and scheduler
 observations without selecting any of them by default. Fork PRs
 [#153](https://github.com/giodl73-repo/openclaw/pull/153),

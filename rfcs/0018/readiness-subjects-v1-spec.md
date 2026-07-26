@@ -49,6 +49,7 @@ type ReadinessCondition = {
 };
 
 type ReadinessResult = {
+  contractVersion: 1;
   evaluatedAtMs: number;
   identity: ReadinessIdentity;
   ready: boolean;
@@ -93,8 +94,12 @@ submit a global reference for declarations. Subject `kind` is the canonical
 owner-qualified kind, for example `plugin.storage.backend`.
 
 `id` and `generation`, when present, are opaque bounded values. Consumers must
-not parse them or infer security authority from them. Owners define their
-lifetime semantics. IDs are not credentials and must not contain secrets,
+not parse them or infer security authority from them. An ID is tied to the
+renewal boundary of the object named by `kind`: it stays stable while that
+object exists and changes when its owner replaces the object. A generation is
+an owner-defined revision of that same object and changes without implying
+replacement. Owners must omit either field when they cannot publish an
+authoritative value. IDs are not credentials and must not contain secrets,
 tenant content, credential-bearing paths, or raw connection strings.
 
 ## Producer
@@ -106,11 +111,20 @@ that lifecycle is disposed. A subsequent Gateway start, including one in the
 same OS process, receives a new ID. Config reload, condition transition, drain,
 and repeated evaluation do not change the Gateway subject ID.
 
-The Gateway subject may have an `openclaw/process/current` parent. Process and
-Gateway identities are distinct because one process may create more than one
-Gateway serving lifecycle over time. OpenClaw generates an opaque random ID by
-default. A host-supplied startup override must preserve the same uniqueness and
-immutability contract.
+The standard lifecycle hierarchy is:
+
+```text
+openclaw/host-instance/current (optional host workload lifecycle)
+  -> openclaw/process/current (OS process lifecycle)
+    -> openclaw/gateway/current (Gateway serving lifecycle)
+```
+
+OpenClaw generates opaque random process and Gateway IDs. A host may provide a
+stable workload-correlation input for the optional host subject, but core
+publishes only a one-way fingerprint of that value. It does not replace the
+process or Gateway identity. Reusing one host workload across process or
+Gateway restarts therefore retains the parent host ID while renewing the child
+IDs at their actual lifecycle boundaries.
 
 A non-live diagnostic projection may use its own producer subject and may
 declare an unresolved Gateway subject without an `id`. It must report live
@@ -140,8 +154,10 @@ An observation over a collection uses an explicit aggregate subject:
 }
 ```
 
-When individual failures matter, owners should emit one condition per subject
-instead of hiding them behind an aggregate.
+When individual failures matter, an owner registers separate criteria or emits
+bounded owner-native core conditions. One plugin readiness provider emits one
+condition. Providers that observe an unbounded collection must use an aggregate
+subject and may include only a deterministic bounded subset of related subjects.
 
 ## Plugin Subject Collector
 
@@ -167,7 +183,10 @@ and records the declaration for the current invocation. Providers use that
 returned value as `subjectRef` or `relatedSubjectRefs`. A provider may reference
 documented core subjects and may parent its subjects to its own or a documented
 core subject. It may not declare, replace, mutate, or parent into another
-plugin's namespace.
+plugin's namespace. Declarations are order-independent: a plugin-local parent
+may be declared before or after its child, and the completed graph is validated
+after the provider returns. Externally supplied identity values are published
+only as one-way fingerprints.
 
 If a provider emits no explicit primary subject, core assigns:
 
@@ -206,6 +225,7 @@ be projected or cached.
 
 V1 enforces these maximums per canonical result:
 
+- 256 conditions, failures, and advisories;
 - 128 subjects;
 - 64 plugin-declared subjects per provider invocation;
 - 16 related subjects per condition;
@@ -214,7 +234,8 @@ V1 enforces these maximums per canonical result:
 - one parent reference per subject with no cycles.
 
 Provider deadlines and outer readiness deadlines include declaration and
-reconciliation work. Subject declaration must perform no I/O.
+reconciliation work. Subject declaration must perform no I/O. The wire schema
+enforces these collection and string bounds before a result is accepted.
 
 ## Diff Semantics
 
@@ -226,11 +247,18 @@ Consumers may compare canonical results as follows:
   object's revision;
 - unchanged `(subjectRef, type)` with changed status or reason means the same
   subject's condition transitioned; and
-- disappearance of a condition means its criterion is no longer selected or
-  its owner is no longer active, not that it became `True`.
+- when `ReadinessEvaluationComplete` is absent or `True`, disappearance of a
+  condition means its criterion is no longer selected or its owner is no longer
+  active, not that it became `True`; and
+- when `ReadinessEvaluationComplete` is `False` or `Unknown`, consumers must
+  treat missing conditions as unobserved and must not infer deselection,
+  deactivation, or success.
 
 OpenClaw need not retain result history. Hosts and telemetry consumers may store
-and diff bounded canonical results.
+and diff bounded canonical results. Metrics may label stable condition type,
+status, requirement, reason, subject kind, and selected profile. Dynamic `id`,
+`generation`, node-specific `ref`, `message`, and related-subject values belong
+only in bounded diagnostic events and must not become metric labels.
 
 ## Conformance
 
@@ -238,6 +266,8 @@ An implementation conforms when it proves:
 
 - one Gateway serving lifecycle retains one producer subject across repeated
   evaluations and receives a new ID after disposal and restart;
+- host, process, Gateway, and owner-resource IDs renew at their documented
+  lifecycle boundaries while generations revise only the same object;
 - all condition and related references resolve;
 - `(subjectRef, type)` is unique;
 - plugin namespaces cannot collide with core or another plugin;
@@ -248,5 +278,6 @@ An implementation conforms when it proves:
 - deterministic ordering is stable across equivalent provider completion
   orders;
 - provider timeout and cancellation behavior remains bounded while subjects are
-  collected; and
+  collected;
+- an incomplete evaluation cannot make consumers infer condition removal; and
 - public subject fields contain no secrets or unredacted owner data.
