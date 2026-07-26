@@ -374,14 +374,14 @@ It depends on the readiness framework in
 at exact head `6dce3555a511`
 and the core-owner criteria in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-at exact head `3a450e8625a7`. The exact profile head is `7dd5bbd26b98`.
+at exact head `9cc02c5d89c`. The exact profile head is `e9c1988c5e59`.
 
 | Slice | Intended scope |
 | --- | --- |
 | Standard selection and predicates | Add opt-in selection, precedence, machine-readable projection, and `local`, `container`, and `reverse-proxy` conditions. |
 | Node mode | Add product-neutral pairing, connected-target, canonical command-policy, and control-channel conditions. |
 | Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, preserve attribution on failed evaluation, and bound pairing recovery work. |
-| Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, and unprofiled compatibility. |
+| Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, unprofiled compatibility, repeated-poll identity, and container-restart renewal boundaries. |
 
 PR 113422 is a stacked upstream draft against `main`. Until PRs 104018 and
 113421 land, its aggregate GitHub diff includes both dependencies followed by
@@ -394,11 +394,14 @@ preserves that exact profile-only comparison view. Fork PRs
 [#21](https://github.com/giodl73-repo/openclaw/pull/21) expose the major design
 slices as review aids; they are not alternative landing requests.
 
-The refreshed stack passes focused profile, readiness, Gateway, config-help,
-CLI, and Docker-plan tests; type-aware lint, formatting, and independent review
-are clean. Package build and tarball-integrity stages pass. The exact-head
-package-installed Docker matrix remains a landing gate because the available
-local Docker Linux engine did not become ready.
+The refreshed stack passes 120 focused profile, readiness, selection, and
+Gateway assertions; type-aware lint, formatting, shell syntax, and diff checks
+are clean. The
+[exact-head package-installed Docker matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30214165737)
+passes on GitHub-hosted Actions at `e9c1988c5e59` using an immutable no-push
+package/image artifact. It proves unprofiled compatibility, all four profiles,
+expected failures, node approval, workspace recovery, stable repeated polls,
+and host-stable/process-and-Gateway-rotating container restart identity.
 
 ## Rationale
 

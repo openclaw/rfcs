@@ -280,6 +280,8 @@ used by hosts. It must prove:
 - `reverse-proxy` success and missing-auth failure;
 - `node-mode` unpaired/unapproved failure and paired/approved recovery;
 - stable profile metadata and subject attribution; and
+- stable host/profile identity plus renewed process and Gateway identity when
+  the same host workload restarts; and
 - exact condition status and profile contract version.
 
 Upgrade survival, direct-ingress security, immutable records, and signed
