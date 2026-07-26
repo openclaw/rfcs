@@ -212,6 +212,12 @@ the first can still be authoritative.
 All persistent journals and paths are scoped by stable operation identity.
 Fixed shared paths across independent attempts are invalid.
 
+OpenClaw-owned recovery intent, committed restore results, startup descriptors,
+and restored-ready evidence use an operation-scoped SQLite journal. They are
+not steady-state JSON sidecars. A dedicated journal is required because final
+capture must commit intent before snapshotting the shared state database, and
+restore must commit intent before the fresh shared state database exists.
+
 ## Failure Dispositions
 
 - **retry same incarnation**: transient response loss with the same child and

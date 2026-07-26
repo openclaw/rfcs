@@ -243,13 +243,16 @@ slices exercised by these sidecars:
   inventory.
 - [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865)
   is a draft stacked on #112385. It adds one hidden offline final
-  capture operation with durable intent, exact committed-result replay, and
-  fail-closed quarantine for conflicting or incomplete attempts.
+  capture operation with operation-scoped SQLite intent, exact
+  committed-result replay, and fail-closed quarantine for conflicting or
+  incomplete attempts.
 - [openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
   is a draft stacked on #112865. It restores one exact accepted aggregate to
   fresh canonical paths, holds when required owner evidence is absent, and
   keeps Gateway work admission closed through scheduler reconciliation and
-  owner readiness.
+  owner readiness. Restore intent, results, startup descriptors, and ready
+  evidence share the dedicated SQLite recovery journal rather than JSON
+  runtime sidecars.
 
 These drafts are evidence for owner review, not normative dependencies. They do
 not move Gateway suspension, external ingress fencing, clean process shutdown,
