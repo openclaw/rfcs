@@ -371,10 +371,10 @@ single dependent series in
 [openclaw/openclaw#113422](https://github.com/openclaw/openclaw/pull/113422).
 It depends on the readiness framework in
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-at exact head `e5834f2a18e7`
+at exact head `c65456659cfd`
 and the core-owner criteria in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-at exact head `24970fe0ee47`. The exact profile head is `fdbaef42e87e`.
+at exact head `2b32ecce5745`. The exact profile head is `810a9fe7dfbe`.
 
 | Slice | Intended scope |
 | --- | --- |
