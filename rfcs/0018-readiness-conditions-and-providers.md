@@ -3,7 +3,7 @@ title: Readiness Conditions and Providers
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-25
+last_updated: 2026-07-26
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -106,10 +106,14 @@ separately accepted Standard Hosting Profile.
 The implementer-facing v1 contracts are captured in
 [`0018/readiness-v1-spec.md`](0018/readiness-v1-spec.md) and the focused
 [`0018/readiness-subjects-v1-spec.md`](0018/readiness-subjects-v1-spec.md)
-sidecar. This RFC remains the design rationale, compatibility argument, and
-rollout plan; the sidecars are the concise schema, identity, provider-lifecycle,
-evaluation, projection, and conformance references for OpenClaw runtime and
-plugin implementations.
+sidecar. The non-normative
+[`0018/readiness-platform-comparison.md`](0018/readiness-platform-comparison.md)
+compares the contract with Kubernetes, Docker, systemd, ASP.NET Core, Spring
+Boot, and OpenTelemetry and records the v1 gap disposition. This RFC remains
+the design rationale, compatibility argument, and rollout plan; the normative
+sidecars are the concise schema, identity, provider-lifecycle, evaluation,
+projection, and conformance references for OpenClaw runtime and plugin
+implementations.
 
 ### Canonical condition model
 

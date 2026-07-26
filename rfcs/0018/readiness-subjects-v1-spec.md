@@ -215,6 +215,12 @@ projection:
    by the ordering in the parent readiness specification with `subjectRef` as a
    deterministic tie-breaker.
 
+The complete identity package and all condition references must come from one
+reconciled evaluation snapshot. If an owner identity, owner generation, or
+plugin activation changes while a condition is in flight, the evaluator must
+discard that late result or fail the evaluation closed. It must not attach an
+observation from one owner generation to the identity of another.
+
 Invalid plugin declarations or references convert that provider's condition to
 `CriterionInvalidResult=Unknown` on its default subject. Invalid core-owned
 identity state fails the outer evaluation closed with
@@ -277,6 +283,9 @@ An implementation conforms when it proves:
   structured failure;
 - deterministic ordering is stable across equivalent provider completion
   orders;
+- every condition is bound to the same reconciled identity snapshot and late
+  results from a replaced owner or activation generation are discarded or fail
+  closed;
 - provider timeout and cancellation behavior remains bounded while subjects are
   collected;
 - an incomplete evaluation cannot make consumers infer condition removal; and
