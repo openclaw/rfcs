@@ -321,15 +321,25 @@ A complete scale-to-zero host also needs to wake without relying on an
 unrelated user request and to retain accepted work while no Gateway process
 exists.
 
-Before source retirement, OpenClaw should produce one owner-authored semantic
-wake registration bound to the accepted final recovery point and scheduler
-evidence. It contains a nullable `nextRequiredAt` and a bounded reason class,
-not cron expressions, job names, prompts, or payloads. The host may subtract a
-configured cold-start lead from that timestamp, but it must not decide whether
-a cron job is due, invent catch-up work, or suppress duplicates.
-The authoritative receipt is produced at final capture and again after restored
-reconciliation; it does not require a host callback for every live cron
-mutation.
+OpenClaw already exposes the owner mechanism Peter added for this job:
+post-commit `cron_changed: scheduled` signals in
+[openclaw/openclaw#103647](https://github.com/openclaw/openclaw/pull/103647)
+and lifecycle-owned `cron_reconciled` snapshots in
+[openclaw/openclaw#104368](https://github.com/openclaw/openclaw/pull/104368).
+The documented safe external projection pattern uses `cron_reconciled` to adopt
+the exact scheduler, treats `cron_changed` only as a coalescible reread hint,
+and completes its `replaceAll` callback only after the host durably accepts the
+projection. Those callbacks remain tracked root work, so the existing
+`gateway.suspend.*` fence cannot report idle while a projection write is still
+in flight.
+
+The host should bind the durably accepted projection revision, accepted final
+recovery point, and revocable sleep authority in one transaction. That host
+wake registration contains a nullable `nextRequiredAt` and a bounded reason
+class, not cron expressions, job names, prompts, or payloads. The host may
+subtract a configured cold-start lead from that timestamp, but it must not
+decide whether a cron job is due, invent catch-up work, or suppress duplicates.
+No continuous callback beyond the shipped reconciliation hooks is required.
 
 A retained-ingress owner such as Teams must durably store its payload or opaque
 reference and deduplication identity before acknowledging upstream delivery.
@@ -357,10 +367,11 @@ start a second authoritative generation, or open admission.
 
 The bounded follow-on PR plan is:
 
-1. **OpenClaw semantic wake registration:** add an owner-authored receipt bound
-   to the final recovery point and scheduler evidence, with nullable
-   `nextRequiredAt`; reuse the existing cron owner's `nextWakeAtMs` and startup
-   reconciliation rather than adding another scheduler.
+1. **Host cron-projection adapter:** implement the documented
+   `cron_reconciled` plus `cron_changed` projection pattern, durably replace the
+   complete external wake set, and bind its accepted revision to the final
+   recovery point and sleep authority. No new OpenClaw core surface is expected
+   by default.
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
@@ -374,6 +385,9 @@ These are review and evidence slices, not a required repository decomposition.
 The host slices may be combined if the same ownership, race, replay, and
 conformance boundaries remain independently reviewable. OpenClaw does not gain
 a Teams transport, compute scheduler, retained-payload store, or placement API.
+If end-to-end proof exposes an invariant the shipped hooks and suspension fence
+cannot express, the follow-up should be the smallest extension of those owner
+seams rather than a parallel continuity scheduler or wake API.
 
 OpenClaw `main` already provides the host-neutral
 `gateway.suspend.prepare|status|resume` contract from
