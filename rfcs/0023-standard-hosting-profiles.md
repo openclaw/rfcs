@@ -403,6 +403,27 @@ package/image artifact. It proves unprofiled compatibility, all four profiles,
 expected failures, node approval, workspace recovery, stable repeated polls,
 and host-stable/process-and-Gateway-rotating container restart identity.
 
+#### Operator and conformance facilities roadmap
+
+The standard catalog becomes easier to support when operators and release
+automation can inspect and validate it without reproducing profile predicates:
+
+1. Add read-only `hosting profile list` and `hosting profile inspect` surfaces
+   over the built-in definitions, selected criteria, startup requirements, and
+   support metadata.
+2. Add `hosting profile validate` over effective configuration and the live RFC
+   0018 canonical readiness result. Validation reports conformance; it does not
+   mutate configuration or run a second evaluator.
+3. Emit one machine-readable conformance artifact suitable for Docker,
+   Kubernetes, OCC, Lobster, CI, support bundles, and release qualification.
+4. Gate every built-in profile through package-installed release scenarios and
+   preserve the evidence with the released artifact.
+
+Transition watching, generic condition/provider inspection, and startup wait
+remain RFC 0018 facilities. Doctor remediation, fleet telemetry, support
+bundles, and upgrade orchestration remain with their existing owners and may
+consume the same readiness and conformance evidence.
+
 ## Rationale
 
 Named profiles are useful because OpenClaw's configuration space is much larger
