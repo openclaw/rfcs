@@ -490,7 +490,7 @@ The primary implementation for this RFC is
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
 Its upgrade boundary keeps unconfigured probes on the legacy checker and makes
 the presence of `gateway.readiness` the explicit canonical activation signal.
-It is one upstream PR at exact head `673e7a8c1ef2`. Focused readiness, live
+It is one upstream PR at exact head `64bba7771598`. Focused readiness, live
 Gateway, HTTP/RPC, health, selector, registry, subject, and CLI suites pass;
 type-aware lint, formatting, and diff checks pass. Timed-out plugin checks
 remain single-flight until the original callback settles, even across registry
@@ -509,8 +509,8 @@ proposed landing shape and current validation state.
 
 The first core-owner adoption is consolidated in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421),
-stacked at exact readiness head `673e7a8c1ef2` and exact implementation head
-`c398dd2c204c`. It adds selectable core-owner criteria,
+stacked at exact readiness head `64bba7771598` and exact implementation head
+`25026844df5a`. It adds selectable core-owner criteria,
 execution-capability, session-storage, state, delivery, and scheduler
 observations without selecting any of them by default. Fork PRs
 [#153](https://github.com/giodl73-repo/openclaw/pull/153),
