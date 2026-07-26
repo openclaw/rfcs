@@ -169,29 +169,33 @@ Every selected profile declares:
   ref: "openclaw/hosting-profile/selected";
   kind: "openclaw.hosting-profile";
   id: "local" | "container" | "reverse-proxy" | "node-mode";
-  generation: "1";
   parentRef: "openclaw/gateway/current";
 }
 ```
 
 `ProfileSelected` targets this subject. Container and proxy conditions target
-the Gateway and include the profile subject in `relatedSubjectRefs`.
+the Gateway and include the profile subject in `relatedSubjectRefs`. The
+profile contract version is result metadata, not a generation of the selected
+profile object.
 
 Node mode also declares:
 
 - `openclaw/nodes/managed`, kind `openclaw.node-controller`, parented by the
   Gateway; and
-- a bounded child subject for each paired node observed during evaluation,
-  with its pairing generation when available.
+- a deterministic subset of at most 16 paired node subjects observed during
+  evaluation, with a one-way fingerprint of pairing generation when available.
 
 Node-mode aggregate conditions target `openclaw/nodes/managed` and list the
-observed node subjects as related subjects. Node IDs must not be copied into a
-subject ref; implementations use a deterministic bounded opaque key.
+observed node subjects as related subjects. Aggregate counts cover the complete
+paired-node set even when related subjects are truncated. Node IDs must not be
+copied into a subject ref; implementations use a deterministic bounded opaque
+key and prioritize actionable disconnected subjects.
 
-The Gateway serving-lifecycle identity is owned by RFC 0018. A host may supply
-`OPENCLAW_INSTANCE_ID`; otherwise OpenClaw generates the Gateway ID. It remains
-stable across repeated readiness evaluations, config reload, and drain, and
-changes after process restart.
+Gateway, process, and optional host-workload identities are owned by RFC 0018.
+OpenClaw generates a Gateway ID at every serving-lifecycle start and a process
+ID at process start. `OPENCLAW_INSTANCE_ID`, when supplied, becomes only a
+fingerprinted host-workload subject; it never overrides either generated child
+identity.
 
 ## Host-Visible Result
 
@@ -210,6 +214,7 @@ profile with a loopback listener returns `503`:
 
 ```json
 {
+  "contractVersion": 1,
   "profileContractVersion": 1,
   "profile": "container",
   "profileSource": "config",
@@ -218,10 +223,20 @@ profile with a loopback listener returns `503`:
     "producerRef": "openclaw/gateway/current",
     "subjects": [
       {
+        "ref": "openclaw/process/current",
+        "kind": "openclaw.process",
+        "id": "process-opaque-id"
+      },
+      {
+        "ref": "openclaw/gateway/current",
+        "kind": "openclaw.gateway",
+        "id": "gateway-opaque-id",
+        "parentRef": "openclaw/process/current"
+      },
+      {
         "ref": "openclaw/hosting-profile/selected",
         "kind": "openclaw.hosting-profile",
         "id": "container",
-        "generation": "1",
         "parentRef": "openclaw/gateway/current"
       }
     ]
