@@ -537,6 +537,33 @@ slices. They are supporting review aids, not alternative landing PRs:
 | Canonical readiness CLI | [PR 27](https://github.com/giodl73-repo/openclaw/pull/27) | Add a thin CLI projection of the live result. |
 | Readiness subjects | [PR 161](https://github.com/giodl73-repo/openclaw/pull/161) | Add the shared producer/subject identity package and condition attribution used by core and plugins. |
 
+#### Operator facilities roadmap
+
+The canonical result should replace private polling, JSON-diff, and startup
+scripts with a small set of ordinary operator facilities. These are follow-on
+consumers of this RFC, not additions to the evaluation model:
+
+1. **Observe transitions.** Add `openclaw ready --watch` over the existing RPC.
+   Poll sequentially with a timeout per call, emit an initial snapshot followed
+   by semantic changes, suppress timestamp-only churn, identify condition
+   changes by `(subjectRef, type)`, and report producer or subject-lifetime
+   replacement. Continue through not-ready and unavailable states so recovery
+   remains observable. `--json` emits versioned JSON Lines. Fork
+   [PR 167](https://github.com/giodl73-repo/openclaw/pull/167) is the first
+   bounded implementation slice.
+2. **Inspect and wait.** Add read-only criterion/provider enumeration after
+   registry metadata is enumerable, and add a bounded startup wait convenience
+   over the same canonical result. Neither facility may create a second
+   evaluator.
+3. **Diagnose and operate.** Let existing Doctor, telemetry, support-bundle,
+   and update owners consume snapshots and transitions for remediation,
+   secret-safe evidence capture, transition telemetry, and pre/post-upgrade
+   comparison. Readiness remains observational and does not absorb those
+   subsystems.
+
+Profile discovery, validation, conformance artifacts, and release gates belong
+to the separate Standard Hosting Profiles RFC.
+
 Profile selection, node-mode composition, profile subject attribution, and packaged
 profile release conformance move to the Standard Hosting Profiles RFC and its
 separate implementation stack.
