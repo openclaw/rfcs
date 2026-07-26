@@ -314,6 +314,67 @@ The three OpenClaw drafts prove only the owner-side recovery-point, final
 capture, and restored-admission slices. Host acceptance, retained ingress,
 wake, and destruction remain separate review and implementation work.
 
+#### Deferred cron and retained-ingress wake composition
+
+The current three-PR evidence stack intentionally stops at restored admission.
+A complete scale-to-zero host also needs to wake without relying on an
+unrelated user request and to retain accepted work while no Gateway process
+exists.
+
+Before source retirement, OpenClaw should produce one owner-authored semantic
+wake registration bound to the accepted final recovery point and scheduler
+evidence. It contains a nullable `nextRequiredAt` and a bounded reason class,
+not cron expressions, job names, prompts, or payloads. The host may subtract a
+configured cold-start lead from that timestamp, but it must not decide whether
+a cron job is due, invent catch-up work, or suppress duplicates.
+The authoritative receipt is produced at final capture and again after restored
+reconciliation; it does not require a host callback for every live cron
+mutation.
+
+A retained-ingress owner such as Teams must durably store its payload or opaque
+reference and deduplication identity before acknowledging upstream delivery.
+That accepted cause revokes an in-progress sleep authorization or joins an
+idempotent wake request. Teams messages, API work, semantic deadlines, and
+operator requests may coalesce one compute-provisioning attempt, but each owner
+retains its independent delivery, retry, and acknowledgement state.
+
+The host then selects an accepted recovery point, grants one destination
+generation, restores through the existing contract, and waits for the exact
+restored-admission readiness identity. Only then may retained-work owners use
+their existing generation-fenced delivery paths. After wake, OpenClaw remains
+authoritative for due and missed-run reconciliation, catch-up policy, duplicate
+suppression, and the next semantic deadline; a host alarm is only a provisioning
+trigger and must not invoke cron jobs directly.
+
+Wake callers cannot select a recovery point or destination generation and
+cannot supply readiness. Central lifecycle records contain bounded cause and
+generation identities only; retained payloads and credentials remain with
+their existing owners.
+
+Unknown provisioning, restore, readiness, or delivery outcomes retain the wake
+causes and hold or quarantine. A timeout is not permission to acknowledge work,
+start a second authoritative generation, or open admission.
+
+The bounded follow-on PR plan is:
+
+1. **OpenClaw semantic wake registration:** add an owner-authored receipt bound
+   to the final recovery point and scheduler evidence, with nullable
+   `nextRequiredAt`; reuse the existing cron owner's `nextWakeAtMs` and startup
+   reconciliation rather than adding another scheduler.
+2. **Host wake authority and coalescing:** atomically accept the recovery point,
+   wake registration, and revocable sleep authority; retain Teams/API causes;
+   schedule semantic deadlines; and coalesce causes into one idempotent
+   ensure-runtime-ready operation.
+3. **Readiness-gated delivery and replay:** consume the exact restored-admission
+   result before delivering retained work, preserve per-owner acknowledgement,
+   and prove replay across a host-process failure with one Teams cause and one
+   cron deadline sharing one cold start.
+
+These are review and evidence slices, not a required repository decomposition.
+The host slices may be combined if the same ownership, race, replay, and
+conformance boundaries remain independently reviewable. OpenClaw does not gain
+a Teams transport, compute scheduler, retained-payload store, or placement API.
+
 OpenClaw `main` already provides the host-neutral
 `gateway.suspend.prepare|status|resume` contract from
 [openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
