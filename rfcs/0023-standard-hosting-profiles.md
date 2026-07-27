@@ -329,8 +329,9 @@ interpreting a profile-specific API.
 
 A standard profile is a support promise only if the release process tests it.
 V1 adds one Docker E2E lane to the release-check matrix. It starts the packaged
-OpenClaw entrypoint and validates the ordinary canonical `/readyz` result;
-runtime readiness does not rerun release tests or claim artifact attestation.
+OpenClaw entrypoint, validates the ordinary canonical `/readyz` result, and
+invokes the packaged `hosting profiles validate --json` command. Runtime
+readiness does not rerun release tests or claim artifact attestation.
 
 The initial profile matrix must execute package-installed scenarios for:
 
@@ -340,10 +341,17 @@ The initial profile matrix must execute package-installed scenarios for:
 - node-mode unpaired failure and paired/approved recovery; and
 - workspace-full failure and recovery without restart.
 
-The implementation wires this lane into package acceptance. Upgrade survival,
-cross-surface parity, direct-ingress security scenarios, immutable records, and
-signed attestations can strengthen the support program later without expanding
-the V1 runtime contract.
+The implementation wires this lane into package acceptance and emits one
+versioned `hosting-profile-conformance.json` artifact. The artifact identifies
+the package and immutable Docker image, retains expected and observed
+validation plus canonical readiness evidence for every scenario, and is marked
+passed only after the exact matrix is complete. Expected non-ready states pass
+the release gate only when they remain structurally conformant and report
+`ready: false`.
+
+Upgrade survival, cross-surface parity, direct-ingress security scenarios,
+immutable records, and signed attestations can strengthen the support program
+later without expanding the V1 runtime contract.
 
 ### Support ownership and compatibility
 
@@ -408,17 +416,17 @@ single dependent series in
 [openclaw/openclaw#113422](https://github.com/openclaw/openclaw/pull/113422).
 It depends on the readiness framework in
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-at exact head `6dce3555a511`
+at exact head `59b02212b1f`
 and the core-owner criteria in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-at exact head `9cc02c5d89c`. The exact profile head is `e9c1988c5e59`.
+at exact head `7350b4cd744b`. The exact profile head is `b8d9808e1922`.
 
 | Slice | Intended scope |
 | --- | --- |
 | Standard selection and predicates | Add opt-in selection, precedence, machine-readable projection, and `local`, `container`, and `reverse-proxy` conditions. |
 | Node mode | Add product-neutral pairing, connected-target, canonical command-policy, and control-channel conditions. |
 | Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, preserve attribution on failed evaluation, and bound pairing recovery work. |
-| Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, unprofiled compatibility, repeated-poll identity, and container-restart renewal boundaries. |
+| Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, unprofiled compatibility, repeated-poll identity, and container-restart renewal boundaries; retain one fail-closed release artifact. |
 
 PR 113422 is a stacked upstream draft against `main`. Until PRs 104018 and
 113421 land, its aggregate GitHub diff includes both dependencies followed by
@@ -434,11 +442,12 @@ slices as review aids; they are not alternative landing requests.
 The refreshed stack passes 120 focused profile, readiness, selection, and
 Gateway assertions; type-aware lint, formatting, shell syntax, and diff checks
 are clean. The
-[exact-head package-installed Docker matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30214165737)
-passes on GitHub-hosted Actions at `e9c1988c5e59` using an immutable no-push
-package/image artifact. It proves unprofiled compatibility, all four profiles,
-expected failures, node approval, workspace recovery, stable repeated polls,
-and host-stable/process-and-Gateway-rotating container restart identity.
+[exact-head package-installed Docker matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30281595193)
+passes on GitHub-hosted Actions over profile head `b8d9808e1922` using an
+immutable no-push package/image artifact. It proves unprofiled compatibility,
+all four profiles, expected failures, node approval, workspace recovery, stable
+repeated polls, and host-stable/process-and-Gateway-rotating container restart
+identity.
 
 #### Operator and conformance facilities
 
@@ -448,18 +457,24 @@ automation can inspect and validate it without reproducing profile predicates:
 1. Read-only `hosting profiles list` and `hosting profiles inspect` surfaces
    expose the built-in definitions and selected criteria. The implementation is
    available in [fork PR 173](https://github.com/giodl73-repo/openclaw/pull/173)
-   at exact head `99449434cb4c`.
+   at exact head `afaf7d1269af`.
 2. `hosting profiles validate` checks active identity, version, condition
    coverage, and readiness over one live RFC 0018 canonical result. The
    implementation is available in
    [fork PR 174](https://github.com/giodl73-repo/openclaw/pull/174) at exact head
-   `84227d246d00`; its
-   [exact-head proof](https://github.com/giodl73-repo/openclaw/actions/runs/30275850209)
-   passes. It does not mutate configuration or run a second evaluator.
-3. Emit one machine-readable conformance artifact suitable for Docker,
-   Kubernetes, OCC, Lobster, CI, support bundles, and release qualification.
-4. Gate every built-in profile through package-installed release scenarios and
-   preserve the evidence with the released artifact.
+   `64cc6b4e8cd9`; the
+   [package-installed proof](https://github.com/giodl73-repo/openclaw/actions/runs/30281595193)
+   exercises that exact validator ancestor. It does not mutate configuration or
+   run a second evaluator.
+3. Package-installed release conformance invokes the canonical validator for
+   all 13 scenario states and retains one machine-readable artifact suitable
+   for Docker, Kubernetes, OCC, Lobster, CI, support bundles, and release
+   qualification. The implementation is available in
+   [fork PR 176](https://github.com/giodl73-repo/openclaw/pull/176) at exact head
+   `890d042267c`; its
+   [exact-head package-installed Docker proof](https://github.com/giodl73-repo/openclaw/actions/runs/30281595193)
+   passes all 13 scenarios, independently verifies the artifact, and uploads it
+   as release evidence.
 
 Transition watching, generic condition/provider inspection, and startup wait
 remain RFC 0018 facilities. Doctor remediation, fleet telemetry, support

@@ -343,7 +343,7 @@ evaluator. It verifies:
 `--json` returns:
 
 ```ts
-{
+type LiveProfileValidationResult = {
   contractVersion: 1;
   conformant: boolean;
   ready: boolean;
@@ -351,7 +351,7 @@ evaluator. It verifies:
   activeProfile?: string;
   findings: Array<{ reason: string; message: string }>;
   readiness?: unknown;
-}
+};
 ```
 
 `conformant` is false for unavailable or malformed readiness, no active
@@ -364,7 +364,8 @@ required condition is false reports `conformant: true`, `ready: false`.
 ## Packaged Scenario Gate
 
 The package-installed Docker lane probes the same canonical `/readyz` result
-used by hosts. It must prove:
+used by hosts and invokes `openclaw hosting profiles validate --json` against
+each stable scenario state. It must prove:
 
 - unchanged unprofiled behavior;
 - explicit `local` success and workspace failure/recovery;
@@ -375,6 +376,58 @@ used by hosts. It must prove:
 - stable host/profile identity plus renewed process and Gateway identity when
   the same host workload restarts; and
 - exact condition status and profile contract version.
+
+The lane writes one `hosting-profile-conformance.json` artifact:
+
+```ts
+{
+  contractVersion: 1;
+  suite: "openclaw-standard-hosting-profiles";
+  profileContractVersion: 1;
+  package: {
+    name: "openclaw";
+    version: string;
+    sha256?: string;
+  };
+  image: {
+    reference: string;
+    id: `sha256:${string}`;
+  };
+  scenarios: Array<{
+    id: string;
+    expected: {
+      profile?: string;
+      conformant: boolean;
+      ready: boolean;
+      exitCode: number;
+    };
+    observed: {
+      exitCode: number;
+      validation: LiveProfileValidationResult;
+    };
+    passed: boolean;
+    mismatches?: string[];
+  }>;
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+  };
+  passed: boolean;
+}
+```
+
+The candidate package SHA-256 is present when the package path is available;
+the immutable Docker image ID is always present. The writer independently
+validates the canonical readiness fields, validation findings, profile
+identity, conformance state, readiness state, and command exit before accepting
+a scenario. It writes mismatch evidence before failing and sets top-level
+`passed: true` only after the exact required scenario set is complete.
+
+Expected non-ready scenarios are successful conformance evidence only when the
+profile is structurally conformant, `ready` is false, and the validator exits
+nonzero. The artifact is portable release evidence, not an immutable or signed
+attestation.
 
 Upgrade survival, direct-ingress security, immutable records, and signed
 attestations are follow-up gates, not V1 runtime semantics.
@@ -407,4 +460,6 @@ operator-selected RFC 0018 criteria.
   attribution.
 - Readiness, health, and status project the same profile result.
 - Packaged scenarios exercise each profile's primary success and recovery path.
+- The packaged gate retains one complete, versioned, fail-closed conformance
+  artifact with package and image provenance.
 - Unprofiled deployments retain RFC 0018 behavior.
