@@ -314,7 +314,8 @@ unresolved, conflicting, or excessive declarations become
 `CriterionInvalidResult=Unknown`; partial raw identity output is never
 projected.
 
-The bundled Policy plugin is the concrete v1 example. When activated, it
+The bundled Policy plugin is an optional example of this contract. Readiness
+does not depend on Policy being installed or enabled. When activated, Policy
 registers `plugin.policy.conformant`, reuses its existing policy evaluator, and
 reports `True` when evaluation has no findings, `False` with a bounded finding
 count when findings exist, and `Unknown` when policy checks are disabled. The
@@ -493,52 +494,33 @@ package rather than adding a profile-only activation envelope.
 
 ### Implementation plan
 
-The primary implementation for this RFC is
-[openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018).
-Its upgrade boundary keeps unconfigured probes on the legacy checker and makes
-the presence of `gateway.readiness` the explicit canonical activation signal.
-It is one upstream PR at exact head `6dce3555a511`. Focused readiness, live
-Gateway, HTTP/RPC, health, selector, registry, subject, and CLI suites pass;
-type-aware lint, formatting, and diff checks pass. Timed-out plugin checks
-remain single-flight until the original callback settles, even across registry
-replacement when the plugin ignores cancellation. Provider output is bounded,
-validated, redacted, and accompanied by safe criterion-ID diagnostics. Config
-publication fences
-provider and workspace evidence by runtime generation, including recovery when
-a retired filesystem probe never settles, while retaining a strict two-probe
-ceiling across repeated generation changes. A prior package-installed
-Docker lane proved `/ready` and `/readyz`
-transition `200 -> 503 -> 200` for a selected workspace failure and recovery,
-`/healthz` remains live, and `openclaw ready --json` exits `0 -> 1 -> 0` with
-the same canonical condition. The
-[exact-head package-installed profile matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30214165737)
-also proves the RFC 0018 surfaces, repeated-poll stability, and host-stable,
-process-and-Gateway-renewing container restart semantics on dependent head
-`e9c1988c5e59`. Standalone published-upgrade proof remains separate. Reviewers
-should use the primary PR for the proposed landing shape and current validation
-state.
+The RFC has two direct upstream implementation PRs, in landing order:
 
-The first core-owner adoption is consolidated in
-[openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421),
-stacked at exact readiness head `6dce3555a511` and exact implementation head
-`9cc02c5d89c`. It adds selectable core-owner criteria,
-execution-capability, session-storage, state, delivery, and scheduler
-observations without selecting any of them by default. Fork PRs
-[#153](https://github.com/giodl73-repo/openclaw/pull/153),
-[#154](https://github.com/giodl73-repo/openclaw/pull/154), and
-[#155](https://github.com/giodl73-repo/openclaw/pull/155) preserve the three
-owner-area review slices; PR 113421 is the intended merge unit.
+1. [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
+   at exact head `2f131c6e220` adds the opt-in canonical evaluator, bounded
+   providers, subject identity, shared HTTP/RPC/status/health projections, and
+   the `openclaw ready` CLI. Unconfigured probes remain on the legacy checker.
+2. [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
+   at exact head `c1d7f394f86` adds selectable core-owner observations for
+   runtime activation, execution capability, session storage, state, delivery,
+   and scheduling. None becomes required by being implemented.
 
-The fork PRs below expose the implementation as optional smaller review
-slices. They are supporting review aids, not alternative landing PRs:
+Focused readiness, live Gateway, HTTP/RPC, health, selector, registry, subject,
+CLI, and owner-adoption suites pass; type-aware lint, formatting, and diff
+checks pass. Timed-out plugin checks remain single-flight until the original
+callback settles, including across registry replacement when a plugin ignores
+cancellation. Provider output is bounded, validated, and redacted. Config
+publication fences provider and workspace evidence by runtime generation,
+including recovery when a retired filesystem probe never settles while
+retaining a strict two-probe ceiling across repeated generation changes.
 
-| Slice | Draft PR | Intended scope |
-| --- | --- | --- |
-| Canonical core conditions | [PR 17](https://github.com/giodl73-repo/openclaw/pull/17) | Normalize existing Gateway observations and compatibility projections. |
-| Workspace readiness | [PR 22](https://github.com/giodl73-repo/openclaw/pull/22) | Add the bounded `WorkspaceWritable` condition without profile behavior. |
-| Readiness providers | [PR 23](https://github.com/giodl73-repo/openclaw/pull/23) | Add activation-scoped provider registration and operator-required criteria, without custom profiles. |
-| Canonical readiness CLI | [PR 27](https://github.com/giodl73-repo/openclaw/pull/27) | Add a thin CLI projection of the live result. |
-| Readiness subjects | [PR 161](https://github.com/giodl73-repo/openclaw/pull/161) | Add the shared producer/subject identity package and condition attribution used by core and plugins. |
+The
+[exact-head package-installed Docker matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
+proves the RFC 0018 surfaces as part of the dependent profile stack: `/ready`
+and `/readyz` transition `200 -> 503 -> 200`, `/healthz` remains live,
+`openclaw ready --json` exits `0 -> 1 -> 0`, repeated polls retain identity,
+and container restart preserves host identity while renewing process and
+Gateway lifetimes. Standalone published-upgrade proof remains separate.
 
 #### Operator facilities roadmap
 
@@ -551,23 +533,18 @@ consumers of this RFC, not additions to the evaluation model:
    by semantic changes, suppress timestamp-only churn, identify condition
    changes by `(subjectRef, type)`, and report producer or subject-lifetime
    replacement. Continue through not-ready and unavailable states so recovery
-   remains observable. `--json` emits versioned JSON Lines. Fork
-   [PR 167](https://github.com/giodl73-repo/openclaw/pull/167) is the first
-   bounded implementation slice.
+   remains observable. `--json` emits versioned JSON Lines.
 2. **Inspect and wait.** Add read-only criterion/provider enumeration and a
    bounded startup wait convenience over the same canonical result. Neither
-   facility may create a second evaluator. Fork
-   [PR 169](https://github.com/giodl73-repo/openclaw/pull/169) implements the
-   catalog as `readiness.catalog` plus `openclaw ready criteria list|inspect`,
-   reading one activation-pinned config/registry snapshot without invoking a
-   provider. Fork [PR 171](https://github.com/giodl73-repo/openclaw/pull/171)
-   implements startup waiting as `openclaw ready --wait [duration]`. It polls
+   facility may create a second evaluator. The catalog should use
+   `readiness.catalog` plus `openclaw ready criteria list|inspect`, reading one
+   activation-pinned config/registry snapshot without invoking a provider.
+   Startup waiting should use `openclaw ready --wait [duration]`. It polls
    sequentially, bounds each call by the remaining total budget, independently
    aborts slow connection setup at the deadline, and emits only the final
    canonical observation. Because waiting belongs to `ready`, Docker,
    Kubernetes, systemd, OCC, and local launchers can use the same facility.
-   Fork [PR 172](https://github.com/giodl73-repo/openclaw/pull/172) completes
-   the human diagnostic projection by showing the existing kind, ID,
+   The human diagnostic projection should show the existing kind, ID,
    generation, and parent reference for primary and related subjects behind a
    non-`True` condition. Healthy human output and canonical JSON remain
    unchanged.
@@ -603,24 +580,23 @@ snapshot.
 | State and background services | `StateReady`, `SessionStorageReady`, `DeliveryRuntimeReady`, `SchedulerReady`; defer `RestoreComplete` until a restore fence exists | State/store activation, bounded persistence-location probes, delivery runtime ownership, cron lifecycle and startup recovery state | Report whether configured stateful services can accept new work. A selected storage probe may perform a capped write/fsync/unlink check, but historical dead letters and individual job failures remain diagnostics or advisories rather than universal blockers. Do not infer restore completion from database-open, fleet-restore, or config-migration state. |
 | Hosted dependencies | `HostBindingsReady`; defer `EgressReady` and `ManagedConfigApplied` until their owners publish authoritative facts | RFC 0020 host-integration bundle and owner-generation evidence | Project required host bindings through the ordinary readiness selector. Keep network probing, config inference, Lobster, OCC, tenant, and deployment policy out of the condition evaluator. |
 
-All four buckets now have fork evidence slices. The first three are stacked
-directly on the exact head of the primary readiness implementation. The fourth
-is stacked on an explicit composition of that readiness head with RFC 0020 host
+Validated prototypes cover all four buckets. The first three depend only on
+the primary readiness implementation. The fourth also depends on RFC 0020 host
 integration package 3. They remain optional follow-on work and are not
 prerequisites for accepting this RFC:
 
-- [Runtime activation integrity PR 153](https://github.com/giodl73-repo/openclaw/pull/153)
-  adds selectable `ConfigCurrent`, `ModelRouteReady`, and `SecretsReady`
+- Runtime activation integrity adds selectable `ConfigCurrent`,
+  `ModelRouteReady`, and `SecretsReady`
   conditions plus quarantine-aware plugin activation evidence.
-- [Agent execution capabilities PR 154](https://github.com/giodl73-repo/openclaw/pull/154)
-  adds selectable context-engine, tool-catalog, MCP, sandbox, and harness
+- Agent execution capabilities adds selectable context-engine, tool-catalog,
+  MCP, sandbox, and harness
   conditions. MCP discovery is captured for every configured agent when the
   Gateway accepts a runtime configuration; readiness evaluation does not
   connect to MCP servers or start any execution surface. `SkillsReady` remains
   deferred because the current skill inventory path is not a bounded readiness
   source; the skills owner must first publish an activation snapshot or index.
-- [State and background services PR 155](https://github.com/giodl73-repo/openclaw/pull/155)
-  adds selectable state-database, session-storage, durable session-delivery,
+- State and background services adds selectable state-database,
+  session-storage, durable session-delivery,
   and scheduler lifecycle conditions. Owners publish synchronous process-local
   snapshots. The selected storage condition uses a one-second, target-capped,
   concurrency-capped, generation-safe write/fsync/unlink probe over resolved
@@ -628,8 +604,8 @@ prerequisites for accepting this RFC:
   install delivery recovery, import or start cron, scan queues, or run recovery.
   `RestoreComplete` remains deferred until OpenClaw owns a generic restore
   generation and admission fence.
-- [Hosted dependencies PR 156](https://github.com/giodl73-repo/openclaw/pull/156)
-  adds selectable `openclaw.host-bindings-ready` and connects RFC 0020 bundle
+- Hosted dependencies adds selectable `openclaw.host-bindings-ready` and
+  connects RFC 0020 bundle
   declarations to the active core/plugin criterion catalog. Selecting the
   aggregate includes referenced criteria as advisory detail without requiring
   operators to repeat the bundle's selectors. A required contribution fails

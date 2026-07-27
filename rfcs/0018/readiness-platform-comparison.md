@@ -171,8 +171,8 @@ The implementation and release proof should include this matrix:
 | Plugin reload or node replacement | New owner ID or generation according to that owner's contract | Late provider output is discarded or represented as incomplete. |
 
 The
-[exact packaged container matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30214165737)
-proves this restart boundary on dependent implementation head `e9c1988c5e59`:
+[exact packaged container matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
+proves this restart boundary on dependent profile head `18c42a7f26a`:
 the same host workload retains its fingerprinted host identity while process
 and Gateway identities renew. Unit tests additionally establish schema and
 generation fences.

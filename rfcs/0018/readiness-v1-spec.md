@@ -259,8 +259,10 @@ separate criteria for independently selectable resources or states; an
 unbounded collection is summarized by one aggregate subject and a bounded,
 deterministic set of related subjects.
 
-The bundled Policy plugin demonstrates this contract with
-`plugin.policy.conformant`. It reuses the plugin's existing policy evaluation,
+The bundled Policy plugin is an optional demonstration of this contract; core
+readiness does not depend on Policy being installed or enabled. When activated,
+it registers `plugin.policy.conformant`. It reuses the plugin's existing policy
+evaluation,
 returns only bounded summary text, and is not evaluated until selected through
 `gateway.readiness`. Advisory selection does not affect the overall readiness
 decision; required selection fails closed for findings, disabled evaluation,
@@ -302,11 +304,11 @@ the active registry entry contains the namespaced ID, description, owning
 plugin, and source. The registry snapshot identity is the activation-generation
 boundary.
 
-### Criterion Catalog Projection
+### Optional Criterion Catalog Projection
 
-An authenticated read-only projection may enumerate configurable criteria from
-one activation-pinned config and registry snapshot. The v1 catalog has this
-shape:
+An implementation may expose an authenticated read-only projection that
+enumerates configurable criteria from one activation-pinned config and registry
+snapshot. When implemented, the v1 catalog has this shape:
 
 ```ts
 type ReadinessCriterionCatalog = {
@@ -446,14 +448,22 @@ An `openclaw ready` command, when implemented, is a client of the live Gateway
 result:
 
 - human output lists all conditions with pass, fail, or warning classification;
-- when identity is available, human output for non-`True` conditions identifies
-  the existing kind, ID, generation, and parent reference of each affected
-  primary and related subject;
+- when identity is available, human output may identify the affected subject;
 - `--json` preserves the canonical result; and
 - exit status is nonzero for required failure, required unknown, transport
   failure, or absence of a supported readiness contract.
 
 The CLI must not implement condition evaluation independently.
+
+### Optional CLI Facilities
+
+The following facilities are compatible extensions over the same live result.
+They are not required for core readiness v1 conformance. When implemented, they
+must follow the contracts below.
+
+Human output for non-`True` conditions may identify the existing kind, ID,
+generation, and parent reference of each affected primary and related subject.
+It must derive that explanation only from the canonical identity package.
 
 Criterion list and inspect commands are clients of the live catalog projection.
 They may filter descriptors for presentation but must not execute a criterion
@@ -506,12 +516,6 @@ An implementation conforms to readiness v1 when it proves:
   workspace, selection, and plugin-generation changes;
 - reload atomically replaces provider descriptors and callbacks, discards late
   results, and remains bounded across repeated never-settling providers;
-- catalog enumeration reflects one active config/registry snapshot, reports
-  selected missing IDs, and never invokes provider callbacks;
-- bounded CLI waiting aborts slow pre-request setup at its total deadline,
-  never overlaps evaluations, and emits only its final observation;
-- CLI subject-lifetime explanation is derived only from the canonical identity
-  package and does not alter canonical JSON or evaluate conditions locally;
 - unknown selected criteria fail closed;
 - every condition and relationship resolves to one reconciled subject;
 - every canonical result has `contractVersion: 1` and satisfies the wire
@@ -526,3 +530,14 @@ An implementation conforms to readiness v1 when it proves:
   observed activation; and
 - public output contains no raw exceptions, secrets, credentials, or tenant
   content.
+
+### Optional Facility Conformance
+
+An implementation that adds the optional operator facilities must also prove:
+
+- catalog enumeration reflects one active config/registry snapshot, reports
+  selected missing IDs, and never invokes provider callbacks;
+- bounded CLI waiting aborts slow pre-request setup at its total deadline,
+  never overlaps evaluations, and emits only its final observation; and
+- CLI subject-lifetime explanation is derived only from the canonical identity
+  package and does not alter canonical JSON or evaluate conditions locally.
