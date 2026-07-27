@@ -416,10 +416,10 @@ single dependent series in
 [openclaw/openclaw#113422](https://github.com/openclaw/openclaw/pull/113422).
 It depends on the readiness framework in
 [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-at exact head `59b02212b1f`
+at exact head `2f131c6e220`
 and the core-owner criteria in
 [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-at exact head `7350b4cd744b`. The exact profile head is `b8d9808e1922`.
+at exact head `c1d7f394f86`. The exact profile head is `18c42a7f26a`.
 
 | Slice | Intended scope |
 | --- | --- |
@@ -442,8 +442,8 @@ slices as review aids; they are not alternative landing requests.
 The refreshed stack passes 120 focused profile, readiness, selection, and
 Gateway assertions; type-aware lint, formatting, shell syntax, and diff checks
 are clean. The
-[exact-head package-installed Docker matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30281595193)
-passes on GitHub-hosted Actions over profile head `b8d9808e1922` using an
+[exact-head package-installed Docker matrix](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
+passes on GitHub-hosted Actions over profile head `18c42a7f26a` using an
 immutable no-push package/image artifact. It proves unprofiled compatibility,
 all four profiles, expected failures, node approval, workspace recovery, stable
 repeated polls, and host-stable/process-and-Gateway-rotating container restart
@@ -456,18 +456,18 @@ automation can inspect and validate it without reproducing profile predicates:
 
 The three facilities below are one ordered upstream review unit in
 [openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636) at
-exact head `890d042267c`. The fork PRs remain smaller comparison views.
+exact head `123bae7b876`. The fork PRs remain smaller comparison views.
 
 1. Read-only `hosting profiles list` and `hosting profiles inspect` surfaces
    expose the built-in definitions and selected criteria. The implementation is
    available in [fork PR 173](https://github.com/giodl73-repo/openclaw/pull/173)
-   at exact head `afaf7d1269af`.
+   at exact head `f9e6b219418`.
 2. `hosting profiles validate` checks active identity, version, condition
    coverage, and readiness over one live RFC 0018 canonical result. The
    implementation is available in
    [fork PR 174](https://github.com/giodl73-repo/openclaw/pull/174) at exact head
-   `64cc6b4e8cd9`; the
-   [package-installed proof](https://github.com/giodl73-repo/openclaw/actions/runs/30281595193)
+   `0f59b726de9`; the
+   [package-installed proof](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
    exercises that exact validator ancestor. It does not mutate configuration or
    run a second evaluator.
 3. Package-installed release conformance invokes the canonical validator for
@@ -475,8 +475,8 @@ exact head `890d042267c`. The fork PRs remain smaller comparison views.
    for Docker, Kubernetes, OCC, Lobster, CI, support bundles, and release
    qualification. The implementation is available in
    [fork PR 176](https://github.com/giodl73-repo/openclaw/pull/176) at exact head
-   `890d042267c`; its
-   [exact-head package-installed Docker proof](https://github.com/giodl73-repo/openclaw/actions/runs/30281595193)
+   `123bae7b876`; its
+   [exact-head package-installed Docker proof](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
    passes all 13 scenarios, independently verifies the artifact, and uploads it
    as release evidence.
 

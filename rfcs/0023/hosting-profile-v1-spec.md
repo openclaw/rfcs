@@ -417,12 +417,15 @@ The lane writes one `hosting-profile-conformance.json` artifact:
 }
 ```
 
-The candidate package SHA-256 is present when the package path is available;
-the immutable Docker image ID is always present. The writer independently
-validates the canonical readiness fields, validation findings, profile
-identity, conformance state, readiness state, and command exit before accepting
-a scenario. It writes mismatch evidence before failing and sets top-level
-`passed: true` only after the exact required scenario set is complete.
+The candidate package SHA-256 is present when package provenance is available;
+the immutable Docker image ID is always present. When a candidate package path
+is supplied, the lane MUST verify that its SHA-256 matches the package digest
+bound into the tested image and fail before recording scenarios on a missing or
+mismatched binding. The writer independently validates the canonical readiness
+fields, validation findings, profile identity, conformance state, readiness
+state, and command exit before accepting a scenario. It writes mismatch
+evidence before failing and sets top-level `passed: true` only after the exact
+required scenario set is complete.
 
 Expected non-ready scenarios are successful conformance evidence only when the
 profile is structurally conformant, `ready` is false, and the validator exits
