@@ -420,12 +420,20 @@ The bounded follow-on PR plan is:
    [giodl/lobster#47](https://microsoft.ghe.com/giodl/lobster/pull/47)
    (Microsoft GHE access required) adds metadata-only native Teams and exact
    permanent cron projection/provider/deadline validation into that authority;
-   route/cohort activation and readiness-gated delivery remain owner-controlled
-   follow-ups.
+   route/cohort activation remains an owner-controlled follow-up.
 3. **Readiness-gated delivery and replay:** consume the exact restored-admission
    result before delivering retained work, preserve per-owner acknowledgement,
    and prove replay across a host-process failure with one Teams cause and one
-   cron deadline sharing one cold start.
+   cron deadline sharing one cold start. Stacked fork-only draft
+   [giodl/lobster#51](https://microsoft.ghe.com/giodl/lobster/pull/51)
+   (Microsoft GHE access required) provides that core evidence with a separate
+   payload-free permanent dispatch journal, exact recovery/destination/readiness
+   fencing, independent per-cause progress, and deterministic crash replay.
+   It does not activate production Teams or cron delivery. Live wiring remains
+   fail-closed until Lobster owners choose an accepted-final-handoff lookup and
+   canonical mapping from opaque logical runtime identity to the Teams/cron
+   semantic owners; each owner must enforce the destination/readiness fence in
+   the operation that controls its side effect.
 
 These are review and evidence slices, not a required repository decomposition.
 The host slices may be combined if the same ownership, race, replay, and
