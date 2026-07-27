@@ -16,6 +16,11 @@ It reuses the RFC 0013 SQLite provider, durably binds the restore receipt and
 private startup descriptor, reconciles the canonical scheduler, and opens work
 admission only after owner readiness.
 
+The draft already produces the durable record that the proposed
+`gateway.restore.status` method would project, but it does not yet add that
+public Gateway Protocol surface. The method below is the recommended V1 design
+for owner review, not a claim about the current implementation head.
+
 The draft deliberately holds when required external or reconstructed
 obligations lack accepted owner evidence. It does not add wake routing,
 placement, idle policy, host acceptance, or a public restore-hook registry.

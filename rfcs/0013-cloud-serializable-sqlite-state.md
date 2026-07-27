@@ -293,7 +293,9 @@ slices exercised by these sidecars:
   keeps Gateway work admission closed through scheduler reconciliation and
   owner readiness. Restore intent, results, startup descriptors, and ready
   evidence share the dedicated SQLite recovery journal rather than JSON
-  runtime sidecars.
+  runtime sidecars. It does not yet expose the proposed
+  `gateway.restore.status` method; that public Gateway Protocol surface remains
+  an explicit owner-review decision.
 
 These drafts are evidence for owner review, not normative dependencies. They do
 not move Gateway suspension, external ingress fencing, clean process shutdown,
