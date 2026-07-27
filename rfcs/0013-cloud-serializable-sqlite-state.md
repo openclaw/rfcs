@@ -416,7 +416,12 @@ The bounded follow-on PR plan is:
    keeps payloads and credentials with their owners, and grants one destination
    generation for concurrent retained causes. Production Teams/cron owner
    adapters and delivery remain follow-up slices rather than new central
-   lifecycle responsibilities.
+   lifecycle responsibilities. Stacked fork-only draft
+   [giodl/lobster#47](https://microsoft.ghe.com/giodl/lobster/pull/47)
+   (Microsoft GHE access required) adds metadata-only native Teams and exact
+   permanent cron projection/provider/deadline validation into that authority;
+   route/cohort activation and readiness-gated delivery remain owner-controlled
+   follow-ups.
 3. **Readiness-gated delivery and replay:** consume the exact restored-admission
    result before delivering retained work, preserve per-owner acknowledgement,
    and prove replay across a host-process failure with one Teams cause and one
