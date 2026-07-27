@@ -389,9 +389,18 @@ The bounded follow-on PR plan is:
    bounded prepare/commit/abort protocol as an image-present, baked-disabled
    plugin. It rereads complete scheduler state, projects no prompts, payloads,
    cron expressions, credentials, or execution authority, and makes lifecycle
-   cancellation explicit. These drafts still do not claim the production
-   endpoint, authentication, permanent-store bootstrap, ECS activation, or
-   rollout wiring.
+   cancellation explicit. Stacked fork-only draft
+   [giodl/lobster#43](https://microsoft.ghe.com/giodl/lobster/pull/43)
+   (Microsoft GHE access required) completes the inactive production path
+   through Lobster's existing loopback proxy-pipe bridge: trusted runtime
+   context supplies tenant, user, provider, and Gateway-role authority; Blob
+   CAS stores the winner; and every accepted-receipt path rehydrates the
+   existing Redis wake scheduler before reporting success. This removes the
+   need for a new public callback or reusable bearer-token design. The plugin
+   remains baked-disabled; permanent Blob-container provisioning and per-user
+   ECS activation through the shared Gateway start overlay, plus routing an
+   already-due recovered deadline into retained-cause runtime readiness, remain
+   explicit owner-reviewed rollout work.
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
