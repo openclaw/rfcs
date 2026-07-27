@@ -428,7 +428,7 @@ at exact head `7350b4cd744b`. The exact profile head is `b8d9808e1922`.
 | Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, preserve attribution on failed evaluation, and bound pairing recovery work. |
 | Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, unprofiled compatibility, repeated-poll identity, and container-restart renewal boundaries; retain one fail-closed release artifact. |
 
-PR 113422 is a stacked upstream draft against `main`. Until PRs 104018 and
+PR 113422 is a stacked upstream PR against `main`. Until PRs 104018 and
 113421 land, its aggregate GitHub diff includes both dependencies followed by
 the profile commits. After both land, the same PR reduces to the profile-only
 diff. [Fork PR 157](https://github.com/giodl73-repo/openclaw/pull/157)
@@ -453,6 +453,10 @@ identity.
 
 The standard catalog becomes easier to support when operators and release
 automation can inspect and validate it without reproducing profile predicates:
+
+The three facilities below are one ordered upstream review unit in
+[openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636) at
+exact head `890d042267c`. The fork PRs remain smaller comparison views.
 
 1. Read-only `hosting profiles list` and `hosting profiles inspect` surfaces
    expose the built-in definitions and selected criteria. The implementation is
