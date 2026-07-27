@@ -409,7 +409,14 @@ The bounded follow-on PR plan is:
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
-   ensure-runtime-ready operation.
+   ensure-runtime-ready operation. Fork-only draft
+   [giodl/lobster#46](https://microsoft.ghe.com/giodl/lobster/pull/46)
+   (Microsoft GHE access required) is the bounded authority/core evidence: it
+   composes the existing final-handoff revocation race and managed-start seam,
+   keeps payloads and credentials with their owners, and grants one destination
+   generation for concurrent retained causes. Production Teams/cron owner
+   adapters and delivery remain follow-up slices rather than new central
+   lifecycle responsibilities.
 3. **Readiness-gated delivery and replay:** consume the exact restored-admission
    result before delivering retained work, preserve per-owner acknowledgement,
    and prove replay across a host-process failure with one Teams cause and one
