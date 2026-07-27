@@ -6,10 +6,10 @@ suspension contract with final owner capture and durable host acceptance.
 
 Status: draft, tied to RFC 0013.
 
-## Draft Implementation Evidence
+## Implementation Evidence
 
 [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865)
-is the OpenClaw draft evidence slice for final owner capture, stacked on
+is the OpenClaw evidence slice for final owner capture, stacked on
 [openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385).
 It uses the existing RFC 0013 SQLite provider, binds the exact runtime lineage,
 source generation, handoff identity, selected-agent inventory, and

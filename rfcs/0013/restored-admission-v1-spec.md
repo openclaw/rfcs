@@ -6,20 +6,20 @@ evidence required before a restored Gateway can receive work.
 
 Status: draft, tied to RFC 0013.
 
-## Draft Implementation Evidence
+## Implementation Evidence
 
 [openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
-is the OpenClaw draft evidence slice for exact fresh-target restore and
-readiness-gated admission, stacked on final-capture draft
+is the OpenClaw evidence slice for exact fresh-target restore and
+readiness-gated admission, stacked on final-capture PR
 [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865).
 It reuses the RFC 0013 SQLite provider, durably binds the restore receipt and
 private startup descriptor, reconciles the canonical scheduler, and opens work
 admission only after owner readiness.
 
-The draft already produces the durable record that the proposed
-`gateway.restore.status` method would project, but it does not yet add that
-public Gateway Protocol surface. The method below is the recommended V1 design
-for owner review, not a claim about the current implementation head.
+The PR also implements the proposed `gateway.restore.status` projection over
+that same durable record. The method below is the recommended V1 design and
+representative proof for owner review; it is not an approved public contract
+until the Gateway protocol owner accepts it.
 
 The draft deliberately holds when required external or reconstructed
 obligations lack accepted owner evidence. It does not add wake routing,
@@ -269,7 +269,7 @@ means the expected restored incarnation is live but ordinary work admission is
 still closed. `ready` is returned only after the exact ready record is durable
 and the same admission identity has opened Gateway work admission.
 
-All strings and arrays use explicit protocol bounds. `retryAfterMs` is a
+All strings use explicit protocol bounds. `retryAfterMs` is a
 non-negative bounded integer and only a polling hint. Results contain no local
 paths, artifact locations, credentials, retained payloads, prompts, or owner
 diagnostic text.

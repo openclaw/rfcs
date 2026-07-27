@@ -259,7 +259,7 @@ wake registration, compute placement, and external durability; OpenClaw and
 its state owners provide the exact recovery point and restored-admission proof
 that make those host primitives safe to use.
 
-The draft implementer-facing follow-on contracts are:
+The implementer-facing follow-on contracts are deliberately split by owner:
 
 - [Recovery Point Components v1](0013/recovery-point-components-v1-spec.md):
   compose verified SQLite snapshots with explicit non-SQLite owner artifacts
@@ -271,33 +271,42 @@ The draft implementer-facing follow-on contracts are:
   accepted components into fresh paths and keep admission closed until
   scheduler and required owner readiness complete.
 
+The split is mechanical rather than architectural:
+
+| Contract | Owner-side input | Durable output | Stops before |
+| --- | --- | --- | --- |
+| Recovery Point Components | Verified owner artifacts plus the closed selected-owner inventory | `recoveryPointId` and `acceptanceSetId` | Suspension, storage, or wake |
+| Portable Handoff | Suspension-ready source generation plus final owner capture | Host acceptance receipt and generation-scoped `safeToDestroy` | Restore or destination admission |
+| Restored Admission | Exact accepted recovery point plus destination generation | Restore receipt and `gateway.restore.status = ready` | Retained-work delivery |
+
+The IDs join the contracts; no sidecar owns another sidecar's work.
+
 These sidecars do not change `openclaw backup sqlite`. They do not make every
 ordinary snapshot a portable recovery point, add a continuity-specific storage
 provider, or make Lobster part of the core contract.
 
-Draft OpenClaw implementation evidence is available for the three owner-side
-slices exercised by these sidecars:
+OpenClaw implementation evidence is available for the three owner-side slices:
 
 - [openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385)
   composes verified global and owner-selected per-agent RFC 0013 snapshots into
   one deterministic `host-protected` recovery point and exact acceptance byte
   inventory.
 - [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865)
-  is a draft stacked on #112385. It adds one hidden offline final
+  is stacked on #112385. It adds one hidden offline final
   capture operation with operation-scoped SQLite intent, exact
   committed-result replay, and fail-closed quarantine for conflicting or
   incomplete attempts.
 - [openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
-  is a draft stacked on #112865. It restores one exact accepted aggregate to
+  is stacked on #112865. It restores one exact accepted aggregate to
   fresh canonical paths, holds when required owner evidence is absent, and
   keeps Gateway work admission closed through scheduler reconciliation and
   owner readiness. Restore intent, results, startup descriptors, and ready
   evidence share the dedicated SQLite recovery journal rather than JSON
-  runtime sidecars. It does not yet expose the proposed
-  `gateway.restore.status` method; that public Gateway Protocol surface remains
-  an explicit owner-review decision.
+  runtime sidecars. It also implements the proposed read-only
+  `gateway.restore.status` projection as review evidence. The public Gateway
+  Protocol surface remains an explicit owner decision before merge or ship.
 
-These drafts are evidence for owner review, not normative dependencies. They do
+These PRs are evidence for owner review, not normative dependencies. They do
 not move Gateway suspension, external ingress fencing, clean process shutdown,
 durable host acceptance, publication, host wake, or source destruction into
 OpenClaw.
@@ -312,7 +321,7 @@ The intended observable outcome of the complete host composition is:
 - the source generation is not destroyed before exact durable acceptance; and
 - replacement readiness names the accepted recovery point it restored.
 
-The three OpenClaw drafts prove only the owner-side recovery-point, final
+The three OpenClaw PRs prove only the owner-side recovery-point, final
 capture, and restored-admission slices. Host acceptance, retained ingress,
 wake, and destruction remain separate review and implementation work.
 
@@ -434,75 +443,24 @@ Unknown provisioning, restore, readiness, or delivery outcomes retain the wake
 causes and hold or quarantine. A timeout is not permission to acknowledge work,
 start a second authoritative generation, or open admission.
 
-The bounded follow-on PR plan is:
+The bounded host follow-on has three independently reviewable responsibilities:
 
-1. **Host cron-projection adapter:** implement the documented
-   `cron_reconciled` plus `cron_changed` projection pattern, durably replace the
-   complete external wake set, and bind its accepted revision to the final
-   recovery point and sleep authority. No new OpenClaw core surface is expected
-   by default. The first host-side authority evidence is the fork-only draft
-   [giodl/lobster#38](https://microsoft.ghe.com/giodl/lobster/pull/38)
-   (Microsoft GHE access required); it binds a content-addressed projection to
-   final acceptance and destruction authority. Stacked fork-only draft
-   [giodl/lobster#39](https://microsoft.ghe.com/giodl/lobster/pull/39)
-   (Microsoft GHE access required) adds permanent atomic `replaceAll`, stale
-   writer supersession, and recovery into Lobster's existing Redis scheduler.
-   Stacked fork-only draft
-   [giodl/lobster#41](https://microsoft.ghe.com/giodl/lobster/pull/41)
-   (Microsoft GHE access required) makes prepare, commit, abort, and newer-
-   attempt supersession contend in the same permanent CAS state, so transport
-   disconnect is never treated as cancellation proof across fungible host
-   pods. Stacked fork-only draft
-   [giodl/lobster#42](https://microsoft.ghe.com/giodl/lobster/pull/42)
-   (Microsoft GHE access required) connects the shipped OpenClaw hooks to the
-   bounded prepare/commit/abort protocol as an image-present, baked-disabled
-   plugin. It rereads complete scheduler state, projects no prompts, payloads,
-   cron expressions, credentials, or execution authority, and makes lifecycle
-   cancellation explicit. Stacked fork-only draft
-   [giodl/lobster#43](https://microsoft.ghe.com/giodl/lobster/pull/43)
-   (Microsoft GHE access required) completes the inactive production path
-   through Lobster's existing loopback proxy-pipe bridge: trusted runtime
-   context supplies tenant, user, provider, and Gateway-role authority; Blob
-   CAS stores the winner; and every accepted-receipt path rehydrates the
-   existing Redis wake scheduler before reporting success. This removes the
-   need for a new public callback or reusable bearer-token design. Stacked
-   fork-only draft
-   [giodl/lobster#45](https://microsoft.ghe.com/giodl/lobster/pull/45)
-   (Microsoft GHE access required) completes the default-off activation
-   boundary: it provisions the private permanent Blob container, adds an
-   explicit per-user ECS opt-in through the shared Gateway start overlay,
-   resets that opt-in across pooled-user reuse, and treats an already-due
-   recovered projection as tracked retry work so ordinary cooperative
-   suspension cannot settle before OpenClaw reconciles it. No user is enabled
-   by the draft; the actual ECS cohort remains an owner rollout decision.
-2. **Host wake authority and coalescing:** atomically accept the recovery point,
-   wake registration, and revocable sleep authority; retain Teams/API causes;
-   schedule semantic deadlines; and coalesce causes into one idempotent
-   ensure-runtime-ready operation. Fork-only draft
-   [giodl/lobster#46](https://microsoft.ghe.com/giodl/lobster/pull/46)
-   (Microsoft GHE access required) is the bounded authority/core evidence: it
-   composes the existing final-handoff revocation race and managed-start seam,
-   keeps payloads and credentials with their owners, and grants one destination
-   generation for concurrent retained causes. Production Teams/cron owner
-   adapters and delivery remain follow-up slices rather than new central
-   lifecycle responsibilities. Stacked fork-only draft
-   [giodl/lobster#47](https://microsoft.ghe.com/giodl/lobster/pull/47)
-   (Microsoft GHE access required) adds metadata-only native Teams and exact
-   permanent cron projection/provider/deadline validation into that authority;
-   route/cohort activation remains an owner-controlled follow-up.
-3. **Readiness-gated delivery and replay:** consume the exact restored-admission
-   result before delivering retained work, preserve per-owner acknowledgement,
-   and prove replay across a host-process failure with one Teams cause and one
-   cron deadline sharing one cold start. Stacked fork-only draft
-   [giodl/lobster#51](https://microsoft.ghe.com/giodl/lobster/pull/51)
-   (Microsoft GHE access required) provides that core evidence with a separate
-   payload-free permanent dispatch journal, exact recovery/destination/readiness
-   fencing, independent per-cause progress, and deterministic crash replay.
-   It does not activate production Teams or cron delivery. Live wiring remains
-   fail-closed until Lobster owners choose an accepted-final-handoff lookup and
-   canonical mapping from opaque logical runtime identity to the Teams/cron
-   semantic owners; each owner must enforce the destination/readiness fence in
-   the operation that controls its side effect.
+1. **Project scheduler wake metadata:** consume `cron_reconciled`, use
+   `cron_changed` only as a reread hint, and durably bind the complete accepted
+   projection to the final recovery point and sleep authority. Fork-only
+   evidence is in Lobster PRs
+   [#38](https://microsoft.ghe.com/giodl/lobster/pull/38) through
+   [#45](https://microsoft.ghe.com/giodl/lobster/pull/45) (Microsoft access
+   required).
+2. **Retain and coalesce wake causes:** keep Teams/API payloads with their
+   owners, revoke sleep atomically, and grant one destination generation for
+   concurrent causes. Fork-only evidence is in Lobster PRs
+   [#46](https://microsoft.ghe.com/giodl/lobster/pull/46) and
+   [#47](https://microsoft.ghe.com/giodl/lobster/pull/47).
+3. **Deliver only after exact readiness:** match `gateway.restore.status`
+   against the host-owned restore operation and destination generation before
+   invoking each owner's existing delivery path. Fork-only replay evidence is
+   in Lobster PR [#51](https://microsoft.ghe.com/giodl/lobster/pull/51).
 
 These are review and evidence slices, not a required repository decomposition.
 The host slices may be combined if the same ownership, race, replay, and
