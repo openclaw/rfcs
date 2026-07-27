@@ -316,66 +316,40 @@ wake, and destruction remain separate review and implementation work.
 
 #### One bidirectional host/runtime contract
 
-The lifecycle can be presented as one contract without moving host authority
-into OpenClaw or introducing a generic lifecycle coordinator. The useful seam
-has two directions:
+The recommended V1 surface is one bidirectional protocol contract without an
+OpenClaw-owned lifecycle coordinator or abstract `Host` base class:
 
-- OpenClaw calls a host implementation only while an OpenClaw process exists,
-  for example to durably accept a closed recovery point or replace the host's
-  wake projection.
-- The host calls OpenClaw's running Gateway and offline recovery operations to
-  suspend a source, capture its closed state, restore an accepted point, and
-  observe whether the restored destination is admissible.
+- current-main `gateway.suspend.prepare|status|resume` supplies the live-source
+  fence;
+- the final-capture and accepted-restore operations supply the offline owner
+  work; and
+- a new read-only `gateway.restore.status` supplies the exact live-destination
+  admission fact.
 
-In TypeScript-like pseudocode, the smallest useful shape is:
+`gateway.restore.status` follows the design Peter established for
+`gateway.suspend.status`: a closed TypeBox request and result, one stable
+operation identity, `operator.read` scope, no mutation, and typed conflict
+behavior. The request names the expected `restoreOperationId`. An ordinary
+Gateway returns `not-restored`; the matching restored Gateway returns `held`
+or `ready`; a different active restore operation fails rather than returning a
+success-shaped result. The `ready` result names the destination generation,
+accepted recovery point and byte set, restore receipt, scheduler and owner
+readiness evidence, admission identity, and final readiness identity.
 
-```ts
-interface ContinuityHost {
-  acceptRecoveryPoint(
-    request: AcceptRecoveryPointRequest,
-  ): Promise<AcceptRecoveryPointReceipt>;
-  replaceWakeProjection(
-    request: ReplaceWakeProjectionRequest,
-  ): Promise<WakeProjectionReceipt>;
-}
+The method projects the durable restored-admission record already required by
+this RFC. It does not add another journal or state machine. Offline restore and
+preflight failures remain offline failures; they are not represented as a
+live `restoring` phase. A quarantined start does not expose a live Gateway and
+therefore is not a success result. The detailed request, result, availability,
+and error contract is normative in
+[Restored Admission v1](0013/restored-admission-v1-spec.md#gateway-restore-status).
 
-interface HostedRuntime {
-  prepareSuspension(
-    request: PrepareSuspensionRequest,
-  ): Promise<SuspensionStatus>;
-  getSuspensionStatus(
-    request: SuspensionStatusRequest,
-  ): Promise<SuspensionStatus>;
-  getRestoreStatus(
-    request: RestoreStatusRequest,
-  ): Promise<RestoreStatus>;
-}
-
-interface OfflineRecovery {
-  captureFinal(
-    request: FinalRecoveryPointRequest,
-  ): Promise<FinalRecoveryPointResult>;
-  restoreAccepted(
-    request: RestoredRecoveryPointRequest,
-  ): Promise<RestoredRecoveryPointResult>;
-}
-```
-
-These interfaces describe protocol ownership, not an abstract base class that
-a host must subclass. A scale-to-zero host cannot rely on in-process virtual
-methods because no OpenClaw process exists to receive wake or provisioning
-work. A conforming host may implement `ContinuityHost` through a plugin,
-loopback service, CLI adapter, or another authenticated transport. Stable
-operation identities, schemas, replay behavior, and typed conflicts are the
-portable contract; transport and placement remain host-owned.
-
-The names above are illustrative. `gateway.suspend.prepare|status|resume`
-already supplies the running-source portion. Maintainers may choose to expose
-the destination portion as a narrow `gateway.restore.status` method, project
-the same closed phases through existing Status/readiness surfaces, or use a
-smaller equivalent seam. In every version, OpenClaw computes readiness and
-opens its own admission; the host cannot assert readiness or invoke an
-`admit` method.
+There is deliberately no `gateway.restore.admit` method. OpenClaw computes
+readiness, durably records it, and opens its own admission. The host may only
+observe the result and compare it with the operation and generation it owns.
+Normal user-work methods remain unavailable while restored admission is held;
+the status method is allowed only through an authenticated pre-admission
+control path, following the existing suspension-control pattern.
 
 One host-owned coordinator may compose those contracts as
 `prepareHibernate`, `ensureRuntimeReady`, and `inspectLifecycle`. Those are
@@ -399,14 +373,13 @@ cron, and API owners retain their own payload, retry, deduplication, and
 acknowledgement state. Unknown outcomes retain work and hold or quarantine;
 timeouts do not imply success.
 
-This framing is intended to simplify the evidence implementation: reuse the
-existing suspension methods, scheduler reconciliation hooks, recovery
-operations, and readiness records; keep one host lifecycle state machine; and
-avoid a second pause API, a generic host callback registry, duplicate Gateway
-admission state, or a central retained-payload store. A shared SDK package is
-not required for V1. The concrete request and result types should remain next
-to their owner surfaces until another host demonstrates a stable extraction
-boundary.
+This contract simplifies the evidence implementation: reuse the existing
+suspension methods, scheduler reconciliation hooks, recovery operations,
+admission fence, and readiness journal; keep one host lifecycle state machine;
+and avoid a second pause API, generic host callback registry, duplicate
+Gateway admission state, or central retained-payload store. The Gateway
+Protocol package should own the new wire schemas beside `gateway-suspend`; a
+separate lifecycle SDK package is not required for V1.
 
 #### Deferred cron and retained-ingress wake composition
 

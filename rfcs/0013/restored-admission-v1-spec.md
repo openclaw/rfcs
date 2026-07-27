@@ -187,6 +187,123 @@ Ordinary startup remains unchanged because it has no restored-start evidence.
 Ordinary startup cannot consume a committed restore hold, and restored startup
 cannot use an ordinary admission path.
 
+## Gateway Restore Status
+
+V1 adds one read-only Gateway Protocol method:
+
+```text
+gateway.restore.status
+```
+
+The method is the live-destination observation seam for a host. It follows the
+existing `gateway.suspend.status` conventions:
+
+- core-owned and host-neutral;
+- closed TypeBox request and result schemas in the Gateway Protocol package;
+- `operator.read` scope;
+- no control-plane-write classification;
+- no config key or environment variable;
+- idempotent and side-effect free; and
+- exposed by authenticated Gateway control transports that opt into core RPC
+  methods, including the existing Admin HTTP RPC path.
+
+The request is:
+
+```ts
+type GatewayRestoreStatusParams = {
+  restoreOperationId: string;
+};
+```
+
+`restoreOperationId` must satisfy the same bounded non-empty token rules as
+the restored-admission operation. It is required even though only one restored
+operation can own a Gateway incarnation. Requiring it prevents an observation
+for one host attempt from being mistaken for another generation's readiness.
+
+The successful result is a closed union:
+
+```ts
+type GatewayRestoreStatusResult =
+  | {
+      status: "not-restored";
+    }
+  | {
+      status: "held";
+      reason: "scheduler-reconciliation" | "owner-readiness" | "ready-commit";
+      retryAfterMs: number;
+      runtimeLineage: string;
+      lifecycleOwnerGeneration: string;
+      destinationRuntimeGeneration: string;
+      restoreOperationId: string;
+      destinationOwner: string;
+      admissionIdentity: string;
+      recoveryPointId: string;
+      acceptanceSetId: string;
+      restoreReceiptIdentity: string;
+    }
+  | {
+      status: "ready";
+      runtimeLineage: string;
+      lifecycleOwnerGeneration: string;
+      destinationRuntimeGeneration: string;
+      restoreOperationId: string;
+      destinationOwner: string;
+      admissionIdentity: string;
+      recoveryPointId: string;
+      acceptanceSetId: string;
+      restoreReceiptIdentity: string;
+      schedulerIdentity: string;
+      ownerReadinessIdentity: string;
+      readinessIdentity: string;
+    };
+```
+
+`not-restored` means the running Gateway has no restored-start evidence. It is
+not permission for a host restore operation to deliver retained work. `held`
+means the expected restored incarnation is live but ordinary work admission is
+still closed. `ready` is returned only after the exact ready record is durable
+and the same admission identity has opened Gateway work admission.
+
+All strings and arrays use explicit protocol bounds. `retryAfterMs` is a
+non-negative bounded integer and only a polling hint. Results contain no local
+paths, artifact locations, credentials, retained payloads, prompts, or owner
+diagnostic text.
+
+The handler must derive `held` and `ready` from the same in-memory startup
+binding and operation-scoped SQLite journal that enforce admission. It must not
+create a second restore-status file, infer readiness from `/healthz`, or hash a
+mutable runtime status object. A replayed call returns the same identity fields
+for the same durable record. The Gateway may retain the already validated
+status projection in memory; polling must not synchronously reopen or rehash
+the recovery journal on every request. Transition to `ready` occurs only after
+the durable record commit succeeds.
+
+If a different restore operation owns the running Gateway, the method returns
+`UNAVAILABLE` with bounded details reason `restored-admission-conflict`; it
+must not return that operation's identity as a success result. Invalid or
+oversized tokens return `INVALID_REQUEST`. Journal corruption, contradictory
+evidence, or failure to read a required committed record returns `UNAVAILABLE`
+and keeps work admission closed. No error is success-shaped.
+
+The method must remain callable while restored admission is held through an
+authenticated pre-admission control path. It is exempt only from the restored-
+admission work fence, like suspension control methods are exempt from the
+suspension work fence; it does not make other RPC methods available. A host
+without such a control path may use `/readyz` only as a backoff hint and call
+`gateway.restore.status` after readiness, but it must not deliver retained
+work until the exact `ready` result matches its operation and destination
+generation.
+
+For a fresh destination, the recommended held-state transport is the existing
+authenticated Admin HTTP RPC route bound to the host-controlled loopback path.
+The status method does not justify a new unauthenticated probe, public listener,
+bearer-token scheme, or sidecar process. A mismatched-operation error must not
+disclose the active operation's identities.
+
+There is no `gateway.restore.admit`, `resume`, or caller-supplied readiness
+method. Admission remains an OpenClaw-owned consequence of durable owner
+evidence, not a host command.
+
 ## Crash Replay
 
 The required crash boundary is:
@@ -243,6 +360,12 @@ V1 conformance must prove:
 - scheduler reconciliation precedes readiness;
 - admission opens exactly once from exact durable evidence;
 - process health alone cannot open admission;
+- `gateway.restore.status` is read-only, operation-fenced, and returns exact
+  durable identities for `ready`;
+- ordinary and mismatched restored Gateways cannot return success-shaped
+  readiness for the requested operation;
+- the status method remains available through an authenticated control path
+  while ordinary restored work admission is held;
 - coordinator crash replay reuses the same child and readiness generation;
 - preparation and restore execute exactly once; and
 - stale, contradictory, corrupt, and fixed-path collision cases fail closed.
