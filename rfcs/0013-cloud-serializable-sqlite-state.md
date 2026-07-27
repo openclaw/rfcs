@@ -314,6 +314,100 @@ The three OpenClaw drafts prove only the owner-side recovery-point, final
 capture, and restored-admission slices. Host acceptance, retained ingress,
 wake, and destruction remain separate review and implementation work.
 
+#### One bidirectional host/runtime contract
+
+The lifecycle can be presented as one contract without moving host authority
+into OpenClaw or introducing a generic lifecycle coordinator. The useful seam
+has two directions:
+
+- OpenClaw calls a host implementation only while an OpenClaw process exists,
+  for example to durably accept a closed recovery point or replace the host's
+  wake projection.
+- The host calls OpenClaw's running Gateway and offline recovery operations to
+  suspend a source, capture its closed state, restore an accepted point, and
+  observe whether the restored destination is admissible.
+
+In TypeScript-like pseudocode, the smallest useful shape is:
+
+```ts
+interface ContinuityHost {
+  acceptRecoveryPoint(
+    request: AcceptRecoveryPointRequest,
+  ): Promise<AcceptRecoveryPointReceipt>;
+  replaceWakeProjection(
+    request: ReplaceWakeProjectionRequest,
+  ): Promise<WakeProjectionReceipt>;
+}
+
+interface HostedRuntime {
+  prepareSuspension(
+    request: PrepareSuspensionRequest,
+  ): Promise<SuspensionStatus>;
+  getSuspensionStatus(
+    request: SuspensionStatusRequest,
+  ): Promise<SuspensionStatus>;
+  getRestoreStatus(
+    request: RestoreStatusRequest,
+  ): Promise<RestoreStatus>;
+}
+
+interface OfflineRecovery {
+  captureFinal(
+    request: FinalRecoveryPointRequest,
+  ): Promise<FinalRecoveryPointResult>;
+  restoreAccepted(
+    request: RestoredRecoveryPointRequest,
+  ): Promise<RestoredRecoveryPointResult>;
+}
+```
+
+These interfaces describe protocol ownership, not an abstract base class that
+a host must subclass. A scale-to-zero host cannot rely on in-process virtual
+methods because no OpenClaw process exists to receive wake or provisioning
+work. A conforming host may implement `ContinuityHost` through a plugin,
+loopback service, CLI adapter, or another authenticated transport. Stable
+operation identities, schemas, replay behavior, and typed conflicts are the
+portable contract; transport and placement remain host-owned.
+
+The names above are illustrative. `gateway.suspend.prepare|status|resume`
+already supplies the running-source portion. Maintainers may choose to expose
+the destination portion as a narrow `gateway.restore.status` method, project
+the same closed phases through existing Status/readiness surfaces, or use a
+smaller equivalent seam. In every version, OpenClaw computes readiness and
+opens its own admission; the host cannot assert readiness or invoke an
+`admit` method.
+
+One host-owned coordinator may compose those contracts as
+`prepareHibernate`, `ensureRuntimeReady`, and `inspectLifecycle`. Those are
+host operations, not new OpenClaw Gateway methods. The resulting evidence
+chain is:
+
+```text
+SuspensionReady
+  -> FinalRecoveryPointResult
+  -> HostAcceptanceReceipt
+  -> generation-scoped safeToDestroy
+  -> retained wake cause
+  -> RestoredAdmissionReadyRecord
+  -> owner delivery and acknowledgement
+```
+
+Each authority contributes only its own fact. `safeToDestroy` is derived from
+durable acceptance rather than supplied by a caller. Wake callers cannot
+select a recovery point, destination generation, or readiness result. Teams,
+cron, and API owners retain their own payload, retry, deduplication, and
+acknowledgement state. Unknown outcomes retain work and hold or quarantine;
+timeouts do not imply success.
+
+This framing is intended to simplify the evidence implementation: reuse the
+existing suspension methods, scheduler reconciliation hooks, recovery
+operations, and readiness records; keep one host lifecycle state machine; and
+avoid a second pause API, a generic host callback registry, duplicate Gateway
+admission state, or a central retained-payload store. A shared SDK package is
+not required for V1. The concrete request and result types should remain next
+to their owner surfaces until another host demonstrates a stable extraction
+boundary.
+
 #### Deferred cron and retained-ingress wake composition
 
 The current three-PR evidence stack intentionally stops at restored admission.
