@@ -428,16 +428,9 @@ at exact head `c1d7f394f86`. The exact profile head is `18c42a7f26a`.
 | Compatibility and safety | Keep unprofiled startup unchanged, validate profile-only identity only when selected, preserve attribution on failed evaluation, and bound pairing recovery work. |
 | Packaged scenarios | Exercise all four profiles, primary failures, node approval, workspace-full recovery, unprofiled compatibility, repeated-poll identity, and container-restart renewal boundaries; retain one fail-closed release artifact. |
 
-PR 113422 is a stacked upstream PR against `main`. Until PRs 104018 and
-113421 land, its aggregate GitHub diff includes both dependencies followed by
-the profile commits. After both land, the same PR reduces to the profile-only
-diff. [Fork PR 157](https://github.com/giodl73-repo/openclaw/pull/157)
-preserves that exact profile-only comparison view. Fork PRs
-[#18](https://github.com/giodl73-repo/openclaw/pull/18),
-[#19](https://github.com/giodl73-repo/openclaw/pull/19),
-[#42](https://github.com/giodl73-repo/openclaw/pull/42), and
-[#21](https://github.com/giodl73-repo/openclaw/pull/21) expose the major design
-slices as review aids; they are not alternative landing requests.
+PR 113422 is stacked on PRs 104018 and 113421. Until those dependencies land,
+its aggregate GitHub diff includes the readiness implementation followed by the
+profile commits. After both land, the same PR reduces to the profile-only diff.
 
 The refreshed stack passes 120 focused profile, readiness, selection, and
 Gateway assertions; type-aware lint, formatting, shell syntax, and diff checks
@@ -454,28 +447,21 @@ identity.
 The standard catalog becomes easier to support when operators and release
 automation can inspect and validate it without reproducing profile predicates:
 
-The three facilities below are one ordered upstream review unit in
+The three facilities below form one ordered upstream review unit in
 [openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636) at
-exact head `123bae7b876`. The fork PRs remain smaller comparison views.
+exact head `123bae7b876`:
 
 1. Read-only `hosting profiles list` and `hosting profiles inspect` surfaces
-   expose the built-in definitions and selected criteria. The implementation is
-   available in [fork PR 173](https://github.com/giodl73-repo/openclaw/pull/173)
-   at exact head `f9e6b219418`.
+   expose the built-in definitions and selected criteria.
 2. `hosting profiles validate` checks active identity, version, condition
    coverage, and readiness over one live RFC 0018 canonical result. The
-   implementation is available in
-   [fork PR 174](https://github.com/giodl73-repo/openclaw/pull/174) at exact head
-   `0f59b726de9`; the
    [package-installed proof](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
    exercises that exact validator ancestor. It does not mutate configuration or
    run a second evaluator.
 3. Package-installed release conformance invokes the canonical validator for
    all 13 scenario states and retains one machine-readable artifact suitable
    for Docker, Kubernetes, OCC, Lobster, CI, support bundles, and release
-   qualification. The implementation is available in
-   [fork PR 176](https://github.com/giodl73-repo/openclaw/pull/176) at exact head
-   `123bae7b876`; its
+   qualification. Its
    [exact-head package-installed Docker proof](https://github.com/giodl73-repo/openclaw/actions/runs/30289122192)
    passes all 13 scenarios, independently verifies the artifact, and uploads it
    as release evidence.
