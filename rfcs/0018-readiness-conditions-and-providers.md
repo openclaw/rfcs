@@ -435,7 +435,8 @@ readiness semantics.
 An optional `openclaw ready` command may be a thin client of the live Gateway
 result:
 
-- human output lists non-`True` conditions;
+- human output lists all conditions and identifies the existing lifetime and
+  generation of primary and related subjects behind non-`True` conditions;
 - `--json` preserves the canonical result; and
 - exit status is nonzero for required failure, required unknown, transport
   failure, or a missing readiness contract.
@@ -565,6 +566,11 @@ consumers of this RFC, not additions to the evaluation model:
    aborts slow connection setup at the deadline, and emits only the final
    canonical observation. Because waiting belongs to `ready`, Docker,
    Kubernetes, systemd, OCC, and local launchers can use the same facility.
+   Fork [PR 172](https://github.com/giodl73-repo/openclaw/pull/172) completes
+   the human diagnostic projection by showing the existing kind, ID,
+   generation, and parent reference for primary and related subjects behind a
+   non-`True` condition. Healthy human output and canonical JSON remain
+   unchanged.
 3. **Diagnose and operate.** Let existing Doctor, telemetry, support-bundle,
    and update owners consume snapshots and transitions for remediation,
    secret-safe evidence capture, transition telemetry, and pre/post-upgrade

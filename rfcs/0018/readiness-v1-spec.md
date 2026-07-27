@@ -446,6 +446,9 @@ An `openclaw ready` command, when implemented, is a client of the live Gateway
 result:
 
 - human output lists all conditions with pass, fail, or warning classification;
+- when identity is available, human output for non-`True` conditions identifies
+  the existing kind, ID, generation, and parent reference of each affected
+  primary and related subject;
 - `--json` preserves the canonical result; and
 - exit status is nonzero for required failure, required unknown, transport
   failure, or absence of a supported readiness contract.
@@ -507,6 +510,8 @@ An implementation conforms to readiness v1 when it proves:
   selected missing IDs, and never invokes provider callbacks;
 - bounded CLI waiting aborts slow pre-request setup at its total deadline,
   never overlaps evaluations, and emits only its final observation;
+- CLI subject-lifetime explanation is derived only from the canonical identity
+  package and does not alter canonical JSON or evaluate conditions locally;
 - unknown selected criteria fail closed;
 - every condition and relationship resolves to one reconciled subject;
 - every canonical result has `contractVersion: 1` and satisfies the wire
