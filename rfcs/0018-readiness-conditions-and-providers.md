@@ -559,7 +559,12 @@ consumers of this RFC, not additions to the evaluation model:
    [PR 169](https://github.com/giodl73-repo/openclaw/pull/169) implements the
    catalog as `readiness.catalog` plus `openclaw ready criteria list|inspect`,
    reading one activation-pinned config/registry snapshot without invoking a
-   provider.
+   provider. Fork [PR 171](https://github.com/giodl73-repo/openclaw/pull/171)
+   implements startup waiting as `openclaw ready --wait [duration]`. It polls
+   sequentially, bounds each call by the remaining total budget, independently
+   aborts slow connection setup at the deadline, and emits only the final
+   canonical observation. Because waiting belongs to `ready`, Docker,
+   Kubernetes, systemd, OCC, and local launchers can use the same facility.
 3. **Diagnose and operate.** Let existing Doctor, telemetry, support-bundle,
    and update owners consume snapshots and transitions for remediation,
    secret-safe evidence capture, transition telemetry, and pre/post-upgrade

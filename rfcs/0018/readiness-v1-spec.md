@@ -456,6 +456,22 @@ Criterion list and inspect commands are clients of the live catalog projection.
 They may filter descriptors for presentation but must not execute a criterion
 or infer registration from a readiness result.
 
+A bounded CLI wait mode is a client of repeated live Gateway results. It must:
+
+- use one explicit total deadline that covers config, credential, TLS,
+  connection, and RPC setup;
+- run attempts sequentially and cap each per-call timeout by the remaining
+  total budget;
+- retry both unavailable and not-ready observations without overlapping calls;
+- emit only the final observation;
+- preserve the canonical result unchanged for successful JSON output and for a
+  final observed not-ready result; and
+- exit nonzero at timeout or transport failure.
+
+The wait facility must not evaluate conditions locally. Launcher-specific
+commands may delegate to it, but they must not define another readiness or
+deadline model.
+
 ## Legacy Projection
 
 Existing `ready`, `failing`, `suppressed`, `eventLoop`, and `uptimeMs` fields
@@ -489,6 +505,8 @@ An implementation conforms to readiness v1 when it proves:
   results, and remains bounded across repeated never-settling providers;
 - catalog enumeration reflects one active config/registry snapshot, reports
   selected missing IDs, and never invokes provider callbacks;
+- bounded CLI waiting aborts slow pre-request setup at its total deadline,
+  never overlaps evaluations, and emits only its final observation;
 - unknown selected criteria fail closed;
 - every condition and relationship resolves to one reconciled subject;
 - every canonical result has `contractVersion: 1` and satisfies the wire
