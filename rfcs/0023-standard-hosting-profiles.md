@@ -140,6 +140,28 @@ condition predicates, packaged conformance scenarios, and an owner willing to
 maintain the support promise. A new diagnostic condition alone does not justify
 a new profile.
 
+### Catalog inspection
+
+The standard catalog is a machine-readable support contract, not only a set of
+internal constants. OpenClaw exposes it through local, read-only commands:
+
+```console
+openclaw hosting profiles list
+openclaw hosting profiles inspect <profile>
+```
+
+Both commands support human output and `--json`. The JSON contract identifies
+its version and returns immutable descriptor copies containing the profile ID,
+runtime-posture description, profile-owned conditions, required RFC 0018
+criteria, and advisory RFC 0018 criteria. Stable catalog order follows the
+documented `local`, `container`, `reverse-proxy`, and `node-mode` order.
+
+Inspection does not load configuration or plugins, contact a Gateway, evaluate
+readiness, infer active selection, or mutate state. The running Gateway remains
+the authority for the selected profile and reports it through canonical
+readiness. Catalog/runtime alignment is tested by deriving profile conditions
+from the same shipped definitions used to build readiness.
+
 ### Profile conditions
 
 The standard catalog composes conditions owned by the canonical readiness
@@ -403,15 +425,16 @@ package/image artifact. It proves unprofiled compatibility, all four profiles,
 expected failures, node approval, workspace recovery, stable repeated polls,
 and host-stable/process-and-Gateway-rotating container restart identity.
 
-#### Operator and conformance facilities roadmap
+#### Operator and conformance facilities
 
 The standard catalog becomes easier to support when operators and release
 automation can inspect and validate it without reproducing profile predicates:
 
-1. Add read-only `hosting profile list` and `hosting profile inspect` surfaces
-   over the built-in definitions, selected criteria, startup requirements, and
-   support metadata.
-2. Add `hosting profile validate` over effective configuration and the live RFC
+1. Read-only `hosting profiles list` and `hosting profiles inspect` surfaces
+   expose the built-in definitions and selected criteria. The implementation is
+   available in [fork PR 173](https://github.com/giodl73-repo/openclaw/pull/173)
+   at exact head `99449434cb4c`.
+2. Add `hosting profiles validate` over effective configuration and the live RFC
    0018 canonical readiness result. Validation reports conformance; it does not
    mutate configuration or run a second evaluator.
 3. Emit one machine-readable conformance artifact suitable for Docker,

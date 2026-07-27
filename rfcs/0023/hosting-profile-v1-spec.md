@@ -269,6 +269,55 @@ advisory RFC 0018 criteria directly through `gateway.readiness`, including
 while a profile is selected. Named operator profiles and inheritance are not
 part of V1.
 
+## Catalog Inspection
+
+OpenClaw exposes the shipped standard catalog through these local, read-only
+commands:
+
+```console
+openclaw hosting profiles list [--json]
+openclaw hosting profiles inspect <profile> [--json]
+```
+
+`list --json` returns:
+
+```ts
+{
+  contractVersion: 1;
+  profiles: HostingProfileDescriptor[];
+}
+```
+
+`inspect --json` returns:
+
+```ts
+{
+  contractVersion: 1;
+  profile: HostingProfileDescriptor;
+}
+```
+
+Each descriptor contains:
+
+```ts
+type HostingProfileDescriptor = {
+  id: "local" | "container" | "reverse-proxy" | "node-mode";
+  description: string;
+  profileConditions: string[];
+  requiredCriteria: string[];
+  advisoryCriteria: string[];
+};
+```
+
+Catalog order is `local`, `container`, `reverse-proxy`, then `node-mode`.
+Callers receive copies and cannot mutate the shipped definitions. Every
+descriptor's `profileConditions` exactly matches the conditions constructed by
+the runtime for that profile.
+
+Inspection is observationally inert: it does not load configuration or plugins,
+contact a Gateway, evaluate readiness, infer active selection, or mutate state.
+The selected profile and its runtime result remain canonical readiness data.
+
 ## Packaged Scenario Gate
 
 The package-installed Docker lane probes the same canonical `/readyz` result
@@ -300,6 +349,10 @@ operator-selected RFC 0018 criteria.
 - Every selection source works with deterministic precedence.
 - Invalid explicit profiles fail startup validation.
 - Every profile composes the documented criteria.
+- Catalog list and inspect output is versioned, stably ordered, and immutable to
+  callers.
+- Catalog profile conditions exactly match the runtime conditions constructed
+  for the same profile.
 - Every profiled result identifies its profile through metadata and subjects.
 - Node conditions identify the observed controller and related node set.
 - Profile failures use stable reasons and canonical aggregation.
