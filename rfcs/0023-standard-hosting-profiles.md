@@ -162,6 +162,21 @@ the authority for the selected profile and reports it through canonical
 readiness. Catalog/runtime alignment is tested by deriving profile conditions
 from the same shipped definitions used to build readiness.
 
+Operators validate a running profile through:
+
+```console
+openclaw hosting profiles validate [profile]
+```
+
+The optional argument requires an exact active profile. Validation calls the
+canonical `ready` RPC once, verifies the readiness schema, profile identity and
+contract version, and required profile-condition coverage, then reports
+`conformant` separately from `ready`. Both false states exit nonzero. A
+conformant profile may still be non-ready because a required condition is
+currently false. Validation embeds the canonical result as evidence and does
+not load local configuration or plugins, reproduce predicates, or invoke a
+second evaluator.
+
 ### Profile conditions
 
 The standard catalog composes conditions owned by the canonical readiness
@@ -434,9 +449,13 @@ automation can inspect and validate it without reproducing profile predicates:
    expose the built-in definitions and selected criteria. The implementation is
    available in [fork PR 173](https://github.com/giodl73-repo/openclaw/pull/173)
    at exact head `99449434cb4c`.
-2. Add `hosting profiles validate` over effective configuration and the live RFC
-   0018 canonical readiness result. Validation reports conformance; it does not
-   mutate configuration or run a second evaluator.
+2. `hosting profiles validate` checks active identity, version, condition
+   coverage, and readiness over one live RFC 0018 canonical result. The
+   implementation is available in
+   [fork PR 174](https://github.com/giodl73-repo/openclaw/pull/174) at exact head
+   `84227d246d00`; its
+   [exact-head proof](https://github.com/giodl73-repo/openclaw/actions/runs/30275850209)
+   passes. It does not mutate configuration or run a second evaluator.
 3. Emit one machine-readable conformance artifact suitable for Docker,
    Kubernetes, OCC, Lobster, CI, support bundles, and release qualification.
 4. Gate every built-in profile through package-installed release scenarios and

@@ -318,6 +318,49 @@ Inspection is observationally inert: it does not load configuration or plugins,
 contact a Gateway, evaluate readiness, infer active selection, or mutate state.
 The selected profile and its runtime result remain canonical readiness data.
 
+## Live Profile Validation
+
+OpenClaw validates a running Gateway through:
+
+```console
+openclaw hosting profiles validate [profile] [--json] [--timeout <ms>]
+```
+
+With no profile argument, the exact profile ID in canonical readiness is used.
+With an argument, that profile must be active. Input parsing may normalize CLI
+text, but Gateway-produced profile identity must exactly match a standard
+catalog ID.
+
+Validation calls the canonical `ready` RPC once. It does not load local
+configuration or plugins, reproduce profile predicates, or invoke another
+evaluator. It verifies:
+
+- canonical readiness schema version and structure;
+- exact standard profile identity and profile contract version; and
+- one required condition row for every `profileConditions` entry in the
+  descriptor.
+
+`--json` returns:
+
+```ts
+{
+  contractVersion: 1;
+  conformant: boolean;
+  ready: boolean;
+  expectedProfile?: string;
+  activeProfile?: string;
+  findings: Array<{ reason: string; message: string }>;
+  readiness?: unknown;
+}
+```
+
+`conformant` is false for unavailable or malformed readiness, no active
+profile, unknown or mismatched profile identity, contract mismatch, or missing,
+duplicate, or non-required profile conditions. `ready` is true only when the
+canonical evidence is structurally valid and its serving decision is true.
+Both false states exit nonzero. A structurally conformant profile whose current
+required condition is false reports `conformant: true`, `ready: false`.
+
 ## Packaged Scenario Gate
 
 The package-installed Docker lane probes the same canonical `/readyz` result
@@ -353,6 +396,10 @@ operator-selected RFC 0018 criteria.
   callers.
 - Catalog profile conditions exactly match the runtime conditions constructed
   for the same profile.
+- Live validation consumes one canonical readiness result and never invokes a
+  second evaluator.
+- Validation fails closed on unavailable, malformed, mismatched, or incomplete
+  evidence and never reports malformed evidence as ready.
 - Every profiled result identifies its profile through metadata and subjects.
 - Node conditions identify the observed controller and related node set.
 - Profile failures use stable reasons and canonical aggregation.
