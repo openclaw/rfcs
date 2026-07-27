@@ -396,11 +396,16 @@ The bounded follow-on PR plan is:
    context supplies tenant, user, provider, and Gateway-role authority; Blob
    CAS stores the winner; and every accepted-receipt path rehydrates the
    existing Redis wake scheduler before reporting success. This removes the
-   need for a new public callback or reusable bearer-token design. The plugin
-   remains baked-disabled; permanent Blob-container provisioning and per-user
-   ECS activation through the shared Gateway start overlay, plus routing an
-   already-due recovered deadline into retained-cause runtime readiness, remain
-   explicit owner-reviewed rollout work.
+   need for a new public callback or reusable bearer-token design. Stacked
+   fork-only draft
+   [giodl/lobster#45](https://microsoft.ghe.com/giodl/lobster/pull/45)
+   (Microsoft GHE access required) completes the default-off activation
+   boundary: it provisions the private permanent Blob container, adds an
+   explicit per-user ECS opt-in through the shared Gateway start overlay,
+   resets that opt-in across pooled-user reuse, and treats an already-due
+   recovered projection as tracked retry work so ordinary cooperative
+   suspension cannot settle before OpenClaw reconciles it. No user is enabled
+   by the draft; the actual ECS cohort remains an owner rollout decision.
 2. **Host wake authority and coalescing:** atomically accept the recovery point,
    wake registration, and revocable sleep authority; retain Teams/API causes;
    schedule semantic deadlines; and coalesce causes into one idempotent
