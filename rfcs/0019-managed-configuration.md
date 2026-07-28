@@ -3,7 +3,7 @@ title: Managed Configuration
 authors:
   - Gio Lodi
 created: 2026-07-10
-last_updated: 2026-07-23
+last_updated: 2026-07-28
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/34
@@ -63,6 +63,39 @@ Hosts remain responsible for materializing values and declaring source order.
 OpenClaw is responsible for resolving, composing, validating, and enforcing
 those sources. This boundary keeps deployment vocabulary outside core while
 ensuring every host receives the same conflict and security behavior.
+
+### Ownership and authority
+
+This RFC uses **ownership** for responsibility over semantics and lifecycle,
+and **authority** for the value-control relationship derived from ordered
+layers. A layer id is a descriptive label, not an authenticated principal or a
+durable owner identity.
+
+| Concern | Responsible owner | Lifetime |
+| --- | --- | --- |
+| Field meaning, defaults, validation, and bounded comparison | The OpenClaw subsystem that owns the existing config field | The OpenClaw contract version |
+| Source contents, materialization, permissions, and declared order | The invoking operator, host, Fleet, or future control plane | One process invocation |
+| Authority over an authored path | The earliest declaring layer, as derived and enforced by OpenClaw | One candidate evaluation and, after acceptance, its layered activation |
+| Candidate composition and admission | OpenClaw config bootstrap | One startup evaluation |
+| Effective runtime snapshot | The existing Gateway config lifecycle | One full process activation, including in-process Gateway restarts |
+| Canonical-path mutation exclusion | Each layered Gateway server lifecycle | Registration through server close or failed startup cleanup |
+| Runtime behavior | The existing Gateway, plugin, channel, tool, and agent owners | The accepted snapshot they consume |
+
+The source producer chooses desired values and order but does not define what a
+field means or whether one value tightens another. OpenClaw derives authority,
+rejects invalid candidates, and publishes the only effective snapshot. Runtime
+consumers use that snapshot; they do not recompute layering or infer roles from
+layer ids.
+
+A full process restart creates a new layered activation and recomputes
+authority from the then-current ordered sources. An in-process Gateway restart
+does not create a new activation and must reuse the accepted snapshot. V1 does
+not persist authority as a separate lease, generation, or configuration source.
+
+This also defines the future OCC boundary. OCC may own desired state,
+admission, rollout, and source materialization, but it remains a caller of this
+contract. It does not replace OpenClaw's ownership of field semantics,
+composition, validation, or the active runtime snapshot.
 
 `$include` remains appropriate for structuring one authored configuration
 document. It does not preserve authority between independent sources, enforce
@@ -172,11 +205,12 @@ the normal runtime config shape; they do not implement layer-specific logic.
 
 ## Authority rules
 
-### Exact ownership
+### Exact authority
 
-Exact ownership is the default.
+Exact authority is the default.
 
-The earliest layer declaring a path owns that path. A later layer may:
+The earliest layer declaring a path controls that path for the current
+candidate and accepted activation. A later layer may:
 
 - omit the path;
 - repeat the same authored value.
@@ -472,7 +506,7 @@ https://github.com/openclaw/openclaw/pull/107026 implements the proposed V1 core
 slice in one reviewable change:
 
 - pure recursive composition;
-- exact ownership and bounded tool-policy checks;
+- exact authority and bounded tool-policy checks;
 - repeatable Gateway CLI loading;
 - ordinary config and plugin validation;
 - immutable server lifecycle;
@@ -530,7 +564,7 @@ running configuration unchanged.
 
 ### Why only two bounded fields?
 
-Exact ownership is generic. Monotonic comparison is field-specific. The two
+Exact authority is generic. Monotonic comparison is field-specific. The two
 tool-policy fields already have runtime semantics OpenClaw can reuse and test.
 Adding an empty comparator framework would increase surface area without
 delivering behavior.

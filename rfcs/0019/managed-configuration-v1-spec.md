@@ -57,8 +57,46 @@ only for clarity; those labels have no core semantics.
   fold.
 - **Runtime snapshot**: the validated config published to ordinary Gateway
   consumers for the process lifetime.
+- **Candidate evaluation**: one attempt to resolve, compose, and validate the
+  complete ordered source list before publication.
+- **Layered activation**: the lifetime beginning when a candidate is accepted
+  and ending when the OpenClaw process exits. An in-process Gateway restart is
+  part of the same activation.
 - **Canonical config path**: the `openclaw.json` path that ordinary config
   persistence would target for the process.
+
+## Ownership And Lifetime Contract
+
+Conforming implementations must preserve these responsibility boundaries:
+
+| Concern | Owner | Required behavior |
+| --- | --- | --- |
+| Config field semantics | The existing OpenClaw field owner | Defines defaults, validation, runtime meaning, and any bounded comparator |
+| Source selection | The invoker or host supervisor | Supplies complete local files, permissions, and deterministic order |
+| Composition and authority admission | OpenClaw config bootstrap | Derives first-declaration authority and rejects the complete candidate on failure |
+| Active effective config | The existing Gateway config lifecycle | Publishes exactly one accepted snapshot for the layered activation |
+| Mutation exclusion | Each layered Gateway server lifecycle | Registers and releases only its own canonical-path write block |
+| Runtime consumption | Existing Gateway, plugin, channel, tool, and agent owners | Consumes the accepted ordinary config without interpreting layer ids or roles |
+
+Layer ids are diagnostic labels. They must not be treated as identities,
+credentials, authorization principals, built-in roles, or durable ownership
+records.
+
+First-declaration authority is derived state scoped to one candidate
+evaluation. Once accepted, that authority and its effective snapshot remain
+fixed for the layered activation. A full process restart creates a new
+activation and must recompute both from the then-current ordered sources. An
+in-process Gateway restart remains in the current activation and must reuse the
+accepted snapshot.
+
+The implementation must not persist derived authority as another config
+source, silently transfer authority during an activation, or allow a runtime
+consumer to reinterpret composition. V1 defines no authority generation,
+ownership lease, or write-through owner.
+
+A control plane or host may own desired state, rollout, source materialization,
+and process replacement. Those responsibilities do not transfer ownership of
+OpenClaw field semantics, admission, or the effective runtime snapshot.
 
 ## Invocation Contract
 
@@ -368,6 +406,7 @@ isolation are host responsibilities rather than OpenClaw core behavior.
 - one valid layer starts successfully;
 - repeated flags preserve declaration order;
 - duplicate or empty ids reject;
+- changing only layer ids does not change composition or runtime behavior;
 - missing files and invalid JSON5 reject;
 - includes resolve relative to each source;
 - missing environment variables preserve normal warnings;
@@ -400,6 +439,9 @@ isolation are host responsibilities rather than OpenClaw core behavior.
 - an existing canonical config remains byte-for-byte unchanged;
 - a full restart rereads sources while an in-process restart reuses the
   validated snapshot.
+- a full restart recomputes authority from the complete current source list;
+- no accepted activation can silently transfer authority or publish a partial
+  candidate.
 
 ### Hosted Cell
 
@@ -423,6 +465,9 @@ An OpenClaw implementation is v1 conformant when it:
 - rejects the complete startup candidate on any finding or validation error;
 - publishes one ordinary runtime snapshot;
 - scopes immutability to the canonical config path and server lifetime;
+- treats layer ids as diagnostic labels rather than identities or roles;
+- keeps field semantics and bounded comparators with their existing OpenClaw
+  owners;
 - prevents persistent side effects before mutation rejection;
 - documents restart-to-apply behavior and the lack of tenant isolation;
 - passes the OpenClaw core portions of the minimum conformance suites.
