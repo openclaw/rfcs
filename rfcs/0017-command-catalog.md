@@ -3,7 +3,7 @@ title: Command Catalog
 authors:
   - Gio
 created: 2026-07-04
-last_updated: 2026-07-23
+last_updated: 2026-07-28
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/32
@@ -76,6 +76,8 @@ initial catalog contract or establish a token-savings claim.
 - Support exact inspection without scraping help text.
 - Give later documentation, diagnostics, prompt, and policy consumers one
   normalized input.
+- Make command ownership, observation scope, and catalog-record lifetime
+  explicit for consumers that retain or compare results.
 
 ## Non-Goals
 
@@ -195,12 +197,43 @@ commands are not stable compatibility promises.
 Plugin metadata remains optional but follows the same validation and
 unknown-preservation rules once emitted.
 
+### Ownership and observation lifetime
+
+The registry or runtime that contributes a command remains the owner of its
+name, semantics, registration lifetime, and execution behavior. The catalog
+normalizes owner-supplied facts; it does not resolve registration conflicts,
+extend a registration, or become the authority for invoking the command.
+
+A catalog record identifies a logical command observed from a labeled source.
+It is not a capability token and does not prove that the same implementation is
+still registered. Static descriptor records are bounded by the OpenClaw build
+and configuration being inspected. Runtime and plugin records are bounded by
+their current registration or plugin-activation lifetime. Node records are
+bounded by the selected authenticated node observation.
+
+Each result is an observation snapshot with explicit collection scope and
+source status. A missing or failed source means `unknown`, not that its commands
+were removed. Drift consumers may compare stable record identity only between
+snapshots whose relevant sources were collected under compatible scope; they
+must preserve source status and must not infer revocation, authorization, or
+availability from catalog absence alone.
+
+Visibility and prompt projections are views over the same records. Hiding or
+excluding a record from one view does not disable the underlying command, and
+including a record does not grant permission to execute it. Dispatch,
+authorization, policy, and confirmation remain with their existing owners.
+
 ## Acceptance Criteria
 
 - `commands list` and `commands inspect` execute no catalog record.
 - Omitted effect metadata remains omitted or explicitly unknown in JSON,
   Markdown, evidence, and prompt inputs.
 - Output reports whether runtime, plugin, and node sources were collected.
+- Catalog records preserve owner provenance and their source observation scope;
+  they are never accepted as execution capabilities or current-availability
+  guarantees.
+- Incomplete or failed source collection remains unknown, and drift comparison
+  does not interpret catalog absence as removal or revocation.
 - Hidden descriptors do not enter public list or generated-documentation views.
 - Requested plugin collection executes only enabled, trusted modules in the
   documented restricted mode and fails on incomplete error-level collection.
