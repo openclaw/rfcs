@@ -266,7 +266,7 @@ The implementer-facing follow-on contracts are deliberately split by owner:
   and external or reconstruction obligations.
 - [Portable Handoff v1](0013/portable-handoff-v1-spec.md): combine the existing
   cooperative Gateway suspension fence with final owner capture, durable host
-  acceptance, and generation-bound source destruction authority.
+  acceptance, and generation-bound source-compute retirement authority.
 - [Restored Admission v1](0013/restored-admission-v1-spec.md): restore exact
   accepted components into fresh paths and keep admission closed until
   scheduler and required owner readiness complete.
@@ -276,7 +276,7 @@ The split is mechanical rather than architectural:
 | Contract | Owner-side input | Durable output | Stops before |
 | --- | --- | --- | --- |
 | Recovery Point Components | Verified owner artifacts plus the closed selected-owner inventory | `recoveryPointId` and `acceptanceSetId` | Suspension, storage, or wake |
-| Portable Handoff | Suspension-ready source generation plus final owner capture | Host acceptance receipt and generation-scoped `safeToDestroy` | Restore or destination admission |
+| Portable Handoff | Suspension-ready source generation plus final owner capture | Host acceptance receipt and generation-scoped `sourceComputeRetirementAuthorized` | Restore or destination admission |
 | Restored Admission | Exact accepted recovery point plus destination generation | Restore receipt and `gateway.restore.status = ready` | Retained-work delivery |
 
 The IDs join the contracts; no sidecar owns another sidecar's work.
@@ -308,7 +308,8 @@ OpenClaw implementation evidence is available for the three owner-side slices:
 
 These PRs are evidence for owner review, not normative dependencies. They do
 not move Gateway suspension, external ingress fencing, clean process shutdown,
-durable host acceptance, publication, host wake, or source destruction into
+durable host acceptance, publication, host wake, or source-compute retirement
+into
 OpenClaw.
 
 The intended observable outcome of the complete host composition is:
@@ -318,12 +319,13 @@ The intended observable outcome of the complete host composition is:
 - accepted ingress remains retained until restored admission succeeds;
 - autonomous scheduled work does not require an unrelated user message to
   recover from absent compute;
-- the source generation is not destroyed before exact durable acceptance; and
+- source compute is not retired before exact durable acceptance; and
 - replacement readiness names the accepted recovery point it restored.
 
 The three OpenClaw PRs prove only the owner-side recovery-point, final
 capture, and restored-admission slices. Host acceptance, retained ingress,
-wake, and destruction remain separate review and implementation work.
+wake, and source-compute retirement remain separate review and implementation
+work.
 
 #### One bidirectional host/runtime contract
 
@@ -362,27 +364,83 @@ Normal user-work methods remain unavailable while restored admission is held;
 the status method is allowed only through an authenticated pre-admission
 control path, following the existing suspension-control pattern.
 
+#### RFC 0018 readiness composition
+
+When the opt-in canonical readiness facility from
+[RFC 0018](https://github.com/openclaw/rfcs/pull/33) is available, restored
+admission composes with it rather than creating a second evaluator. A restored
+start publishes one required `RecoveryPointRestored` condition whose primary
+subject is the stable `openclaw/gateway` role. Related stable subject references
+identify the restore operation, accepted recovery point, destination runtime
+generation, scheduler reconciliation, and required state-owner roles; their
+current IDs and generations live in RFC 0018's identity package rather than in
+the references. The condition remains `Unknown` or `False` while the restore
+hold is active and becomes `True` only from the same durable record that opens
+admission.
+
+`gateway.restore.status` remains the stronger operation-fenced query: its
+caller supplies the expected restore operation and receives typed conflict
+behavior. `/readyz`, `openclaw ready`, Status, and Gateway readiness RPC expose
+the ordinary RFC 0018 projection for the active runtime. Both surfaces must
+project the same readiness generation and subject identities. Neither may
+infer restore completion from process health, database-open success, or a
+container probe. This composition is contingent on RFC 0018 acceptance and
+activation; `gateway.restore.status` remains independently useful and does not
+depend on RFC 0018.
+
 One host-owned coordinator may compose those contracts as
 `prepareHibernate`, `ensureRuntimeReady`, and `inspectLifecycle`. Those are
 host operations, not new OpenClaw Gateway methods. The resulting evidence
 chain is:
 
 ```text
-SuspensionReady
-  -> FinalRecoveryPointResult
-  -> HostAcceptanceReceipt
-  -> generation-scoped safeToDestroy
+GatewaySuspensionReady
+  -> SourceWritersClosed
+  -> RecoveryPointCaptured
+  -> RecoveryPointAccepted
+  -> generation-scoped SourceComputeRetirementAuthorized
   -> retained wake cause
-  -> RestoredAdmissionReadyRecord
+  -> RecoveryPointRestored
+  -> AdmissionReady
   -> owner delivery and acknowledgement
 ```
 
-Each authority contributes only its own fact. `safeToDestroy` is derived from
-durable acceptance rather than supplied by a caller. Wake callers cannot
+These are distinct facts, not aliases for one global `synced` state:
+
+- `GatewaySuspensionReady` proves OpenClaw's cooperative tracked-work fence for
+  one source generation.
+- `SourceWritersClosed` proves the host supervisor closed the Gateway process
+  and every other authoritative writer it owns for that generation.
+- `RecoveryPointCaptured` proves immutable owner artifacts and one closed
+  recovery-point identity.
+- `RecoveryPointAccepted` proves the host durability boundary accepted the
+  exact logical byte set.
+- `SourceComputeRetirementAuthorized` permits removal of only the named source
+  compute generation. It never authorizes persistent-state deletion.
+- `RecoveryPointRestored` proves exact fresh-target restore and owner
+  reconciliation for one destination generation.
+- `AdmissionReady` proves that same destination may accept ordinary work.
+
+Each authority contributes only its own fact.
+`SourceComputeRetirementAuthorized` is derived from durable acceptance rather
+than supplied by a caller. Wake callers cannot
 select a recovery point, destination generation, or readiness result. Teams,
 cron, and API owners retain their own payload, retry, deduplication, and
 acknowledgement state. Unknown outcomes retain work and hold or quarantine;
 timeouts do not imply success.
+
+The diagram shows the success path, not an irreversible linear workflow. A new
+retained-work cause may race any pre-retirement step. The host must atomically
+revoke or defeat `SourceComputeRetirementAuthorized` while source compute still
+exists; after retirement, the same cause joins the single destination wake and
+restore operation.
+
+Planned and forced transitions deliberately have different guarantees:
+
+| Transition | New recovery point | Source retirement | Recovery guarantee |
+| --- | --- | --- | --- |
+| Planned handoff | Requires Gateway suspension, closed source writers, final capture, and exact durable acceptance | Only after generation-scoped authorization | The newly accepted point |
+| Forced source loss | None may be inferred from process absence or partial files | Host policy handles already-lost compute; no clean-retirement claim is created | The last previously accepted point and its declared RPO |
 
 This contract simplifies the evidence implementation: reuse the existing
 suspension methods, scheduler reconciliation hooks, recovery operations,

@@ -40,7 +40,7 @@ This specification does not define:
 - another SQLite snapshot command, repository, or manifest;
 - mutation of an RFC 0013 snapshot after publication;
 - upload, storage transport, retention, or encryption implementation;
-- Gateway suspension, final handoff, or source destruction;
+- Gateway suspension, final handoff, or source-compute retirement;
 - restore-on-boot, restored admission, hibernation, or wake;
 - arbitrary restore hooks or a generic capture-provider registry.
 
@@ -74,6 +74,21 @@ The aggregate layer must treat the directory and its strict `manifest.json` and
 
 The composer does not inspect private SQLite schema to infer application state.
 It consumes the verified owner result.
+
+### Required-component inventory authority
+
+The runtime state owner, not the host and not the aggregate composer, selects
+the complete required-component inventory. The owner must derive it from the
+same activation-pinned runtime and selected-agent state that governs the source
+generation, then bind that inventory revision and source generation into the
+recovery-point input. A caller-supplied list of agent IDs, a filesystem scan,
+or whatever databases happen to exist is not authoritative.
+
+The composer validates and records the owner result but cannot add, remove, or
+reinterpret components. Retrying the same capture operation with a different
+owner inventory conflicts. A changed selected-agent set requires a new owner
+inventory revision and a new recovery point. Missing owner evidence fails
+closed rather than treating an empty or partial inventory as complete.
 
 ## Component Model
 
@@ -129,6 +144,9 @@ Illustrative V1 shape:
   "createdAt": "2026-07-21T15:00:00.000Z",
   "inventory": {
     "version": "openclaw-runtime-sqlite-inventory/v1",
+    "owner": "openclaw-state",
+    "sourceRuntimeGeneration": "runtime-generation-17",
+    "revision": "inventory-revision-9",
     "requiredComponentIds": ["sqlite/global", "sqlite/agent/main"]
   },
   "protection": {
@@ -169,9 +187,10 @@ cycles, digest mismatches, and unsupported major versions fail closed.
 The state owner supplies the complete required component IDs for the selected
 runtime before composition. V1 requires exactly one global component and the
 exact selected set of per-agent components. The inventory is canonicalized,
-stored in the manifest, and covered by `recoveryPointId`. Composition fails on
-a missing or extra component; successfully composing one agent cannot imply
-that every agent owned by the selected runtime was captured.
+stored in the manifest with its owner, source runtime generation, and revision,
+and covered by `recoveryPointId`. Composition fails on a missing or extra
+component; successfully composing one agent cannot imply that every agent
+owned by the selected runtime was captured.
 
 The aggregate manifest does not copy the complete RFC 0013 manifest. It binds
 that owner manifest by digest and preserves it beside the component artifact.
@@ -251,6 +270,8 @@ success-shaped partial result.
 V1 conformance must prove:
 
 - one global and the exact owner-selected per-agent RFC 0013 components;
+- the inventory is bound to the source runtime generation and owner revision;
+- caller-supplied IDs and filesystem discovery cannot replace owner selection;
 - rejection of missing and extra components against the bound inventory;
 - deterministic aggregate identity;
 - exact owner-manifest binding;

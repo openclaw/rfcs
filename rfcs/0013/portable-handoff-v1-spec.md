@@ -18,7 +18,7 @@ point after response loss.
 
 The operation is deliberately offline and host-invoked. It does not suspend or
 stop Gateway, fence external ingress, accept or publish bytes, or authorize
-source destruction. The pull request is implementation evidence; this
+source-compute retirement. The pull request is implementation evidence; this
 specification remains the normative responsibility boundary.
 
 ## Scope
@@ -30,7 +30,7 @@ This specification defines:
 - final capture after the tracked Gateway work fence is ready;
 - immutable host acceptance of one aggregate recovery point;
 - exact replay after transport or coordinator uncertainty;
-- generation-bound source destruction authority;
+- generation-bound source-compute retirement authority;
 - hold and quarantine behavior.
 
 This specification does not define:
@@ -73,7 +73,7 @@ The lease is cooperative and refuse-only. It does not:
 - prove unregistered plugin or background work idle;
 - stop the process tree;
 - snapshot the filesystem; or
-- authorize source destruction.
+- authorize source-compute retirement.
 
 The handoff binding must preserve those boundaries.
 
@@ -91,7 +91,7 @@ fence host-controlled ingress
   -> assemble and verify one aggregate recovery point
   -> durably accept exact recovery-point bytes and identity
   -> finalize the source generation
-  -> derive safeToDestroy
+  -> derive sourceComputeRetirementAuthorized
 ```
 
 If the handoff is abandoned before process stop, the controller calls
@@ -174,9 +174,10 @@ Every mutating step is idempotent under the handoff identity.
 - Source process or adapter replacement before local state is durable:
   quarantine unless the host can prove the exact accepted recovery point.
 
-## Destruction Authority
+## Source Compute Retirement Authority
 
-`safeToDestroy` is a host-owned durable conclusion bound to:
+`sourceComputeRetirementAuthorized` is a host-owned durable conclusion bound
+to:
 
 - runtime lineage;
 - source generation;
@@ -184,13 +185,18 @@ Every mutating step is idempotent under the handoff identity.
 - accepted recovery point; and
 - the current lifecycle revision.
 
-It authorizes removal of only the source compute generation. It never
+It authorizes retirement of only the source compute generation. It never
 authorizes deletion of recovery points, persistent tenant data, external
 credentials, registry records, or another generation.
 
-New retained work or an operator cancellation must revoke or race with
-destruction through the host's durable lifecycle authority. OpenClaw does not
-poll for that race after it has stopped.
+New retained work or an operator cancellation must revoke or race with source
+compute retirement through the host's durable lifecycle authority. OpenClaw
+does not poll for that race after it has stopped.
+
+This fact is not a general `synced` or clean-filesystem state. It is valid only
+for the exact runtime lineage, source generation, handoff, recovery point, and
+lifecycle revision named by the record. Process absence, an expired suspension
+lease, a local snapshot path, or a successful health probe cannot create it.
 
 ## Conformance
 
@@ -208,5 +214,6 @@ V1 conformance must prove:
 - host-protected snapshots cannot be reported as credential-free portable
   without exact owner portability receipts;
 - response loss replays the same acceptance;
-- digest conflict and unknown outcome block destruction; and
-- `safeToDestroy` is generation-scoped and cannot purge persistent data.
+- digest conflict and unknown outcome block source compute retirement; and
+- `sourceComputeRetirementAuthorized` is generation-scoped and cannot purge
+  persistent data.

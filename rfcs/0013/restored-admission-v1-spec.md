@@ -37,6 +37,7 @@ This specification defines:
 - external and reconstructed obligation handling;
 - scheduler reconciliation;
 - required owner and generic Gateway readiness;
+- RFC 0018 readiness projection for the restored recovery point;
 - one-time restored admission;
 - same-child replay after coordinator failure.
 
@@ -44,7 +45,7 @@ This specification does not define:
 
 - another SQLite restore implementation;
 - a public generic restore-hook or readiness-provider registry;
-- capture, host storage, retention, or source destruction;
+- capture, host storage, retention, or source-compute retirement;
 - host placement, proxy transport, or Channel delivery;
 - Elastic wake policy.
 
@@ -191,6 +192,53 @@ Admission opens only after one canonical restored-ready record binds:
 Ordinary startup remains unchanged because it has no restored-start evidence.
 Ordinary startup cannot consume a committed restore hold, and restored startup
 cannot use an ordinary admission path.
+
+## Canonical Readiness Projection
+
+When enabled, restored admission uses the opt-in readiness result defined by
+[RFC 0018](https://github.com/openclaw/rfcs/pull/33). It does not define a
+parallel health evaluator or provider registry. This composition is contingent
+on RFC 0018 acceptance and activation; the restore hold, admission fence, and
+`gateway.restore.status` remain independently complete without it.
+
+A restored start publishes one required condition and adds the referenced
+objects to RFC 0018's identity package. Stable refs name roles; current IDs and
+generations name their occupants:
+
+```text
+type: RecoveryPointRestored
+subjectRef: openclaw/gateway
+relatedSubjectRefs:
+  - openclaw/restore-operation
+  - openclaw/recovery-point
+  - openclaw/runtime-generation
+  - openclaw/scheduler-reconciliation
+  - openclaw/state-owner/<owner-key>...
+
+identity.subjects:
+  - { ref: openclaw/gateway, kind: gateway, id: <gateway-incarnation> }
+  - { ref: openclaw/restore-operation, kind: restore-operation,
+      id: <restore-operation-id> }
+  - { ref: openclaw/recovery-point, kind: recovery-point,
+      id: <recovery-point-id> }
+  - { ref: openclaw/runtime-generation, kind: runtime-generation,
+      generation: <destination-runtime-generation> }
+```
+
+The related subject list is bounded by RFC 0018 and uses its canonical subject
+deduplication and lifetime rules. `RecoveryPointRestored` is `Unknown` while
+required durable evidence is unavailable, `False` when current evidence proves
+the selected restore is not admissible, and `True` only after the same durable
+record that authorizes admission commits. A required non-`True` result keeps
+aggregate readiness false.
+
+`gateway.restore.status` and RFC 0018 readiness are two projections of one
+owner record. The status method adds caller-supplied operation fencing and
+typed conflict behavior; `/readyz`, `openclaw ready`, Status, and Gateway
+readiness RPC report the active runtime's canonical result. They must expose
+the same readiness generation and subject identities. No projection may infer
+restore completion from `/healthz`, process existence, database-open success,
+or container readiness.
 
 ## Gateway Restore Status
 
@@ -340,6 +388,28 @@ not steady-state JSON sidecars. A dedicated journal is required because final
 capture must commit intent before snapshotting the shared state database, and
 restore must commit intent before the fresh shared state database exists.
 
+### Recovery journal ownership and lifecycle
+
+OpenClaw core owns the recovery journal schema, versioning, atomic transitions,
+migrations, integrity checks, and repair classification. Hosts may retain,
+protect, and back up the journal with the runtime protection domain, but must
+not write rows, advance transitions, or infer success from file presence.
+
+The journal must be opened and integrity-checked before a restored start can
+publish readiness. Unsupported schema versions, failed migrations, malformed
+terminal records, and contradictory operation identities hold or quarantine;
+they never fall back to ordinary startup. Repair is an explicit offline owner
+operation and cannot fabricate committed acceptance, restore, or readiness
+evidence.
+
+An operation record remains available while its restore hold, destination
+generation, status query, crash replay, or retained-delivery reference can
+still be active. Cleanup may remove a terminal record only after the owner can
+prove that no supported replay or status consumer references it and the host's
+retention obligation has expired. Cleanup is idempotent and cannot remove the
+currently active restored-admission record. Orphaned or partially committed
+records are quarantined rather than age-deleted.
+
 ## Failure Dispositions
 
 - **retry same incarnation**: transient response loss with the same child and
@@ -363,6 +433,10 @@ V1 conformance must prove:
 - component dependency order is preserved;
 - external and reconstructed obligations remain owner-evaluated;
 - scheduler reconciliation precedes readiness;
+- `RecoveryPointRestored` uses RFC 0018 subjects, lifetimes, aggregation, and
+  bounded projection rules;
+- canonical readiness and `gateway.restore.status` project the same durable
+  readiness generation and identities;
 - admission opens exactly once from exact durable evidence;
 - process health alone cannot open admission;
 - `gateway.restore.status` is read-only, operation-fenced, and returns exact
@@ -373,4 +447,6 @@ V1 conformance must prove:
   while ordinary restored work admission is held;
 - coordinator crash replay reuses the same child and readiness generation;
 - preparation and restore execute exactly once; and
+- journal schema, migration, corruption, repair, retention, and cleanup remain
+  OpenClaw-owner operations and fail closed; and
 - stale, contradictory, corrupt, and fixed-path collision cases fail closed.
