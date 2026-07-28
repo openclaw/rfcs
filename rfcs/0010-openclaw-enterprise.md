@@ -383,7 +383,7 @@ substitute one Agent's identity for another.
 ## Agent deployment
 
 An `Agent` is the stable, user-configured platform resource. Its
-`Configuration`, `Channel`, `Secret`, `SecretBroker`, and `SandboxPolicy`
+`Configuration`, `Channel`, `Secret`, and `SandboxPolicy`
 references belong to its Namespace; its `Harness` belongs to the same
 Installation. Editing an Agent or one of its referenced resources changes only
 the inputs available to a future deployment; it does not change an existing
