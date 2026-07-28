@@ -3,7 +3,7 @@ title: Automations Terminology and Configurable Feature Naming
 authors:
   - Omar Shahine
 created: 2026-07-23
-last_updated: 2026-07-25
+last_updated: 2026-07-27
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/50
@@ -114,14 +114,16 @@ Phase 2 stalls, Phase 1 still leaves the product consistent.
     `src/agents/local-model-lean.ts`, the system-prompt `toolOrder` list,
     the tool-catalog entry, and tool-policy allow/deny resolution including
     groups and profiles.
-  - **Persisted policy.** `openclaw doctor --fix` rewrites stored
-    `toolsAllow`/`toolsDeny` entries `"cron"` → `"automations"`. Until
-    rewritten, policy resolution normalizes the legacy name through the
-    predicate so existing configs keep constructing and permitting the tool.
-  - **Invocation compat.** The tool router accepts a model-emitted `cron`
-    tool call as `automations` for one release train (sessions upgraded
-    mid-conversation carry old schema bytes in cached context), with the
-    removal plan named at the alias site.
+  - **Permanent alias (owner decision).** `"cron"` remains a permanently
+    accepted spelling for the tool — in persisted `toolsAllow`/`toolsDeny`
+    lists via `TOOL_NAME_ALIASES` (the same shipped contract as
+    `bash -> exec`), and for inbound calls at every external dispatch
+    boundary (MCP `tools/call`, gateway `POST /tools/invoke`, stdio MCP
+    servers), which resolve it to the published canonical tool without
+    re-advertising it. Nothing is being retired — `cron.*` config keys, RPC
+    methods, schedule syntax, and the CLI token all keep the name — so this
+    is standing vocabulary, not migration debt: no doctor rewrite, no
+    removal window.
   - **Transcripts and tool cards.** Historical transcripts keep the literal
     `cron` tool name; renderers already display arbitrary tool names and
     must not special-case it. No transcript rewriting.
@@ -293,8 +295,8 @@ a seam that presents a different name to the model than the runtime id is a
 rename with extra indirection — the same name-keyed consumers must be
 audited either way, plus a permanent translation layer. Renaming once,
 through the canonical migration contract in Phase 1 (single constant,
-predicate, doctor rewrite, bounded invocation alias, regression tests), is
-the smaller permanent surface.
+predicate, permanent policy/dispatch alias, regression tests), is the
+smaller permanent surface.
 
 **Why placeholders in i18n rather than a term-resolution layer in the
 translator?** Parameter interpolation already exists and is visible in the
@@ -322,9 +324,9 @@ follows the `ui.assistant.name` precedent.
   sweep controls first-party text, but the model can still say "cron" when
   discussing cron expressions or third-party content. Proposed line: syntax
   mentions are fine, feature mentions are not. Is that the accepted bar?
-- **Invocation-alias window.** The tool router accepts model-emitted `cron`
-  calls for one release train; confirm one train is enough for long-lived
-  sessions, or whether the alias should key off session age instead.
+- ~~**Invocation-alias window.**~~ Resolved by owner decision during
+  implementation (openclaw/openclaw#114841): the alias is permanent, not
+  windowed — same contract as `bash -> exec`.
 - **RFC 0024 adoption boundary.** Which terminology-interpolated surfaces
   count as "adopted localized surfaces" under RFC 0024's coverage checks in
   v1 — Control UI only, or agent-visible prompt text too (which is not
