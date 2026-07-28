@@ -362,7 +362,12 @@ readiness, durably records it, and opens its own admission. The host may only
 observe the result and compare it with the operation and generation it owns.
 Normal user-work methods remain unavailable while restored admission is held;
 the status method is allowed only through an authenticated pre-admission
-control path, following the existing suspension-control pattern.
+control path, following the existing suspension-control pattern. That path
+must admit only a bounded, non-enrolling control handshake, track it as active
+root work until authentication and connection completion, and lose to any
+restart fence. It must not admit nodes, device pairing or enrollment, remote
+clients, presence-bearing sessions, or any RPC other than the read-only status
+query while work admission is held.
 
 #### RFC 0018 readiness composition
 

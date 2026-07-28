@@ -339,13 +339,16 @@ evidence, or failure to read a required committed record returns `UNAVAILABLE`
 and keeps work admission closed. No error is success-shaped.
 
 The method must remain callable while restored admission is held through an
-authenticated pre-admission control path. It is exempt only from the restored-
-admission work fence, like suspension control methods are exempt from the
-suspension work fence; it does not make other RPC methods available. A host
-without such a control path may use `/readyz` only as a backoff hint and call
-`gateway.restore.status` after readiness, but it must not deliver retained
-work until the exact `ready` result matches its operation and destination
-generation.
+authenticated pre-admission control path. The path may reserve tracked work to
+complete authentication, but the pre-auth request shape must be limited to a
+non-enrolling host probe and the resulting connection must remain scoped to
+read-only status inspection. The lease lasts through handshake completion so
+a concurrent restart drains it rather than racing it. Restart always wins;
+nodes, pairing or enrollment, remote clients, presence-bearing sessions, and
+ordinary RPC methods remain fenced. A host without such a control path may use
+`/readyz` only as a backoff hint and call `gateway.restore.status` after
+readiness, but it must not deliver retained work until the exact `ready` result
+matches its operation and destination generation.
 
 For a fresh destination, the recommended held-state transport is the existing
 authenticated Admin HTTP RPC route bound to the host-controlled loopback path.
