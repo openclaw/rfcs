@@ -3,7 +3,7 @@ title: Automations Terminology and Configurable Feature Naming
 authors:
   - Omar Shahine
 created: 2026-07-23
-last_updated: 2026-07-23
+last_updated: 2026-07-25
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/50
@@ -76,30 +76,59 @@ without changing runtime behavior." Feature naming deserves the same seam.
   technical contexts (it must emit `{kind: "cron"}` on the wire, and cron
   expressions are a universal term). The goal is what the feature is
   *called*, not banning a dictionary word.
-- No per-locale terminology. The existing UI i18n pipeline and docs glossary
-  handle translation; this RFC only adds the English-source term injection
-  point that localized catalogs can flow through.
+- No general translation work. The existing UI i18n pipeline (RFC 0024) and
+  docs glossary own translation; this RFC adds a term-injection point that
+  flows through them. Custom terms are English-first in v1 — non-customized
+  locales keep their canonical localized terms via explicit fallback.
 - Docs are not per-deployment. Custom terms ("Habits") apply to the runtime
   product surfaces only; docs.openclaw.ai keeps the canonical "Automations."
 
 ## Proposal
 
-Two phases. Phase 1 is a coordinated string sweep with no new config surface.
-Phase 2 adds the terminology config on top of the seams Phase 1 creates.
+Two phases, shipped and accepted independently. Phase 1 is the rename with no
+new config surface and stands on its own. Phase 2 adds the terminology config
+on top of the seams Phase 1 creates and is contingent on Phase 1 landing; if
+Phase 2 stalls, Phase 1 still leaves the product consistent.
 
 ### Phase 1: finish the rename to "Automations"
 
 **Agent surface** (the largest gap, ~15 files in `openclaw/openclaw`):
 
-- Rename the agent tool `cron` → `automations`: `label`, `name`,
-  `displaySummary`, and the full description block in
-  `src/agents/tools/cron-tool.ts`, the catalog entry in
-  `src/agents/tool-catalog.ts`, and the preset in
-  `src/agents/tool-description-presets.ts`. The tool keeps calling the
-  `cron.*` gateway methods internally; the wire is unaffected.
-- Accept the old tool name in `toolsAllow` / tool-policy matching so
-  existing configs that allow `cron` keep working (one-line alias in policy
-  resolution, or a doctor rewrite of the allow-list entry).
+- Rename the agent tool `cron` → `automations` as a **tool-identity
+  migration**, not a string swap. The tool name is a runtime identifier with
+  behavioral consumers keyed on the exact string, so the rename ships as one
+  canonical contract:
+  - **Single source of truth.** The tool module exports
+    `AUTOMATIONS_TOOL_NAME = "automations"`,
+    `LEGACY_AUTOMATIONS_TOOL_NAMES = ["cron"]`, and a predicate
+    `isAutomationsToolName(name)`. No other file spells the tool name as a
+    literal.
+  - **Known name-keyed consumers move to the constant/predicate** (inventory
+    from current `main`; the implementation PR must re-sweep):
+    `src/agents/core-tool-factory-descriptors.ts` (narrow tool
+    construction), `src/agents/agent-tools.deferred-followup.ts` (scheduler
+    availability detection for exec/process guidance),
+    `src/agents/embedded-agent-subscribe.handlers.tools.ts` (successful-add
+    counting that feeds incomplete-turn recovery, plus its CLI-arg
+    heuristic), `LOCAL_MODEL_LEAN_DENY_TOOL_NAMES` in
+    `src/agents/local-model-lean.ts`, the system-prompt `toolOrder` list,
+    the tool-catalog entry, and tool-policy allow/deny resolution including
+    groups and profiles.
+  - **Persisted policy.** `openclaw doctor --fix` rewrites stored
+    `toolsAllow`/`toolsDeny` entries `"cron"` → `"automations"`. Until
+    rewritten, policy resolution normalizes the legacy name through the
+    predicate so existing configs keep constructing and permitting the tool.
+  - **Invocation compat.** The tool router accepts a model-emitted `cron`
+    tool call as `automations` for one release train (sessions upgraded
+    mid-conversation carry old schema bytes in cached context), with the
+    removal plan named at the alias site.
+  - **Transcripts and tool cards.** Historical transcripts keep the literal
+    `cron` tool name; renderers already display arbitrary tool names and
+    must not special-case it. No transcript rewriting.
+  - **Regression tests** cover both names across policy resolution, narrow
+    construction, deferred-followup detection, and add-counting.
+  The tool keeps calling the `cron.*` gateway methods internally; the wire
+  is unaffected.
 - Reword system-prompt lines (`src/agents/system-prompt.ts`), heartbeat
   guidance (`src/auto-reply/heartbeat.ts`,
   `src/agents/heartbeat-system-prompt.ts`), and the subagent prompt
@@ -169,27 +198,55 @@ UI route alias.
 ### Phase 2: configurable terminology
 
 Add one config surface, defaulting to the Phase 1 terms so it is invisible
-unless used:
+unless used. The shape is locale-keyed from day one so it composes with the
+accepted localization contract (RFC 0024) without a later migration:
 
 ```jsonc
 {
   "ui": {
     "terminology": {
-      "automation": { "singular": "habit", "plural": "habits" }
+      "automation": {
+        "en": { "singular": "habit", "plural": "habits" }
+      }
     }
   }
 }
 ```
 
-- **Shape.** Singular and plural forms are both required when set; casing is
-  derived (capitalize for titles/labels, lowercase mid-sentence). Values are
-  plain words, length-capped, validated like `ui.assistant.name`.
+- **Ownership: this explicitly broadens the `ui` contract.** Today `ui` is
+  documented as presentation customization with no runtime behavior, and
+  `ui.assistant.name` is projected only as Control UI identity. This RFC
+  amends that contract: `ui.terminology` is a runtime-wide product-language
+  value consumed by the Control UI, agent prompt builders, and CLI output
+  formatters. The `ui` schema help and docs are updated to say so; the
+  broadening is a deliberate part of this proposal, not a side effect. (The
+  alternative, a new top-level key, is worse under the repo's config-surface
+  bar; see Rationale.)
+- **Shape and validation.** Per concept, a locale-keyed map of
+  `{ singular, plural }`; `en` is required when the concept is set. Casing
+  is derived (capitalize for titles/labels, lowercase mid-sentence). Values
+  are plain words, length-capped, validated like `ui.assistant.name`.
+- **Localization scope (v1): English-first with explicit fallback.** When
+  the active UI locale has no entry in the map, that locale renders its
+  canonical localized term from the standard catalogs — a custom English
+  term never leaks into a non-English sentence, and locales the operator
+  has not customized behave exactly as before. Locales with an entry use
+  it through the same interpolation path. Per RFC 0024, surfaces adopting
+  interpolated terminology are covered by its mixed-language interpolation
+  checks; grammatical agreement beyond singular/plural (case, gender) is
+  the operator's responsibility for the locales they choose to customize.
+- **Gateway carrier.** The Control UI bootstrap payload — the same
+  gateway-to-browser projection that carries `ui.assistant.name` — gains a
+  `terminology` field. On config reload the gateway re-projects it and the
+  i18n manager updates its ambient params in place; missing or invalid
+  values fall back to the built-in defaults. This is a named, additive
+  extension of the bootstrap contract, specified in the implementation PR.
 - **UI.** The i18n layer's existing `t(key, params)` interpolation carries
   the term: the affected `en.ts` values (~30 keys, mostly the `cron.*`
   namespace) gain `{term}`/`{termPlural}`/`{termTitle}` placeholders, and
-  the i18n manager injects the configured values as ambient params. No
-  architectural change; localized catalogs translate around the
-  placeholder as they already do for other params.
+  the i18n manager injects the resolved per-locale values as ambient
+  params. No architectural change to the translator; localized catalogs
+  translate around the placeholder as they already do for other params.
 - **Agent.** Prompt builders (tool description, catalog summary, system
   prompt lines, heartbeat guidance, session labels, default job name,
   delivery notices) template the term at build time. The value is
@@ -198,13 +255,17 @@ unless used:
   `automations` regardless of the term (tool names are identifiers in
   allow-lists and transcripts; only descriptions and prose carry the custom
   term).
-- **CLI.** Display strings resolve the term from loaded config through the
-  central formatter. The command tokens (`automations`, `cron`) do not
-  change per deployment: docs, shell history, and support content cannot
-  follow a moving token. The custom term appears in output prose and help
-  descriptions only.
+- **CLI: runtime output only; help text is excluded.** On current `main`,
+  `buildProgram()` registers the command tree and its help/description
+  strings before config bootstrap, which runs in a Commander pre-action
+  hook — help invocations return before any config is loaded. Configurable
+  terminology therefore applies only to post-bootstrap output (command
+  results, warnings, doctor prose) resolved through the central formatter
+  after the config snapshot exists. `--help` prose, command registration
+  strings, and completions always use the canonical "automations" term.
+  Command tokens (`automations`, `cron`) never change per deployment.
 - **Docs pointer.** One paragraph in the automation docs explaining the
-  terminology setting.
+  terminology setting and its English-first scope.
 
 Per the repo's config-surface bar: the justification for a new key is that
 no existing behavior can express per-deployment product language, and the
@@ -221,12 +282,19 @@ version bump, doctor migrations, and ecosystem breakage. The docs already
 model the correct split: display name for people, technical identifier
 underneath.
 
-**Why rename the agent tool at all, instead of only its description?** The
-tool name is itself model-visible vocabulary and shows up in transcripts,
-tool-call UI, permission prompts, and the model's own phrasing ("I'll use
-the cron tool"). Renaming it is cheap (one definition site) and the
-allow-list alias covers compatibility. Leaving it named `cron` would leave
-the most prominent agent-facing string untouched.
+**Why rename the agent tool instead of keeping `cron` as the stable runtime
+identifier with a display-name seam?** The considered alternative — stable
+internal id, custom model/display name layered on top — was rejected. The
+tool name is the single most prominent model-visible string: it appears in
+the tool schema, transcripts, tool-call UI, permission prompts, and the
+model's own phrasing ("I'll use the cron tool"). A display seam that leaves
+the model calling a tool literally named `cron` fails the RFC's core goal;
+a seam that presents a different name to the model than the runtime id is a
+rename with extra indirection — the same name-keyed consumers must be
+audited either way, plus a permanent translation layer. Renaming once,
+through the canonical migration contract in Phase 1 (single constant,
+predicate, doctor rewrite, bounded invocation alias, regression tests), is
+the smaller permanent surface.
 
 **Why placeholders in i18n rather than a term-resolution layer in the
 translator?** Parameter interpolation already exists and is visible in the
@@ -250,19 +318,14 @@ follows the `ui.assistant.name` precedent.
   on-disk `cron` key. Pure "Automations" labeling hides the key name users
   must type in `openclaw.json`; "Automations (`cron`)" is honest but
   clunky. Needs a product call.
-- **Grammar beyond singular/plural.** English gets by with two forms plus
-  derived casing. If localized catalogs need case/gender agreement with an
-  injected term, translators may need locale-specific placeholder handling.
-  Acceptable to ship English-first and let the localization RFC (0024)
-  owners weigh in.
 - **Scope of "model never says cron."** The system-prompt rule plus string
   sweep controls first-party text, but the model can still say "cron" when
   discussing cron expressions or third-party content. Proposed line: syntax
   mentions are fine, feature mentions are not. Is that the accepted bar?
-- **Tool-name alias mechanics.** Whether old `toolsAllow: ["cron"]` entries
-  are aliased at policy-resolution time forever, or rewritten once by
-  `openclaw doctor --fix` and dropped after a deprecation window.
-- **Does `ui.terminology` apply to the `openclaw automations` CLI help
-  noun?** Proposal says yes for prose; confirm that seeing "habits" in
-  `--help` output while the command is `automations` is acceptable, or
-  whether CLI prose should stay canonical.
+- **Invocation-alias window.** The tool router accepts model-emitted `cron`
+  calls for one release train; confirm one train is enough for long-lived
+  sessions, or whether the alias should key off session age instead.
+- **RFC 0024 adoption boundary.** Which terminology-interpolated surfaces
+  count as "adopted localized surfaces" under RFC 0024's coverage checks in
+  v1 — Control UI only, or agent-visible prompt text too (which is not
+  localized today).
