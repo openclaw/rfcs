@@ -14,15 +14,13 @@ rfc_pr:
 ## Summary
 
 OpenClaw Enterprise provides a multi-tenant control plane for configuring,
-deploying, and operating agents. The OpenClaw Controller (OCC) owns platform
-resources, authorization, deployment, integration selection, and audit. OCC
-manages one isolated OpenClaw gateway for each Namespace. Users change an
-`Agent`; each deployment creates an immutable `AgentRevision`, and at most one
-revision is active for each Agent. The selected `ComputeDriver` provisions
-only that revision's workload, and the selected `SandboxDriver` enforces its
-containment. A selected `SecretDriver` performs brokered secret-backend
-operations without exposing secret values or backend credentials to workloads.
-Kubernetes is the only supported compute implementation in v1.
+deploying, and operating agents.
+
+Enterprise functionality is mediated by the OpenClaw Controller (OCC). This is a new component that is responsible for provisioning and orchestrating agents.
+
+The platform also introduces a small core set of resource primitives required to manage agents. These resources can extended or completely owned by external systems via a common driver and adapater interface. 
+
+For the initial spec, we limit support to a Kubernetes based deployment of the platform.
 
 ## Motivation
 
@@ -71,8 +69,8 @@ boundaries without introducing a separate resource for each runtime detail.
 ## Proposal
 
 1. Introduce OCC as the owner of the multi-tenant control plane, platform
-   resources, authorization, deployment, integration dispatch, and audit. `OCC
-   API` and `OCC Console` name future product surfaces; their implementation
+   resources, authorization, deployment, integration dispatch, and audit. 
+   `OCC API` and `OCC Console` name future product surfaces; their implementation
    belongs to later RFCs.
 2. Use an Ingress Gateway as the public control-plane boundary. It forwards
    protected requests only after the OpenClaw Access Gateway (OAG) verifies
@@ -570,5 +568,8 @@ The platform preserves:
 
 - OCC API contracts and implementation.
 - OCC Console design and implementation.
-- Stable integration wire contracts and capability payloads.
-- Multi-tenant OpenClaw gateways and agent-to-agent delegation.
+- Agent and Plugin Directories.
+- Plugin invocation, authorization, and approvals
+- Installation wide actions and auth
+- Audit interface 
+- Additional primitives: Budges, Routers, and Inference 
