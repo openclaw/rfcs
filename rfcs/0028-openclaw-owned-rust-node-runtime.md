@@ -80,6 +80,12 @@ of those products into OpenClaw.
   than defining a Microsoft-specific wire profile.
 - Preserve incremental value: the Gateway client can be used independently of
   the complete node host.
+- Let OpenClaw maintainers accept the Rust commitment incrementally—from the
+  shared client, through the bounded node-role subset, up to broader native
+  node-mode parity—without making later layers prerequisites for earlier ones.
+- Keep every accepted runtime and capability API customer-neutral so native,
+  embedded, appliance, and headless adopters can reuse it without Microsoft
+  product dependencies or a product-specific protocol profile.
 
 ## Non-Goals
 
@@ -143,6 +149,21 @@ Microsoft's Edge/Chromium product teams own:
 Scout Cloud owns its management and orchestration experience. It discovers and
 manages the node through supported Gateway surfaces; it does not fork the Rust
 runtime or introduce a separate node protocol.
+
+Microsoft is prepared to act as the anchor adopter and provide named
+implementation and conformance owners for the Rust capability layers, including
+broader node-mode parity if OpenClaw accepts that scope. That sponsorship does
+not make the runtime Microsoft-specific: accepted APIs, fixtures, and policy
+integration must serve other OpenClaw customers and contributors equally.
+OpenClaw maintainers retain authority over the canonical contract, security and
+policy boundaries, repository acceptance, and release requirements. Peter and
+the maintainer group can therefore choose the product scope that is right for
+OpenClaw and its broader customer base without requiring them to staff every
+implementation layer themselves.
+
+Product-specific shells and adapters remain outside the generic runtime. Other
+customers can embed the crates, supervise the headless host, and contribute
+portable capability layers under the same conformance and ownership rules.
 
 ### Embedding contract
 
@@ -266,16 +287,23 @@ policy boundary, and conformance corpus. The TypeScript `src/node-host` remains
 the executable behavioral reference while the Rust implementation reaches the
 approved native/headless subset.
 
-The Rust runtime does not duplicate the Gateway's model-facing agent loop or
-copy all TypeScript MCP, skills, and plugin behavior. It implements the proper
-node-role subset needed by native and headless hosts. Shared fixtures must prove
-equivalent behavior for every capability implemented in both languages.
+The minimum Rust commitment is the proper node-role subset needed by native and
+headless hosts; it does not absorb the Gateway's model-facing agent loop.
+Additional node-mode capabilities—including MCP, skills, plugins, and richer
+tool execution where they truly belong to the node role—can be added when
+OpenClaw accepts the scope and a named owner supplies implementation,
+conformance, and maintenance. Microsoft is willing to seed that ownership, but
+the resulting surface must remain useful to non-Microsoft adopters. Shared
+fixtures must prove equivalent behavior for every capability implemented in
+both languages, and Rust must reuse the canonical policy rather than create a
+parallel one.
 
-This creates a supported native implementation where the deployment requires
-one while eliminating multiple product-owned Rust node forks. Whether a future
-native/headless deployment replaces its TypeScript bridge is an adoption
-decision made only after conformance is proven; this RFC does not require
-removing the TypeScript host from Node.js deployments.
+This lets Peter and the OpenClaw maintainers choose among a shared Gateway
+client, a bounded native node host, or broader native node-mode parity. In every
+case it eliminates product-owned Rust node forks. Whether a future native or
+headless deployment replaces its TypeScript bridge is an adoption decision made
+only after conformance is proven; this RFC does not require removing the
+TypeScript host from Node.js deployments.
 
 ### Why not keep a separate Rust repository
 
