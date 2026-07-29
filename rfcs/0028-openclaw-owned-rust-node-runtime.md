@@ -258,6 +258,27 @@ authentication, and reconnect logic from Rust consumers.
 
 ## Rationale
 
+### Existing multi-language node precedent
+
+OpenClaw node mode already has several language- and platform-specific
+implementations: the generic TypeScript headless host, shared Swift sessions
+used by Apple nodes, the Kotlin Android node, the official C# Windows node, and
+the official C ESP-IDF component. They do not expose identical tools. Each
+advertises the capabilities and commands its platform can currently serve.
+
+These are not competing protocols. They implement one node role: protocol
+admission, signed device identity and pairing, a connection-scoped capability
+manifest, invocation/result behavior, bounded lifecycle, and Gateway plus local
+policy enforcement. Transport adapters, credential storage, native capability
+handlers, and application lifecycle remain implementation-specific.
+
+The Rust work is therefore not a new architectural exception. It fills the
+reusable native/headless Rust slot and prevents every Rust adopter from
+implementing that common machinery independently. Its additional commitment is
+to strengthen the shared cross-language fixtures and conformance corpus where
+input, progress, cancellation, lifecycle, and error behavior are currently
+distributed across schemas and implementation tests.
+
 ### Why OpenClaw owns the runtime
 
 The runtime implements an OpenClaw protocol role and security boundary. Keeping
