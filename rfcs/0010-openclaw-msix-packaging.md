@@ -3,7 +3,7 @@ title: OpenClaw MSIX Packaging for Windows
 authors:
   - Linus Huang
 created: 2026-07-14
-last_updated: 2026-07-28
+last_updated: 2026-07-29
 status: draft
 issue:
 rfc_pr:
@@ -323,6 +323,10 @@ verification behavior are defined.
 
 - Which capabilities must be declared in the package manifest, and which
   changes require explicit security review?
+- Should packaged OpenClaw disable native self-updates, including updates
+  initiated through `openclaw update` or by prompting the Gateway? If so, what
+  enforcement mechanism can enterprise administrators rely on, given that
+  OpenClaw does not provide one today?
 - If Microsoft Store distribution is introduced later, packages that are released
   from GitHub and those from the Store will have different PFNs. How will side-by-side
   installation be handled?
