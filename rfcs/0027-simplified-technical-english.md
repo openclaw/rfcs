@@ -261,6 +261,33 @@ After the pilot, repository owners add their declarations. They then convert
 documents by owner or topic. A pull request should contain one reviewable
 document set, not an arbitrary number of files.
 
+### Contributor adoption and ClawSweeper
+
+The migration must also reach contributors who change code, configuration, and
+documentation. Maintainers should publish the short author guide, examples,
+and term base before the first pilot. During the first weeks, contributors and
+AI-assisted contributors can use these materials to prepare new prose. Review
+comments should teach the rule and point to the guide instead of treating an
+old document as a reason to block unrelated work.
+
+ClawSweeper should adopt this rule in stages. In `inventory` and `baseline`, it
+reports these cases without blocking a pull request:
+
+- the pull request changes declared English source documentation; or
+- the pull request changes a command, configuration value, API, permission,
+  safety condition, operator workflow, or other user-facing behavior that
+  needs a documentation decision.
+
+For the second case, the pull request must either update the applicable source
+documentation or state why no documentation change is needed. A missing
+decision is a review finding, not an automatic product failure.
+
+After the pilot, maintainers can make ClawSweeper required for these cases. A
+required check must be source-aware, must understand generated-document
+boundaries, and must allow a narrow owner-approved disposition. It must not
+block unrelated code changes, require manual edits to generated translations,
+or claim that a passing check proves full STE conformance.
+
 For `openclaw/openclaw`, authors change English pages under `docs/`. The normal
 documentation workflow then copies the pages to `openclaw/docs`. Translation
 jobs update locale output after the English changes merge.
