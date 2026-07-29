@@ -18,7 +18,10 @@ deploying, and operating agents.
 
 Enterprise functionality is mediated by the OpenClaw Controller (OCC). This is a new component that is responsible for provisioning and orchestrating agents.
 
-The platform also introduces a small core set of resource primitives required to manage agents. These resources can extended or completely owned by external systems via a common driver and adapater interface. 
+The platform introduces a small set of resource primitives for managing agents.
+OCC owns these platform resources and their lifecycles; external systems own
+the underlying infrastructure or provider resources accessed through Driver
+and Adapter interfaces.
 
 For the initial spec, we limit support to a Kubernetes based deployment of the platform.
 
