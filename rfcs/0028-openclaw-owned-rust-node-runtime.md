@@ -158,10 +158,29 @@ Tauri types, Chromium types, Windows handles, or Scout-specific management
 objects. Platform tools are registered through bounded adapters and execute only
 after canonical admission and approval decisions.
 
-When Windows Companion and Scout Cloud can both manage a node, Gateway remains
-the authority for node session state. The final design must define controller
-authorization, audit attribution, conflict behavior, and revocation before that
-multi-manager topology is considered production-ready.
+### Hosting and management are separate relationships
+
+Windows Companion can have two relationships with the same Rust node instance:
+
+1. **Local hosting and supervision:** Windows Companion embeds the runtime or
+   starts it as a sidecar, supplies credentials and native-tool adapters, and
+   owns local start, stop, health, and recovery behavior.
+2. **Gateway-mediated management:** Windows Companion, Scout Cloud, or another
+   authorized OpenClaw controller observes and manages the node through
+   canonical Gateway APIs.
+
+The first relationship is local process composition. The second is a control-
+plane relationship and does not require another runtime or a product-specific
+management implementation inside `openclaw-node-host`. The same system-tray
+node can participate in both relationships.
+
+Gateway remains authoritative for controller authentication, node session
+state, authorization, conflict behavior, audit attribution, and revocation.
+The Rust runtime receives canonical authorized events, executes or cancels the
+corresponding work, preserves attribution, and reports status and results. It
+must not contain separate Windows Companion and Scout Cloud control planes.
+These authority rules must be complete before the multi-manager topology is
+considered production-ready.
 
 Sidecar deployments also require an explicit operational contract: local-only
 authenticated IPC, bounded startup and memory, truthful readiness, supervised
@@ -238,6 +257,25 @@ Tauri and the Rust runtime occupy different layers. A Tauri app can consume the
 Gateway client or node host, but a headless service, Chromium component, or
 Windows-native shell should not need an application framework to reuse protocol
 and lifecycle behavior.
+
+### Why this is not two competing OpenClaw runtimes
+
+Node mode is a protocol role, not a requirement that every node run in the same
+language or application framework. OpenClaw keeps one canonical node contract,
+policy boundary, and conformance corpus. The TypeScript `src/node-host` remains
+the executable behavioral reference while the Rust implementation reaches the
+approved native/headless subset.
+
+The Rust runtime does not duplicate the Gateway's model-facing agent loop or
+copy all TypeScript MCP, skills, and plugin behavior. It implements the proper
+node-role subset needed by native and headless hosts. Shared fixtures must prove
+equivalent behavior for every capability implemented in both languages.
+
+This creates a supported native implementation where the deployment requires
+one while eliminating multiple product-owned Rust node forks. Whether a future
+native/headless deployment replaces its TypeScript bridge is an adoption
+decision made only after conformance is proven; this RFC does not require
+removing the TypeScript host from Node.js deployments.
 
 ### Why not keep a separate Rust repository
 
