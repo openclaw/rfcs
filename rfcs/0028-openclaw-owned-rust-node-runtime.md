@@ -200,7 +200,7 @@ The implementation can land as independently reviewable slices:
    headless node lifecycle ([prototype stack PR](https://github.com/giodl73-repo/openclaw/pull/186)).
 3. **Runnable node parity:** add bounded invocation input/progress, cancellation,
    and command execution while keeping unrestricted system execution out of
-   scope.
+   scope ([prototype stack PR](https://github.com/giodl73-repo/openclaw/pull/187)).
 4. **Canonical integration:** connect the runtime to OpenClaw's command/tool
    catalog, approval pipeline, and shared conformance corpus instead of adding
    parallel policy.
