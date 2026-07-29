@@ -3,7 +3,7 @@ title: OpenClaw MSIX Packaging for Windows
 authors:
   - Linus Huang
 created: 2026-07-14
-last_updated: 2026-07-21
+last_updated: 2026-07-28
 status: draft
 issue:
 rfc_pr:
@@ -18,10 +18,11 @@ Windows as an MSIX package. A dedicated `openclaw/openclaw-msix-packaging`
 repository will build a package-specific host app and an OpenClaw payload
 tarball from a commit pinned for each MSIX release, validate
 architecture-specific artifacts with GitHub Actions, and publish them through
-GitHub Releases. After installation, the host app will verify and stage the
-payload, run OpenClaw onboarding, and manage the Gateway lifecycle. This
-provides a stable Package Family Name (PFN), enterprise-friendly deployment,
-and predictable installation and update behavior on Windows.
+GitHub Releases. The MSIX installs the packaged app and its Windows identity;
+on first launch, the host app prepares the payload and runs onboarding before
+the Gateway is ready to use. This provides a stable Package Family Name (PFN),
+enterprise-friendly deployment, and predictable installation and update
+behavior on Windows.
 
 ## Motivation
 
@@ -32,14 +33,10 @@ package identity, declared capabilities, and a standard Windows
 application-management surface, inspectable and governed like any other
 managed application.
 
-Windows uses the PFN to associate the package with package-scoped app data and
-clean that data up on uninstall.
-
-MSIX package identity and signing do not by themselves define how the Gateway
-payload is prepared or how long-lived state survives package updates. The host
-app included in the MSIX package is responsible for verifying and staging the
-payload, running onboarding, and controlling the Gateway lifecycle. This keeps
-Windows packaging behavior out of the OpenClaw core.
+Windows uses the PFN to associate system-managed resources with the packaged
+app and clean up those resources when the package is removed.
+A separate RFC will define how the platform uses this package identity when
+managing OpenClaw Gateway instances.
 
 Keeping the packaging definition in a dedicated repository also supports trust
 and maintainability: contributors and enterprise reviewers can determine
@@ -63,10 +60,9 @@ release checks produced a given OpenClaw MSIX artifact.
 
 ## Non-Goals
 
-- Publishing through or depending on the Microsoft Store, including
-  Store-managed updates.
-- Enabling unattended package auto-update by default. IT administrators remain
-  responsible for managing package updates.
+- Publishing v1 through or depending on the Microsoft Store, including
+  Store-managed updates. GitHub Releases are the canonical initial release
+  channel.
 - Defining every enterprise runtime policy, data-loss-prevention rule, or tool
   authorization rule that may be applied to OpenClaw.
 - Defining runtime isolation. A separate RFC may define a session-based runtime
@@ -86,7 +82,7 @@ release-ready MSIX artifacts. The repository should contain:
 - Build orchestration for x64 and ARM64.
 - GitHub Actions workflows for pull requests, release candidates, and releases.
 - Documentation for local builds, release operations, signing, installation,
-  upgrade, rollback, and uninstall behavior.
+  update, repair, reset, and uninstall behavior.
 
 The official
 [`openclaw/openclaw`](https://github.com/openclaw/openclaw) repository is the
@@ -100,7 +96,7 @@ verified, and recorded in the release SBOM and provenance.
 The host app is packaging infrastructure specific to the Windows MSIX
 deployment. It is not a fork of the OpenClaw Gateway and must keep its
 responsibilities narrow: package activation, payload verification and staging,
-Gateway lifecycle, health, repair, and cleanup.
+Gateway lifecycle, health, repair, and supported reset flows.
 
 ### Build and release pipeline
 
@@ -149,34 +145,11 @@ or exposed to pull-request workflows.
 
 The MSIX package provides OpenClaw's Windows package identity, a Gateway
 payload built from a pinned source revision, declared capabilities, packaged
-entry points, and a host app that manages payload setup and the Gateway
-lifecycle.
+entry points, and the host app. The lifecycle section below defines how the
+host prepares and manages the Gateway.
 
-On first-run setup, the host app should:
-
-1. Verify that the package identity, publisher, architecture, OpenClaw version,
-   payload digest, and payload inventory match the signed package metadata.
-2. Extract the OpenClaw payload from its packaged tarball into a clean,
-   versioned staging directory.
-3. Verify the staged files against the payload inventory before activation.
-4. Run OpenClaw's onboarding, matching the onboarding experience of a standard
-   OpenClaw install.
-5. Start and stop the Gateway through a narrow lifecycle interface.
-6. Clean up or explicitly preserve Gateway state during repair, reset,
-   rollback, and uninstall.
-
-The host app should expose a stable way for OpenClaw clients and nodes to obtain
-the Gateway endpoint and complete normal pairing. Those clients are consumers
-of a running Gateway; they do not own its lifecycle.
-
-Behavior for multiple Windows users must be explicit, including ownership of
-the staged payload, Gateway state, credentials, and endpoints.
-
-Staged payload files and long-lived Gateway state must have an explicit
-lifecycle. Updating or uninstalling the MSIX package must not leave an unknown
-running Gateway or inaccessible state. If Windows cannot remove external state
-transactionally with package removal, the host app must expose a supported
-cleanup flow and clearly warn administrators before uninstall.
+The host app is the packaged entry point and exposes a stable way for OpenClaw
+clients and nodes to obtain the Gateway endpoint and complete normal pairing.
 
 ```mermaid
 flowchart LR
@@ -194,13 +167,75 @@ flowchart LR
   App -->|Manage lifecycle| Gateway
 ```
 
-**Figure 1.** The packaging repository builds an OpenClaw payload tarball from
-a pinned source revision and packages it with a C# host app, preferably
-published with NativeAOT, into the MSIX. After installation, that host app
-verifies the tarball and file inventory, extracts the payload into clean
-versioned staging, runs OpenClaw's onboarding, and manages the Gateway
-lifecycle. The tarball provides a single payload unit to hash, inventory, and
-audit.
+**Figure 1.** The packaging repository creates a signed MSIX containing the C#
+host app and a payload built from a pinned OpenClaw revision.
+
+### End-to-end lifecycle
+
+The MSIX provides the Windows package identity and the files needed to
+bootstrap OpenClaw. The Gateway runs from the payload prepared by the host app.
+
+#### Installing the OpenClaw MSIX
+
+An administrator or user installs the signed MSIX. Windows verifies it,
+registers its package identity, and presents OpenClaw as an installed packaged
+app in Start. At this point, the packaged app is installed, but OpenClaw has not
+yet been onboarded and the Gateway is not ready.
+
+Launching OpenClaw starts the host app. On first run, the host verifies the
+packaged tarball, extracts the Gateway, and runs OpenClaw onboarding. After
+onboarding completes, the Gateway is ready and the packaged app provides its
+entry point.
+
+#### Uninstalling the OpenClaw MSIX
+
+Uninstalling OpenClaw removes the registered MSIX and its installed entry
+points, and the Gateway is stopped.
+
+> **Note:** Resources created on behalf of the packaged app are associated with
+> its package identity. When the MSIX is uninstalled, the system cleans up those
+> package-associated resources. OpenClaw is not invoked and does not run custom
+> cleanup code during uninstall. The cleanup mechanism is outside the scope of
+> this RFC.
+
+#### Updating OpenClaw through MSIX (preferred)
+
+In an enterprise deployment, an IT administrator reviews and deploys a newer
+signed MSIX with the same package identity and a higher package version.
+Windows replaces the installed package files, including the host app and
+bundled payload, while keeping the package identity stable. It does not directly
+replace the extracted Gateway or its data.
+
+Installing the newer MSIX does not immediately replace an extracted Gateway
+that is already running. The host detects the new packaged payload the next
+time it starts or restarts the Gateway. It verifies and stages the payload
+separately rather than overwriting the active files. If the Gateway is running,
+the host stops it, activates the staged version, and starts it again. Enterprise
+deployments that require immediate activation must include that restart in
+their rollout.
+
+Until activation finishes, the installed MSIX version and the active Gateway
+version may differ. A partially staged payload must not be activated. If an
+update changes stored data or configuration, the release must include and test
+the required migration.
+
+#### Updating through OpenClaw itself
+
+OpenClaw may also update its extracted installation through its native
+`openclaw update` command. A user may invoke the same behavior indirectly by
+asking OpenClaw to update itself.
+
+The packaging layer cannot reliably prevent this update path. A native update
+changes the running OpenClaw files without changing the installed MSIX version
+or its signed payload. The PFN continues to identify the packaged application,
+but the MSIX version no longer identifies the exact OpenClaw revision currently
+running.
+
+Native updating is therefore not encouraged for managed enterprise
+installations. It can bypass administrator approval, make inventory less
+precise, and complicate support. The packaging host does not initiate a native
+update on its own. A later MSIX update returns the Gateway to the version
+carried by the administrator-approved package.
 
 ### Distribution and updates
 
@@ -210,13 +245,12 @@ signatures, provenance, release notes, and an SBOM.
 
 Enterprise administrators should handle OpenClaw MSIX like any other Windows
 app distributed outside the Microsoft Store. They should use their existing
-tools and policies to review, test, approve, deploy, update, and roll back a
+tools and policies to review, test, approve, deploy, update, and remove a
 specific signed release. OpenClaw does not require a separate IT deployment
 process.
 
-The installed package and host app must not bypass administrator approval by
-fetching and installing a newer OpenClaw payload on their own. Unattended
-auto-update is disabled by default in v1.
+The update behavior and limitations are described in the lifecycle section
+above. Unattended MSIX package updates are disabled by default in v1.
 
 For consumer installations, v1 may provide a manual update check or link to an
 explicit GitHub Release, but installation still requires a clear user action.
@@ -232,12 +266,12 @@ user to the appropriate artifact.
 
 ### Release readiness
 
-MSIX should become the preferred Windows installation mechanism once:
+MSIX should become the preferred Windows installation mechanism for enterprise once:
 
 - x64 and ARM64 packages are built and signed through the packaging pipeline.
 - The payload tarball and staged files are verified before activation.
-- Install, update, rollback, repair, reset, and uninstall paths have automated
-  and manual coverage.
+- Install, onboarding, update, repair, reset, and uninstall paths have
+  automated and manual coverage.
 - Gateway state ownership and cleanup are documented, including behavior for
   multiple Windows users.
 - Package capability changes are reviewable and release-blocking.
@@ -258,12 +292,13 @@ the installed application and its requested capabilities easier to inventory
 and review.
 
 - A separate host app keeps Windows packaging and lifecycle code out of
-OpenClaw core. It owns payload verification and staging, onboarding, Gateway
-lifecycle, health, repair, and cleanup.
+OpenClaw core while providing the packaged entry point needed to prepare and
+manage the Gateway.
 
 - A payload tarball gives each release one unit to hash, inventory, and audit.
-Clean versioned staging keeps updates and rollback predictable, while keeping
-the package format independent of later runtime changes.
+Clean versioned staging prevents a partially prepared update from replacing the
+active Gateway, while keeping the package format independent of later runtime
+changes.
 
 - A separate packaging repository creates a focused review and ownership boundary
 for the host app, manifests, OpenClaw source pinning, signing, and release
@@ -278,24 +313,19 @@ through their existing management systems. Store publication can be considered
 separately if consumer distribution requirements justify its policy, identity,
 and update implications.
 
-- Disabling unattended auto-update by default prioritizes administrator control,
-reproducibility, and rollback over consumer convenience. This is the safer
+- Disabling unattended MSIX package updates by default prioritizes administrator
+control and reproducibility over consumer convenience. This is the safer
 starting point for a package whose payload can execute agent actions. A
-consumer-friendly update channel can be added after its consent, verification,
-and rollback behavior are defined.
+consumer-friendly package update channel can be added after its consent and
+verification behavior are defined.
 
 ## Unresolved questions
 
 - Which capabilities must be declared in the package manifest, and which
   changes require explicit security review?
-- What is the exact migration path for an existing WSL-based or source-based
-  local Gateway?
-- What are the ownership rules for Gateway state, credentials, and endpoints
-  when multiple Windows users install or run the package?
-- How are payload files and Gateway state cleaned up during uninstall, failed
-  setup, rollback, or package identity changes?
-- Can an administrator roll back the package without rolling back or corrupting
-  Gateway state?
+- If Microsoft Store distribution is introduced later, packages that are released
+  from GitHub and those from the Store will have different PFNs. How will side-by-side
+  installation be handled?
 - How should enterprise deployment systems receive revocation or urgent
   security-update guidance without allowing clients to install unapproved
   payloads?
