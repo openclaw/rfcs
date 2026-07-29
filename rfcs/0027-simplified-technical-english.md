@@ -6,7 +6,7 @@ created: 2026-07-25
 last_updated: 2026-07-29
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/53
 ---
 
 # Proposal: Simplified Technical English for OpenClaw Technical Documentation
