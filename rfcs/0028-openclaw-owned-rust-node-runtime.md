@@ -252,6 +252,16 @@ The implementation can land as independently reviewable slices:
    compatibility windows, servicing, and support ownership before declaring the
    crates generally supported.
 
+The existing official C# Windows node now has a concrete draft adopter seam
+([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
+It introduces an injectable node-runtime contract while keeping the current C#
+client as the production default. A follow-up adapter can supervise the Rust
+runtime over authenticated, versioned local IPC: Rust owns Gateway transport,
+registration, invocation, cancellation, reconnect, and runtime lifecycle, while
+the Windows app retains WinUI, the operator role, MCP, approvals, and native
+capability handlers. This proves adoption can be incremental and does not
+require replacing the Windows product shell or introducing a Tauri dependency.
+
 Each earlier layer remains useful if maintainers defer a later layer. In
 particular, adopting only the Gateway client still removes duplicated transport,
 authentication, and reconnect logic from Rust consumers.
