@@ -21,29 +21,22 @@ This gives Windows Companion and Scout Cloud a common OpenClaw node to manage,
 while each product keeps ownership of its user experience, native tools,
 packaging, and deployment.
 
-This RFC records the requested ownership split. Microsoft product stakeholders
-want the Windows shell to remain with the Edge/Chromium product, while Scott
-Hanselman has asked that the reusable runtime be owned by OpenClaw under Peter's
-maintainer leadership. The latter is a proposal for OpenClaw maintainer
-agreement, not a claim that the ownership decision has already been accepted.
+This RFC records the requested technical ownership split. Microsoft product
+stakeholders want the Windows shell to remain with the Edge/Chromium product
+while the reusable, product-neutral runtime lives in OpenClaw. That is a
+proposal for OpenClaw maintainer agreement, not a claim that the architectural
+decision has already been accepted.
 
 The acceptance discussion and decision record for that proposal is
 [RFC PR #54](https://github.com/openclaw/rfcs/pull/54). Acceptance of this RFC
 means accepting the bounded, unpublished monorepo foundation described below;
 it does not by itself publish crates, ship the proof binary, promise platform
 support, or accept broader TypeScript node-host parity. A maintainer approval on
-the RFC PR should name the initial code/security owner and record that bounded
-decision. Later release or scope expansion requires the separate gates in this
-RFC and its companion specifications.
-
-The proposed initial implementation and conformance owner is
-[`@giodl73-repo`](https://github.com/giodl73-repo), backed by the Microsoft
-product team that needs the runtime. OpenClaw's Gateway and security authority
-remains with [`@steipete`](https://github.com/steipete) and the OpenClaw
-maintainer group; their approval of this RFC is the acceptance of that boundary,
-not an ownership claim made by the proposer. No release owner is assigned yet
-because this RFC does not authorize publishing crates or shipping an official
-binary.
+the RFC PR records that bounded technical decision. It does not assign
+individual maintainers or require a staffing decision as a condition of
+acceptance. Normal OpenClaw maintainership, review, and CODEOWNERS processes can
+evolve with the implementation. Later release or scope expansion requires the
+separate gates in this RFC and its companion specifications.
 
 ## Motivation
 
@@ -182,16 +175,16 @@ Scout Cloud owns its management and orchestration experience. It discovers and
 manages the node through supported Gateway surfaces; it does not fork the Rust
 runtime or introduce a separate node protocol.
 
-Microsoft is prepared to act as the anchor adopter and provide named
-implementation and conformance owners for the Rust capability layers, including
-broader node-mode parity if OpenClaw accepts that scope. That sponsorship does
+Microsoft is prepared to act as the anchor adopter and contribute implementation,
+conformance, and maintenance for the Rust capability layers, including broader
+node-mode parity if OpenClaw accepts that scope. That sponsorship does
 not make the runtime Microsoft-specific: accepted APIs, fixtures, and policy
 integration must serve other OpenClaw customers and contributors equally.
 OpenClaw maintainers retain authority over the canonical contract, security and
-policy boundaries, repository acceptance, and release requirements. Peter and
-the maintainer group can therefore choose the product scope that is right for
-OpenClaw and its broader customer base without requiring them to staff every
-implementation layer themselves.
+policy boundaries, repository acceptance, and release requirements. The
+maintainer group can therefore choose the product scope that is right for
+OpenClaw and its broader customer base without making individual staffing part
+of this architecture decision.
 
 Product-specific shells and adapters remain outside the generic runtime. Other
 customers can embed the crates, supervise the headless host, and contribute
@@ -367,15 +360,15 @@ The minimum Rust commitment is the proper node-role subset needed by native and
 headless hosts; it does not absorb the Gateway's model-facing agent loop.
 Additional node-mode capabilities—including MCP, skills, plugins, and richer
 tool execution where they truly belong to the node role—can be added when
-OpenClaw accepts the scope and a named owner supplies implementation,
-conformance, and maintenance. Microsoft is willing to seed that ownership, but
+OpenClaw accepts the scope and the change carries implementation, conformance,
+and a credible maintenance path. Microsoft is willing to seed that work, but
 the resulting surface must remain useful to non-Microsoft adopters. Shared
 fixtures must prove equivalent behavior for every capability implemented in
 both languages, and Rust must reuse the canonical policy rather than create a
 parallel one.
 
-This lets Peter and the OpenClaw maintainers choose among a shared Gateway
-client, a bounded native node host, or broader native node-mode parity. In every
+This lets OpenClaw maintainers choose among a shared Gateway client, a bounded
+native node host, or broader native node-mode parity. In every
 case it eliminates product-owned Rust node forks. Whether a future native or
 headless deployment replaces its TypeScript bridge is an adoption decision made
 only after conformance is proven; this RFC does not require removing the
@@ -396,18 +389,19 @@ and preserves two runtimes across lifecycle and security-sensitive paths.
 
 ## Acceptance record and follow-on decisions
 
-One decision is required to accept this RFC:
+One technical decision is required to accept this RFC:
 
-- Do Peter and the OpenClaw maintainer group accept ownership of the bounded,
-  unpublished Rust Gateway-client and node-runtime foundation in the OpenClaw
-  monorepo, with `@giodl73-repo` as the proposed initial implementation and
-  conformance owner, OpenClaw maintainers retaining Gateway/security authority,
-  and conformance maintained beside the TypeScript reference?
+- Should the bounded, unpublished Rust Gateway-client and node-runtime
+  foundation be an OpenClaw core surface in the monorepo, with Gateway/security
+  authority and cross-language conformance maintained beside the TypeScript
+  reference?
 
 The recommended bounded answer is **yes**. It permits the two `publish = false`
 workspace crates and the Tauri reuse slice to incubate in `openclaw/openclaw`.
 It does not make the foreground proof host an official binary, promise a public
 crate API, select supported platforms, or authorize broader tool execution.
+It also does not assign individual maintainers; that is an implementation and
+project-maintenance concern rather than an architectural prerequisite.
 
 The following are explicit follow-on adoption or release decisions, not hidden
 prerequisites for reviewing the bounded foundation:
