@@ -36,6 +36,15 @@ the RFC PR should name the initial code/security owner and record that bounded
 decision. Later release or scope expansion requires the separate gates in this
 RFC and its companion specifications.
 
+The proposed initial implementation and conformance owner is
+[`@giodl73-repo`](https://github.com/giodl73-repo), backed by the Microsoft
+product team that needs the runtime. OpenClaw's Gateway and security authority
+remains with [`@steipete`](https://github.com/steipete) and the OpenClaw
+maintainer group; their approval of this RFC is the acceptance of that boundary,
+not an ownership claim made by the proposer. No release owner is assigned yet
+because this RFC does not authorize publishing crates or shipping an official
+binary.
+
 ## Motivation
 
 OpenClaw already has a TypeScript node host, and its Tauri application has Rust
@@ -391,8 +400,9 @@ One decision is required to accept this RFC:
 
 - Do Peter and the OpenClaw maintainer group accept ownership of the bounded,
   unpublished Rust Gateway-client and node-runtime foundation in the OpenClaw
-  monorepo, with a named initial code/security owner and conformance maintained
-  beside the TypeScript reference?
+  monorepo, with `@giodl73-repo` as the proposed initial implementation and
+  conformance owner, OpenClaw maintainers retaining Gateway/security authority,
+  and conformance maintained beside the TypeScript reference?
 
 The recommended bounded answer is **yes**. It permits the two `publish = false`
 workspace crates and the Tauri reuse slice to incubate in `openclaw/openclaw`.
