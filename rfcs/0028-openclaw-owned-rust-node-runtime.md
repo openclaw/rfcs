@@ -241,16 +241,17 @@ Windows adopter PR:
 2. **OpenClaw embeddable runtime:** add external credential/signing hooks,
    issued-token delivery, the supervised lifecycle, bounded duplex invocation,
    local fail-closed admission, connection-scoped command manifests, and the
-   shared TypeScript/Rust lifecycle corpus. The consolidated follow-up is
-   prepared as [giodl73-repo/openclaw#192](https://github.com/giodl73-repo/openclaw/pull/192)
-   and becomes the second upstream PR after the foundation lands.
+   shared TypeScript/Rust lifecycle corpus. Draft
+   [openclaw/openclaw#116450](https://github.com/openclaw/openclaw/pull/116450)
+   is the second upstream PR, explicitly dependent on the foundation landing
+   first.
 3. **Windows adopter:** keep the existing C# runtime as the production default
    while adding one replaceable runtime boundary and one Windows-owned shared
    capability dispatcher ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
 
 The earlier fork drafts #186-#191 remain as detailed evidence history, but they
 are superseded as the intended review shape by the single embeddable-runtime
-follow-up. Their commits remain intact in #192, so consolidation does not hide
+follow-up. Their commits remain intact in #116450, so consolidation does not hide
 the native-signing, lifecycle, duplex, authority, manifest, or conformance
 boundaries.
 
