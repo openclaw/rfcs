@@ -105,6 +105,20 @@ of those products into OpenClaw.
 
 ## Proposal
 
+The normative candidate contracts and evidence are split into companion
+documents so this RFC can stay focused on ownership and architectural choice:
+
+- [Rust Gateway client v1 specification](0028/gateway-client-v1-spec.md)
+- [Rust node runtime v1 specification](0028/node-runtime-v1-spec.md)
+- [Rust node sidecar hosting v1 specification](0028/sidecar-hosting-v1-spec.md)
+- [Conformance and adoption plan](0028/conformance-and-adoption-plan.md)
+- [Implementation and evidence inventory](0028/implementation-and-evidence-inventory.md)
+
+The first two describe the reusable OpenClaw layers. The sidecar specification
+defines product-neutral hosting invariants without selecting a product IPC
+encoding. The plan and inventory distinguish implemented evidence from future
+adoption and release gates.
+
 ### Repository and crate boundary
 
 The runtime lives in `openclaw/openclaw` as two workspace crates:
