@@ -27,6 +27,15 @@ Hanselman has asked that the reusable runtime be owned by OpenClaw under Peter's
 maintainer leadership. The latter is a proposal for OpenClaw maintainer
 agreement, not a claim that the ownership decision has already been accepted.
 
+The acceptance discussion and decision record for that proposal is
+[RFC PR #54](https://github.com/openclaw/rfcs/pull/54). Acceptance of this RFC
+means accepting the bounded, unpublished monorepo foundation described below;
+it does not by itself publish crates, ship the proof binary, promise platform
+support, or accept broader TypeScript node-host parity. A maintainer approval on
+the RFC PR should name the initial code/security owner and record that bounded
+decision. Later release or scope expansion requires the separate gates in this
+RFC and its companion specifications.
+
 ## Motivation
 
 OpenClaw already has a TypeScript node host, and its Tauri application has Rust
@@ -376,15 +385,31 @@ A wrapper is the shortest path for products already carrying Node.js. It does
 not meet the all-Rust runtime goal, does not simplify the Windows process model,
 and preserves two runtimes across lifecycle and security-sensitive paths.
 
-## Unresolved questions
+## Acceptance record and follow-on decisions
 
-- Do Peter and the OpenClaw maintainer group accept long-term ownership of the
-  runtime, its conformance surface, and its release compatibility?
-- Which command/tool catalog and approval APIs are the canonical integration
-  point, and what shared fixtures must exist before native tools are enabled?
-- Should Windows Companion embed the runtime or supervise a signed sidecar?
-- How are controller authority, conflicts, revocation, and audit attribution
-  represented when Windows Companion and Scout Cloud manage the same node?
+One decision is required to accept this RFC:
+
+- Do Peter and the OpenClaw maintainer group accept ownership of the bounded,
+  unpublished Rust Gateway-client and node-runtime foundation in the OpenClaw
+  monorepo, with a named initial code/security owner and conformance maintained
+  beside the TypeScript reference?
+
+The recommended bounded answer is **yes**. It permits the two `publish = false`
+workspace crates and the Tauri reuse slice to incubate in `openclaw/openclaw`.
+It does not make the foreground proof host an official binary, promise a public
+crate API, select supported platforms, or authorize broader tool execution.
+
+The following are explicit follow-on adoption or release decisions, not hidden
+prerequisites for reviewing the bounded foundation:
+
+- Select the canonical command/tool and approval adapters before enabling each
+  native capability beyond the bounded custom-handler surface.
+- Choose in-process embedding or an authenticated signed sidecar per adopter;
+  both must satisfy the same runtime contract.
+- Define controller authority, conflicts, revocation, and audit attribution
+  before Windows Companion and Scout Cloud jointly manage one node.
+- Name release owners, platforms, artifact identities, compatibility windows,
+  and servicing policy before publishing crates or shipping an official binary.
 - Which identity and token material is stored by the runtime versus a
   Windows-secure-storage adapter?
 - What is explicitly in scope for the node invocation loop, and what remains in
