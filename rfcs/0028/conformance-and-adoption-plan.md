@@ -133,7 +133,7 @@ The current drafts provide:
 - #116450: lifecycle/signing/token, duplex/admission/manifest conformance and
   73 stacked Rust tests at `894d125ee76`;
 - Windows #1068: replaceable runtime boundary, shared dispatcher, full C# test
-  suites, and 2/2 live Gateway MXC tests at `194928fdc0c8`; and
+  suites, and 2/2 live Gateway MXC tests at `c0cfa8ba6680`; and
 - earlier experimental repository package, SBOM, dependency, and provenance
   evidence, which remains evidence history rather than an official release.
 

@@ -11,7 +11,7 @@ semantics.
 | --- | --- | --- |
 | `openclaw/openclaw` foundation PR #116050 | `41f4e705887` | Draft; Rust client/host plus Linux Tauri consumer |
 | `openclaw/openclaw` follow-up PR #116450 | `894d125ee76` | Draft; logically stacked on #116050 |
-| `openclaw/openclaw-windows-node` PR #1068 | `194928fdc0c8` | Draft; C# remains production default |
+| `openclaw/openclaw-windows-node` PR #1068 | `c0cfa8ba6680` | Draft; C# remains production default |
 | `openclaw/rfcs` RFC #54 | Current PR head | Draft ownership decision; this inventory is refreshed with each evidence change |
 | Experimental `openclaw-rust-node` evidence repository | merged PRs #1-#5; draft #6 | Evidence history, not official distribution |
 
@@ -114,7 +114,7 @@ of the C# Gateway client.
 | Linux Tauri suite | Linux proof head | 98/98 passed | Not a packaged desktop UI build |
 | Embeddable stack | Ubuntu 24.04 WSL2, Rust 1.93, `894d125ee76` | 73 workspace tests; strict Clippy/rustdoc/format/diff pass | In-process Gateway peer for follow-up behaviors |
 | Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers pass at `894d125ee76`; earlier hosted TypeScript lanes passed | Final-head TypeScript UTF-8 validator tests are pending because the local dependency fetch failed TLS negotiation |
-| Windows adopter | Windows 11, `194928fdc0c8` | 3,402 Shared, 2,022 Tray, 516 Connection tests | Rust adapter not present |
+| Windows adopter | Windows 11, `c0cfa8ba6680` | 3,402 Shared, 2,023 Tray, 519 Connection tests | Rust adapter not present |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |
 | Experimental package acceptance | Linux x64, Windows x64, macOS ARM64 | Build/checksum/extract/execute evidence | Separate experimental repository |
 | Dependency/SBOM/provenance | Experimental repository PRs #5/#6 | RustSec, CycloneDX, repository-bound attestations | Not an OpenClaw-supported release |
