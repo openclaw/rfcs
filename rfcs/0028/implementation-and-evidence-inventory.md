@@ -9,10 +9,10 @@ semantics.
 
 | Repository / surface | Reviewed head | Status |
 | --- | --- | --- |
-| `openclaw/openclaw` foundation PR #116050 | `7600501dd50` | Draft; Rust client/host plus Linux Tauri consumer |
-| `openclaw/openclaw` follow-up PR #116450 | `c533982d751` | Draft; logically stacked on #116050 |
+| `openclaw/openclaw` foundation PR #116050 | `41f4e705887` | Draft; Rust client/host plus Linux Tauri consumer |
+| `openclaw/openclaw` follow-up PR #116450 | `894d125ee76` | Draft; logically stacked on #116050 |
 | `openclaw/openclaw-windows-node` PR #1068 | `194928fdc0c8` | Draft; C# remains production default |
-| `openclaw/rfcs` RFC #54 | `cdc10f5a4a9d` before these companion docs | Draft ownership decision |
+| `openclaw/rfcs` RFC #54 | Current PR head | Draft ownership decision; this inventory is refreshed with each evidence change |
 | Experimental `openclaw-rust-node` evidence repository | merged PRs #1-#5; draft #6 | Evidence history, not official distribution |
 
 Exact heads must be refreshed before approval or release.
@@ -109,11 +109,11 @@ of the C# Gateway client.
 
 | Evidence | Environment | Result | Limitation |
 | --- | --- | --- | --- |
-| Foundation Rust workspace | Windows 11, Rust 1.95, `7600501dd50` | 47 tests; strict Clippy/rustdoc/format/diff pass | No deployed production Gateway at latest head |
+| Foundation Rust workspace | Ubuntu 24.04 WSL2, Rust 1.93, `41f4e705887` | 56 tests; strict Clippy/format/diff pass | No deployed production Gateway at latest head |
 | Foundation host/socket proof | Ubuntu 24.04 WSL2, Rust 1.93, `13242763f3d` | Health 200, pre-ready 503, clean shutdown, real loopback invocation | Earlier proof head; in-process Gateway harness |
 | Linux Tauri suite | Linux proof head | 98/98 passed | Not a packaged desktop UI build |
-| Embeddable stack | Windows 11, Rust 1.95, `c533982d751` | 62 workspace tests and strict static gates | In-process Gateway peer for follow-up behaviors |
-| Shared fixtures | Rust plus canonical TypeScript validators | Lifecycle and Gateway-authority cases pass | Corpus is not yet the complete node contract |
+| Embeddable stack | Ubuntu 24.04 WSL2, Rust 1.93, `894d125ee76` | 73 workspace tests; strict Clippy/rustdoc/format/diff pass | In-process Gateway peer for follow-up behaviors |
+| Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers pass at `894d125ee76`; earlier hosted TypeScript lanes passed | Final-head TypeScript UTF-8 validator tests are pending because the local dependency fetch failed TLS negotiation |
 | Windows adopter | Windows 11, `194928fdc0c8` | 3,402 Shared, 2,022 Tray, 516 Connection tests | Rust adapter not present |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |
 | Experimental package acceptance | Linux x64, Windows x64, macOS ARM64 | Build/checksum/extract/execute evidence | Separate experimental repository |
@@ -122,7 +122,10 @@ of the C# Gateway client.
 The shared fixture files are
 `test/fixtures/node-invoke-lifecycle-contract.json` and
 `test/fixtures/node-runtime-integration-contract.json`; both have TypeScript and
-Rust consumers at the reviewed stacked head.
+Rust consumers at the reviewed stacked head. The Rust consumer passed at the
+current head. The final TypeScript validator execution remains pending after a
+repeated package-registry TLS failure; hosted TypeScript lanes passed before the
+final UTF-8 validator correction.
 
 ## Capability gap inventory
 
@@ -134,7 +137,7 @@ Rust consumers at the reviewed stacked head.
 | Sidecar IPC | Not implemented; current foreground proof host uses environment-indirected secrets | Accept `sidecar-hosting-v1-spec.md`, choose transport, build authenticated launch/adapter |
 | Persistent secure identity/token storage | Embedding seam only | Platform adapter and rotation/revocation proof |
 | Product audit/export adapter | Not implemented | Stable event contract, correlation/redaction proof, real product audit sink |
-| Aggregate retained-event byte budget | Count-bounded only | Accept measured supported envelope or add byte-aware retention without collapsing small-event capacity |
+| Aggregate retained-event byte budget | Implemented draft: exact count plus aggregate raw-frame bytes; 256 events and 64 MiB by default | Current-head compatibility and load proof before support |
 | Windows runtime selection | Not implemented | Opt-in adapter, parity, rollout and rollback |
 | `system.which` | Not implemented | Admin-sensitive canonical policy/result corpus |
 | `system.run` / PTY | Not implemented | OpenClaw-owned preparation, approval, execution, audit and emergency-disable contracts |

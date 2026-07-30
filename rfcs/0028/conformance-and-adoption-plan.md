@@ -80,6 +80,10 @@ are seeds, not a claim that the complete node contract is already projected.
 - live Gateway pairing, invocation, cancellation, reconnect, and revocation;
 - allowed and denied platform capability paths;
 - sidecar crash, supervisor crash, IPC loss, version mismatch, and rollback;
+- finite bootstrap-stage deadlines, pre-negotiation ceilings, and negotiated
+  limits that cannot exceed either peer's local policy;
+- duplicate authenticated-sequence and retired-session replay rejection without
+  native redispatch;
 - startup/steady-state resource measurements; and
 - audit correlation through the product's real audit/export path without
   credential or raw-error disclosure.
@@ -125,9 +129,9 @@ Workspace tests alone do not authorize publication.
 The current drafts provide:
 
 - #116050: reusable Gateway client, bounded host, Tauri migration, real
-  loopback node/health proof, and 47 Rust workspace tests at `7600501dd50`;
+  loopback node/health proof, and 56 Rust workspace tests at `41f4e705887`;
 - #116450: lifecycle/signing/token, duplex/admission/manifest conformance and
-  62 stacked Rust tests at `c533982d751`;
+  73 stacked Rust tests at `894d125ee76`;
 - Windows #1068: replaceable runtime boundary, shared dispatcher, full C# test
   suites, and 2/2 live Gateway MXC tests at `194928fdc0c8`; and
 - earlier experimental repository package, SBOM, dependency, and provenance

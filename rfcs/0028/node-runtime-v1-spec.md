@@ -77,25 +77,32 @@ manifest or synthesize Gateway approval.
 
 ## Bounded execution
 
-The candidate defaults are:
+The embedding-configurable candidate defaults are:
 
 | Limit | Candidate default |
 | --- | ---: |
 | Concurrent handlers | 8 |
 | Invocation input/parameter budget | 256 KiB |
 | Result/output budget | 256 KiB |
-| Pending duplex input | 64 KiB |
-| One input frame | 16 KiB |
-| One progress chunk | 16 KiB |
 | Handler deadline when omitted | 30 seconds |
 | Maximum handler deadline | 5 minutes |
 | Result-delivery reserve | 100 milliseconds |
+
+The current fixed protocol/runtime constants are:
+
+| Limit | Candidate constant |
+| --- | ---: |
+| Pending duplex input | 64 KiB |
+| One input frame | 16 KiB UTF-8 |
+| One progress chunk | 16 KiB UTF-8 |
 | Duplex heartbeat interval | 5 seconds |
 
-All limits must be finite and configurable downward by an embedding. Saturation
-must reject immediately with a stable structured failure; it must not create an
-unbounded work queue. A handler panic must become a structured failure and must
-not terminate the host process.
+All embedding-configurable limits must be finite and configurable downward.
+Fixed constants must remain finite and require a runtime/protocol revision to
+change; embedders may narrow them in their own adapters but cannot advertise a
+larger shared contract. Saturation must reject immediately with a stable
+structured failure; it must not create an unbounded work queue. A handler panic
+must become a structured failure and must not terminate the host process.
 
 `timeoutMs: 0` follows the canonical Gateway meaning and disables the handler
 deadline; embeddings that cannot safely permit that behavior must narrow it in
@@ -121,8 +128,12 @@ The runtime must not automatically replay an invocation after reconnect.
 
 Every admitted invocation produces at most one final result. Success and
 handler failure use the canonical node result envelope. Public failures must
-use stable bounded codes/messages; raw OS, network, key-store, or product
-exceptions remain in trusted local diagnostics.
+use stable bounded codes/messages. Default runtime and proof-host diagnostic
+sinks must emit only bounded redacted classes and explicitly safe context.
+Generic library error values may retain source detail for programmatic
+classification; embedders must not log arbitrary `Display`, `Debug`, or source
+text without an explicit redaction policy. Canonical signing payloads and
+credentials must never be formatted.
 
 At minimum, distinct outcomes must exist for unsupported command, duplicate
 invocation, saturation, invalid/oversized input, admission rejection,

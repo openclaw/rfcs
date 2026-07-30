@@ -78,31 +78,36 @@ Request IDs must be unique within the session. The session must correlate only
 an exact response ID with its pending request and must remove pending state on
 response, timeout, cancellation, or session closure.
 
-Requests and their local cancellation commands must share one ordered queue.
-The concurrency permit must remain owned by the queued or pending request even
-if the caller drops its future. This bounds abandoned callers as well as active
-callers and prevents a timeout cancellation from overtaking its request.
+A dropped or timed-out request must be durably marked independently of bounded
+queue capacity. If it has not yet been written, it must not be transmitted; in
+all states it must release its pending entry and concurrency permit. A queued
+cancellation notification may wake the session loop sooner, but it must remain
+a best-effort optimization rather than the source of cancellation truth.
 
 The default candidate limits are:
 
 | Limit | Candidate default |
 | --- | ---: |
 | Challenge timeout | 15 seconds |
+| Connection establishment timeout | 10 seconds |
+| WebSocket write timeout | 10 seconds |
 | Request timeout | 30 seconds |
 | Maximum WebSocket message/frame | 16 MiB |
 | Retained event capacity | 256 events |
+| Retained raw-event bytes | 64 MiB |
 | Queued plus pending requests | 64 |
 
 Embeddings may choose smaller or larger finite limits. Zero-valued capacities
 must normalize to at least one or fail validation; they must not create an
 unbounded queue.
 
-The current candidate bounds retained events by count, not by aggregate
-serialized bytes. Before a supported release, maintainers must either accept a
-documented maximum-memory envelope for the configured frame/capacity pair or
-add byte-aware retention without reducing the normal small-event burst below
-the configured event capacity. A theoretical frame maximum must not be treated
-as the size of every event and used to collapse the default queue.
+The current candidate bounds retained events by both exact event count and
+aggregate raw-frame bytes. It evicts the oldest retained frames until both
+limits hold. A single frame larger than the complete byte budget advances the
+stream position and produces explicit lag for affected subscribers without
+closing the transport; later bounded events remain deliverable. The count,
+aggregate-byte, oversized-frame, and lag paths have focused current-head tests,
+including preservation of the default 256-event small-event burst.
 
 Event subscribers must receive explicit lag rather than silent loss. The
 single-consumer convenience API must deliver already-buffered events before a
@@ -157,7 +162,7 @@ Before v1 support is claimed, the exact candidate head must prove:
 - bounded concurrency when callers abandon futures;
 - measured or mechanically enforced worst-case event-retention memory for the
   supported configuration;
-- ordered timeout cancellation;
+- durable timeout and caller-abandon cancellation under queue saturation;
 - event delivery, lag, final-event-before-close, and idle-close wakeup;
 - ping/pong transport activity; and
 - terminal versus retryable Gateway recovery metadata.

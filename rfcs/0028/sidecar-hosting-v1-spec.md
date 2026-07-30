@@ -42,6 +42,13 @@ authenticate the sidecar artifact and protocol version before forwarding any
 native capability request. Failure on either side is terminal for that process
 instance and must fail closed.
 
+Before reading the first protocol message, each peer must enforce local hard
+ceilings for frame bytes, connections, and in-flight work. Authentication,
+version negotiation, and configuration must each have a finite local deadline;
+a peer that stalls or exceeds a pre-negotiation ceiling is terminated without
+activation. Negotiated limits are `min(local ceiling, peer offer)` and may
+never raise either peer's local ceiling.
+
 The supervisor owns Gateway credentials and private identity access. It may
 grant the sidecar a short-lived handle/callback or scoped secret material. The
 sidecar must not require Microsoft-, Tauri-, Chromium-, or Windows-specific
@@ -61,6 +68,8 @@ The first IPC exchange must include:
 Unknown major versions must fail before activation. Unknown optional features
 must remain disabled. Minor-version compatibility must be additive and covered
 by N-1 fixtures. Neither peer may infer support from product version alone.
+Limit values in this exchange are offers inside the hard bootstrap envelope,
+not authority to allocate or accept more than local policy allows.
 
 ## State model
 
@@ -99,6 +108,16 @@ advertisement without that generation change.
 IPC messages must carry a sidecar session identifier and invocation identifier.
 Identifiers supplied by a remote controller must not choose a local UI,
 credential, or audit scope without supervisor validation.
+
+The authenticated channel must reject replay across process sessions. Within
+one session generation, every authenticated message in each direction must
+carry a strictly increasing sequence number, or use an equivalent transport
+guarantee with the same property. A message at or below the accepted high-water
+mark, or from a retired generation, must fail before admission or native
+dispatch. The high-water mark is bounded constant state; peers must rotate the
+generation before sequence exhaustion and must not reset it in place.
+Invocation identifiers remain correlation and idempotency keys, but are not the
+replay-security primitive.
 
 ## Invocation flow
 

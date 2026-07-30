@@ -135,9 +135,11 @@ adoption and release gates.
 The runtime lives in `openclaw/openclaw` as two workspace crates:
 
 1. `openclaw-gateway-client` owns transport, authentication, request/response
-   correlation, event delivery, reconnection, and trust policy. It is useful to
-   applications—including Tauri applications—that need Gateway connectivity but
-   do not host a node.
+   correlation, event delivery, reconnect classification/backoff primitives,
+   and trust policy. Reconnect supervision, per-attempt material, and final
+   retry decisions remain with `NodeLifecycle` or the embedding. The client is
+   useful to applications—including Tauri applications—that need Gateway
+   connectivity but do not host a node.
 2. `openclaw-node-host` builds on the client and owns node identity, pairing,
    capability declaration, lifecycle, invocation dispatch, duplex input and
    progress, cancellation, and a bounded adapter boundary for commands/tools.
