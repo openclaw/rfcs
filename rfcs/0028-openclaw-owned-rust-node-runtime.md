@@ -3,7 +3,7 @@ title: OpenClaw-owned Rust node runtime
 authors:
   - Gio Della-Libera
 created: 2026-07-29
-last_updated: 2026-07-29
+last_updated: 2026-07-30
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/54
@@ -232,35 +232,47 @@ retain authority.
 
 ### Delivery plan
 
-The implementation can land as independently reviewable slices:
+The proposed review shape is two OpenClaw implementation PRs plus one initial
+Windows adopter PR:
 
-1. **Foundation:** add the two crates, a role-safe Gateway session, and a minimal
-   Tauri consumer to prove the client is reusable ([openclaw/openclaw#116050](https://github.com/openclaw/openclaw/pull/116050)).
-2. **Native embedding:** add external credential/signing hooks and a supervised,
-   headless node lifecycle ([prototype stack PR](https://github.com/giodl73-repo/openclaw/pull/186)).
-3. **Runnable node parity:** add bounded invocation input/progress, cancellation,
-   and command execution while keeping unrestricted system execution out of
-   scope ([prototype stack PR](https://github.com/giodl73-repo/openclaw/pull/187)).
-4. **Canonical integration:** connect the runtime to OpenClaw's command/tool
-   catalog, approval pipeline, and shared conformance corpus instead of adding
-   parallel policy.
-5. **Adoption proof:** demonstrate one Windows Companion integration and one
-   Scout Cloud management flow against a real Gateway, including cancellation,
-   revocation, reconnect, crash recovery, readiness, and audit evidence. Sidecar
-   proof also measures startup and steady-state resource cost.
-6. **Release decision:** define API stability, artifacts, SBOM/signing,
-   compatibility windows, servicing, and support ownership before declaring the
-   crates generally supported.
+1. **OpenClaw foundation:** add the two crates, a role-safe Gateway session, a
+   minimal bounded node host, and a Tauri consumer that proves the client is
+   reusable ([openclaw/openclaw#116050](https://github.com/openclaw/openclaw/pull/116050)).
+2. **OpenClaw embeddable runtime:** add external credential/signing hooks,
+   issued-token delivery, the supervised lifecycle, bounded duplex invocation,
+   local fail-closed admission, connection-scoped command manifests, and the
+   shared TypeScript/Rust lifecycle corpus. The consolidated follow-up is
+   prepared as [giodl73-repo/openclaw#192](https://github.com/giodl73-repo/openclaw/pull/192)
+   and becomes the second upstream PR after the foundation lands.
+3. **Windows adopter:** keep the existing C# runtime as the production default
+   while adding one replaceable runtime boundary and one Windows-owned shared
+   capability dispatcher ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
 
-The existing official C# Windows node now has a concrete draft adopter seam
+The earlier fork drafts #186-#191 remain as detailed evidence history, but they
+are superseded as the intended review shape by the single embeddable-runtime
+follow-up. Their commits remain intact in #192, so consolidation does not hide
+the native-signing, lifecycle, duplex, authority, manifest, or conformance
+boundaries.
+
+After those reviews, adoption proof must demonstrate the authenticated,
+versioned Windows adapter and a Scout Cloud management flow against a real
+Gateway, including cancellation, revocation, reconnect, crash recovery,
+readiness, rollback, and audit evidence. Sidecar proof also measures startup
+and steady-state resource cost. API stability, artifacts, SBOM/signing,
+compatibility windows, servicing, and support ownership remain explicit release
+decisions before the crates are declared generally supported.
+
+The existing official C# Windows node now has one consolidated draft adopter
 ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
-It introduces an injectable node-runtime contract while keeping the current C#
-client as the production default. A follow-up adapter can supervise the Rust
-runtime over authenticated, versioned local IPC: Rust owns Gateway transport,
-registration, invocation, cancellation, reconnect, and runtime lifecycle, while
-the Windows app retains WinUI, the operator role, MCP, approvals, and native
-capability handlers. This proves adoption can be incremental and does not
-require replacing the Windows product shell or introducing a Tauri dependency.
+It introduces an injectable node-runtime contract and extracts a single
+Windows-owned capability dispatcher shared by the current C# transport and a
+future Rust adapter, while keeping the C# client as the production default. A
+follow-up adapter can supervise the Rust runtime over authenticated, versioned
+local IPC: Rust owns Gateway transport, registration, invocation, cancellation,
+reconnect, and runtime lifecycle, while the Windows app retains WinUI, the
+operator role, MCP, approvals, and native capability handlers. This proves
+adoption can be incremental without duplicating Windows command routing,
+replacing the product shell, or introducing a Tauri dependency.
 
 Each earlier layer remains useful if maintainers defer a later layer. In
 particular, adopting only the Gateway client still removes duplicated transport,
