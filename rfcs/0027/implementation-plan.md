@@ -73,6 +73,13 @@ Active PR: [`openclaw/openclaw#115962`](https://github.com/openclaw/openclaw/pul
 - Support strict `openclaw`, `claude`, `codex`, and `cursor` format assertions.
 - Delegate detection, safety scanning, package preflight, installation,
   readiness, update, uninstall warnings, and cleanup to canonical plugin owners.
+- Persist extension dependency edges as referenced resources even when Claw add
+  introduced the global plugin. Default remove releases only the Claw edge.
+- Exclude global plugins from bulk `remove-if-unused` cleanup because ownership
+  provenance cannot prove that arbitrary agents do not use them. Preserve exact
+  opt-in plugin cleanup through `remove-selected` / `--remove-referenced`, with
+  dry-run, plan-integrity consent, known-owner disclosure, an unknown-agent-use
+  warning, and canonical plugin uninstall behavior.
 - Include exact extension effects and adapter identity in plan integrity and
   provenance.
 - Report mapped, detect-only, unavailable, unsupported, and compatibility-drift
@@ -205,7 +212,9 @@ Minimum proof before asking maintainers to land the full track:
 8. Update preserves user-owned personalization, managed-file drift rules, and
    unchanged extension dependency edges.
 9. Remove preserves user-owned outputs and retains referenced extensions by
-   default while offering canonical cleanup under RFC 0016 rules.
+   default. Bulk unused cleanup does not select global plugins; exact selected
+   plugin cleanup shows known owners, warns that unrecorded agent use cannot be
+   disproved, and delegates to canonical uninstall.
 10. ClawHub publication/search/download feeds the exact same artifact into a
     clean OpenClaw add dry-run.
 11. Control UI produces the same plan identity and lifecycle outcome as CLI for

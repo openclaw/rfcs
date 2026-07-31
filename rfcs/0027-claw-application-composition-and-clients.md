@@ -272,6 +272,17 @@ referenced resources by default, and preserves user-owned workspace content. A
 still-pending, digest-identical seeded `BOOTSTRAP.md` may be removed; a consumed
 or modified bootstrap file and every interview output remain user-owned.
 
+Native extensions backed by globally installed plugins are always referenced,
+even when Claw add introduced the plugin. Normal remove releases only the
+removing Claw's dependency edge and retains the plugin. Bulk
+`remove-if-unused` cleanup must not select a global plugin because provenance
+records known ownership, not every agent that may use shared plugin tools.
+Operators may still explicitly select an exact plugin for canonical uninstall
+after dry-run. That plan must show known affected owners and warn, even when
+none are known, that manually configured agents may still depend on it. This
+warning and exact selection are required in addition to plan-integrity consent;
+a general cleanup mode or `--yes` is insufficient.
+
 Export remains selection-based and excludes credentials, bindings, runtime
 choices, and user-owned personal files by default. It emits supported OpenClaw
 settings and native extension dependencies to `profiles/openclaw.yml`. Export
@@ -371,6 +382,10 @@ guided-template form.
     runtime extension compatibility or collecting local onboarding state.
 14. All new surfaces fail closed when their existing experimental Claws gate is
     disabled.
+15. Remove retains referenced plugins by default, excludes global plugins from
+    bulk unused cleanup, and permits canonical plugin uninstall only after exact
+    selection, dry-run, integrity-bound consent, and a warning that unknown
+    manually configured agents may still use the plugin.
 
 ## Unresolved Questions
 

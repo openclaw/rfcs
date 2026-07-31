@@ -356,6 +356,11 @@ or incomplete cleanup state. Implementations must not require a historical
 operation ledger or stored reference-count history. Any cleanup decision uses
 the current enumerated dependency edges and canonical owner state.
 
+Known ownership is not proof of runtime use. In particular, an agent may use a
+globally installed plugin without creating a Claw dependency edge or another
+machine-readable ownership record. The absence of another known owner must
+therefore never be presented as proof that a shared plugin is unused.
+
 Applied state and ready state are distinct. A complete add means every declared
 mutation was applied or safely referenced. Status must separately report
 unresolved environment placeholders, incomplete OAuth login, unavailable MCP
@@ -445,7 +450,10 @@ The operator must be offered these referenced-resource dispositions:
 - **remove-if-unused**: invoke canonical removal only when the resource has no
   other Claw dependency edge or known non-Claw owner, was introduced by Claw
   add, is complete, unchanged, and unambiguous, and its canonical owner permits
-  removal.
+  removal. This bulk disposition applies only when the canonical owner can
+  establish that no remaining consumer uses the resource. Globally installed
+  plugins are excluded because Claw provenance cannot enumerate every agent
+  that may use them.
 - **remove-selected**: invoke canonical removal for specifically selected
   resources after showing all known affected Claws and non-Claw owners. A
   remaining dependency or pre-existing origin requires stronger explicit
@@ -456,6 +464,13 @@ integrity-bound remove plan. Non-interactive mutation must identify its cleanup
 mode explicitly; it must not broaden default `retain` behavior merely because a
 general `--yes` flag is present. Referenced cleanup runs after managed-resource
 cleanup so failure cannot damage a still-live Claw agent.
+
+Explicitly selected plugin cleanup remains available. Its plan and consent
+prompt must identify the exact plugin, show every known dependency and owner,
+and warn even when none are known that other manually configured agents may
+still use the global plugin. The canonical plugin uninstaller and its normal
+Claw-reference warnings remain authoritative. A general cleanup mode or
+`--yes` alone must never select a plugin for uninstall.
 
 If an operator explicitly uninstalls an artifact despite a Claw-reference
 warning, canonical uninstall semantics win. The Claw becomes degraded and
@@ -552,4 +567,7 @@ A conforming applying client must:
 - derive managed and referenced relationships from canonical owner state;
 - retain referenced resources by default and bind any operator-selected
   referenced cleanup into the exact remove plan;
+- never treat missing ownership records as proof that a global plugin is
+  unused, and require exact operator selection plus a shared-use warning before
+  canonical plugin uninstall;
 - report partial outcomes and leave them diagnosable.
