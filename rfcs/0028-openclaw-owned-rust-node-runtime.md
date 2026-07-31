@@ -259,8 +259,8 @@ retain authority.
 
 ### Delivery plan
 
-The proposed review shape is two OpenClaw implementation PRs plus one initial
-Windows adopter PR:
+The proposed review shape is three logically stacked OpenClaw implementation
+PRs plus one initial Windows adopter PR:
 
 1. **OpenClaw foundation:** add the two crates, a role-safe Gateway session, a
    minimal bounded node host, and a Tauri consumer that proves the client is
@@ -272,15 +272,24 @@ Windows adopter PR:
    [openclaw/openclaw#116450](https://github.com/openclaw/openclaw/pull/116450)
    is the second upstream PR, explicitly dependent on the foundation landing
    first.
-3. **Windows adopter:** keep the existing C# runtime as the production default
+3. **OpenClaw authenticated sidecar bridge:** add transport-neutral framing,
+   negotiation, immutable configuration, an ordinary-command runtime bridge,
+   and exact cross-language corpora
+   ([openclaw/openclaw#116863](https://github.com/openclaw/openclaw/pull/116863)).
+   This draft is logically stacked on #116450. It defines the shared primitive
+   but deliberately stops before choosing product IPC, credential bootstrap,
+   process supervision, or rollout policy.
+4. **Windows adopter:** keep the existing C# runtime as the production default
    while adding one replaceable runtime boundary and one Windows-owned shared
-   capability dispatcher ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
+   capability dispatcher, plus an independent non-selectable C# consumer of
+   the sidecar contracts
+   ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
 
-The earlier fork drafts #186-#191 remain as detailed evidence history, but they
-are superseded as the intended review shape by the single embeddable-runtime
-follow-up. Their commits remain intact in #116450, so consolidation does not hide
-the native-signing, lifecycle, duplex, authority, manifest, or conformance
-boundaries.
+The earlier fork drafts #186-#191 remain detailed evidence history for #116450,
+and closed fork drafts #193-#195 remain detailed evidence history for #116863.
+Their commits remain intact in the consolidated branches, so the review shape
+does not hide the native-signing, lifecycle, duplex, authority, manifest,
+sidecar-protocol, negotiation, or runtime-bridge boundaries.
 
 After those reviews, adoption proof must demonstrate the authenticated,
 versioned Windows adapter and a Scout Cloud management flow against a real
@@ -293,14 +302,15 @@ decisions before the crates are declared generally supported.
 The existing official C# Windows node now has one consolidated draft adopter
 ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
 It introduces an injectable node-runtime contract and extracts a single
-Windows-owned capability dispatcher shared by the current C# transport and a
-future Rust adapter, while keeping the C# client as the production default. A
-follow-up adapter can supervise the Rust runtime over authenticated, versioned
-local IPC: Rust owns Gateway transport, registration, invocation, cancellation,
-reconnect, and runtime lifecycle, while the Windows app retains WinUI, the
-operator role, MCP, approvals, and native capability handlers. This proves
-adoption can be incremental without duplicating Windows command routing,
-replacing the product shell, or introducing a Tauri dependency.
+Windows-owned capability dispatcher shared by the current C# transport and the
+new non-selectable sidecar adapter, while keeping the C# client as the
+production default. A future adoption slice can replace the in-process proof
+with supervision of the Rust runtime over authenticated, versioned local IPC:
+Rust owns Gateway transport, registration, invocation, cancellation, reconnect,
+and runtime lifecycle, while the Windows app retains WinUI, the operator role,
+MCP, approvals, and native capability handlers. This proves adoption can be
+incremental without duplicating Windows command routing, replacing the product
+shell, or introducing a Tauri dependency.
 
 Each earlier layer remains useful if maintainers defer a later layer. In
 particular, adopting only the Gateway client still removes duplicated transport,

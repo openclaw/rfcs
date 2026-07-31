@@ -26,7 +26,7 @@ supported.
 | N1 bounded node foundation | OpenClaw #116050 | Real loopback Gateway invocation plus health/readiness/shutdown | Per-adopter basic node session/runtime scaffolding |
 | N2 embeddable lifecycle | OpenClaw #116450 | Shared fixtures and real socket lifecycle, signing, token, reconnect, duplex, manifest, admission tests | Per-adopter signing/reconnect/invocation lifecycle |
 | A1 adopter seam | Windows #1068 | Existing C# default, full unit suites, real Gateway MXC path | Duplicate Windows routing when Rust adapter arrives |
-| A2 sidecar adapter | OpenClaw fork evidence #193-#195 plus Windows fork PR #2 | Independent authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, dispatcher routing, and exact cross-language corpora | No deletion; process/IPC and production adoption gates remain |
+| A2 sidecar adapter | OpenClaw #116863 plus Windows #1068 | Independent authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, dispatcher routing, and exact cross-language corpora | No deletion; process/IPC and production adoption gates remain |
 | A3 sidecar adoption | Future Windows adopter PR | Verified artifact/launch, protected bootstrap, concrete IPC, Gateway/pairing/token parity, crash, revocation, audit, resource, rollout and rollback proof | Incumbent product-owned Gateway transport after observation window |
 | R1 supported release | future OpenClaw release decision | Package acceptance, signing/provenance, SBOM, compatibility, servicing and security runbooks | Experimental-only packaging and private distribution |
 
@@ -133,11 +133,13 @@ The current drafts provide:
   loopback node/health proof, and 56 Rust workspace tests at `41f4e705887`;
 - #116450: lifecycle/signing/token, duplex/admission/manifest conformance and
   73 stacked Rust tests at `894d125ee76`;
-- Windows #1068: replaceable runtime boundary, shared dispatcher, full C# test
-  suites, and 2/2 live Gateway MXC tests at `c0cfa8ba6680`;
-- Windows fork #2: independent C# framing/handshake/runtime-corpus consumer,
-  dispatcher adapter, fail-closed supervisor harness, 18 focused tests, 3,420
-  Shared tests, and 2,023 Tray tests at `0725c588fe23`; and
+- #116863: consolidated authenticated sidecar framing, handshake, immutable
+  configuration, ordinary-command bridge, three exact corpora, and 110 stacked
+  Rust tests at `8d0a1b013ea`;
+- Windows #1068: replaceable runtime boundary, shared dispatcher, independent
+  C# sidecar consumer, 60 focused, 3,462 Shared, 2,023 Tray, and 519 Connection
+  tests at `3ca913a43a6`; the unchanged C# default path also has 2/2 live
+  Gateway MXC proof; and
 - earlier experimental repository package, SBOM, dependency, and provenance
   evidence, which remains evidence history rather than an official release.
 

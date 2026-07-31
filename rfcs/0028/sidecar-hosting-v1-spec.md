@@ -7,16 +7,15 @@ named pipes, Unix sockets, loopback transport, Cap'n Proto, JSON, protobuf, or
 another concrete IPC encoding.
 
 Status: draft and not implemented by upstream OpenClaw PRs #116050 or #116450.
-Fork evidence PRs `giodl73-repo/openclaw` #193-#195 implement the
-transport-neutral authenticated framing, handshake, immutable configuration,
-and ordinary-command runtime bridge for review. They do not implement a
-production sidecar. Windows PR #1068 creates the replaceable client and
-capability-dispatch seam needed by the future concrete adapter while keeping C#
-as the production runtime. Windows fork PR
-`giodl73-repo/openclaw-windows-node` #2 independently reproduces all three
-Rust corpora and routes ordinary native invocations through that dispatcher.
-It is a non-selectable in-process adapter proof, not the verified process,
-protected bootstrap, concrete IPC, or production lifecycle required below.
+Upstream draft OpenClaw PR #116863 consolidates the reviewed fork evidence from
+#193-#195 and implements the transport-neutral authenticated framing, handshake,
+immutable configuration, and ordinary-command runtime bridge for review. It
+does not implement a production sidecar. Windows PR #1068 now combines the replaceable client,
+capability-dispatch seam, and independent C# reproduction of all three Rust
+corpora while keeping C# as the production runtime. Its adapter routes ordinary
+native invocations through the shared dispatcher. It is a non-selectable
+in-process proof, not the verified process, protected bootstrap, concrete IPC,
+or production lifecycle required below.
 
 The current `openclaw-node` executable is a foreground proof host, not this
 production sidecar. Its environment-indirected identity/auth loading does not
