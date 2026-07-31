@@ -38,6 +38,7 @@ Repository: `openclaw/rfcs`.
 
 - Update `rfcs/0016-claws.md`.
 - Add `rfcs/0016/claw-project-v1-spec.md`.
+- Add `rfcs/0016/claw-test-v1-spec.md`.
 - Add this implementation-plan sidecar.
 - Define project, package, and applied states plus owner boundaries.
 - Preserve schema version 1 and every accepted RFC #52 contract.
@@ -55,6 +56,9 @@ Repository: `openclaw/openclaw`.
 - Discover projects from root `package.json` plus `CLAW.md` without another
   root config file.
 - Add read-only project validation and stable structured findings.
+- Run the same validation implicitly before dev, test, and build; keep primary
+  help focused on create, dev/test, and build.
+- Reject nonempty root package scripts so built Claws remain data-only.
 - Reuse the canonical package, profile, bootstrap, extension, and file readers.
 - Keep the command behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
 
@@ -73,23 +77,29 @@ Repository: `openclaw/openclaw`.
 - Execute no package scripts or hooks.
 - Re-read the result through the canonical package reader.
 
-Exit proof: two clean builds are byte-identical; a selected input change alters
-the digest; a packed-CLI clean-prefix test independently reads the artifact.
+Exit proof: one golden project produces byte-identical output and the same
+digest on Linux, macOS, and Windows, with WSL packed-CLI proof; a selected input
+change alters the digest; the artifact independently re-reads.
 
 ### PR 4: Isolated dev and test
 
 Repository: `openclaw/openclaw`.
 
-- Add `openclaw claws dev` using disposable state by default.
+- Add offline, non-delivering `openclaw claws dev` that creates no durable
+  OpenClaw state; require `--live` plus consent and marked disposable state for
+  external effects.
 - Reuse inspect, dry-run, consent, add, status, doctor, update, and remove.
 - Print the native chat or Control UI entry point.
-- Add offline static/project scenario tests.
+- Implement the strict project-only test-v1 checks; execute no arbitrary test
+  code.
 - Gate provider-backed evaluation behind `--live` with visible model and budget
   context.
 
-Exit proof: normal stop and forced interruption leave production state
-unchanged; static tests run offline; live tests cannot start without explicit
-opt-in.
+Exit proof: offline dev creates no durable OpenClaw state; normal live stop
+cleans disposable state; an uncatchable live interruption leaves a durable
+marker that the next command and doctor can reclaim; production state remains
+unchanged; default dev/static tests produce no external effects; live execution
+cannot start without explicit opt-in.
 
 ### PR 5: Exact-artifact publication
 
