@@ -276,8 +276,10 @@ Export remains selection-based and excludes credentials, bindings, runtime
 choices, and user-owned personal files by default. It emits supported OpenClaw
 settings and native extension dependencies to `profiles/openclaw.yml`. Export
 does not infer setup questions or copy a consumed local bootstrap ritual. An
-author may add and review a new package-root `BOOTSTRAP.md` explicitly before
-publication.
+author may explicitly supply a reviewed Markdown file as the new package-root
+`BOOTSTRAP.md`. The exporter validates the finished package and binds those
+bytes into normal package integrity, but it does not infer questions, template
+private values, persist answers, or recreate bootstrap during update.
 
 ### ClawHub boundary
 
@@ -324,15 +326,18 @@ The dependency-aware cross-repository plan is in
 [`0027/implementation-plan.md`](0027/implementation-plan.md). OpenClaw
 [#115237](https://github.com/openclaw/openclaw/pull/115237) is reused for the
 conventional-profile/native-bootstrap slice. The schema-v1 extension slice is
-[#115962](https://github.com/openclaw/openclaw/pull/115962), and the current
+[#115962](https://github.com/openclaw/openclaw/pull/115962), bootstrap-native
+export authoring reuses
+[#115371](https://github.com/openclaw/openclaw/pull/115371), and the current
 Control UI/Gateway pair is
 [#112808](https://github.com/openclaw/openclaw/pull/112808) followed by
 [#112828](https://github.com/openclaw/openclaw/pull/112828). Standalone
 [#1](https://github.com/giodl73-repo/claws/pull/1) provides the schema-v1
 reference CLI/OpenClaw adapter, and standalone
 [#2](https://github.com/giodl73-repo/claws/pull/2) provides the bounded Codex
-workspace adapter. The remaining schema-v2 answer-state and guided-template
-drafts are superseded and should not land in their current form.
+workspace adapter. The schema-v2 planning and answer-state drafts in #115565
+and #115296 are superseded. #115371 is rewritten rather than landed in its
+guided-template form.
 
 ## Acceptance Criteria
 
@@ -349,19 +354,22 @@ drafts are superseded and should not land in their current form.
 7. A package-root `BOOTSTRAP.md` is seeded once through native first-run state;
    consumption is not drift, update never recreates it, and remove deletes only
    a pending digest-identical seed while preserving user-owned outputs.
-8. Credentials and resolved secrets remain on canonical owner surfaces and out
+8. Export may attach only an explicitly selected, reviewed package-root
+   `BOOTSTRAP.md`; it validates the finished package without inferring questions,
+   templating private data, or persisting answers.
+9. Credentials and resolved secrets remain on canonical owner surfaces and out
    of package content, package-authored bootstrap chat, plans, provenance, logs,
    and browser state; clients label bootstrap trust and warn against pasting
    secrets.
-9. CLI, TUI, chat, automation, and Control UI use one package validator,
+10. CLI, TUI, chat, automation, and Control UI use one package validator,
    planner, consent contract, executor, and owner model.
-10. OpenClaw presentation can use `show_widget` and packaged assets when the
+11. OpenClaw presentation can use `show_widget` and packaged assets when the
     runtime exposes the tool and returns a complete message fallback otherwise.
-11. Status and doctor report extension compatibility drift, bootstrap progress,
+12. Status and doctor report extension compatibility drift, bootstrap progress,
     and owner-specific readiness without adding per-turn Claw parsing.
-12. ClawHub validates package/profile/bootstrap structure without claiming
+13. ClawHub validates package/profile/bootstrap structure without claiming
     runtime extension compatibility or collecting local onboarding state.
-13. All new surfaces fail closed when their existing experimental Claws gate is
+14. All new surfaces fail closed when their existing experimental Claws gate is
     disabled.
 
 ## Unresolved Questions

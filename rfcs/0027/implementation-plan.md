@@ -21,8 +21,18 @@ first PR number is reused for the replacement first slice:
 - [`openclaw/openclaw#115237`](https://github.com/openclaw/openclaw/pull/115237):
   rewritten as conventional profile discovery and native bootstrap; this is
   OpenClaw PR 1 below.
-- `openclaw/openclaw#115296` persisted answers and setup mutation: superseded.
-- `openclaw/openclaw#115371` guided setup-template export: superseded.
+- [`openclaw/openclaw#115565`](https://github.com/openclaw/openclaw/pull/115565)
+  setup-v2 and application planning: accepted schema-v1 extension planning and
+  canonical plugin-owner behavior moved into #115962; setup schemas, resource
+  roles, metadata profile pointers, and schema version 2 are superseded.
+- [`openclaw/openclaw#115296`](https://github.com/openclaw/openclaw/pull/115296)
+  persisted answers and setup mutation: superseded by native bootstrap; no
+  answer ledger, configure command, setup database, or reconciliation behavior
+  moves into the replacement stack.
+- [`openclaw/openclaw#115371`](https://github.com/openclaw/openclaw/pull/115371)
+  guided setup-template export: its schema-v2 implementation is superseded, but
+  the PR number is reused for the bootstrap-native export-authoring follow-up
+  below.
 - [`openclaw/openclaw#115962`](https://github.com/openclaw/openclaw/pull/115962):
   rebuilt around schema v1 profile extensions and ordinary managed files; this
   is OpenClaw PR 2 below.
@@ -32,8 +42,9 @@ first PR number is reused for the replacement first slice:
   rebuilt without form-schema or answer-state dependencies as the bounded
   Gateway mutation and guided lifecycle slice.
 
-The superseded branches remain historical design evidence until maintainers
-choose whether to close them; they are not dependencies of the new stack.
+The superseded #115565 and #115296 branches are historical design evidence and
+are not dependencies of the new stack. Their accepted extension work is
+represented by #115962; closing them does not discard a live capability.
 
 ## OpenClaw Track
 
@@ -71,7 +82,23 @@ Active PR: [`openclaw/openclaw#115962`](https://github.com/openclaw/openclaw/pul
 - Prove schemas, references, templates, examples, fixtures, and static assets
   need no new manifest role or lifecycle beyond `workspace.files`.
 
-### PR 3: Gateway lifecycle API
+### PR 3: Bootstrap-native export authoring
+
+Planned reuse: [`openclaw/openclaw#115371`](https://github.com/openclaw/openclaw/pull/115371).
+
+- Let an author explicitly select a reviewed local Markdown file to become the
+  exported package-root `BOOTSTRAP.md`.
+- Validate bounded, nonempty UTF-8 content and reject root-bootstrap managed-file
+  collisions through the existing package reader.
+- Re-read the complete exported package so the bootstrap bytes participate in
+  the same package integrity and inspection contract as hand-authored packages.
+- Remove an incomplete export target on validation failure.
+- Warn authors that bootstrap is package-authored prompt content and must not
+  contain credentials, tokens, private answers, or machine-specific paths.
+- Do not infer setup questions, rewrite personal files, render templates,
+  persist answers, add `claws configure`, or introduce schema version 2.
+
+### PR 4: Gateway lifecycle API
 
 Active implementation is split across the read prerequisite
 [`openclaw/openclaw#112808`](https://github.com/openclaw/openclaw/pull/112808)
@@ -88,7 +115,7 @@ and mutation/guided-lifecycle
 - Keep the API presentation-neutral so CLI, TUI, automation, and browser clients
   share outcomes.
 
-### PR 4: Control UI experience
+### PR 5: Control UI experience
 
 Active implementation is the same dependency-ordered pair:
 [`openclaw/openclaw#112808`](https://github.com/openclaw/openclaw/pull/112808)
@@ -186,6 +213,9 @@ Minimum proof before asking maintainers to land the full track:
 12. One schema-v1 package produces separate host-native OpenClaw and Codex
     previews; the Codex adapter proves project-oriented projection without
     OpenClaw agent CRUD or silent loss of required capabilities.
+13. Bootstrap-native export attaches an explicit reviewed `BOOTSTRAP.md`,
+    re-inspects the finished package, and leaves no partial target after a
+    validation failure.
 
 ## Landing Order
 
@@ -194,15 +224,17 @@ Minimum proof before asking maintainers to land the full track:
    conventional profile/bootstrap.
 3. OpenClaw [PR #115962](https://github.com/openclaw/openclaw/pull/115962)
    extensions/application content.
-4. Standalone [PR #1](https://github.com/giodl73-repo/claws/pull/1)
+4. OpenClaw [PR #115371](https://github.com/openclaw/openclaw/pull/115371)
+   bootstrap-native export authoring.
+5. Standalone [PR #1](https://github.com/giodl73-repo/claws/pull/1)
    schema-v1 reference engine and OpenClaw adapter.
-5. ClawHub narrow validation update.
-6. Awesome Claws migration and clean-state validation.
-7. OpenClaw [PR #112808](https://github.com/openclaw/openclaw/pull/112808)
+6. ClawHub narrow validation update.
+7. Awesome Claws migration and clean-state validation.
+8. OpenClaw [PR #112808](https://github.com/openclaw/openclaw/pull/112808)
    read/status Control UI prerequisite.
-8. OpenClaw [PR #112828](https://github.com/openclaw/openclaw/pull/112828)
+9. OpenClaw [PR #112828](https://github.com/openclaw/openclaw/pull/112828)
    Gateway mutation and guided lifecycle.
-9. Standalone [PR #2](https://github.com/giodl73-repo/claws/pull/2) Codex
+10. Standalone [PR #2](https://github.com/giodl73-repo/claws/pull/2) Codex
    adapter proof and cross-harness conformance report.
 
 Each PR must be independently testable, signed, rebased on its real base, and
