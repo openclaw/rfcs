@@ -34,6 +34,13 @@ The sidecar must not become a second product control plane. Cloud or local
 controllers manage the node through Gateway APIs; local IPC exists only to host
 the runtime and execute product-owned capabilities.
 
+The authenticated sidecar boundary is not a sandbox for product-native
+handlers. The platform adapter is trusted product code. Authentication,
+admission, message bounds, and cancellation prevent unauthorized or confused
+dispatch, but they do not isolate a handler from the product account or OS.
+The product owns least privilege, native permissions, containment, and any
+stronger process isolation required by its capability surface.
+
 ## Launch and trust bootstrap
 
 The supervisor must select an exact runtime artifact and verify the platform's

@@ -166,6 +166,8 @@ The runtime does not own:
 
 - product UI or approval presentation;
 - product IPC and runtime selection;
+- sandboxing, OS isolation, or least-privilege policy for product-native
+  handlers, which are trusted embedding components;
 - credential persistence or OS key-store policy;
 - Windows, Apple, Android, ESP, Scout, or Lobster capability handlers;
 - `system.run`, PTY, MCP, skills, or plugins without separate accepted

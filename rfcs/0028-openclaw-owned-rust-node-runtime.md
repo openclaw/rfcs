@@ -98,6 +98,9 @@ of those products into OpenClaw.
 - Replacing Tauri or requiring native consumers to use Tauri.
 - Making OpenClaw responsible for Microsoft product UX, native tool
   implementations, IPC, signing, packaging, deployment, or support policy.
+- Sandboxing product-native handlers. Product adapters are trusted components
+  inside the embedding product's security boundary; untrusted capability code
+  must not be registered with this runtime.
 - Adding a second protocol or Microsoft-specific node role.
 - Shipping unrestricted `system.run`, PTY, or process execution without the
   canonical OpenClaw approval and policy boundary.
@@ -145,6 +148,16 @@ The crates remain in the OpenClaw monorepo while the contract is evolving. This
 keeps TypeScript and Rust conformance changes reviewable together and avoids
 repository, version, and release skew. A later RFC or maintainer decision may
 publish them once the public API and support policy are stable.
+
+During incubation, `pub` means available to reviewed workspace consumers, not
+a stable or supported public Rust API. The crate names, module layout, Rust
+types, configuration, and proof-binary interface may change through ordinary
+OpenClaw review without SemVer compatibility. In-tree consumers must change in
+the same commit or stacked series, and the shared wire fixtures and canonical
+Gateway behavior—not the current Rust API shape—remain the compatibility
+authority. The supported-release gate must define an API/versioning policy
+before publication or compatibility claims. This RFC does not select or commit
+to a cross-repository distribution mechanism.
 
 ### Ownership boundary
 
@@ -199,6 +212,12 @@ The selection is a product and deployment concern. Runtime APIs must not expose
 Tauri types, Chromium types, Windows handles, or Scout-specific management
 objects. Platform tools are registered through bounded adapters and execute only
 after canonical admission and approval decisions.
+
+The adapter is trusted product code, not a sandbox boundary. The Rust runtime
+authenticates, authorizes, bounds, correlates, and cancels dispatch, but it does
+not isolate a handler from the product account or operating system. The product
+owns least privilege, OS permissions, containment, and any stronger isolation
+required for native capability execution.
 
 ### Hosting and management are separate relationships
 
@@ -408,6 +427,8 @@ The recommended bounded answer is **yes**. It permits the two `publish = false`
 workspace crates and the Tauri reuse slice to incubate in `openclaw/openclaw`.
 It does not make the foreground proof host an official binary, promise a public
 crate API, select supported platforms, or authorize broader tool execution.
+Public Rust visibility during incubation is an internal workspace seam, carries
+no SemVer promise, and may change with its reviewed in-tree consumers.
 It also does not assign individual maintainers; that is an implementation and
 project-maintenance concern rather than an architectural prerequisite.
 
