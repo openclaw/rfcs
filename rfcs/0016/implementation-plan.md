@@ -76,6 +76,8 @@ unsafe inputs fail without mutation; the artifact independently re-reads.
 
 Repository: `openclaw/clawhub`.
 
+Implementation draft: [#3359](https://github.com/openclaw/clawhub/pull/3359).
+
 - Accept an already-built Claw artifact through the existing experimental
   ClawHub gate.
 - Authenticate package ownership, validate and scan exact bytes, and enforce
