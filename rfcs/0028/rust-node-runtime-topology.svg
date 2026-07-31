@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="600" viewBox="0 0 1120 600" role="img" aria-labelledby="title desc">
+  <title id="title">Proposed OpenClaw Rust node runtime topology</title>
+  <desc id="desc">Authorized controllers communicate with the Rust node only through the OpenClaw Gateway. A product shell hosts the runtime through a product-owned adapter and retains native tools, approvals, process supervision, packaging, and deployment.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#52606d"/>
+    </marker>
+    <style>
+      .title { font: 700 22px system-ui, sans-serif; fill: #172b4d; }
+      .label { font: 600 17px system-ui, sans-serif; fill: #172b4d; }
+      .small { font: 14px system-ui, sans-serif; fill: #42526e; }
+      .box { stroke-width: 2; rx: 12; }
+      .arrow { fill: none; stroke: #52606d; stroke-width: 2.5; marker-end: url(#arrow); }
+      .bidi { fill: none; stroke: #52606d; stroke-width: 2.5; marker-start: url(#arrow); marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1120" height="600" fill="#ffffff"/>
+  <text x="560" y="36" text-anchor="middle" class="title">Proposed OpenClaw Rust node runtime topology</text>
+
+  <rect x="40" y="86" width="240" height="188" class="box" fill="#e9f2ff" stroke="#579dff"/>
+  <text x="160" y="118" text-anchor="middle" class="label">Authorized controllers</text>
+  <text x="160" y="155" text-anchor="middle" class="small">Scout Cloud</text>
+  <text x="160" y="185" text-anchor="middle" class="small">Windows Companion</text>
+  <text x="160" y="215" text-anchor="middle" class="small">Cowork / other clients</text>
+  <text x="160" y="250" text-anchor="middle" class="small">No direct runtime access</text>
+
+  <rect x="416" y="116" width="288" height="128" class="box" fill="#fff7d6" stroke="#e2b203"/>
+  <text x="560" y="155" text-anchor="middle" class="label">OpenClaw Gateway</text>
+  <text x="560" y="185" text-anchor="middle" class="small">authentication · authorization</text>
+  <text x="560" y="211" text-anchor="middle" class="small">session state · audit · revocation</text>
+
+  <rect x="808" y="76" width="272" height="210" class="box" fill="#e3fcef" stroke="#22a06b"/>
+  <text x="944" y="110" text-anchor="middle" class="label">OpenClaw Rust runtime</text>
+  <rect x="836" y="133" width="216" height="52" class="box" fill="#ffffff" stroke="#22a06b"/>
+  <text x="944" y="165" text-anchor="middle" class="small">openclaw-gateway-client</text>
+  <rect x="836" y="205" width="216" height="52" class="box" fill="#ffffff" stroke="#22a06b"/>
+  <text x="944" y="237" text-anchor="middle" class="small">openclaw-node-host</text>
+
+  <rect x="416" y="388" width="288" height="88" class="box" fill="#f3f0ff" stroke="#8777d9"/>
+  <text x="560" y="423" text-anchor="middle" class="label">Product-owned adapter</text>
+  <text x="560" y="451" text-anchor="middle" class="small">in-process or authenticated sidecar</text>
+
+  <rect x="760" y="350" width="320" height="182" class="box" fill="#f7f8f9" stroke="#7a869a"/>
+  <text x="920" y="386" text-anchor="middle" class="label">Product shell</text>
+  <text x="920" y="418" text-anchor="middle" class="small">first adopter: Copilot system tray</text>
+  <text x="920" y="450" text-anchor="middle" class="small">native tools · approvals · IPC</text>
+  <text x="920" y="478" text-anchor="middle" class="small">process supervision · audit</text>
+  <text x="920" y="506" text-anchor="middle" class="small">packaging · deployment</text>
+
+  <path d="M280 180 H408" class="arrow"/>
+  <text x="344" y="168" text-anchor="middle" class="small">Gateway APIs</text>
+  <path d="M704 180 H800" class="bidi"/>
+  <text x="752" y="162" text-anchor="middle" class="small">node session</text>
+  <path d="M944 286 V334 H704 V388" class="bidi"/>
+  <text x="824" y="326" text-anchor="middle" class="small">bounded runtime contract</text>
+  <path d="M704 432 H752" class="bidi"/>
+</svg>

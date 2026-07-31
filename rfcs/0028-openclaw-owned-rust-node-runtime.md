@@ -3,7 +3,7 @@ title: OpenClaw-owned Rust node runtime
 authors:
   - Gio Della-Libera
 created: 2026-07-29
-last_updated: 2026-07-30
+last_updated: 2026-07-31
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/54
@@ -14,11 +14,11 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/54
 ## Summary
 
 OpenClaw should own a reusable, headless Rust node runtime in the OpenClaw
-repository. Product shells—including Microsoft's Windows Companion and system
-tray work in Microsoft-owned Edge/Chromium repositories—should embed or launch
-that runtime through narrow adapters instead of implementing a separate node.
-This gives Windows Companion and Scout Cloud a common OpenClaw node to manage,
-while each product keeps ownership of its user experience, native tools,
+repository. Its first proposed product adopter is the new Copilot app system
+tray in Microsoft's Edge/Chromium repository. Separately, Windows Companion
+and `openclaw-windows-node` can align on the same crates to simplify their
+native stack. Each product embeds or launches the runtime through a narrow
+adapter while retaining ownership of its user experience, native tools,
 packaging, and deployment.
 
 This RFC records the requested technical ownership split. Microsoft product
@@ -54,24 +54,17 @@ Windows-native product that intends to run without a Node.js or Tauri runtime:
   drift likely and would not give Scout Cloud or other native hosts a reusable
   OpenClaw implementation.
 
-The desired Windows architecture is materially simpler when the product shell
-can delegate the portable execution plane:
+The desired architecture is materially simpler when a product shell delegates
+the portable node execution plane while all remote management remains behind
+Gateway authentication and authorization:
 
-```text
-Windows Companion
-  Tray / Settings / Windows UX / Windows-native tools / IPC adapter
-                              |
-                              v
-                    OpenClaw Rust runtime
-  Gateway client / protocol / node lifecycle / invocation execution /
-        input and progress / cancellation / approval integration
-                              |
-                              v
-                           Gateway
-                              ^
-                              |
-                 Scout Cloud management plane
-```
+![Proposed OpenClaw Rust node runtime topology](0028/rust-node-runtime-topology.svg)
+
+The Copilot app system tray is the first proposed host. Windows Companion is a
+separate adopter: it can reuse the same crates for its native node work and can
+also act as an authorized Gateway controller for the tray node. Scout Cloud and
+other authorized OpenClaw controllers use the same Gateway-mediated path; none
+connect directly to the local runtime.
 
 One implementation and conformance suite can then serve native desktop shells,
 headless deployments, and managed-node scenarios without transferring ownership
@@ -164,9 +157,10 @@ OpenClaw maintainers own:
 - integration with canonical OpenClaw approval and command/tool policy;
 - cross-language fixtures, conformance tests, compatibility, and releases.
 
-Microsoft's Edge/Chromium product teams own:
+Microsoft product teams own:
 
-- the Windows Companion process and system-tray shell;
+- the Copilot app system-tray shell in Edge/Chromium;
+- the Windows Companion and `openclaw-windows-node` product integration;
 - settings and Windows-native user experiences;
 - Windows-native tools and their runtime adapters;
 - the IPC shape between the product shell and an out-of-process runtime, when
@@ -208,19 +202,21 @@ after canonical admission and approval decisions.
 
 ### Hosting and management are separate relationships
 
-Windows Companion can have two relationships with the same Rust node instance:
+A product may have either or both of these relationships with a Rust node:
 
-1. **Local hosting and supervision:** Windows Companion embeds the runtime or
+1. **Local hosting and supervision:** the product shell embeds the runtime or
    starts it as a sidecar, supplies credentials and native-tool adapters, and
-   owns local start, stop, health, and recovery behavior.
+   owns local start, stop, health, and recovery behavior. The first proposed
+   host is the Copilot app system tray in Edge/Chromium.
 2. **Gateway-mediated management:** Windows Companion, Scout Cloud, or another
-   authorized OpenClaw controller observes and manages the node through
-   canonical Gateway APIs.
+   authorized OpenClaw controller observes and manages a node through canonical
+   Gateway APIs.
 
 The first relationship is local process composition. The second is a control-
 plane relationship and does not require another runtime or a product-specific
-management implementation inside `openclaw-node-host`. The same system-tray
-node can participate in both relationships.
+management implementation inside `openclaw-node-host`. The Copilot system-tray
+node can be locally hosted by its product shell while authorized controllers
+manage it through the Gateway.
 
 Gateway remains authoritative for controller authentication, node session
 state, authorization, conflict behavior, audit attribution, and revocation.
