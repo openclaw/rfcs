@@ -52,6 +52,8 @@ runtime, and that the V1 slice is small enough to prove with one application.
 
 Repository: `openclaw/openclaw`.
 
+Implementation draft: [#117037](https://github.com/openclaw/openclaw/pull/117037).
+
 - Add `openclaw claws create` with one minimal readable project.
 - Discover a project from root `package.json` plus `CLAW.md`; add read-only
   validation and run it implicitly before dev and build.
