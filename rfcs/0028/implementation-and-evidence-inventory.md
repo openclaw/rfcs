@@ -134,7 +134,7 @@ final UTF-8 validator correction.
 | Gateway session | Implemented draft | Ownership, compatibility and release acceptance |
 | Basic node invocation | Implemented draft | Shared canonical fixtures and current-head live Gateway proof |
 | Duplex input/progress/cancel | Implemented draft | Complete published node-event corpus and cross-language proof |
-| Sidecar IPC | Not implemented; current foreground proof host uses environment-indirected secrets | Accept `sidecar-hosting-v1-spec.md`, choose transport, build authenticated launch/adapter |
+| Sidecar IPC | Fork evidence #193-#195 implements authenticated framing, handshake, immutable configuration, ordinary-command adapter bridge, and cross-language corpora; no concrete IPC/credential bootstrap | Accept `sidecar-hosting-v1-spec.md`, reproduce vectors in the Windows adapter, choose transport, and prove authenticated launch/duplex/audit/crash/rollback behavior |
 | Persistent secure identity/token storage | Embedding seam only | Platform adapter and rotation/revocation proof |
 | Product audit/export adapter | Not implemented | Stable event contract, correlation/redaction proof, real product audit sink |
 | Aggregate retained-event byte budget | Implemented draft: exact count plus aggregate raw-frame bytes; 256 events and 64 MiB by default | Current-head compatibility and load proof before support |

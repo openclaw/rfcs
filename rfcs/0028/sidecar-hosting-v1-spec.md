@@ -6,9 +6,13 @@ security, and lifecycle invariants. It intentionally does not select Windows
 named pipes, Unix sockets, loopback transport, Cap'n Proto, JSON, protobuf, or
 another concrete IPC encoding.
 
-Status: draft and not implemented by OpenClaw PRs #116050 or #116450. Windows
-PR #1068 creates the replaceable client and capability-dispatch seam needed by
-a future adapter while keeping C# as the production runtime.
+Status: draft and not implemented by upstream OpenClaw PRs #116050 or #116450.
+Fork evidence PRs `giodl73-repo/openclaw` #193-#195 implement the
+transport-neutral authenticated framing, handshake, immutable configuration,
+and ordinary-command runtime bridge for review. They do not implement a
+production sidecar. Windows PR #1068 creates the replaceable client and
+capability-dispatch seam needed by the future concrete adapter while keeping C#
+as the production runtime.
 
 The current `openclaw-node` executable is a foreground proof host, not this
 production sidecar. Its environment-indirected identity/auth loading does not

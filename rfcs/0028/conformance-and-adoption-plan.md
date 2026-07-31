@@ -26,7 +26,7 @@ supported.
 | N1 bounded node foundation | OpenClaw #116050 | Real loopback Gateway invocation plus health/readiness/shutdown | Per-adopter basic node session/runtime scaffolding |
 | N2 embeddable lifecycle | OpenClaw #116450 | Shared fixtures and real socket lifecycle, signing, token, reconnect, duplex, manifest, admission tests | Per-adopter signing/reconnect/invocation lifecycle |
 | A1 adopter seam | Windows #1068 | Existing C# default, full unit suites, real Gateway MXC path | Duplicate Windows routing when Rust adapter arrives |
-| A2 sidecar adapter | future adopter PR | Authenticated/versioned IPC, parity, crash, revocation, resource, rollout and rollback proof | Incumbent product-owned Gateway transport after rollout |
+| A2 sidecar adapter | OpenClaw fork evidence #193-#195 plus future adopter PR | Authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, parity, crash, revocation, resource, rollout and rollback proof | Incumbent product-owned Gateway transport after rollout |
 | R1 supported release | future OpenClaw release decision | Package acceptance, signing/provenance, SBOM, compatibility, servicing and security runbooks | Experimental-only packaging and private distribution |
 
 ## Shared fixture families
