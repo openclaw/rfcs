@@ -12,6 +12,7 @@ semantics.
 | `openclaw/openclaw` foundation PR #116050 | `41f4e705887` | Draft; Rust client/host plus Linux Tauri consumer |
 | `openclaw/openclaw` follow-up PR #116450 | `894d125ee76` | Draft; logically stacked on #116050 |
 | `openclaw/openclaw-windows-node` PR #1068 | `c0cfa8ba6680` | Draft; C# remains production default |
+| `giodl73-repo/openclaw-windows-node` fork PR #2 | `0725c588fe23` | Draft adapter proof stacked on #1068; not selectable |
 | `openclaw/rfcs` RFC #54 | Current PR head | Draft ownership decision; this inventory is refreshed with each evidence change |
 | Experimental `openclaw-rust-node` evidence repository | merged PRs #1-#5; draft #6 | Evidence history, not official distribution |
 
@@ -105,6 +106,23 @@ execute commands.
 It contains no Rust binary, IPC protocol, runtime-selection change, or deletion
 of the C# Gateway client.
 
+### Independent Windows sidecar adapter in fork #2
+
+- byte-exact C# consumers for the Rust protocol, handshake, and runtime corpora;
+- authenticated direction/session/generation/sequence enforcement with terminal
+  key retirement;
+- independently recomputed negotiation and immutable manifest acknowledgement;
+- bounded admission and outbound queues, cancellation, logical-output and exact
+  envelope bounds; and
+- ordinary native invocation routing only through `NodeCapabilityDispatcher`.
+
+It is an in-process, non-selectable proof. It does not implement the verified
+Rust artifact/process owner, protected bootstrap, concrete IPC, Gateway
+connection/pairing/token lifecycle, health/crash supervision, audit export,
+resource proof, rollout, or rollback. The current Rust runtime also rejects the
+reserved `system.*` namespace, so Windows `system.run` remains on C# pending an
+explicit OpenClaw authorization mechanism.
+
 ## Evidence inventory
 
 | Evidence | Environment | Result | Limitation |
@@ -116,6 +134,7 @@ of the C# Gateway client.
 | Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers pass at `894d125ee76`; earlier hosted TypeScript lanes passed | Final-head TypeScript UTF-8 validator tests are pending because the local dependency fetch failed TLS negotiation |
 | Windows adopter | Windows 11, `c0cfa8ba6680` | 3,402 Shared, 2,023 Tray, 519 Connection tests | Rust adapter not present |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |
+| Windows sidecar adapter | Windows 11, `0725c588fe23` | Exact three-corpus reproduction; 18 focused, 3,420 Shared, and 2,023 Tray tests; sequential correctness/design/security reviews clean | In-process source harness; no Rust process, concrete IPC, Gateway session, or selection |
 | Experimental package acceptance | Linux x64, Windows x64, macOS ARM64 | Build/checksum/extract/execute evidence | Separate experimental repository |
 | Dependency/SBOM/provenance | Experimental repository PRs #5/#6 | RustSec, CycloneDX, repository-bound attestations | Not an OpenClaw-supported release |
 
@@ -134,7 +153,7 @@ final UTF-8 validator correction.
 | Gateway session | Implemented draft | Ownership, compatibility and release acceptance |
 | Basic node invocation | Implemented draft | Shared canonical fixtures and current-head live Gateway proof |
 | Duplex input/progress/cancel | Implemented draft | Complete published node-event corpus and cross-language proof |
-| Sidecar IPC | Fork evidence #193-#195 implements authenticated framing, handshake, immutable configuration, ordinary-command adapter bridge, and cross-language corpora; no concrete IPC/credential bootstrap | Accept `sidecar-hosting-v1-spec.md`, reproduce vectors in the Windows adapter, choose transport, and prove authenticated launch/duplex/audit/crash/rollback behavior |
+| Sidecar IPC | Fork evidence #193-#195 plus Windows fork #2 implements both sides of authenticated framing, handshake, immutable configuration, ordinary-command adapter routing, and exact cross-language corpora; no concrete IPC/credential bootstrap | Accept `sidecar-hosting-v1-spec.md`, choose transport, and prove verified artifact launch, protected bootstrap, duplex/Gateway/audit/crash/resource/rollback behavior |
 | Persistent secure identity/token storage | Embedding seam only | Platform adapter and rotation/revocation proof |
 | Product audit/export adapter | Not implemented | Stable event contract, correlation/redaction proof, real product audit sink |
 | Aggregate retained-event byte budget | Implemented draft: exact count plus aggregate raw-frame bytes; 256 events and 64 MiB by default | Current-head compatibility and load proof before support |

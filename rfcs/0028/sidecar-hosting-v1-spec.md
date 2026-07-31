@@ -12,7 +12,11 @@ transport-neutral authenticated framing, handshake, immutable configuration,
 and ordinary-command runtime bridge for review. They do not implement a
 production sidecar. Windows PR #1068 creates the replaceable client and
 capability-dispatch seam needed by the future concrete adapter while keeping C#
-as the production runtime.
+as the production runtime. Windows fork PR
+`giodl73-repo/openclaw-windows-node` #2 independently reproduces all three
+Rust corpora and routes ordinary native invocations through that dispatcher.
+It is a non-selectable in-process adapter proof, not the verified process,
+protected bootstrap, concrete IPC, or production lifecycle required below.
 
 The current `openclaw-node` executable is a foreground proof host, not this
 production sidecar. Its environment-indirected identity/auth loading does not
