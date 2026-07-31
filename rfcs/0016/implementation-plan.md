@@ -1,8 +1,8 @@
 # Claw Application Framework Implementation Plan
 
-This sidecar defines the dependency-ordered implementation plan for the Claw
-project and developer lifecycle in RFC 0016. It is a follow-on to, not a
-replacement for, the package/application stack.
+This sidecar defines the smallest dependency-ordered implementation plan for
+the Claw project and developer lifecycle in RFC 0016. It proves one complete
+author-to-recipient path before generalizing testing or live development.
 
 Status: proposed experimental plan.
 
@@ -24,84 +24,53 @@ behavior supplied by their current OpenClaw implementation stack:
 5. [#112828](https://github.com/openclaw/openclaw/pull/112828): consented
    Gateway and Control UI mutation lifecycle.
 
-The framework PRs may be drafted while this prerequisite stack is reviewed,
-but they must not duplicate it or be presented as independently complete. The
-framework RFC must not be accepted before RFC #48 and RFC #52. OpenClaw
-implementation PRs should be based on the merged prerequisite behavior, not
-permanently stacked on unmerged fork heads.
+The project PRs may be drafted while this prerequisite stack is reviewed, but
+they must not duplicate it or be presented as independently complete. This RFC
+must not be accepted before RFC #48 and RFC #52. OpenClaw implementation should
+be based on merged prerequisite behavior rather than permanently stacked on
+unmerged fork heads.
 
-## Series
+## Four-PR Series
 
-### PR 1: RFC 0016 application-framework addendum
+### PR 1: Core project contract
 
 Repository: `openclaw/rfcs`.
 
 - Update `rfcs/0016-claws.md`.
-- Add `rfcs/0016/claw-project-v1-spec.md`.
-- Add `rfcs/0016/claw-test-v1-spec.md`.
-- Add this implementation-plan sidecar.
-- Define project, package, and applied states plus owner boundaries.
+- Add `rfcs/0016/claw-project-v1-spec.md` and this implementation plan.
+- Define project, immutable package, and applied Claw states.
+- Define `create`, implicit/read-only validation, offline `dev`, deterministic
+  `build`, exact-artifact publication, and clean-recipient proof.
 - Preserve schema version 1 and every accepted RFC #52 contract.
+- Record declarative tests and live development as explicit follow-ups.
 
-Exit proof: maintainer review confirms that project tooling composes OpenClaw
-owners rather than becoming a second runtime, and the dependencies on RFC #48
-and RFC #52 are explicit.
+Exit proof: maintainer review confirms that the project layer supplies the
+missing OpenClaw application-development lifecycle without becoming a second
+runtime, and that the V1 slice is small enough to prove with one application.
 
-### PR 2: Create and validate
-
-Repository: `openclaw/openclaw`.
-
-- Add `openclaw claws create` with one minimal project and one maintained
-  application example.
-- Discover projects from root `package.json` plus `CLAW.md` without another
-  root config file.
-- Add read-only project validation and stable structured findings.
-- Run the same validation implicitly before dev, test, and build; keep primary
-  help focused on create, dev/test, and build.
-- Reject nonempty root package scripts so built Claws remain data-only.
-- Reuse the canonical package, profile, bootstrap, extension, and file readers.
-- Keep the command behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
-
-Exit proof: one command creates a readable project that validates offline; an
-unsafe path and unsupported required component fail without mutation.
-
-### PR 3: Deterministic build
+### PR 2: Complete local authoring lifecycle
 
 Repository: `openclaw/openclaw`.
 
-- Add `openclaw claws build` producing one immutable artifact.
-- Emit one canonical npm-compatible `.tgz` with a conventional `package/` root.
-- Define stable archive ordering, metadata, timestamps, permissions, path
-  separators, and compression.
-- Exclude tests, caches, secrets, host paths, and local state.
-- Execute no package scripts or hooks.
-- Re-read the result through the canonical package reader.
+- Add `openclaw claws create` with one minimal readable project.
+- Discover a project from root `package.json` plus `CLAW.md`; add read-only
+  validation and run it implicitly before dev and build.
+- Reject nonempty root package scripts and reuse canonical package, profile,
+  bootstrap, extension, asset, and lifecycle readers.
+- Add `openclaw claws build` producing one deterministic npm-compatible `.tgz`
+  with a conventional `package/` root and no author-only or local state.
+- Re-read the artifact through the canonical package reader.
+- Add offline `openclaw claws dev`, which builds a temporary snapshot and shows
+  the canonical inspect/add dry-run without applying, contacting providers,
+  invoking network capabilities, activating schedules, or delivering messages.
+- Keep every command behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
 
-Exit proof: one golden project produces byte-identical output and the same
-digest on Linux, macOS, and Windows, with WSL packed-CLI proof; a selected input
-change alters the digest; the artifact independently re-reads.
+Exit proof: one command creates a valid readable project; offline dev reports
+the exact lifecycle plan without durable state; one golden project builds to
+the same artifact digest on Linux, macOS, and Windows with WSL packed-CLI proof;
+unsafe inputs fail without mutation; the artifact independently re-reads.
 
-### PR 4: Isolated dev and test
-
-Repository: `openclaw/openclaw`.
-
-- Add offline, non-delivering `openclaw claws dev` that creates no durable
-  OpenClaw state; require `--live` plus consent and marked disposable state for
-  external effects.
-- Reuse inspect, dry-run, consent, add, status, doctor, update, and remove.
-- Print the native chat or Control UI entry point.
-- Implement the strict project-only test-v1 checks; execute no arbitrary test
-  code.
-- Gate provider-backed evaluation behind `--live` with visible model and budget
-  context.
-
-Exit proof: offline dev creates no durable OpenClaw state; normal live stop
-cleans disposable state; an uncatchable live interruption leaves a durable
-marker that the next command and doctor can reclaim; production state remains
-unchanged; default dev/static tests produce no external effects; live execution
-cannot start without explicit opt-in.
-
-### PR 5: Exact-artifact publication
+### PR 3: Exact-artifact publication
 
 Repository: `openclaw/clawhub`.
 
@@ -110,47 +79,58 @@ Repository: `openclaw/clawhub`.
 - Authenticate package ownership, validate and scan exact bytes, and enforce
   immutable versions.
 - Record and return the exact artifact digest.
-- Never rebuild source or execute package project code.
-- Keep publication ownership in ClawHub rather than adding a second OpenClaw
-  mutation path.
+- Never rebuild source or execute project code.
+- Keep publication ownership in ClawHub rather than adding an OpenClaw publish
+  or mutation path.
 
-Exit proof: the submitted, stored, and downloaded bytes and digests match; a
+Exit proof: submitted, stored, and downloaded bytes and digests match; a
 changed or reused immutable version fails closed.
 
-### PR 6: Reference corpus and clean-recipient proof
+### PR 4: One polished end-to-end reference Claw
 
 Repository: `openclaw/awesome-claws`.
 
-- Upgrade the copyable reference Claw and golden Claw to the project/test
-  contract.
+- Upgrade one copyable reference Claw into the golden application project.
 - Include one schema asset, one output template, one exact extension, one MCP
-  prerequisite, native bootstrap, one isolated schedule, and rich UI plus
+  prerequisite, native bootstrap, one isolated schedule, and rich UI with a
   complete Markdown fallback.
-- Run create, validate, build, dev, static test, publish, clean add, status,
-  doctor, and remove against the exact artifact.
-- Classify package, framework, registry, adapter, owner, environment, and model
-  failures separately.
+- Run create, validate, offline dev, deterministic build, exact publish, clean
+  add, status, doctor, and remove against the same artifact.
+- Record source revision, builder version, package digest, registry digest,
+  applying OpenClaw version, experimental gates, environment, and owner result.
 
 Exit proof: build digest equals published digest equals downloaded and applied
-digest; the clean recipient is ready except for any deliberately omitted local
-credential, and removal preserves bootstrap-created user content.
+digest; the clean recipient is ready except for a deliberately omitted local
+credential; removal preserves bootstrap-created user content. Unit tests alone
+do not satisfy this clean-recipient gate.
 
 ## Dependency Graph
 
 ```mermaid
 flowchart LR
-  Base[RFC 48 and 52 prerequisite stack] --> RFC[1 project RFC]
-  RFC --> Create[2 create and validate]
-  Create --> Build[3 deterministic build]
-  Build --> Dev[4 isolated dev and test]
-  Build --> Publish[5 exact publish]
-  Dev --> Corpus[6 corpus proof]
-  Publish --> Corpus
+  Base[RFC 48 and 52 prerequisite stack] --> RFC[1 core project contract]
+  RFC --> Local[2 local authoring lifecycle]
+  Local --> Publish[3 exact publication]
+  Publish --> Proof[4 polished reference proof]
 ```
 
-PRs 4 and 5 may proceed in parallel after deterministic build. The corpus PR
-is last because it is the cross-repository proof, not the place to invent
-missing framework semantics.
+This is intentionally one vertical sequence. The reference project verifies
+the framework and registry contracts; it is not the place to invent missing
+semantics.
+
+## Deferred Follow-Ups
+
+After the four-PR series demonstrates internal product fit, separate reviewed
+tracks may add:
+
+- a bounded declarative `claws test` format;
+- provider-backed model evaluation with explicit model and budget disclosure;
+- live disposable development and interruption recovery; and
+- a broader Awesome Claws conformance matrix.
+
+These are not required to call the first lifecycle complete. Their design must
+use evidence from real authors and the golden reference Claw rather than
+speculating ahead of use.
 
 ## Deliberate Omissions
 
@@ -161,27 +141,23 @@ This series does not add:
 - schema version 2;
 - setup forms, answer persistence, or update reconciliation;
 - package-authored build hooks or arbitrary downloaded test code;
+- provider-backed or live project execution;
 - Gateway deployment or service management;
 - multi-agent/subagent packages; or
 - a required standalone `npx claws` implementation.
-
-These omissions keep the first series focused on the missing development and
-artifact lifecycle while reusing the application and runtime contracts already
-under review.
 
 ## End-to-End Gate
 
 Before the series is called complete, one exact reference project must prove:
 
 ```text
-create -> validate -> isolated dev -> static test -> deterministic build
-       -> exact publish -> clean add -> status/doctor -> remove
+create -> offline dev -> deterministic build -> exact publish
+       -> clean add -> status/doctor -> remove
 ```
 
-The proof must record the source revision, builder version, package digest,
-registry digest, applying OpenClaw version, experimental gates, environment,
-and result for each owner boundary. Unit tests alone do not satisfy the
-clean-recipient or interruption-cleanup gates.
+The proof must show that the same immutable package bytes cross every boundary.
+No stage may substitute a rebuilt artifact or imply registry approval bypasses
+OpenClaw dependency policy, capability consent, or owner readiness.
 
 ## Stop Conditions
 
@@ -193,5 +169,4 @@ Return to RFC review if implementation requires:
 - accepting nondeterministic artifact bytes;
 - changing portable schema version 1;
 - treating registry approval as dependency or capability consent; or
-- merging this addendum before its RFC #48 and RFC #52 prerequisites are
-  accepted.
+- merging this addendum before RFC #48 and RFC #52 are accepted.

@@ -627,8 +627,8 @@ adds; it never reports a partial agent as successfully added.
 ### Claw projects and developer lifecycle
 
 RFC 0016 also defines a source-project layer above the package and applied
-lifecycle. A **Claw project** is human-authored source plus project-only tests
-and fixtures. A **Claw package** is the deterministic, immutable artifact built
+lifecycle. A **Claw project** is human-authored source plus local authoring
+material. A **Claw package** is the deterministic, immutable artifact built
 from that source. An **applied Claw** is the one agent and owner-managed local
 state realized from that artifact.
 
@@ -639,10 +639,9 @@ all local mutation. ClawHub owns authenticated publication, scanning,
 discovery, and immutable artifact delivery.
 
 The normative project and build contract is
-[`0016/claw-project-v1-spec.md`](0016/claw-project-v1-spec.md). The bounded
-project-only test format is
-[`0016/claw-test-v1-spec.md`](0016/claw-test-v1-spec.md). Their delivery
-sequence is [`0016/implementation-plan.md`](0016/implementation-plan.md).
+[`0016/claw-project-v1-spec.md`](0016/claw-project-v1-spec.md). Its focused
+four-PR delivery sequence is
+[`0016/implementation-plan.md`](0016/implementation-plan.md).
 
 This addendum depends on the portable profile/bootstrap contract in
 [RFC PR #48](https://github.com/openclaw/rfcs/pull/48), the
@@ -655,13 +654,15 @@ does not redefine or independently implement them. This addendum may be
 reviewed in parallel, but it must not be accepted or merged before those
 prerequisite contracts are accepted.
 
-The V1 primary authoring lifecycle is create, dev, test, and build. Read-only
+The V1 primary authoring lifecycle is create, dev, and build. Read-only
 `validate` remains available for CI and diagnosis and runs automatically before
-dev, test, and build. Build is separate from publication: a registry receives
-only an exact already-built artifact. Production realization continues to use
-the existing `claws add` lifecycle. Project commands never write production
-OpenClaw state implicitly, run or ship package-authored lifecycle scripts, or
-package credentials and local bindings.
+dev and build. V1 `dev` stops at an offline canonical lifecycle preview; live
+execution and a declarative test framework require later evidence. Build is
+separate from publication: a registry receives only an exact already-built
+artifact. Production realization continues to use the existing `claws add`
+lifecycle. Project commands never write production OpenClaw state implicitly,
+run or ship package-authored lifecycle scripts, or package credentials and
+local bindings.
 
 ### Provenance and local state
 
@@ -986,16 +987,13 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
     same artifact digest; project-only tests, caches, scripts, credentials, and
     local paths are excluded, and the result revalidates through the canonical
     package reader.
-22. Offline development creates no durable OpenClaw state. Live development
-    uses durable disposable-state markers, never touches the operator's
-    production state, cleans normally on stop, and makes abandoned state
-    discoverable and reclaimable after interruption.
-23. Static project tests use the strict project-only test-v1 format and run
-    without provider credentials or external effects. Live development or
-    evaluation is separately requested and reports its selected model and
-    budget context.
-24. Publication accepts the exact built artifact rather than rebuilding source,
-    and clean-recipient add verifies the same artifact digest.
+22. Offline development creates no durable OpenClaw state and produces no
+    provider, network, schedule, or channel-delivery effects.
+23. Publication accepts the exact built artifact rather than rebuilding source
+    and returns its immutable digest.
+24. One polished reference Claw proves create, offline dev, deterministic build,
+    exact publish, clean-recipient add, status, doctor, and remove with the same
+    artifact digest.
 
 ## Unresolved questions
 

@@ -33,7 +33,7 @@ This specification defines:
 - project discovery and conventional source layout;
 - create and read-only validation behavior;
 - deterministic package builds and project-only exclusions;
-- isolated local development and static or explicitly live tests;
+- offline local lifecycle preview;
 - the handoff of exact built artifacts to ClawHub and OpenClaw; and
 - conformance evidence for the complete author-to-recipient lifecycle.
 
@@ -66,7 +66,7 @@ identity.
 ```mermaid
 flowchart LR
   Project[Claw project] --> Validate[validate]
-  Validate --> Dev[dev and test]
+  Validate --> Dev[offline dev preview]
   Validate --> Build[deterministic build]
   Build --> Package[Claw package]
   Package --> Publish[ClawHub publish]
@@ -81,9 +81,9 @@ models, tools, sandboxes, channels, secrets, plugins, MCP servers, schedules,
 workspaces, bootstrap, status, diagnostics, update, and removal.
 
 The Claw project tooling owns only source discovery, project validation,
-deterministic packaging, disposable development orchestration, project tests,
-and exact-artifact handoff. It must call public or explicitly shared OpenClaw
-lifecycle services rather than reproduce their planning or mutation logic.
+deterministic packaging, offline lifecycle preview, and exact-artifact handoff.
+It must call public or explicitly shared OpenClaw lifecycle services rather
+than reproduce their planning or mutation logic.
 
 ClawHub owns authenticated publication, package ownership, immutable versions,
 security scanning, discovery, and exact artifact distribution. Publication is
@@ -107,25 +107,16 @@ my-claw/
 |-- references/
 |-- schemas/
 |-- templates/
-|-- examples/
-|-- fixtures/
-`-- tests/
-    `-- smoke.claw-test.yml
+`-- examples/
 ```
 
 These directory names do not create new runtime owners. Files become package
-content only through the existing package and manifest contracts. `tests/` is
-project-only by default. A fixture intended to ship as application content must
-also be selected through ordinary managed package content rather than inheriting
-publishability from its directory name.
+content only through the existing package and manifest contracts. Repository
+tests, fixtures, and other author-only material are not selected implicitly.
 
 Project discovery must use canonical real paths, reject an ambiguous ancestor
 project, and apply the package specification's path, link, file-type, size, and
 containment rules before consuming source bytes.
-
-Project tests use the strict format in
-[`claw-test-v1-spec.md`](claw-test-v1-spec.md). They are never inferred from
-arbitrary YAML or executable files under `tests/`.
 
 ## Create
 
@@ -151,7 +142,7 @@ credentials, or modify OpenClaw state.
 `openclaw claws validate [path]` is read-only. It validates the project and the
 exact package inputs that a subsequent build would consume.
 
-Validate is also an implicit prerequisite of `dev`, `test`, and `build`. Those
+Validate is also an implicit prerequisite of `dev` and `build`. Those
 commands must return the same validation findings before performing their own
 work. Standalone validate remains useful for editors, CI, and focused diagnosis
 without becoming another required first-use step.
@@ -225,85 +216,25 @@ quarantines the incomplete output and returns failure.
 Build and publish are separate operations. Build success conveys no registry
 ownership, security approval, or runtime compatibility promise.
 
-## Isolated Development
+## Offline Development Preview
 
 `openclaw claws dev [path]` builds a development snapshot and exercises it
-through the canonical OpenClaw lifecycle. Its default lane stops at an offline
-preview; its explicit live lane uses disposable state.
-
-Default `dev` is offline, non-delivering, and read-only outside temporary build
-files. It validates, builds, and produces the complete native lifecycle preview
-without creating applied or durable OpenClaw state. It does not start
-provider-backed turns, invoke network-capable tools or MCP servers, activate
-recurring schedules, or deliver through channels. Starting those effects
-requires `dev --live`, a marked disposable state boundary, the normal
-integrity-bound lifecycle consent, and an explicit display of each enabled
-external effect. Recurring work and outbound channel delivery remain suppressed
-unless separately selected in that live plan.
+through the canonical OpenClaw planner without applying it. V1 `dev` is
+offline, non-delivering, and read-only outside temporary build files. It
+validates, builds, and produces the complete native lifecycle preview without
+creating applied or durable OpenClaw state. It does not start provider-backed
+turns, invoke network-capable tools or MCP servers, activate recurring
+schedules, or deliver through channels.
 
 If a canonical owner cannot complete preflight without network access, offline
 dev reports that unresolved prerequisite or blocker rather than weakening the
-offline boundary or claiming readiness. The same project may obtain the fuller
-preflight only through explicitly consented live execution.
+offline boundary or claiming readiness.
 
-Every dev run must:
+Dev must:
 
 - show the same inspect and dry-run effects production add would show;
 - reuse the canonical add planner and readiness owners; and
 - expose missing local prerequisites honestly.
-
-Live dev must additionally:
-
-- use an isolated state directory, agent id, workspace, scheduler state, and
-  local lifecycle provenance;
-- require `--live` and normal consent before provider, executable, network,
-  schedule, or delivery effects;
-- reuse add, status, doctor, update, and remove mutation owners;
-- report the exact local chat or Control UI entry point when started;
-- remove disposable managed state on explicit stop;
-- persist a bounded marker before creating disposable state and clear it only
-  after cleanup completes; and
-- detect abandoned markers on the next project command and through doctor,
-  report their exact paths and owners, and offer canonical reclamation.
-
-No implementation can promise immediate cleanup after an uncatchable process
-termination. Conformance instead requires that production state remains
-untouched, abandoned development state is unambiguously identifiable, and a
-subsequent command can reclaim it without guessing ownership.
-
-An explicit future option may target a named non-disposable OpenClaw instance,
-but that is production add semantics and must not be the default or be implied
-by `dev`.
-
-## Project Tests
-
-`openclaw claws test [path]` runs static conformance and declared offline
-scenarios by default. Tests are authoring evidence and do not become applied
-runtime state.
-
-The strict project-only format is defined by
-[`claw-test-v1-spec.md`](claw-test-v1-spec.md). Unknown fields and unsupported
-checks fail validation; downloaded package tests never execute automatically.
-
-The default lane must run without provider credentials or network access. It
-may assert:
-
-- package validity and deterministic build inputs;
-- expected lifecycle actions, blockers, and readiness requirements;
-- fixture-to-output-schema conformance;
-- required packaged assets and fallback content; and
-- planned removal and cleanup actions from canonical dry-run output.
-
-Provider-backed model evaluation requires `--live`, an explicit model or
-approved default, a bounded turn count, and visible budget context. When the
-provider cannot enforce a monetary or token ceiling, the runner must say so
-rather than present an estimate as a hard limit. Live tests must not publish
-private prompts, transcripts, user files, or credentials as package content.
-Test output must distinguish framework failure, package failure, harness-owner
-failure, unavailable local prerequisite, and model assertion failure.
-
-V1 does not execute arbitrary test code from projects or downloaded Claw
-packages. Ordinary repository tests remain outside the Claw toolchain.
 
 ## Publication and Application
 
@@ -313,11 +244,11 @@ new archive. The authenticated publisher selects package identity and version;
 ClawHub validates and scans the exact bytes, stores their digest, and enforces
 version immutability.
 
-The digest of the locally tested artifact, accepted publication artifact, and
-downloaded artifact must match. OpenClaw then resolves and verifies those exact
-bytes before producing the normal `claws add --dry-run` plan. Registry approval
-does not bypass dependency policy, capability consent, or canonical owner
-readiness.
+The digest of the locally built and previewed artifact, accepted publication
+artifact, and downloaded artifact must match. OpenClaw then resolves and
+verifies those exact bytes before producing the normal `claws add --dry-run`
+plan. Registry approval does not bypass dependency policy, capability consent,
+or canonical owner readiness.
 
 No `openclaw claws publish` command is required by this specification. A
 ClawHub-owned CLI or another publisher client may perform the authenticated
@@ -332,11 +263,8 @@ dependency, and consent rules from RFC 0016. It adds these requirements:
 - project validation and build never resolve or serialize secret values;
 - validation rejects package scripts and build executes or ships no
   package-authored lifecycle code;
-- dev isolation fails closed if its state boundary cannot be established;
-- default dev and test suppress provider, network, schedule, and delivery
-  effects until explicit live selection and consent;
-- static tests do not require provider credentials;
-- live tests are explicit and budget-visible;
+- dev stops at canonical offline planning and produces no provider, network,
+  schedule, channel-delivery, or durable-state effects;
 - logs and machine-readable results redact credentials and private local data;
 - publication accepts exact bytes and cannot silently rebuild; and
 - experimental commands remain behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
@@ -352,15 +280,11 @@ A V1 project implementation conforms only when it proves:
    Linux, macOS, Windows, and WSL packed-CLI proof.
 5. The built artifact independently passes the canonical package reader.
 6. Project-only tests, caches, credentials, and host paths are absent.
-7. Offline dev creates no durable OpenClaw state. Live dev uses marked
-   disposable state, leaves production state unchanged, cleans on normal stop,
-   and reclaims abandoned state on a subsequent command.
-8. Default dev and static tests produce no provider, network, schedule, or
-   channel-delivery effects and classify failures by owner.
-9. Live tests require explicit opt-in and report model and budget context.
-10. The built, published, downloaded, and applied artifact digests match.
-11. Clean-recipient add, status, doctor, and remove use existing OpenClaw
-    lifecycle owners and preserve user-owned local state.
+7. Offline dev creates no durable OpenClaw state and produces no provider,
+   network, schedule, or channel-delivery effects.
+8. The built, published, downloaded, and applied artifact digests match.
+9. Clean-recipient add, status, doctor, and remove use existing OpenClaw
+   lifecycle owners and preserve user-owned local state.
 
 ## Non-Goals
 
@@ -386,3 +310,14 @@ semantics.
 Additional project metadata, test check kinds, dependency-workspace mappings,
 and deployment targets require separate evidence and versioned contracts. They
 must not be inferred from permissive unknown fields in V1.
+
+The first implementation intentionally stops at one polished end-to-end
+reference Claw. The following are follow-up tracks, not V1 conformance:
+
+- a bounded declarative `claws test` format;
+- provider-backed model evaluation;
+- live disposable development, including interruption recovery; and
+- a broader Awesome Claws conformance matrix.
+
+Each follow-up requires evidence from the initial author workflow and its own
+reviewed safety, ownership, and result contract before implementation.
