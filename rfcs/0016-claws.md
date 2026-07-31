@@ -3,7 +3,7 @@ title: Claws
 authors:
   - Gio
 created: 2026-07-03
-last_updated: 2026-07-19
+last_updated: 2026-07-31
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/27
@@ -624,6 +624,41 @@ is retained for deterministic resume, doctor, or remove rather than hidden by a
 best-effort rollback. The result distinguishes complete, partial, and failed
 adds; it never reports a partial agent as successfully added.
 
+### Claw projects and developer lifecycle
+
+RFC 0016 also defines a source-project layer above the package and applied
+lifecycle. A **Claw project** is human-authored source plus project-only tests
+and fixtures. A **Claw package** is the deterministic, immutable artifact built
+from that source. An **applied Claw** is the one agent and owner-managed local
+state realized from that artifact.
+
+The project layer makes Claws OpenClaw's application development model without
+turning Claws into a second runtime. OpenClaw continues to own agents, models,
+tools, sandboxes, channels, secrets, plugins, MCP, schedules, workspaces, and
+all local mutation. ClawHub owns authenticated publication, scanning,
+discovery, and immutable artifact delivery.
+
+The normative project and build contract is
+[`0016/claw-project-v1-spec.md`](0016/claw-project-v1-spec.md). Its delivery
+sequence is [`0016/implementation-plan.md`](0016/implementation-plan.md).
+
+This addendum depends on the portable profile/bootstrap contract in
+[RFC PR #48](https://github.com/openclaw/rfcs/pull/48), the
+application-composition and client contract in
+[RFC PR #52](https://github.com/openclaw/rfcs/pull/52), and their experimental
+OpenClaw implementation stack. That work establishes conventional profiles,
+native `BOOTSTRAP.md`, profile extensions, managed application content, and
+shared lifecycle clients. The project lifecycle consumes those contracts; it
+does not redefine or independently implement them. This addendum may be
+reviewed in parallel, but it must not be accepted or merged before those
+prerequisite contracts are accepted.
+
+The V1 authoring lifecycle is create, validate, build, dev, and test. Build is
+separate from publication: a registry receives only an exact already-built
+artifact. Production realization continues to use the existing `claws add`
+lifecycle. Project commands never write production OpenClaw state implicitly,
+run package-authored build hooks, or package credentials and local bindings.
+
 ### Provenance and local state
 
 Claw lifecycle state belongs in OpenClaw's shared SQLite state database, not in
@@ -941,6 +976,18 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 19. Add and update plans disclose capability escalations separately from
     ordinary content, include them in plan integrity, and reject mutation when
     the reviewed capability set changes.
+20. A generated Claw project is readable and valid without hidden generator
+    state, and validation performs no OpenClaw or registry mutation.
+21. Two builds from identical project inputs produce byte-identical artifacts;
+    project-only tests, caches, credentials, and local paths are excluded, and
+    the result revalidates through the canonical package reader.
+22. Development uses disposable OpenClaw state by default and cleans it after
+    normal stop or interruption without touching the operator's production
+    state.
+23. Static project tests run without provider credentials. Live evaluation is
+    separately requested and reports its selected model and budget context.
+24. Publication accepts the exact built artifact rather than rebuilding source,
+    and clean-recipient add verifies the same artifact digest.
 
 ## Unresolved questions
 
