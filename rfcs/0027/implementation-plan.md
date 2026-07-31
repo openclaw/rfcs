@@ -1,0 +1,210 @@
+# RFC 0027 Implementation Plan
+
+This sidecar translates RFC 0027 into bounded, dependency-aware repository
+changes. PR boundaries are implementation guidance, not portable schema.
+
+## Dependencies
+
+- Merged RFC 0016 proposal and shipped experimental OpenClaw lifecycle; the RFC
+  source remains draft-status pending graduation.
+- Draft RFC #48 conventional profile, bootstrap, and adapter addendum.
+- Existing experimental OpenClaw and ClawHub feature gates.
+
+No public npm publication, stable-schema graduation, or Hermes support is a
+prerequisite for this track.
+
+## Draft Disposition
+
+The previous structured-setup stack does not land in its current form. Its
+first PR number is reused for the replacement first slice:
+
+- [`openclaw/openclaw#115237`](https://github.com/openclaw/openclaw/pull/115237):
+  rewritten as conventional profile discovery and native bootstrap; this is
+  OpenClaw PR 1 below.
+- `openclaw/openclaw#115296` persisted answers and setup mutation: superseded.
+- `openclaw/openclaw#115371` guided setup-template export: superseded.
+- [`openclaw/openclaw#115962`](https://github.com/openclaw/openclaw/pull/115962):
+  rebuilt around schema v1 profile extensions and ordinary managed files; this
+  is OpenClaw PR 2 below.
+- [`openclaw/openclaw#112808`](https://github.com/openclaw/openclaw/pull/112808):
+  rebuilt as the experimental read/status Control UI prerequisite.
+- [`openclaw/openclaw#112828`](https://github.com/openclaw/openclaw/pull/112828):
+  rebuilt without form-schema or answer-state dependencies as the bounded
+  Gateway mutation and guided lifecycle slice.
+
+The superseded branches remain historical design evidence until maintainers
+choose whether to close them; they are not dependencies of the new stack.
+
+## OpenClaw Track
+
+### PR 1: Conventional profile and native bootstrap
+
+Active PR: [`openclaw/openclaw#115237`](https://github.com/openclaw/openclaw/pull/115237).
+
+- Replace `metadata.openclaw.config` lookup with optional fixed
+  `profiles/openclaw.yml` discovery.
+- Bind exact profile bytes into development and package integrity.
+- Discover optional package-root `BOOTSTRAP.md`, disclose it in inspect and
+  dry-run, and reject ordinary managed destinations targeting root bootstrap.
+- Seed it through OpenClaw's existing new-agent bootstrap owner.
+- Treat expected consumption as progress, never recreate it during update, and
+  preserve user-owned outputs during remove. Remove only a still-pending
+  `BOOTSTRAP.md` whose bytes match the applied digest.
+- Update export and fixtures to emit conventional profile paths and omit
+  consumed local bootstrap state.
+- Keep all commands under `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
+
+### PR 2: Profile extensions and application content
+
+Active PR: [`openclaw/openclaw#115962`](https://github.com/openclaw/openclaw/pull/115962).
+
+- Finalize OpenClaw profile schema version 1 with optional `extensions`.
+- Support strict `openclaw`, `claude`, `codex`, and `cursor` format assertions.
+- Delegate detection, safety scanning, package preflight, installation,
+  readiness, update, uninstall warnings, and cleanup to canonical plugin owners.
+- Include exact extension effects and adapter identity in plan integrity and
+  provenance.
+- Report mapped, detect-only, unavailable, unsupported, and compatibility-drift
+  states through inspect, status, and doctor.
+- Preserve existing experimental portable plugin entries for reads while
+  exporting new native dependencies into `profiles/openclaw.yml`.
+- Prove schemas, references, templates, examples, fixtures, and static assets
+  need no new manifest role or lifecycle beyond `workspace.files`.
+
+### PR 3: Gateway lifecycle API
+
+Active implementation is split across the read prerequisite
+[`openclaw/openclaw#112808`](https://github.com/openclaw/openclaw/pull/112808)
+and mutation/guided-lifecycle
+[`openclaw/openclaw#112828`](https://github.com/openclaw/openclaw/pull/112828).
+
+- Expose bounded inspect, add-plan, add, status, doctor, update-plan, update,
+  remove-plan, remove, and export services over the canonical Claw owners.
+- Expose authorized exact manifest/effect expansion and redacted default
+  projections without leaking source bytes or secret values.
+- Report native bootstrap progress and canonical owner prerequisites.
+- Advertise methods only while the experimental gate is enabled and fail closed
+  for direct disabled calls.
+- Keep the API presentation-neutral so CLI, TUI, automation, and browser clients
+  share outcomes.
+
+### PR 4: Control UI experience
+
+Active implementation is the same dependency-ordered pair:
+[`openclaw/openclaw#112808`](https://github.com/openclaw/openclaw/pull/112808)
+followed by [`openclaw/openclaw#112828`](https://github.com/openclaw/openclaw/pull/112828).
+
+- Add experimental Claw discovery, detail, preview, consent, progress, update,
+  remove, and export views.
+- Present overview, preview, add, personalize, connect, and ready stages using
+  Gateway-produced state.
+- Route native bootstrap to the existing agent conversation rather than parsing
+  package instructions or storing answers in the browser.
+- Label bootstrap as package-authored, warn against pasting secrets, and route
+  credentials and integrations only through host-owned canonical setup controls.
+- Render extension mapping and compatibility drift, managed/referenced
+  ownership, retained user files, and applied-versus-ready status.
+- Add responsive, keyboard, focus, reconnect, invalidated-plan, partial-outcome,
+  and disabled-gate tests.
+
+## Standalone Reference CLI Track
+
+The standalone `claws` repository supplies the reference lifecycle entry point:
+
+1. Parse and validate schema-v1 packages, conventional profiles, bootstrap, and
+   safe managed sources.
+2. Resolve source, choose `--agent <adapter>`, preview exact effects, bind
+   consent, and delegate host lifecycle ownership to the selected adapter.
+3. Use an OpenClaw adapter that invokes `openclaw claws add` across an external
+   process boundary without importing or reproducing OpenClaw policy.
+4. Use a bounded Codex adapter to create a new project workspace from portable
+   prompt/bootstrap instructions and ordinary workspace files. It ignores
+   foreign profiles and fails closed on required semantics it cannot represent.
+
+Active PRs:
+
+- [`giodl73-repo/claws#1`](https://github.com/giodl73-repo/claws/pull/1):
+  schema-v1 parser, source providers, constructor, consent flow, and OpenClaw
+  adapter.
+- [`giodl73-repo/claws#2`](https://github.com/giodl73-repo/claws/pull/2):
+  portable-core Codex workspace adapter and one-package/two-host conformance
+  fixture.
+
+No package is published to npm until maintainers approve the name, repository,
+release process, and initial compatibility contract.
+
+## ClawHub Track
+
+One narrow experimental PR should:
+
+- remove `metadata.openclaw.config` validation;
+- discover and structurally validate optional conventional profiles;
+- validate optional package-root `BOOTSTRAP.md` as safe bounded UTF-8 content;
+- validate OpenClaw profile v1 extension structure without executing bundles or
+  claiming applying-version compatibility;
+- retain exact artifacts as authority and expose only bounded safe summaries;
+- preserve `CLAWHUB_EXPERIMENTAL_CLAWS=1` fail-closed reads and routes.
+
+## Awesome Claws Track
+
+Migrate all examples before using them as conformance proof:
+
+- keep `schemaVersion: 1`;
+- remove profile metadata pointers;
+- move native plugin dependencies into conventional profiles;
+- replace structured setup/templates with reviewed package-root
+  `BOOTSTRAP.md` where onboarding is useful;
+- keep reusable content as ordinary managed files in readable directories;
+- remove invented `dashboard` tool names and use `show_widget` with complete
+  Markdown/message fallback where appropriate;
+- validate every example from a clean OpenClaw state.
+
+## End-to-End Proof
+
+Minimum proof before asking maintainers to land the full track:
+
+1. Inspect a local package with no profile and inherited defaults.
+2. Inspect a package with `profiles/openclaw.yml`, one native extension,
+   managed schemas/assets, and package-root `BOOTSTRAP.md`.
+3. Add dry-run discloses every effect without mutation or secret resolution.
+4. Consented add creates one new agent, installs through canonical owners, and
+   seeds bootstrap exactly once.
+5. First chat/TUI turn labels package-authored onboarding, does not inject
+   secrets, and consumes bootstrap without status drift.
+6. The agent uses `show_widget` when available and returns equivalent useful
+   Markdown when it is not.
+7. Status distinguishes applied, bootstrap-pending, owner-setup-required,
+   extension-incompatible, and ready states.
+8. Update preserves user-owned personalization, managed-file drift rules, and
+   unchanged extension dependency edges.
+9. Remove preserves user-owned outputs and retains referenced extensions by
+   default while offering canonical cleanup under RFC 0016 rules.
+10. ClawHub publication/search/download feeds the exact same artifact into a
+    clean OpenClaw add dry-run.
+11. Control UI produces the same plan identity and lifecycle outcome as CLI for
+    the same exact source and local state.
+12. One schema-v1 package produces separate host-native OpenClaw and Codex
+    previews; the Codex adapter proves project-oriented projection without
+    OpenClaw agent CRUD or silent loss of required capabilities.
+
+## Landing Order
+
+1. RFC #48 and RFC #52 design updates.
+2. OpenClaw [PR #115237](https://github.com/openclaw/openclaw/pull/115237)
+   conventional profile/bootstrap.
+3. OpenClaw [PR #115962](https://github.com/openclaw/openclaw/pull/115962)
+   extensions/application content.
+4. Standalone [PR #1](https://github.com/giodl73-repo/claws/pull/1)
+   schema-v1 reference engine and OpenClaw adapter.
+5. ClawHub narrow validation update.
+6. Awesome Claws migration and clean-state validation.
+7. OpenClaw [PR #112808](https://github.com/openclaw/openclaw/pull/112808)
+   read/status Control UI prerequisite.
+8. OpenClaw [PR #112828](https://github.com/openclaw/openclaw/pull/112828)
+   Gateway mutation and guided lifecycle.
+9. Standalone [PR #2](https://github.com/giodl73-repo/claws/pull/2) Codex
+   adapter proof and cross-harness conformance report.
+
+Each PR must be independently testable, signed, rebased on its real base, and
+kept behind the existing experimental gate. No step merges or publishes as a
+side effect of this plan.
