@@ -93,6 +93,10 @@ not an OpenClaw runtime mutation and must not rebuild source.
 
 A V1 project is identified by both `package.json` and `CLAW.md` at its root.
 No additional root configuration file or hidden generator state is required.
+Equivalent grouped JSON remains a supported package-reader serialization, but
+V1 project authoring deliberately requires the human-readable `CLAW.md`
+envelope. A JSON-only package is therefore valid package input, not a V1 source
+project for `create`, `validate`, `dev`, or `build`.
 
 Conventional optional paths are:
 
@@ -154,7 +158,8 @@ Validation must:
   `BOOTSTRAP.md`, declared files, skills, and exact dependency references;
 - report project-only exclusions;
 - resolve local source paths without mutation;
-- reject unsupported required components, collisions, unsafe paths, links,
+- reject unsupported required components, collisions, unsafe paths, links
+  other than the package specification's confined development-manifest symlink,
   special files, unbounded content, and credentials in prohibited fields;
 - reject a nonempty package `scripts` object, including npm lifecycle scripts;
 - distinguish package validity from local OpenClaw readiness; and
@@ -168,6 +173,12 @@ resolution mode must be explicit and must not change the local project.
 
 `openclaw claws build [path] --out <artifact>` produces one immutable package
 artifact from the validated project snapshot.
+
+The destination must not already exist. The builder writes a temporary sibling,
+re-opens and verifies that temporary artifact, and publishes it to the requested
+path with no-replace semantics. Failure removes or clearly quarantines only the
+incomplete temporary artifact; it must never delete or replace a pre-existing
+destination.
 
 The V1 OpenClaw builder emits a deterministic npm-compatible `.tgz` archive
 with the conventional `package/` root. Registries and applying clients may
@@ -207,6 +218,14 @@ The build excludes by default:
 - local OpenClaw state, sessions, memories, bindings, and user-created output;
 - host-specific paths and development dependency mappings; and
 - source-control metadata.
+
+These exclusions prevent ambient or undeclared local state from entering a
+build. Explicitly declared workspace sources are package content and are copied
+byte-for-byte after the package path and file rules pass; project tooling cannot
+promise semantic secret detection inside arbitrary authored content. Authors
+must not declare secret-bearing files, package validation and registry scanning
+may reject suspected secrets, and valid packages remain subject to the package
+specification's no-secrets rule.
 
 After writing the artifact, the builder must re-open it through the canonical
 Claw package reader and verify its package identity, complete contents,
@@ -263,7 +282,8 @@ boundary.
 Project tooling inherits all package containment, archive, size, integrity,
 dependency, and consent rules from RFC 0016. It adds these requirements:
 
-- project validation and build never resolve or serialize secret values;
+- project validation and build never resolve, interpolate, or inject secret
+  values from the environment, host state, or SecretRef providers;
 - validation rejects package scripts and build executes or ships no
   package-authored lifecycle code;
 - dev stops at canonical offline planning and produces no provider, network,

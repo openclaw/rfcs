@@ -64,6 +64,9 @@ Implementation draft: [#117037](https://github.com/openclaw/openclaw/pull/117037
   bootstrap, extension, asset, and lifecycle readers.
 - Add `openclaw claws build` producing one deterministic npm-compatible `.tgz`
   with a conventional `package/` root and no author-only or local state.
+- Add the minimal golden builder fixture and expected digest used by
+  cross-platform deterministic-build tests; PR 4 expands that fixture into a
+  polished reference application and clean-recipient proof.
 - Re-read the artifact through the canonical package reader.
 - Add offline `openclaw claws dev`, which builds a temporary snapshot and shows
   the canonical inspect/add dry-run without applying, contacting providers,

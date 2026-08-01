@@ -582,6 +582,10 @@ does not itself establish those contracts.
 The public CLI is:
 
 ```bash
+openclaw claws create [path]
+openclaw claws validate [path]
+openclaw claws build [path] --out <artifact>
+openclaw claws dev [path]
 openclaw claws inspect <source>
 openclaw claws add <source> --dry-run --json
 openclaw claws add <source> [--agent-id <id>] [--workspace <path>] --yes --plan-integrity <digest>
