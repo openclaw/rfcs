@@ -300,6 +300,15 @@ PRs plus one initial Windows adopter PR:
    the sidecar contracts
    ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
 
+Fork-only follow-up evidence now launches the real Rust test child over
+anonymous pipes, verifies an exact SHA-256 artifact pin, delivers the fresh
+session key through a bounded inherited private pipe, and requires the
+authenticated runtime offer to match that verified identity
+([Rust #12](https://github.com/giodl73-repo/openclaw-rust-node/pull/12),
+[Windows #4](https://github.com/giodl73-repo/openclaw-windows-node/pull/4)).
+It remains non-selectable source evidence rather than another upstream
+implementation PR or a packaged production runtime.
+
 The earlier fork drafts #186-#191 remain detailed evidence history for #116450,
 and closed fork drafts #193-#195 remain detailed evidence history for #116863.
 Their commits remain intact in the consolidated branches, so the review shape
@@ -319,8 +328,10 @@ The existing official C# Windows node now has one consolidated draft adopter
 It introduces an injectable node-runtime contract and extracts a single
 Windows-owned capability dispatcher shared by the current C# transport and the
 new non-selectable sidecar adapter, while keeping the C# client as the
-production default. A future adoption slice can replace the in-process proof
-with supervision of the Rust runtime over authenticated, versioned local IPC:
+production default. Fork evidence now replaces the in-process-only uncertainty
+with a verified, privately bootstrapped process over authenticated, versioned
+anonymous pipes. A future product adoption slice can wire that launcher into
+an opt-in runtime and add signing, packaging, supervision, and rollback:
 Rust owns Gateway transport, registration, invocation, cancellation, reconnect,
 and runtime lifecycle, while the Windows app retains WinUI, the operator role,
 MCP, approvals, and native capability handlers. This proves adoption can be

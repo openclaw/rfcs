@@ -13,6 +13,8 @@ semantics.
 | `openclaw/openclaw` follow-up PR #116450 | `894d125ee76` | Draft; logically stacked on #116050 |
 | `openclaw/openclaw` sidecar PR #116863 | `8d0a1b013ea` | Draft; logically stacked on #116450; consolidates fork evidence #193-#195 |
 | `openclaw/openclaw-windows-node` PR #1068 | `3ca913a43a6` | Draft; seam plus independent sidecar adapter; C# remains production default |
+| Experimental Rust launch proof #12 | `3376ff5` | Draft, fork-only; protected bootstrap plus pinned aggregate evidence |
+| Experimental Windows launch proof #4 | `67cd91f1e54` | Draft, fork-only; verified launcher and mandatory artifact identity |
 | `openclaw/rfcs` RFC #54 | Current PR head | Draft ownership decision; this inventory is refreshed with each evidence change |
 | Experimental `openclaw-rust-node` evidence repository | merged PRs #1-#5; draft #6 | Evidence history, not official distribution |
 
@@ -125,6 +127,14 @@ resource proof, rollout, or rollback. The current Rust runtime also rejects the
 reserved `system.*` namespace, so Windows `system.run` remains on C# pending an
 explicit OpenClaw authorization mechanism.
 
+Fork-only follow-ups #3/#4 launch a real Rust test child over anonymous pipes.
+They verify an exact SHA-256 pin while holding the artifact through launch,
+deliver the fresh session secret in a bounded private-pipe bootstrap record,
+and require the authenticated runtime offer to present the same self-computed
+artifact identity. These follow-ups remain non-selectable source evidence; they
+do not add package discovery, platform signing, Gateway credentials, restart
+policy, or rollout controls to the product.
+
 ## Evidence inventory
 
 | Evidence | Environment | Result | Limitation |
@@ -136,6 +146,7 @@ explicit OpenClaw authorization mechanism.
 | Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers pass at `894d125ee76`; earlier hosted TypeScript lanes passed | Final-head TypeScript UTF-8 validator tests are pending because the local dependency fetch failed TLS negotiation |
 | OpenClaw sidecar bridge | Rust workspace, `8d0a1b013ea` | 110 workspace tests; strict Clippy/rustdoc/format/diff pass; exact three-corpus producer/consumer proof | Source harness; no concrete process/IPC/bootstrap |
 | Windows adopter | Windows 11, `3ca913a43a6` | Full build; exact three-corpus reproduction; 60 focused, 3,462 Shared, 2,023 Tray, and 519 Connection tests; Codex and three-model reviews clean | C# remains selected; adapter is in-process and non-selectable |
+| Protected process launch | Windows 11, Rust `3376ff5`, Windows `67cd91f1e54` | 122 shared Rust and 63 focused Windows tests; three exact fixture blobs; hash and handshake-identity rejection; private bootstrap and real invocation | Test artifact and source harness; no platform signature, package/update or production selection |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |
 | Experimental package acceptance | Linux x64, Windows x64, macOS ARM64 | Build/checksum/extract/execute evidence | Separate experimental repository |
 | Dependency/SBOM/provenance | Experimental repository PRs #5/#6 | RustSec, CycloneDX, repository-bound attestations | Not an OpenClaw-supported release |
@@ -155,7 +166,7 @@ final UTF-8 validator correction.
 | Gateway session | Implemented draft | Ownership, compatibility and release acceptance |
 | Basic node invocation | Implemented draft | Shared canonical fixtures and current-head live Gateway proof |
 | Duplex input/progress/cancel | Implemented draft | Complete published node-event corpus and cross-language proof |
-| Sidecar IPC | OpenClaw #116863 plus Windows #1068 implements both sides of authenticated framing, handshake, immutable configuration, ordinary-command adapter routing, and exact cross-language corpora; no concrete IPC/credential bootstrap | Accept `sidecar-hosting-v1-spec.md`, choose transport, and prove verified artifact launch, protected bootstrap, duplex/Gateway/audit/crash/resource/rollback behavior |
+| Sidecar IPC | OpenClaw #116863 plus Windows #1068 implements both sides of authenticated framing and adapter routing; fork #12/#4 proves anonymous-pipe transport, exact hash launch, protected bootstrap, and handshake artifact binding | Accept `sidecar-hosting-v1-spec.md`; prove platform signing/package delivery plus duplex Gateway, audit, crash, resource, rollout and rollback behavior |
 | Persistent secure identity/token storage | Embedding seam only | Platform adapter and rotation/revocation proof |
 | Product audit/export adapter | Not implemented | Stable event contract, correlation/redaction proof, real product audit sink |
 | Aggregate retained-event byte budget | Implemented draft: exact count plus aggregate raw-frame bytes; 256 events and 64 MiB by default | Current-head compatibility and load proof before support |
@@ -182,7 +193,7 @@ No deletion is authorized by RFC acceptance alone.
 
 - maintainer ownership and code owners;
 - embed versus sidecar default;
-- concrete IPC transport and encoding;
+- whether anonymous pipes remain the adopter transport or another concrete IPC is selected;
 - supported compatibility window and platforms;
 - secure-store adapter ownership;
 - canonical approval/tool integration APIs; and

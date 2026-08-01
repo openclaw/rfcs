@@ -17,6 +17,15 @@ native invocations through the shared dispatcher. It is a non-selectable
 in-process proof, not the verified process, protected bootstrap, concrete IPC,
 or production lifecycle required below.
 
+Subsequent fork-only evidence
+([Rust #11](https://github.com/giodl73-repo/openclaw-rust-node/pull/11),
+[Rust #12](https://github.com/giodl73-repo/openclaw-rust-node/pull/12), and
+[Windows #3](https://github.com/giodl73-repo/openclaw-windows-node/pull/3)/
+[Windows #4](https://github.com/giodl73-repo/openclaw-windows-node/pull/4))
+now demonstrates real anonymous-pipe framing, an exact SHA-256 launch pin, a
+bounded private-pipe bootstrap, and handshake binding to the verified artifact.
+That is source-harness evidence, not packaged production adoption.
+
 The current `openclaw-node` executable is a foreground proof host, not this
 production sidecar. Its environment-indirected identity/auth loading does not
 satisfy the authenticated launch and scoped secret-delivery requirements below.
