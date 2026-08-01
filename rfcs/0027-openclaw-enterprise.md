@@ -3,9 +3,9 @@ title: OpenClaw as the Open Enterprise Agent Platform
 authors:
   - Kevin Lin
 created: 2026-07-08
-last_updated: 2026-07-31
-status: draft
-issue:
+last_updated: 2026-08-01
+status: accepted
+issue: https://github.com/openclaw/rfcs/issues/57
 rfc_pr: https://github.com/openclaw/rfcs/pull/35
 ---
 
