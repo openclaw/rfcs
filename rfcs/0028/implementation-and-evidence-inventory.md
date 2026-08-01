@@ -36,7 +36,7 @@ Exact heads must be refreshed before approval or release.
 | Implementation | Reusable evidence | Product-specific ownership retained | Do not copy into Rust v1 |
 | --- | --- | --- | --- |
 | TypeScript `src/node-host` | Generic node role, manifests, invocation lifecycle, reconnect classification, built-in semantics | Node.js process, dynamic plugin/skill inventory, full execution policy | Transliteration of every command or Node.js assumption |
-| Linux Tauri Rust Gateway client | Rust TLS pinning, signed identity, reconnect, heartbeat, correlation | Tauri UI/operator role, persistence and desktop lifecycle | Treating an operator client as the node semantic authority |
+| Linux Tauri Rust Gateway client | Rust TLS pinning, signed identity, issued-token replacement, stale-token clearing, reconnect, heartbeat, correlation | Tauri UI/operator role, identity/token persistence and desktop lifecycle | Treating an operator client as the node semantic authority |
 | Apple Swift nodes | Connection-scoped route/capability snapshots and reconnect on authority change | TCC, app/worker IPC, Apple UI and native tools | Apple lifecycle or permission APIs |
 | Android Kotlin node | Role-separated sessions, role-keyed tokens, bounded token retry, permission-driven inventory | Android service/UI/permission lifecycle | Android storage and foreground-service policy |
 | Windows C# node | Backpressure, cancellation, shared capability dispatcher, real Gateway/MXC execution | WinUI, operator role, MCP, approvals, MXC/native tools | Reimplementing Windows routing or policy in Rust |
@@ -107,6 +107,28 @@ execute commands.
   and
 - three byte-exact language-neutral corpora consumed independently by Windows.
 
+It does not yet carry Gateway endpoint/auth material, external signing
+requests/results, issued-token acknowledgement, or connection retirement.
+Those are a distinct live control-plane message family, not fields on the
+immutable capability configuration.
+
+### Proposed sidecar Gateway connection control
+
+`sidecar-gateway-connection-v1-spec.md` and its draft fixture adapt existing
+behavior rather than inventing a new credential model:
+
+- Tauri supplies the custody precedent for endpoint trust, identity signing,
+  issued-token persistence, and stale-token clearing;
+- `NodeLifecycle` supplies per-attempt reacquisition, external signing, typed
+  issued-token delivery, reconnect classification, and secret-free status; and
+- Windows supplies endpoint authorization, generation fencing, token recovery,
+  and product-owned capability dispatch.
+
+The shared contract adds only the missing protected process boundary. Private
+keys remain supervisor-owned, credentials are attempt-scoped, issued tokens
+require explicit durable acknowledgement, and revocation retires one exact
+connection generation. No implementation PR exists yet.
+
 ### Windows adopter seam in #1068
 
 - `INodeRuntimeClient` replaceable client boundary;
@@ -167,7 +189,7 @@ final UTF-8 validator correction.
 | Gateway session | Implemented draft | Ownership, compatibility and release acceptance |
 | Basic node invocation | Implemented draft | Shared canonical fixtures and current-head live Gateway proof |
 | Duplex input/progress/cancel | Implemented draft | Complete published node-event corpus and cross-language proof |
-| Sidecar IPC | OpenClaw #116863 plus Windows #1068 implements both sides of authenticated framing and adapter routing; fork #12/#4 proves anonymous-pipe transport, exact hash launch, protected bootstrap, and handshake artifact binding | Accept `sidecar-hosting-v1-spec.md`; prove platform signing/package delivery plus duplex Gateway, audit, crash, resource, rollout and rollback behavior |
+| Sidecar IPC | OpenClaw #116863 plus Windows #1068 implements both sides of authenticated framing and adapter routing; fork #12/#4 proves anonymous-pipe transport, exact hash launch, protected bootstrap, and handshake artifact binding; RFC connection-control contract is drafted but unimplemented | Implement both consumers of `sidecar-gateway-connection-v1-spec.md`; prove platform signing/package delivery plus live Gateway, audit, crash, resource, rollout and rollback behavior |
 | Persistent secure identity/token storage | Embedding seam only | Platform adapter and rotation/revocation proof |
 | Product audit/export adapter | Not implemented | Stable event contract, correlation/redaction proof, real product audit sink |
 | Aggregate retained-event byte budget | Implemented draft: exact count plus aggregate raw-frame bytes; 256 events and 64 MiB by default | Current-head compatibility and load proof before support |

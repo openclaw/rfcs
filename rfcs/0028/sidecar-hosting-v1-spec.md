@@ -74,10 +74,15 @@ a peer that stalls or exceeds a pre-negotiation ceiling is terminated without
 activation. Negotiated limits are `min(local ceiling, peer offer)` and may
 never raise either peer's local ceiling.
 
-The supervisor owns Gateway credentials and private identity access. It may
-grant the sidecar a short-lived handle/callback or scoped secret material. The
-sidecar must not require Microsoft-, Tauri-, Chromium-, or Windows-specific
-objects in its portable protocol.
+The supervisor owns Gateway credentials and private identity access. The
+portable exchange for per-attempt endpoint/auth material, external signing,
+issued-token acknowledgement, and revocation is defined in
+[`sidecar-gateway-connection-v1-spec.md`](sidecar-gateway-connection-v1-spec.md).
+The sidecar must not require Microsoft-, Tauri-, Chromium-, or Windows-specific
+objects in that protocol. The connection-control feature requires a
+peer-confidential IPC transport for its entire exchange because credentials,
+signing payloads, signatures, and issued tokens are secret-bearing;
+authenticated framing alone does not encrypt payloads.
 
 ## Version negotiation
 
@@ -113,7 +118,8 @@ stopped -> starting -> authenticated -> configured -> connecting -> ready
 - accepted IPC version/features;
 - valid bounded runtime configuration;
 - active Gateway node session;
-- activated connection-scoped manifest; and
+- activated connection-scoped manifest;
+- durable supervisor acknowledgement of any Gateway-issued device token; and
 - a responsive product capability adapter.
 
 The supervisor must not route product traffic merely because the process is
@@ -123,12 +129,17 @@ alive or the IPC socket is open. Liveness and readiness are separate signals.
 
 Configuration must be finite, validated before activation, and free of inline
 long-lived secrets. The supervisor supplies the exact command/capability
-surface for one connection generation. Registration must complete before the
-Gateway connection advertises that surface.
+surface for one immutable `manifestGeneration`. The same manifest may be
+advertised across multiple fresh Gateway connection generations during
+transport reconnect. Registration must complete before any Gateway connection
+advertises that surface.
 
-A capability update retires the current generation, cancels its affected work,
-and reconnects with a new manifest. Neither side may add a handler after
-advertisement without that generation change.
+A capability update retires every active connection under the current manifest,
+cancels its affected work, and requires a new manifest generation and validated
+configuration/bridge before reconnect. Neither side may add a handler after
+advertisement without that manifest-generation change. The authenticated
+sidecar process/session generation is a third, independent scope and changes on
+process restart or channel replacement.
 
 IPC messages must carry a sidecar session identifier and invocation identifier.
 Identifiers supplied by a remote controller must not choose a local UI,

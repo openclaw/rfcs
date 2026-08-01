@@ -118,13 +118,16 @@ documents so this RFC can stay focused on ownership and architectural choice:
 - [Rust Gateway client v1 specification](0028/gateway-client-v1-spec.md)
 - [Rust node runtime v1 specification](0028/node-runtime-v1-spec.md)
 - [Rust node sidecar hosting v1 specification](0028/sidecar-hosting-v1-spec.md)
+- [Rust node sidecar Gateway connection v1 specification](0028/sidecar-gateway-connection-v1-spec.md)
 - [Conformance and adoption plan](0028/conformance-and-adoption-plan.md)
 - [Implementation and evidence inventory](0028/implementation-and-evidence-inventory.md)
 
-The first two describe the reusable OpenClaw layers. The sidecar specification
-defines product-neutral hosting invariants without selecting a product IPC
-encoding. The plan and inventory distinguish implemented evidence from future
-adoption and release gates.
+The first two describe the reusable OpenClaw layers. The hosting specification
+defines product-neutral process and IPC invariants. The connection specification
+defines how a sidecar reacquires endpoint/auth material, requests external
+signatures, returns issued tokens, and retires authority without selecting a
+product IPC transport or secure-store API. The plan and inventory distinguish
+implemented evidence from future adoption and release gates.
 
 ### Repository and crate boundary
 
@@ -309,6 +312,13 @@ authenticated runtime offer to match that verified identity
 [Windows #4](https://github.com/giodl73-repo/openclaw-windows-node/pull/4)).
 It remains non-selectable source evidence rather than another upstream
 implementation PR or a packaged production runtime.
+
+The next proposed OpenClaw slice implements the product-neutral sidecar Gateway
+connection-control contract defined here: per-attempt material acquisition,
+external signing, issued-token acknowledgement, and authoritative retirement.
+It does not move secure storage, endpoint authorization, process supervision,
+or product policy into Rust. A matching adopter slice can then replace the
+current environment-based live-Gateway proof with the protected sidecar path.
 
 The earlier fork drafts #186-#191 remain detailed evidence history for #116450,
 and closed fork drafts #193-#195 remain detailed evidence history for #116863.

@@ -28,6 +28,7 @@ supported.
 | A1 adopter seam | Windows #1068 | Existing C# default, full unit suites, real Gateway MXC path | Duplicate Windows routing when Rust adapter arrives |
 | A2 sidecar adapter | OpenClaw #116863 plus Windows #1068 | Independent authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, dispatcher routing, and exact cross-language corpora | No deletion; process/IPC and production adoption gates remain |
 | A3a launch/bootstrap evidence | Rust fork #12 plus Windows fork #4 | Exact artifact SHA-256 and reparse-path rejection, path locks through launch, self-identity handshake binding, bounded private-pipe bootstrap, real process admission/invocation | No deletion; signing, packaging, Gateway parity and operational adoption remain |
+| A3b Gateway connection control | RFC connection fixture plus future OpenClaw and adopter PRs | Negotiated feature gate, per-attempt material acquisition, external signing, issued-token acknowledgement, generation retirement, redaction, and protected-IPC live Gateway proof | Environment/file credential proof paths only; no incumbent production deletion |
 | A3 sidecar adoption | Future Windows adopter PR | Verified artifact/launch, protected bootstrap, concrete IPC, Gateway/pairing/token parity, crash, revocation, audit, resource, rollout and rollback proof | Incumbent product-owned Gateway transport after observation window |
 | R1 supported release | future OpenClaw release decision | Package acceptance, signing/provenance, SBOM, compatibility, servicing and security runbooks | Experimental-only packaging and private distribution |
 
@@ -46,6 +47,7 @@ The conformance corpus must cover:
 | Authority | Gateway permits delivery; local admission narrows; neither side broadens the other |
 | Recovery | retryable transport/TLS, terminal auth/config/protocol, backoff reset, token fallback |
 | Observability | stable state/reason codes, redaction, approved-but-failed distinct from denial |
+| Sidecar connection control | material request/deny, endpoint trust, external signing, token acknowledgement, mismatch fallback, retirement, stale-generation rejection |
 
 Fixtures must identify their canonical source and version. Unknown additive
 fields must be exercised where the protocol permits them. A fixture must fail
@@ -58,6 +60,12 @@ Gateway-protocol tests and Rust node tests, plus
 `test/fixtures/node-runtime-integration-contract.json`, consumed by the
 TypeScript integration-contract test and Rust authority/admission test. These
 are seeds, not a claim that the complete node contract is already projected.
+
+RFC 0028 also carries draft semantic and cryptographic vectors in
+`sidecar-gateway-connection-v1.json`. Its first implementation PR must move or
+mirror that fixture into the OpenClaw test corpus, add byte-exact canonical
+encodings, and prove independent Rust and adopter consumers before the contract
+is considered implemented.
 
 ## Validation ladder
 
@@ -86,6 +94,9 @@ are seeds, not a claim that the complete node contract is already projected.
   limits that cannot exceed either peer's local policy;
 - duplicate authenticated-sequence and retired-session replay rejection without
   native redispatch;
+- per-attempt credential reacquisition, external signing without private-key
+  export, durable issued-token acknowledgement, and authoritative generation
+  retirement through the protected sidecar transport;
 - startup/steady-state resource measurements; and
 - audit correlation through the product's real audit/export path without
   credential or raw-error disclosure.
@@ -150,7 +161,9 @@ The current drafts provide:
 
 Known gaps are a production/deployed Gateway run for the latest Rust heads,
 platform signing/provenance and packaged artifact discovery/update,
-Gateway/pairing/token integration through the sidecar, crash/circuit-breaker/
+implementation of the specified Gateway connection-control messages and their
+Rust/adopter fixture consumers, live Gateway/pairing/token integration through
+the sidecar, crash/circuit-breaker/
 resource/rollback proof, an embedding/product audit adapter, explicit
 authorization for the reserved `system.*` namespace, supported artifact
 publication, and maintainer ownership acceptance.

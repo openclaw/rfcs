@@ -46,6 +46,11 @@ canonical device-token-mismatch response, the runtime may clear it and retry
 configured authentication once; it must not loop or discard unrelated auth
 failures.
 
+In sidecar deployments the supervisor, not the runtime, selects and persists
+credentials. The runtime reports the mismatch and retires that connection
+generation; any bounded fallback is explicitly reauthorized through
+[`sidecar-gateway-connection-v1-spec.md`](sidecar-gateway-connection-v1-spec.md).
+
 ## Connection-scoped manifest
 
 Commands and capabilities form an immutable lease for one connection attempt.
@@ -182,6 +187,10 @@ denial, admission fail-closed behavior, duplicate/saturation bounds, timeout
 and panic containment, ordered input/progress, UTF-8 chunking, cancellation at
 each wait window, disconnect cleanup, result correlation, lifecycle shutdown,
 and readiness transitions.
+
+Sidecar conformance additionally covers material reacquisition, external
+signing, issued-token acknowledgement, generation retirement, and redaction
+through the shared sidecar Gateway connection fixture.
 
 Every behavior shared with TypeScript must use a shared fixture or an explicit
 documented comparison. See
