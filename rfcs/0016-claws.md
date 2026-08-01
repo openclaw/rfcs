@@ -992,8 +992,10 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 23. Publication accepts the exact built artifact rather than rebuilding source
     and returns its immutable digest.
 24. One polished reference Claw proves create, offline dev, deterministic build,
-    exact publish, clean-recipient add, status, doctor, and remove with the same
-    artifact digest.
+    exact publish and download, safe extraction, clean-recipient add, status,
+    doctor, and remove. The archive digest remains identical through transport,
+    and proof binds the extracted package to OpenClaw's canonical package and
+    plan-integrity digests.
 
 ## Unresolved questions
 

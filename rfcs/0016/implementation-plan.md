@@ -35,6 +35,7 @@ unmerged fork heads.
 ### PR 1: Core project contract
 
 Repository: `openclaw/rfcs`.
+Implementation: [RFC #56](https://github.com/openclaw/rfcs/pull/56).
 
 - Update `rfcs/0016-claws.md`.
 - Add `rfcs/0016/claw-project-v1-spec.md` and this implementation plan.
@@ -51,6 +52,8 @@ runtime, and that the V1 slice is small enough to prove with one application.
 ### PR 2: Complete local authoring lifecycle
 
 Repository: `openclaw/openclaw`.
+Implementation:
+[#117037](https://github.com/openclaw/openclaw/pull/117037).
 
 Implementation draft: [#117037](https://github.com/openclaw/openclaw/pull/117037).
 
@@ -75,6 +78,7 @@ unsafe inputs fail without mutation; the artifact independently re-reads.
 ### PR 3: Exact-artifact publication
 
 Repository: `openclaw/clawhub`.
+Implementation: [#3359](https://github.com/openclaw/clawhub/pull/3359).
 
 Implementation draft: [#3359](https://github.com/openclaw/clawhub/pull/3359).
 
@@ -92,21 +96,29 @@ changed or reused immutable version fails closed.
 
 ### PR 4: One polished end-to-end reference Claw
 
-Repository: `openclaw/awesome-claws`.
+Repository: the Awesome Claws incubator, intended for eventual
+`openclaw/awesome-claws` ownership.
+Implementation:
+[giodl73-repo/awesome-claws#2](https://github.com/giodl73-repo/awesome-claws/pull/2).
 
-- Upgrade one copyable reference Claw into the golden application project.
+- Preserve two distinct authoring references: a small dependency-free Copyable
+  Claw and a separate Golden Claw that demonstrates the complete application
+  shape.
 - Include one schema asset, one output template, one exact extension, one MCP
   prerequisite, native bootstrap, one isolated schedule, and rich UI with a
   complete Markdown fallback.
-- Run create, validate, offline dev, deterministic build, exact publish, clean
-  add, status, doctor, and remove against the same artifact.
+- Run create, validate, offline dev, deterministic build, exact publish and
+  download, verified extraction, clean add, status, doctor, and remove against
+  the same package content.
 - Record source revision, builder version, package digest, registry digest,
   applying OpenClaw version, experimental gates, environment, and owner result.
 
-Exit proof: build digest equals published digest equals downloaded and applied
-digest; the clean recipient is ready except for a deliberately omitted local
-credential; removal preserves bootstrap-created user content. Unit tests alone
-do not satisfy this clean-recipient gate.
+Exit proof: the immutable archive digest matches across build, publication, and
+download; a safe extractor binds that digest to the package directory OpenClaw
+reads; OpenClaw records its canonical package snapshot and plan-integrity
+digests. The clean recipient is ready except for a deliberately omitted local
+credential, and removal preserves bootstrap-created user content. Unit tests
+alone do not satisfy this clean-recipient gate.
 
 ## Dependency Graph
 
@@ -155,13 +167,15 @@ This series does not add:
 Before the series is called complete, one exact reference project must prove:
 
 ```text
-create -> offline dev -> deterministic build -> exact publish
-       -> clean add -> status/doctor -> remove
+create -> offline dev -> deterministic build -> exact publish -> exact download
+       -> verified extraction -> clean add -> status/doctor -> remove
 ```
 
-The proof must show that the same immutable package bytes cross every boundary.
-No stage may substitute a rebuilt artifact or imply registry approval bypasses
-OpenClaw dependency policy, capability consent, or owner readiness.
+The proof must show that the same immutable archive bytes cross the build,
+publication, and download boundaries, then that safe extraction hands exactly
+their package content to OpenClaw. No stage may substitute a rebuilt artifact
+or imply registry approval bypasses OpenClaw dependency policy, capability
+consent, or owner readiness.
 
 ## Stop Conditions
 

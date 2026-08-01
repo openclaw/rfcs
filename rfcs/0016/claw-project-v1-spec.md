@@ -244,11 +244,14 @@ new archive. The authenticated publisher selects package identity and version;
 ClawHub validates and scans the exact bytes, stores their digest, and enforces
 version immutability.
 
-The digest of the locally built and previewed artifact, accepted publication
-artifact, and downloaded artifact must match. OpenClaw then resolves and
-verifies those exact bytes before producing the normal `claws add --dry-run`
-plan. Registry approval does not bypass dependency policy, capability consent,
-or canonical owner readiness.
+The digest of the locally built and previewed archive, accepted publication
+artifact, and downloaded archive must match. A transport client then verifies
+that digest, rejects unsafe archive entries, extracts the package into an
+isolated directory, and hands that directory to OpenClaw's canonical package
+reader. OpenClaw records its canonical package snapshot and plan-integrity
+digests; the proof record binds those identities to the verified transport
+digest. Registry approval does not bypass dependency policy, capability
+consent, or canonical owner readiness.
 
 No `openclaw claws publish` command is required by this specification. A
 ClawHub-owned CLI or another publisher client may perform the authenticated
@@ -282,7 +285,9 @@ A V1 project implementation conforms only when it proves:
 6. Project-only tests, caches, credentials, and host paths are absent.
 7. Offline dev creates no durable OpenClaw state and produces no provider,
    network, schedule, or channel-delivery effects.
-8. The built, published, downloaded, and applied artifact digests match.
+8. The built, published, and downloaded archive digests match, and proof binds
+   the safely extracted package content to OpenClaw's canonical package
+   snapshot and plan-integrity digests.
 9. Clean-recipient add, status, doctor, and remove use existing OpenClaw
    lifecycle owners and preserve user-owned local state.
 
