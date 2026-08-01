@@ -13,8 +13,8 @@ semantics.
 | `openclaw/openclaw` follow-up PR #116450 | `894d125ee76` | Draft; logically stacked on #116050 |
 | `openclaw/openclaw` sidecar PR #116863 | `8d0a1b013ea` | Draft; logically stacked on #116450; consolidates fork evidence #193-#195 |
 | `openclaw/openclaw-windows-node` PR #1068 | `3ca913a43a6` | Draft; seam plus independent sidecar adapter; C# remains production default |
-| Experimental Rust launch proof #12 | `b63baf2` | Draft, fork-only; protected bootstrap plus pinned aggregate evidence |
-| Experimental Windows launch proof #4 | `70a378180da` | Draft, fork-only; path-locked verified launcher and mandatory artifact identity |
+| Experimental Rust launch proof #12 | `3d1357f` | Draft, fork-only; protected bootstrap plus deterministic pinned aggregate evidence |
+| Experimental Windows launch proof #4 | `199eaa1fcba` | Draft, fork-only; path-locked verified launcher and mandatory artifact identity |
 | `openclaw/rfcs` RFC #54 | Current PR head | Draft ownership decision; this inventory is refreshed with each evidence change |
 | Experimental `openclaw-rust-node` evidence repository | merged PRs #1-#5; draft #6 | Evidence history, not official distribution |
 
@@ -147,7 +147,7 @@ policy, or rollout controls to the product.
 | Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers pass at `894d125ee76`; earlier hosted TypeScript lanes passed | Final-head TypeScript UTF-8 validator tests are pending because the local dependency fetch failed TLS negotiation |
 | OpenClaw sidecar bridge | Rust workspace, `8d0a1b013ea` | 110 workspace tests; strict Clippy/rustdoc/format/diff pass; exact three-corpus producer/consumer proof | Source harness; no concrete process/IPC/bootstrap |
 | Windows adopter | Windows 11, `3ca913a43a6` | Full build; exact three-corpus reproduction; 60 focused, 3,462 Shared, 2,023 Tray, and 519 Connection tests; Codex and three-model reviews clean | C# remains selected; adapter is in-process and non-selectable |
-| Protected process launch | Windows 11, Rust `b63baf2`, Windows `70a378180da` | 122 shared Rust and 64 focused Windows tests; three exact fixture blobs; hash, reparse-path, and handshake-identity rejection; private bootstrap and real invocation | Test artifact and source harness; no platform signature, package/update or production selection |
+| Protected process launch | Windows 11, Rust `3d1357f`, Windows `199eaa1fcba` | 122 shared Rust and 64 focused Windows tests; three exact fixture blobs; deterministic junction-path, hash, and handshake-identity rejection; private bootstrap and real invocation | Test artifact and source harness; no platform signature, package/update or production selection |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |
 | Experimental package acceptance | Linux x64, Windows x64, macOS ARM64 | Build/checksum/extract/execute evidence | Separate experimental repository |
 | Dependency/SBOM/provenance | Experimental repository PRs #5/#6 | RustSec, CycloneDX, repository-bound attestations | Not an OpenClaw-supported release |
