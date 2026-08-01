@@ -301,7 +301,8 @@ PRs plus one initial Windows adopter PR:
    ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
 
 Fork-only follow-up evidence now launches the real Rust test child over
-anonymous pipes, verifies an exact SHA-256 artifact pin, delivers the fresh
+anonymous pipes, verifies an exact SHA-256 artifact pin while locking the
+artifact path against substitution through launch, delivers the fresh
 session key through a bounded inherited private pipe, and requires the
 authenticated runtime offer to match that verified identity
 ([Rust #12](https://github.com/giodl73-repo/openclaw-rust-node/pull/12),

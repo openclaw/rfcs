@@ -13,8 +13,8 @@ semantics.
 | `openclaw/openclaw` follow-up PR #116450 | `894d125ee76` | Draft; logically stacked on #116050 |
 | `openclaw/openclaw` sidecar PR #116863 | `8d0a1b013ea` | Draft; logically stacked on #116450; consolidates fork evidence #193-#195 |
 | `openclaw/openclaw-windows-node` PR #1068 | `3ca913a43a6` | Draft; seam plus independent sidecar adapter; C# remains production default |
-| Experimental Rust launch proof #12 | `3376ff5` | Draft, fork-only; protected bootstrap plus pinned aggregate evidence |
-| Experimental Windows launch proof #4 | `67cd91f1e54` | Draft, fork-only; verified launcher and mandatory artifact identity |
+| Experimental Rust launch proof #12 | `b63baf2` | Draft, fork-only; protected bootstrap plus pinned aggregate evidence |
+| Experimental Windows launch proof #4 | `70a378180da` | Draft, fork-only; path-locked verified launcher and mandatory artifact identity |
 | `openclaw/rfcs` RFC #54 | Current PR head | Draft ownership decision; this inventory is refreshed with each evidence change |
 | Experimental `openclaw-rust-node` evidence repository | merged PRs #1-#5; draft #6 | Evidence history, not official distribution |
 
@@ -128,7 +128,8 @@ reserved `system.*` namespace, so Windows `system.run` remains on C# pending an
 explicit OpenClaw authorization mechanism.
 
 Fork-only follow-ups #3/#4 launch a real Rust test child over anonymous pipes.
-They verify an exact SHA-256 pin while holding the artifact through launch,
+They verify an exact SHA-256 pin while holding native handles on every parent
+directory and the artifact through launch, reject reparse-point path components,
 deliver the fresh session secret in a bounded private-pipe bootstrap record,
 and require the authenticated runtime offer to present the same self-computed
 artifact identity. These follow-ups remain non-selectable source evidence; they
@@ -146,7 +147,7 @@ policy, or rollout controls to the product.
 | Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers pass at `894d125ee76`; earlier hosted TypeScript lanes passed | Final-head TypeScript UTF-8 validator tests are pending because the local dependency fetch failed TLS negotiation |
 | OpenClaw sidecar bridge | Rust workspace, `8d0a1b013ea` | 110 workspace tests; strict Clippy/rustdoc/format/diff pass; exact three-corpus producer/consumer proof | Source harness; no concrete process/IPC/bootstrap |
 | Windows adopter | Windows 11, `3ca913a43a6` | Full build; exact three-corpus reproduction; 60 focused, 3,462 Shared, 2,023 Tray, and 519 Connection tests; Codex and three-model reviews clean | C# remains selected; adapter is in-process and non-selectable |
-| Protected process launch | Windows 11, Rust `3376ff5`, Windows `67cd91f1e54` | 122 shared Rust and 63 focused Windows tests; three exact fixture blobs; hash and handshake-identity rejection; private bootstrap and real invocation | Test artifact and source harness; no platform signature, package/update or production selection |
+| Protected process launch | Windows 11, Rust `b63baf2`, Windows `70a378180da` | 122 shared Rust and 64 focused Windows tests; three exact fixture blobs; hash, reparse-path, and handshake-identity rejection; private bootstrap and real invocation | Test artifact and source harness; no platform signature, package/update or production selection |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |
 | Experimental package acceptance | Linux x64, Windows x64, macOS ARM64 | Build/checksum/extract/execute evidence | Separate experimental repository |
 | Dependency/SBOM/provenance | Experimental repository PRs #5/#6 | RustSec, CycloneDX, repository-bound attestations | Not an OpenClaw-supported release |

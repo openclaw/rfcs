@@ -27,7 +27,7 @@ supported.
 | N2 embeddable lifecycle | OpenClaw #116450 | Shared fixtures and real socket lifecycle, signing, token, reconnect, duplex, manifest, admission tests | Per-adopter signing/reconnect/invocation lifecycle |
 | A1 adopter seam | Windows #1068 | Existing C# default, full unit suites, real Gateway MXC path | Duplicate Windows routing when Rust adapter arrives |
 | A2 sidecar adapter | OpenClaw #116863 plus Windows #1068 | Independent authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, dispatcher routing, and exact cross-language corpora | No deletion; process/IPC and production adoption gates remain |
-| A3a launch/bootstrap evidence | Rust fork #12 plus Windows fork #4 | Exact artifact SHA-256 rejection, self-identity handshake binding, bounded private-pipe bootstrap, real process admission/invocation | No deletion; signing, packaging, Gateway parity and operational adoption remain |
+| A3a launch/bootstrap evidence | Rust fork #12 plus Windows fork #4 | Exact artifact SHA-256 and reparse-path rejection, path locks through launch, self-identity handshake binding, bounded private-pipe bootstrap, real process admission/invocation | No deletion; signing, packaging, Gateway parity and operational adoption remain |
 | A3 sidecar adoption | Future Windows adopter PR | Verified artifact/launch, protected bootstrap, concrete IPC, Gateway/pairing/token parity, crash, revocation, audit, resource, rollout and rollback proof | Incumbent product-owned Gateway transport after observation window |
 | R1 supported release | future OpenClaw release decision | Package acceptance, signing/provenance, SBOM, compatibility, servicing and security runbooks | Experimental-only packaging and private distribution |
 
@@ -142,9 +142,9 @@ The current drafts provide:
   tests at `3ca913a43a6`; the unchanged C# default path also has 2/2 live
   Gateway MXC proof;
 - fork-only Rust #11/#12 and Windows #3/#4: real child-process pipes, exact
-  artifact hash verification, bounded secret bootstrap outside arguments,
+  artifact hash verification with reparse-safe path locks through launch, bounded secret bootstrap outside arguments,
   environment and files, required handshake artifact binding, 122 shared Rust
-  plus 63 focused Windows tests, and three exact fixture blobs; and
+  plus 64 focused Windows tests, and three exact fixture blobs; and
 - earlier experimental repository package, SBOM, dependency, and provenance
   evidence, which remains evidence history rather than an official release.
 

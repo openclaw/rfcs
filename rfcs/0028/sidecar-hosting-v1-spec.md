@@ -22,8 +22,9 @@ Subsequent fork-only evidence
 [Rust #12](https://github.com/giodl73-repo/openclaw-rust-node/pull/12), and
 [Windows #3](https://github.com/giodl73-repo/openclaw-windows-node/pull/3)/
 [Windows #4](https://github.com/giodl73-repo/openclaw-windows-node/pull/4))
-now demonstrates real anonymous-pipe framing, an exact SHA-256 launch pin, a
-bounded private-pipe bootstrap, and handshake binding to the verified artifact.
+now demonstrates real anonymous-pipe framing, an exact SHA-256 launch pin held
+against reparse/path substitution through process creation, a bounded private-
+pipe bootstrap, and handshake binding to the verified artifact.
 That is source-harness evidence, not packaged production adoption.
 
 The current `openclaw-node` executable is a foreground proof host, not this
@@ -52,8 +53,9 @@ stronger process isolation required by its capability surface.
 
 ## Launch and trust bootstrap
 
-The supervisor must select an exact runtime artifact and verify the platform's
-accepted code-signing/provenance policy before launch. It must create a fresh,
+The supervisor must select an exact runtime artifact, prevent path or reparse-
+point substitution between verification and process creation, and verify the
+platform's accepted code-signing/provenance policy before launch. It must create a fresh,
 local-only IPC endpoint with an unguessable session credential or equivalent
 mutual authentication. The credential must not appear in command-line
 arguments, inherited broad environment state, logs, crash reports, or world-
