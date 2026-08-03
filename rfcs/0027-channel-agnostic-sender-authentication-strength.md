@@ -95,6 +95,10 @@ where possible," tracked as recommendation R-008 at `docs/security/THREAT-MODEL-
 - Defining what "authenticated" means for any specific transport. Each channel owns that
   judgment and must document it.
 - Composing this with approval flows. RFC 0011 already owns plugin-attested approvals.
+- Adding a new operator-facing config surface in v1. The default policy minimum stays
+  `asserted`, which is exactly today's default behavior, so no current deployment changes;
+  requiring `verified` is new and opt-in, declared in code by a channel. A public
+  minimum-strength config knob, if ever justified, is a separate RFC.
 
 ## Proposal
 
@@ -386,8 +390,8 @@ Sequential, each independently landable and testable, smallest first.
 | # | PR | Scope | Risk |
 | --- | --- | --- | --- |
 | 1 | Threat model and terminology | Define the gap and the trust boundary in `docs/security/THREAT-MODEL-ATLAS.md` and channel security docs. No runtime change. | Minimal |
-| 2 | Kernel internalization | Add `IdentifierAuthentication`, resolve it during normalization for both entries and subjects, add the per-message subject strength map, replace `applyMutableIdentifierPolicy` with the `min()` gate, add the reason code. No new exported names; see the note below. Tests in `src/channels/message-access/`. | Low, fully unit-testable |
-| 3 | SDK compat | Export `authentication`, the subject strength map, and `minIdentifierAuthentication` through `src/plugin-sdk/channel-ingress-runtime.ts`, deprecate `dangerous` and `mutableIdentifierMatching`, update the API baseline, add precedence tests. | Medium, public surface |
+| 2 | Kernel internalization ([#116281](https://github.com/openclaw/openclaw/pull/116281)) | Add `IdentifierAuthentication`, resolve it during normalization for both entries and subjects, add the per-message subject strength map, replace `applyMutableIdentifierPolicy` with the `min()` gate, add the reason code. No new exported names; see the note below. Tests in `src/channels/message-access/`. | Low, fully unit-testable |
+| 3 | SDK compat ([#117121](https://github.com/openclaw/openclaw/pull/117121)) | Export `authentication`, the subject strength map, and `minIdentifierAuthentication` through `src/plugin-sdk/channel-ingress-runtime.ts`, deprecate `dangerous` and `mutableIdentifierMatching`, update the API baseline, add precedence tests. | Medium, public surface |
 | 4 | Bundled channel migration | Migrate the six channels declaring `dangerous: true` to explicit strength. Each channel's docs state what backs its claim. First PR exercising the model across real transports. | Medium, six owners |
 | 5 | Audit and doctor findings | Widen `audit-channel` wording, add the lockout-preview doctor finding. | Medium |
 | 6 | Downstream consumer | Private email channel maps its mail-auth facts onto the primitive. Not in this repo. | Downstream |
