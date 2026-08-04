@@ -6,7 +6,7 @@ created: 2026-08-04
 last_updated: 2026-08-04
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/59
 ---
 
 # Proposal: External Automation Deadlines and Schedule-Only Occurrences
