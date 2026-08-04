@@ -3,7 +3,7 @@ title: OpenClaw MSIX Packaging for Windows
 authors:
   - Linus Huang
 created: 2026-07-14
-last_updated: 2026-07-29
+last_updated: 2026-08-03
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/58
