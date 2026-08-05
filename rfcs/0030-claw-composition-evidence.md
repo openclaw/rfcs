@@ -6,7 +6,7 @@ created: 2026-08-05
 last_updated: 2026-08-05
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/60
 ---
 
 # Proposal: Claw Composition Evidence (Agent BOM)
