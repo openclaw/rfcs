@@ -55,6 +55,10 @@ release checks produced a given OpenClaw MSIX artifact.
   payload and manages the Gateway lifecycle.
 - Publish signed MSIX artifacts under a stable OpenClaw-controlled identity,
   with checksums and source-version metadata, through GitHub Releases.
+- Make a supported way to disable OpenClaw Gateway self-updates a hard
+  dependency for the MSIX release. The mechanism belongs in OpenClaw rather
+  than this packaging RFC, but it is required so an administrator-approved
+  MSIX remains authoritative for the deployed Gateway version.
 - Make the [Windows companion app](https://github.com/openclaw/openclaw-windows-node) present **Install OpenClaw MSIX** as the
   default or preferred option for creating a local OpenClaw Gateway.
 
@@ -231,17 +235,24 @@ or its signed payload. The PFN continues to identify the packaged application,
 but the MSIX version no longer identifies the exact OpenClaw revision currently
 running.
 
-Native updating is therefore not encouraged for managed enterprise
-installations. It can bypass administrator approval, make inventory less
-precise, and complicate support. The packaging host does not initiate a native
-update on its own. A later MSIX update returns the Gateway to the version
-carried by the administrator-approved package.
+Native updating the Gateway must therefore be disabled for managed enterprise
+installations. Otherwise it can bypass administrator approval, break the
+version and inventory contract, and leave the running Gateway outside the
+tested and signed MSIX release. The packaging host does not initiate a native
+update on its own, but that is insufficient because users and the Gateway can
+still invoke the OpenClaw update path. A supported OpenClaw mechanism for
+disabling Gateway self-updates is therefore a hard dependency for the MSIX
+release, even though defining and implementing that mechanism is outside this
+RFC.
 
 ### Distribution and updates
 
 GitHub Releases are the canonical distribution point for the first version of
 this proposal. A release should provide direct artifact links, checksums,
 signatures, provenance, release notes, and an SBOM.
+Future versions may expand distribution to additional channels such as WinGet
+or the Microsoft Store once their identity, signing, update, and publication
+requirements are defined.
 
 Enterprise administrators should handle OpenClaw MSIX like any other Windows
 app distributed outside the Microsoft Store. They should use their existing
@@ -269,6 +280,8 @@ user to the appropriate artifact.
 MSIX should become the preferred Windows installation mechanism for enterprise once:
 
 - x64 and ARM64 packages are built and signed through the packaging pipeline.
+- OpenClaw provides a supported mechanism that disables Gateway self-updates
+  for managed MSIX installations.
 - The payload tarball and staged files are verified before activation.
 - Install, onboarding, update, repair, reset, and uninstall paths have
   automated and manual coverage.
@@ -321,12 +334,14 @@ verification behavior are defined.
 
 ## Unresolved questions
 
+- Is a standalone `openclaw/openclaw-msix-packaging` repository preferable, or
+  should the host app, package definitions, and release workflows be maintained
+  directly in `openclaw/openclaw`?
 - Which capabilities must be declared in the package manifest, and which
   changes require explicit security review?
-- Should packaged OpenClaw disable native self-updates, including updates
-  initiated through `openclaw update` or by prompting the Gateway? If so, what
-  enforcement mechanism can enterprise administrators rely on, given that
-  OpenClaw does not provide one today?
+- What supported OpenClaw enforcement mechanism will disable native
+  self-updates, including updates initiated through `openclaw update` or by
+  prompting the Gateway, for managed MSIX installations?
 - If Microsoft Store distribution is introduced later, packages that are released
   from GitHub and those from the Store will have different PFNs. How will side-by-side
   installation be handled?
