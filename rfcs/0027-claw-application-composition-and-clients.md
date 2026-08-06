@@ -3,7 +3,7 @@ title: Claw Application Composition and Clients
 authors:
   - Gio
 created: 2026-07-27
-last_updated: 2026-07-31
+last_updated: 2026-08-06
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/52
@@ -17,9 +17,9 @@ Complete the experimental Claw application model without introducing schema
 version 2 or a second setup engine. A Claw remains a versioned definition of one
 complete new agent. Its portable core carries purpose, instructions, skills,
 direct MCP servers, managed workspace content, and scheduled work. Conventional
-harness profiles carry native extensions and operating policy. An optional
-package-root `BOOTSTRAP.md` gives the new agent a seed-once first-run interview
-through the harness's existing bootstrap lifecycle.
+harness profiles carry native extension requirements and operating policy. An
+optional package-root `BOOTSTRAP.md` gives the new agent a seed-once first-run
+interview through the harness's existing bootstrap lifecycle.
 
 Schemas, API references, templates, examples, fixtures, images, HTML, and other
 assets remain ordinary managed workspace files. CLI, TUI, chat, and Control UI
@@ -70,8 +70,8 @@ setup possible as evidence-driven follow-up.
 
 - Preserve schema version 1 for launch.
 - Keep `CLAW.md` portable and understandable without one harness profile.
-- Put native plugin bundles and their format assertions in conventional harness
-  profiles.
+- Put native plugin requirements and their format assertions in conventional
+  harness profiles without transferring plugin ownership to the Claw.
 - Delegate extension detection, scanning, installation, readiness, update, and
   cleanup to canonical harness owners.
 - Support finished applications with managed schemas, references, templates,
@@ -111,8 +111,9 @@ A Claw application has three layers:
 
 1. **Portable package.** `CLAW.md`, optional `BOOTSTRAP.md`, identity, managed
    workspace files, skills, direct MCP servers, and scheduled work.
-2. **Harness profile.** Native extensions, tool posture, memory posture, sandbox
-   behavior, and presentation choices at `profiles/<harness>.yml`.
+2. **Harness profile.** Native extension requirements, tool posture, memory
+   posture, sandbox behavior, and presentation choices at
+   `profiles/<harness>.yml`.
 3. **Local instance.** Credentials, OAuth state, channel bindings, operator
    policy, runtime selection, and user-owned personalization.
 
@@ -126,10 +127,11 @@ need identical tools or presentation, but an adapter must fail the complete plan
 when it cannot realize a required component; it must not silently call a
 degraded partial projection conforming.
 
-### Native extensions
+### Native extension requirements
 
-New harness-native plugin dependencies belong in the selected conventional
-profile. The exact OpenClaw schema is defined by
+New harness-native plugin requirements belong in the selected conventional
+profile. They are requirements of the application, not members owned by the
+Claw lifecycle. The exact OpenClaw schema is defined by
 [`0016/openclaw-profile-v1-spec.md` in RFC #48](https://github.com/openclaw/rfcs/pull/48).
 Existing experimental schema-v1 manifests with portable `plugin` package
 entries remain readable, but canonical producers do not duplicate a dependency
@@ -146,6 +148,13 @@ inventory, unavailable inventory, trust findings, redacted effects, and adapter
 identity bind preview and consent. A later OpenClaw version may map the same
 bundle differently; status and doctor report that compatibility drift without
 silently changing plugin enablement.
+
+Preview classifies each requirement as satisfied, missing and installable,
+conflicting, or requiring local setup. A missing installable requirement is a
+distinct capability effect. Interactive clients ask whether to install it;
+non-interactive clients disclose the grouped requirement action and bind it to
+the exact plan-integrity acknowledgment. Approved canonical requirement actions
+complete before any agent, workspace, MCP, or scheduled-work mutation.
 
 Direct `mcpServers` remain portable core. MCP servers embedded in extensions
 remain extension-owned. Claws do not invent semantic deduplication between the
@@ -228,7 +237,7 @@ Every client uses the same Gateway or local lifecycle services:
 flowchart LR
   Source[Claw source] --> Inspect[Inspect]
   Inspect --> Plan[Add dry-run]
-  Plan --> Consent[Explicit consent]
+  Plan --> Consent[Approve requirements and exact plan]
   Consent --> Add[Add new agent]
   Add --> Bootstrap[Native first run]
   Bootstrap --> Connect[Canonical owner setup]
@@ -239,15 +248,17 @@ The primary guided stages are:
 
 1. **Overview:** identity, exact version, publisher/trust context, purpose, and
    expandable validated manifest.
-2. **Preview:** complete agent, file, skill, extension, MCP, cron, bootstrap,
-   capability, blocker, and retained-boundary effects.
-3. **Add:** exact plan-integrity consent and canonical mutation outcomes.
-4. **Personalize:** the new agent conducts native bootstrap through chat or TUI.
-5. **Connect:** canonical plugin, MCP OAuth, channel, and credential surfaces.
-6. **Ready:** status and doctor distinguish applied state from operational
+2. **Preview:** complete agent, file, skill, extension-requirement, MCP, cron,
+   bootstrap, capability, blocker, and retained-boundary effects.
+3. **Requirements:** reuse satisfied requirements and explicitly approve any
+   canonical installation needed before Claw-owned mutation.
+4. **Add:** exact plan-integrity consent and canonical mutation outcomes.
+5. **Personalize:** the new agent conducts native bootstrap through chat or TUI.
+6. **Connect:** canonical plugin, MCP OAuth, channel, and credential surfaces.
+7. **Ready:** status and doctor distinguish applied state from operational
    readiness and provide owner-specific remediation.
 
-Control UI can present all six stages in one polished flow. TUI and CLI may
+Control UI can present all seven stages in one polished flow. TUI and CLI may
 link or transition to the same native owner operations. Surface-specific layout
 is allowed; package meaning, plan integrity, consent, ownership, and lifecycle
 outcomes are not.
@@ -260,8 +271,10 @@ secret values or an independent mutation contract.
 
 ### Update, remove, and export
 
-Update reconciles managed package content and native extension dependencies
-under RFC 0016. It preserves user-owned bootstrap output and never restarts the
+Update reconciles managed package content and native extension requirements
+under RFC 0016. New missing requirements receive the same explicit consent as
+add; removed requirements release their dependency edge and retain the shared
+artifact. Update preserves user-owned bootstrap output and never restarts the
 first-run ritual. A package that needs a new guided migration must introduce an
 explicit future contract rather than repurpose bootstrap as recurring update
 code.
@@ -274,14 +287,12 @@ or modified bootstrap file and every interview output remain user-owned.
 
 Native extensions backed by globally installed plugins are always referenced,
 even when Claw add introduced the plugin. Normal remove releases only the
-removing Claw's dependency edge and retains the plugin. Bulk
-`remove-if-unused` cleanup must not select a global plugin because provenance
-records known ownership, not every agent that may use shared plugin tools.
-Operators may still explicitly select an exact plugin for canonical uninstall
-after dry-run. That plan must show known affected owners and warn, even when
-none are known, that manually configured agents may still depend on it. This
-warning and exact selection are required in addition to plan-integrity consent;
-a general cleanup mode or `--yes` is insufficient.
+removing Claw's dependency edge, retains the plugin, and reminds the operator
+when Claw add introduced it. A client may separately offer exact canonical
+plugin uninstall after dry-run. That plan must show known affected owners and
+warn, even when none are known, that manually configured agents may still
+depend on it. This warning and exact selection are required in addition to
+plan-integrity consent; a general cleanup mode or `--yes` is insufficient.
 
 Export remains selection-based and excludes credentials, bindings, runtime
 choices, and user-owned personal files by default. It emits supported OpenClaw
@@ -355,10 +366,13 @@ guided-template form.
 1. Schema version 1 remains the only accepted portable manifest version.
 2. Optional profiles are discovered only at conventional paths and are bound
    into package integrity without manifest pointers.
-3. OpenClaw validates profile v1 agent settings and native extensions strictly.
+3. OpenClaw validates profile v1 agent settings and native extension
+   requirements strictly.
 4. Every extension delegates to canonical plugin detection, safety, install,
    readiness, update, and cleanup paths.
-5. A required extension failure or unusable mapping blocks the complete plan;
+5. Requirements are classified as satisfied, missing-installable, conflicting,
+   or setup-required; missing installation needs explicit consent before
+   Claw-owned mutation, while a conflict or unusable mapping blocks the plan;
    unavailable components are disclosed without being presented as working.
 6. Application schemas, references, templates, examples, fixtures, and assets
    use ordinary managed workspace-file semantics.
@@ -382,10 +396,11 @@ guided-template form.
     runtime extension compatibility or collecting local onboarding state.
 14. All new surfaces fail closed when their existing experimental Claws gate is
     disabled.
-15. Remove retains referenced plugins by default, excludes global plugins from
-    bulk unused cleanup, and permits canonical plugin uninstall only after exact
-    selection, dry-run, integrity-bound consent, and a warning that unknown
-    manually configured agents may still use the plugin.
+15. Remove releases requirement edges, retains referenced plugins by default,
+    reports which requirements Claw add introduced, and permits canonical
+    plugin uninstall only after separate exact selection, dry-run,
+    integrity-bound consent, and a warning that unknown manually configured
+    agents may still use the plugin.
 
 ## Unresolved Questions
 

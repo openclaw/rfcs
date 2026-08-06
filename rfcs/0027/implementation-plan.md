@@ -65,21 +65,25 @@ Active PR: [`openclaw/openclaw#115237`](https://github.com/openclaw/openclaw/pul
   consumed local bootstrap state.
 - Keep all commands under `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
 
-### PR 2: Profile extensions and application content
+### PR 2: Profile extension requirements and application content
 
 Active PR: [`openclaw/openclaw#115962`](https://github.com/openclaw/openclaw/pull/115962).
 
-- Finalize OpenClaw profile schema version 1 with optional `extensions`.
+- Finalize OpenClaw profile schema version 1 with optional `extensions`, whose
+  entries declare shared host requirements rather than Claw-owned members.
 - Support strict `openclaw`, `claude`, `codex`, and `cursor` format assertions.
 - Delegate detection, safety scanning, package preflight, installation,
   readiness, update, uninstall warnings, and cleanup to canonical plugin owners.
+- Classify requirements as satisfied, missing-installable, conflicting, or
+  setup-required; bind approved missing installs into plan integrity and run
+  them before Claw-owned agent/workspace mutation.
 - Persist extension dependency edges as referenced resources even when Claw add
-  introduced the global plugin. Default remove releases only the Claw edge.
-- Exclude global plugins from bulk `remove-if-unused` cleanup because ownership
-  provenance cannot prove that arbitrary agents do not use them. Preserve exact
-  opt-in plugin cleanup through `remove-selected` / `--remove-referenced`, with
-  dry-run, plan-integrity consent, known-owner disclosure, an unknown-agent-use
-  warning, and canonical plugin uninstall behavior.
+  introduced the global plugin. Default remove releases only the Claw edge,
+  retains the plugin, and reports that add introduced it.
+- Preserve exact opt-in plugin cleanup through `remove-selected` /
+  `--remove-referenced` as a separate canonical owner action, with dry-run,
+  plan-integrity consent, known-owner disclosure, an unknown-agent-use warning,
+  and canonical plugin uninstall behavior.
 - Include exact extension effects and adapter identity in plan integrity and
   provenance.
 - Report mapped, detect-only, unavailable, unsupported, and compatibility-drift
@@ -201,8 +205,9 @@ Minimum proof before asking maintainers to land the full track:
 2. Inspect a package with `profiles/openclaw.yml`, one native extension,
    managed schemas/assets, and package-root `BOOTSTRAP.md`.
 3. Add dry-run discloses every effect without mutation or secret resolution.
-4. Consented add creates one new agent, installs through canonical owners, and
-   seeds bootstrap exactly once.
+4. Consented add resolves satisfied requirements, installs approved missing
+   requirements through canonical owners before Claw-owned mutation, creates
+   one new agent, and seeds bootstrap exactly once.
 5. First chat/TUI turn labels package-authored onboarding, does not inject
    secrets, and consumes bootstrap without status drift.
 6. The agent uses `show_widget` when available and returns equivalent useful
@@ -211,10 +216,11 @@ Minimum proof before asking maintainers to land the full track:
    extension-incompatible, and ready states.
 8. Update preserves user-owned personalization, managed-file drift rules, and
    unchanged extension dependency edges.
-9. Remove preserves user-owned outputs and retains referenced extensions by
-   default. Bulk unused cleanup does not select global plugins; exact selected
-   plugin cleanup shows known owners, warns that unrecorded agent use cannot be
-   disproved, and delegates to canonical uninstall.
+9. Remove preserves user-owned outputs, releases extension dependency edges,
+   retains referenced extensions by default, and reports which were introduced
+   by add. Separately selected plugin cleanup shows known owners, warns that
+   unrecorded agent use cannot be disproved, and delegates to canonical
+   uninstall.
 10. ClawHub publication/search/download feeds the exact same artifact into a
     clean OpenClaw add dry-run.
 11. Control UI produces the same plan identity and lifecycle outcome as CLI for
