@@ -16,7 +16,7 @@ behavior supplied by their current OpenClaw implementation stack:
 1. [#115237](https://github.com/openclaw/openclaw/pull/115237): conventional
    profiles and native package-root `BOOTSTRAP.md`.
 2. [#115962](https://github.com/openclaw/openclaw/pull/115962): schema-v1
-   profile extensions and managed application content.
+   profile extension requirements and managed application content.
 3. [#115371](https://github.com/openclaw/openclaw/pull/115371): export of an
    explicitly reviewed native bootstrap file.
 4. [#112808](https://github.com/openclaw/openclaw/pull/112808): read-only
@@ -71,6 +71,9 @@ Implementation draft: [#117037](https://github.com/openclaw/openclaw/pull/117037
 - Add offline `openclaw claws dev`, which builds a temporary snapshot and shows
   the canonical inspect/add dry-run without applying, contacting providers,
   invoking network capabilities, activating schedules, or delivering messages.
+- Report declared requirements and any locally available canonical resolution
+  state during validate/dev, but never install them; preserve exact requirement
+  declarations during deterministic build without vendoring artifacts.
 - Keep every command behind `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
 
 Exit proof: one command creates a valid readable project; offline dev reports
@@ -110,6 +113,9 @@ Implementation:
 - Include one schema asset, one output template, one exact extension, one MCP
   prerequisite, native bootstrap, one isolated schedule, and rich UI with a
   complete Markdown fallback.
+- Prove the extension is treated as a shared host requirement: clean-recipient
+  add explicitly approves its canonical installation before agent mutation and
+  remove releases the edge, retains it, and reports that add introduced it.
 - Run create, validate, offline dev, deterministic build, exact publish and
   download, verified extraction, clean add, status, doctor, and remove against
   the same package content.

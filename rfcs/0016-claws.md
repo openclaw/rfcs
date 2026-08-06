@@ -652,11 +652,11 @@ This addendum depends on the portable profile/bootstrap contract in
 application-composition and client contract in
 [RFC PR #52](https://github.com/openclaw/rfcs/pull/52), and their experimental
 OpenClaw implementation stack. That work establishes conventional profiles,
-native `BOOTSTRAP.md`, profile extensions, managed application content, and
-shared lifecycle clients. The project lifecycle consumes those contracts; it
-does not redefine or independently implement them. This addendum may be
-reviewed in parallel, but it must not be accepted or merged before those
-prerequisite contracts are accepted.
+native `BOOTSTRAP.md`, profile extension requirements, managed application
+content, and shared lifecycle clients. The project lifecycle consumes those
+contracts; it does not redefine or independently implement them. This addendum
+may be reviewed in parallel, but it must not be accepted or merged before
+those prerequisite contracts are accepted.
 
 The V1 primary authoring lifecycle is create, dev, and build. Read-only
 `validate` remains available for CI and diagnosis and runs automatically before
@@ -667,6 +667,11 @@ artifact. Production realization continues to use the existing `claws add`
 lifecycle. Project commands never write production OpenClaw state implicitly,
 run or ship package-authored lifecycle scripts, or package credentials and
 local bindings.
+
+Project validate and dev may report requirement declarations and canonical
+resolution state, but they never install host requirements. Build preserves the
+exact declarations in the package without downloading or vendoring their
+artifacts; consented production add remains the only realization boundary.
 
 ### Provenance and local state
 

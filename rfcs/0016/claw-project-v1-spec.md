@@ -17,8 +17,8 @@ in [RFC PR #48](https://github.com/openclaw/rfcs/pull/48) and the
 application-composition and client contract proposed in
 [RFC PR #52](https://github.com/openclaw/rfcs/pull/52). In particular, it
 consumes those proposals' schema-v1 conventional profiles, package-root
-`BOOTSTRAP.md`, native extensions, managed application content, and shared
-lifecycle services.
+`BOOTSTRAP.md`, native extension requirements, managed application content,
+and shared lifecycle services.
 
 This specification does not independently standardize those inputs. If either
 prerequisite changes, this specification must be reconciled before acceptance.
@@ -168,6 +168,11 @@ Validation must:
 Validation may inspect installed catalogs needed for compatibility, but it must
 not install, enable, authenticate, publish, or apply anything. A network-backed
 resolution mode must be explicit and must not change the local project.
+Validation reports each declared host requirement and, when canonical owner
+state is available, whether it is satisfied, missing-installable, conflicting,
+or setup-required. Offline or source-only validation may report resolution as
+unavailable; it must not mistake an unresolved requirement for embedded package
+content or install it as a side effect.
 
 ## Deterministic Build
 
@@ -234,6 +239,9 @@ quarantines the incomplete output and returns failure.
 
 Build and publish are separate operations. Build success conveys no registry
 ownership, security approval, or runtime compatibility promise.
+The builder preserves exact requirement declarations byte-for-byte in their
+selected manifest or conventional profile. It does not resolve, download,
+vendor, install, or rewrite host requirements.
 
 ## Offline Development Preview
 
@@ -253,7 +261,8 @@ Dev must:
 
 - show the same inspect and dry-run effects production add would show;
 - reuse the canonical add planner and readiness owners; and
-- expose missing local prerequisites honestly.
+- expose satisfied, missing-installable, conflicting, setup-required, and
+  offline-unresolved requirements honestly without installing any of them.
 
 ## Publication and Application
 
@@ -310,6 +319,9 @@ A V1 project implementation conforms only when it proves:
    snapshot and plan-integrity digests.
 9. Clean-recipient add, status, doctor, and remove use existing OpenClaw
    lifecycle owners and preserve user-owned local state.
+10. Validate and dev report requirement declarations and available resolution
+    state without installation, while build preserves declarations without
+    resolving or vendoring their artifacts.
 
 ## Non-Goals
 
