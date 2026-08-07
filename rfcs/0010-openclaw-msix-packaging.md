@@ -253,6 +253,10 @@ signatures, provenance, release notes, and an SBOM.
 Future versions may expand distribution to additional channels such as WinGet
 or the Microsoft Store once their identity, signing, update, and publication
 requirements are defined.
+Publishing through WinGet requires submitting a package manifest to the WinGet
+repository that references the signed MSIX hosted on GitHub Releases; WinGet
+does not need to host a separate copy of the package. This allows GitHub
+Releases to remain the canonical artifact source when WinGet support is added.
 
 Enterprise administrators should handle OpenClaw MSIX like any other Windows
 app distributed outside the Microsoft Store. They should use their existing
@@ -342,9 +346,14 @@ verification behavior are defined.
 - What supported OpenClaw enforcement mechanism will disable native
   self-updates, including updates initiated through `openclaw update` or by
   prompting the Gateway, for managed MSIX installations?
-- If Microsoft Store distribution is introduced later, packages that are released
-  from GitHub and those from the Store will have different PFNs. How will side-by-side
-  installation be handled?
+- If Microsoft Store distribution is introduced later, can packages released
+  through GitHub and the Store preserve the same PFN? If not, how will
+  side-by-side installation be handled?
+  - [@DrusTheAxe](https://github.com/DrusTheAxe) noted that preserving the PFN
+    may be possible by defining the Store product identity in advance and using
+    an Azure Artifact Services certificate whose subject matches the package
+    manifest's `Publisher`. This is not a v1 priority; GitHub Releases will
+    remain the MSIX release channel for the time being.
 - How should enterprise deployment systems receive revocation or urgent
   security-update guidance without allowing clients to install unapproved
   payloads?
