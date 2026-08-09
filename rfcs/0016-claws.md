@@ -990,17 +990,17 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 19. Add and update plans disclose capability escalations separately from
     ordinary content, include them in plan integrity, and reject mutation when
     the reviewed capability set changes.
-20. A generated Claw project is readable and valid without hidden generator
+21. A generated Claw project is readable and valid without hidden generator
     state, and validation performs no OpenClaw or registry mutation.
-21. Linux, macOS, and Windows builds from identical project inputs produce the
+22. Linux, macOS, and Windows builds from identical project inputs produce the
     same artifact digest; project-only tests, caches, scripts, credentials, and
     local paths are excluded, and the result revalidates through the canonical
     package reader.
-22. Offline development creates no durable OpenClaw state and produces no
+23. Offline development creates no durable OpenClaw state and produces no
     provider, network, schedule, or channel-delivery effects.
-23. Publication accepts the exact built artifact rather than rebuilding source
+24. Publication accepts the exact built artifact rather than rebuilding source
     and returns its immutable digest.
-24. One polished reference Claw proves create, offline dev, deterministic build,
+25. One polished reference Claw proves create, offline dev, deterministic build,
     exact publish and download, safe extraction, clean-recipient add, status,
     doctor, and remove. The archive digest remains identical through transport,
     and proof binds the extracted package to OpenClaw's canonical package and
