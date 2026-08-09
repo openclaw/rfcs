@@ -4,7 +4,8 @@ This sidecar defines the smallest dependency-ordered implementation plan for
 the Claw project and developer lifecycle in RFC 0016. It proves one complete
 author-to-recipient path before generalizing testing or live development.
 
-Status: proposed experimental plan.
+Status: proposed experimental plan; implementation slices 2-4 are merged while
+RFC acceptance remains pending.
 
 ## Prerequisite Stack
 
@@ -19,16 +20,14 @@ behavior supplied by their current OpenClaw implementation stack:
    profile extension requirements and managed application content.
 3. [#115371](https://github.com/openclaw/openclaw/pull/115371): export of an
    explicitly reviewed native bootstrap file.
-4. [#112808](https://github.com/openclaw/openclaw/pull/112808): read-only
-   Gateway and Control UI lifecycle.
-5. [#112828](https://github.com/openclaw/openclaw/pull/112828): consented
-   Gateway and Control UI mutation lifecycle.
+4. [#112828](https://github.com/openclaw/openclaw/pull/112828): the separate,
+   non-blocking Gateway and Control UI reconstruction still remaining on current
+   `main`. Closed #112808 is superseded and is not a live prerequisite.
 
-The project PRs may be drafted while this prerequisite stack is reviewed, but
-they must not duplicate it or be presented as independently complete. This RFC
-must not be accepted before RFC #48 and RFC #52. OpenClaw implementation should
-be based on merged prerequisite behavior rather than permanently stacked on
-unmerged fork heads.
+The authoring and exact-artifact series landed against merged prerequisite
+behavior rather than permanent fork heads. It does not duplicate that behavior
+or depend on the remaining Control UI reconstruction. This RFC must still not be
+accepted before RFC #48 and RFC #52.
 
 ## Four-PR Series
 
@@ -55,7 +54,7 @@ Repository: `openclaw/openclaw`.
 Implementation:
 [#117037](https://github.com/openclaw/openclaw/pull/117037).
 
-Implementation draft: [#117037](https://github.com/openclaw/openclaw/pull/117037).
+Merged as `7422222788c4b75581c0370e0614be9e635ec3cd`.
 
 - Add `openclaw claws create` with one minimal readable project.
 - Discover a project from root `package.json` plus `CLAW.md`; add read-only
@@ -86,7 +85,7 @@ unsafe inputs fail without mutation; the artifact independently re-reads.
 Repository: `openclaw/clawhub`.
 Implementation: [#3359](https://github.com/openclaw/clawhub/pull/3359).
 
-Implementation draft: [#3359](https://github.com/openclaw/clawhub/pull/3359).
+Merged as `82313c2bb17fb8401c41c8ed2b0144d42b461ae7`.
 
 - Accept an already-built Claw artifact through the existing experimental
   ClawHub gate.
@@ -105,7 +104,9 @@ changed or reused immutable version fails closed.
 Repository: the Awesome Claws incubator, intended for eventual
 `openclaw/awesome-claws` ownership.
 Implementation:
-[giodl73-repo/awesome-claws#2](https://github.com/giodl73-repo/awesome-claws/pull/2).
+[giodl73-repo/awesome-claws#5](https://github.com/giodl73-repo/awesome-claws/pull/5),
+merged as `a1a7608ba112700cb4effcd8fc79033e3a218425`. It replaces closed,
+superseded #2.
 
 - Preserve two distinct authoring references: a small dependency-free Copyable
   Claw and a separate Golden Claw that demonstrates the complete application
@@ -185,6 +186,14 @@ publication, and download boundaries, then that safe extraction hands exactly
 their package content to OpenClaw. No stage may substitute a rebuilt artifact
 or imply registry approval bypasses OpenClaw dependency policy, capability
 consent, or owner readiness.
+
+Awesome Claws #5 completed this gate with artifact SHA-256
+`02ab968af17c75d473bcf0a839735a1104dcaf135838651d5af4e59899e2f916`.
+The proof used merged standalone Claws
+`250e41588a54d23ab53b49eef5e7b2eeee83ea03`, OpenClaw
+`7422222788c4b75581c0370e0614be9e635ec3cd`, and ClawHub
+`82313c2bb17fb8401c41c8ed2b0144d42b461ae7`; one complete lifecycle and its
+deterministic application scenario passed.
 
 ## Stop Conditions
 
