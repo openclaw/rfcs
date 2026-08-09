@@ -346,20 +346,19 @@ provide the best visual experience.
 
 The dependency-aware cross-repository plan is in
 [`0027/implementation-plan.md`](0027/implementation-plan.md). OpenClaw
-[#115237](https://github.com/openclaw/openclaw/pull/115237) is reused for the
-conventional-profile/native-bootstrap slice. The schema-v1 extension slice is
-[#115962](https://github.com/openclaw/openclaw/pull/115962), bootstrap-native
-export authoring reuses
-[#115371](https://github.com/openclaw/openclaw/pull/115371), and the current
-Control UI/Gateway pair is
-[#112808](https://github.com/openclaw/openclaw/pull/112808) followed by
-[#112828](https://github.com/openclaw/openclaw/pull/112828). Standalone
-[#1](https://github.com/giodl73-repo/claws/pull/1) provides the schema-v1
-reference CLI/OpenClaw adapter, and standalone
-[#2](https://github.com/giodl73-repo/claws/pull/2) provides the bounded Codex
-workspace adapter. The schema-v2 planning and answer-state drafts in #115565
-and #115296 are superseded. #115371 is rewritten rather than landed in its
-guided-template form.
+[#115237](https://github.com/openclaw/openclaw/pull/115237),
+[#115962](https://github.com/openclaw/openclaw/pull/115962), and
+[#115371](https://github.com/openclaw/openclaw/pull/115371) have merged the
+conventional-profile/native-bootstrap, schema-v1 extension, and reviewed
+bootstrap-export slices. The read-only Control UI branch
+[#112808](https://github.com/openclaw/openclaw/pull/112808) is closed and
+superseded; [#112828](https://github.com/openclaw/openclaw/pull/112828) is the
+single remaining reconstruction target on current `main`. Standalone
+[#1](https://github.com/giodl73-repo/claws/pull/1) merged the schema-v1 reference
+CLI/OpenClaw adapter, and replacement
+[#3](https://github.com/giodl73-repo/claws/pull/3) merged the bounded Codex
+workspace adapter after superseding #2. The schema-v2 planning and answer-state
+drafts in #115565 and #115296 remain superseded.
 
 ## Acceptance Criteria
 
