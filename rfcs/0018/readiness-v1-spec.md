@@ -478,6 +478,10 @@ decision path and must not invoke providers or the canonical runtime evaluator.
 - An implementation may expose `/statusz` for selected-condition health.
   Successful evaluation returns `200` for every health status; `/statusz` is
   diagnostic and must not duplicate `/readyz` traffic-admission status codes.
+  A request may trigger canonical readiness evaluation, including bounded
+  checks for selected providers. The health projection must not invoke
+  additional or unselected providers, and `/statusz` must not invoke active
+  channel probes used only by deeper health diagnostics.
 - Local or authenticated `/statusz` callers may receive canonical non-`True`
   condition details. Unauthenticated remote callers receive only `status` and
   `ready`.

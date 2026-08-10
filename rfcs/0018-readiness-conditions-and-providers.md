@@ -564,7 +564,7 @@ slice, in landing order:
    runtime activation, execution capability, session storage, state, delivery,
    and scheduling. None becomes required by being implemented.
 3. [openclaw/openclaw#121355](https://github.com/openclaw/openclaw/pull/121355)
-   at exact head `88c15047262`, stacked after
+   at exact head `8cb054a8f47`, stacked after
    [openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636)
    head `0a9851b6fa0`, derives selected-condition health for Gateway
    health/status and adds `/statusz`. It changes no condition, selector,
