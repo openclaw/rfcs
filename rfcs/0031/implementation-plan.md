@@ -1,6 +1,6 @@
-# RFC 0027 Implementation Plan
+# RFC 0031 Implementation Plan
 
-This sidecar translates RFC 0027 into bounded, dependency-aware repository
+This sidecar translates RFC 0031 into bounded, dependency-aware repository
 changes. PR boundaries are implementation guidance, not portable schema.
 
 ## Dependencies

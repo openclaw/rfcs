@@ -345,7 +345,7 @@ provide the best visual experience.
 ## Implementation Plan
 
 The dependency-aware cross-repository plan is in
-[`0027/implementation-plan.md`](0027/implementation-plan.md). OpenClaw
+[`0031/implementation-plan.md`](0031/implementation-plan.md). OpenClaw
 [#115237](https://github.com/openclaw/openclaw/pull/115237),
 [#115962](https://github.com/openclaw/openclaw/pull/115962), and
 [#115371](https://github.com/openclaw/openclaw/pull/115371) have merged the
