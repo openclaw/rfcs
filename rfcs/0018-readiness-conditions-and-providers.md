@@ -3,7 +3,7 @@ title: Readiness Conditions and Providers
 authors:
   - Gio
 created: 2026-07-09
-last_updated: 2026-07-26
+last_updated: 2026-08-09
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/33
@@ -83,6 +83,8 @@ separately accepted Standard Hosting Profile.
   criteria as required or advisory without selecting a hosting profile.
 - Project one result through HTTP readiness, health, status, and an optional
   `openclaw ready` command.
+- Derive one selected-condition health state for diagnostic projections without
+  evaluating another condition set.
 - Add missing runtime status facts alongside conditions rather than creating a
   parallel evidence store.
 - Keep detailed readiness output authenticated or local while preserving the
@@ -100,6 +102,8 @@ separately accepted Standard Hosting Profile.
 - Make readiness prove checkpoint durability, safe shutdown, compatibility, or
   safe destruction.
 - Standardize Docker, Kubernetes, or systemd probe intervals and retries.
+- Turn `/health` or `/healthz` into dependency-aware probes or change their
+  shallow liveness status-code behavior.
 
 ## Proposal
 
@@ -161,6 +165,52 @@ An unobserved required fact is `Unknown`, never inferred as `True`. Duplicate
 condition identities, invalid statuses, or malformed provider results are
 converted to stable `Unknown` conditions or reject provider registration; they
 must not disappear from the result.
+
+### Selected-condition health
+
+Health and status consumers can derive a diagnostic state from the canonical
+result without changing any condition or invoking another evaluator:
+
+```ts
+type ConditionHealthStatus =
+  | "passing"
+  | "degraded"
+  | "failing"
+  | "unknown";
+
+type ConditionHealthSummary = {
+  contractVersion: 1;
+  evaluatedAtMs: number;
+  scope: "selected-readiness-conditions";
+  status: ConditionHealthStatus;
+  ready: boolean;
+};
+```
+
+The reduction order is deterministic:
+
+1. `failing` when any required condition is `False`;
+2. `unknown` when no required condition is `False` and at least one required
+   condition is `Unknown`;
+3. `degraded` when all required conditions are `True` and at least one advisory
+   condition is `False` or `Unknown`; and
+4. `passing` when every selected condition is `True`.
+
+This is deliberately scoped to selected readiness conditions. Registered but
+unselected providers remain inert; a health projection must not run every
+known criterion or create a broader private evaluator. A deployment that wants
+a fact represented in condition health selects it as required or advisory,
+directly or through a separately accepted Hosting Profile.
+
+Detailed local or authenticated output may include the canonical non-`True`
+conditions. Their existing `reason` is the stable machine code, `message` is
+the bounded redacted operator explanation, and subject references identify the
+affected runtime objects. Unauthenticated remote output exposes only the
+aggregate status and readiness boolean.
+
+The summary is a projection, not a new field in `ReadinessResult`. Keeping it
+outside the canonical result avoids a readiness wire-version change and lets
+existing readiness consumers remain unchanged.
 
 ### Subject identity
 
@@ -430,8 +480,16 @@ retain a redacted boolean response. `HEAD` behavior remains unchanged.
 
 The same result is projected through Gateway health and status. A surface that
 did not observe a required live fact reports `Unknown`; it does not synthesize
-success. `/health` and `/healthz` remain shallow liveness and do not acquire
-readiness semantics.
+success. These surfaces may include the derived selected-condition health
+summary and canonical non-passing condition details for their existing trust
+audience.
+
+`/health` and `/healthz` remain shallow liveness and do not acquire readiness
+semantics. A separate `/statusz` surface may expose selected-condition health
+without becoming a liveness or traffic-admission probe. Successful evaluation
+returns `200` regardless of `passing`, `degraded`, `failing`, or `unknown`;
+`/readyz` remains the endpoint whose status code gates traffic. Detailed
+`/statusz` condition messages require a local or authenticated caller.
 
 An optional `openclaw ready` command may be a thin client of the live Gateway
 result:
@@ -494,16 +552,24 @@ package rather than adding a profile-only activation envelope.
 
 ### Implementation plan
 
-The RFC has two direct upstream implementation PRs, in landing order:
+The RFC has two framework/owner implementation PRs and one final projection
+slice, in landing order:
 
 1. [openclaw/openclaw#104018](https://github.com/openclaw/openclaw/pull/104018)
-   at exact head `2f131c6e220` adds the opt-in canonical evaluator, bounded
+   at exact head `abbdfa0876f` adds the opt-in canonical evaluator, bounded
    providers, subject identity, shared HTTP/RPC/status/health projections, and
    the `openclaw ready` CLI. Unconfigured probes remain on the legacy checker.
 2. [openclaw/openclaw#113421](https://github.com/openclaw/openclaw/pull/113421)
-   at exact head `c1d7f394f86` adds selectable core-owner observations for
+   at exact head `a7e0df75ff2` adds selectable core-owner observations for
    runtime activation, execution capability, session storage, state, delivery,
    and scheduling. None becomes required by being implemented.
+3. A final projection-only PR, stacked after
+   [openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636),
+   derives selected-condition health for Gateway health/status and adds
+   `/statusz`. It changes no condition, selector, provider lifecycle, readiness
+   aggregation, `/healthz`, or `/readyz` status-code behavior. The temporary
+   stack position avoids rebasing the four current implementation/profile PRs;
+   the runtime design does not depend on a Hosting Profile.
 
 Focused readiness, live Gateway, HTTP/RPC, health, selector, registry, subject,
 CLI, and owner-adoption suites pass; type-aware lint, formatting, and diff

@@ -171,6 +171,46 @@ The condition array must use this v1 order when present:
 Malformed evaluator output must become a stable `Unknown` result or cause
 registration/config validation to fail. It must not disappear from aggregation.
 
+### Selected-Condition Health
+
+A diagnostic projection may derive this summary from one canonical result:
+
+```ts
+type ConditionHealthStatus = "passing" | "degraded" | "failing" | "unknown";
+
+type ConditionHealthSummary = {
+  contractVersion: 1;
+  evaluatedAtMs: number;
+  scope: "selected-readiness-conditions";
+  status: ConditionHealthStatus;
+  ready: boolean;
+};
+```
+
+The projection must use this precedence:
+
+1. `failing` if any required condition is `False`;
+2. `unknown` if no required condition is `False` and any required condition is
+   `Unknown`;
+3. `degraded` if all required conditions are `True` and any advisory condition
+   is `False` or `Unknown`; and
+4. `passing` otherwise.
+
+`evaluatedAtMs` and `ready` must equal the source canonical result. The scope
+value is fixed because the summary covers only conditions selected into that
+result. Implementations must not invoke unselected providers to expand health
+coverage.
+
+Detailed output may include canonical non-`True` conditions without rewriting
+them. `reason` remains the stable machine-readable code, `message` remains the
+bounded redacted operator explanation, and `subjectRef` plus
+`relatedSubjectRefs` identify affected objects. Unauthenticated remote output
+must omit those details.
+
+This summary is not part of `CanonicalReadinessResult` and does not change its
+contract version. It is computed only by projection owners from an already
+evaluated result.
+
 ## Core Criteria
 
 The initial public core criteria are:
@@ -435,12 +475,20 @@ decision path and must not invoke providers or the canonical runtime evaluator.
 - Unauthenticated remote callers receive only a compact redacted response.
 - `/health` and `/healthz` remain shallow liveness probes and do not acquire
   readiness semantics.
+- An implementation may expose `/statusz` for selected-condition health.
+  Successful evaluation returns `200` for every health status; `/statusz` is
+  diagnostic and must not duplicate `/readyz` traffic-admission status codes.
+- Local or authenticated `/statusz` callers may receive canonical non-`True`
+  condition details. Unauthenticated remote callers receive only `status` and
+  `ready`.
 
 ### Health And Status
 
 Gateway health and status project the canonical result or a bounded summary of
 it. A surface that did not observe a required live fact reports `Unknown`; it
 must not synthesize success. Descriptor enumeration must not execute providers.
+When a surface exposes selected-condition health, it uses the normative
+derivation above and does not evaluate conditions independently.
 
 ### CLI
 
@@ -540,4 +588,9 @@ An implementation that adds the optional operator facilities must also prove:
 - bounded CLI waiting aborts slow pre-request setup at its total deadline,
   never overlaps evaluations, and emits only its final observation; and
 - CLI subject-lifetime explanation is derived only from the canonical identity
-  package and does not alter canonical JSON or evaluate conditions locally.
+  package and does not alter canonical JSON or evaluate conditions locally;
+- selected-condition health follows the required-false, required-unknown,
+  advisory-non-true, all-true precedence exactly;
+- `/statusz`, when implemented, preserves `/healthz` liveness and `/readyz`
+  admission behavior and redacts condition details for unauthenticated remote
+  callers.
