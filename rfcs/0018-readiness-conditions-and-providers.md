@@ -563,10 +563,12 @@ slice, in landing order:
    at exact head `a7e0df75ff2` adds selectable core-owner observations for
    runtime activation, execution capability, session storage, state, delivery,
    and scheduling. None becomes required by being implemented.
-3. A final projection-only PR, stacked after
-   [openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636),
-   derives selected-condition health for Gateway health/status and adds
-   `/statusz`. It changes no condition, selector, provider lifecycle, readiness
+3. [openclaw/openclaw#121355](https://github.com/openclaw/openclaw/pull/121355)
+   at exact head `88c15047262`, stacked after
+   [openclaw/openclaw#114636](https://github.com/openclaw/openclaw/pull/114636)
+   head `0a9851b6fa0`, derives selected-condition health for Gateway
+   health/status and adds `/statusz`. It changes no condition, selector,
+   provider lifecycle, readiness
    aggregation, `/healthz`, or `/readyz` status-code behavior. The temporary
    stack position avoids rebasing the four current implementation/profile PRs;
    the runtime design does not depend on a Hosting Profile.
