@@ -3,7 +3,7 @@ title: OpenClaw MSIX Packaging for Windows
 authors:
   - Linus Huang
 created: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-10
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/58
@@ -34,7 +34,9 @@ application-management surface, inspectable and governed like any other
 managed application.
 
 Windows uses the PFN to associate system-managed resources with the packaged
-app and clean up those resources when the package is removed.
+app and clean up those resources when the package is removed. Gateway state
+and other resources created outside the package registration require separate,
+explicit lifecycle handling as described below.
 A separate RFC will define how the platform uses this package identity when
 managing OpenClaw Gateway instances.
 
@@ -71,6 +73,8 @@ release checks produced a given OpenClaw MSIX artifact.
   authorization rule that may be applied to OpenClaw.
 - Defining runtime isolation. A separate RFC may define a session-based runtime
   model.
+- Defining a new Gateway endpoint, discovery mechanism, authentication scheme,
+  pairing flow, or Windows companion app connection role.
 
 ## Proposal
 
@@ -152,8 +156,10 @@ payload built from a pinned source revision, declared capabilities, packaged
 entry points, and the host app. The lifecycle section below defines how the
 host prepares and manages the Gateway.
 
-The host app is the packaged entry point and exposes a stable way for OpenClaw
-clients and nodes to obtain the Gateway endpoint and complete normal pairing.
+The host app is the packaged entry point. Its v1 responsibilities are package
+activation, payload verification and staging, and launching or stopping the
+packaged Gateway. It does not proxy Gateway traffic, distribute Gateway
+credentials, or approve clients, nodes, or channel users.
 
 ```mermaid
 flowchart LR
@@ -174,17 +180,44 @@ flowchart LR
 **Figure 1.** The packaging repository creates a signed MSIX containing the C#
 host app and a payload built from a pinned OpenClaw revision.
 
+### Gateway compatibility boundary
+
+The MSIX deployment does not introduce a new Gateway endpoint, discovery
+mechanism, connection protocol, authentication scheme, or pairing flow. The
+packaged payload runs the standard OpenClaw Gateway and preserves its native
+endpoint configuration, discovery, device authorization, node-capability
+approval, channel behavior, and protocol handling. Clients and nodes connect
+directly to the Gateway through existing OpenClaw mechanisms.
+
+Gateway configuration, credentials, pairing records, and user data remain
+owned by OpenClaw rather than the packaging host. The host does not inspect,
+copy, authorize, or revoke those credentials. Their exact storage and
+retention behavior must be documented and tested for install, update,
+uninstall, reset, and multi-user scenarios.
+
+This RFC does not define whether the Windows companion app connects to a
+Gateway as an operator client, a node, or both. It changes the recommended
+installation path for creating a local Gateway, not the companion app's
+connection contract. Existing source-based, WSL, remote-Gateway, and companion
+node-worker flows remain available unless a separate proposal changes them.
+
 ### End-to-end lifecycle
 
 The MSIX provides the Windows package identity and the files needed to
 bootstrap OpenClaw. The Gateway runs from the payload prepared by the host app.
+The host owns package activation and packaged-payload lifecycle mechanics;
+OpenClaw continues to own Gateway runtime behavior and protocol state.
+Enterprise administrators own deployment policy and the selection of the MSIX
+version approved for each managed device.
 
 #### Installing the OpenClaw MSIX
 
-An administrator or user installs the signed MSIX. Windows verifies it,
-registers its package identity, and presents OpenClaw as an installed packaged
-app in Start. At this point, the packaged app is installed, but OpenClaw has not
-yet been onboarded and the Gateway is not ready.
+An administrator or user installs the signed MSIX, either interactively by
+opening it or through an enterprise deployment system. Windows verifies it,
+registers its package identity and `openclaw.exe` app execution alias, and
+presents OpenClaw as an installed packaged app in Start. No separate PATH
+modification is required. At this point, the packaged app is installed, but
+OpenClaw has not yet been onboarded and the Gateway is not ready.
 
 Launching OpenClaw starts the host app. On first run, the host verifies the
 packaged tarball, extracts the Gateway, and runs OpenClaw onboarding. After
@@ -193,14 +226,33 @@ entry point.
 
 #### Uninstalling the OpenClaw MSIX
 
-Uninstalling OpenClaw removes the registered MSIX and its installed entry
-points, and the Gateway is stopped.
+Removing the MSIX unregisters the packaged application, its package identity,
+and its installed entry points, including the `openclaw.exe` execution alias.
+Package removal must not be treated as an implicit destructive reset of Gateway
+data.
 
 > **Note:** Resources created on behalf of the packaged app are associated with
 > its package identity. When the MSIX is uninstalled, the system cleans up those
 > package-associated resources. OpenClaw is not invoked and does not run custom
-> cleanup code during uninstall. The cleanup mechanism is outside the scope of
-> this RFC.
+> cleanup code during uninstall. Gateway processes, state, or separately
+> provisioned execution resources may exist outside the package registration
+> and may require explicit decommissioning. The exact automated cleanup
+> mechanism is outside the scope of this RFC and may be refined alongside a
+> future session-isolation design.
+
+Enterprise administrators are responsible for ensuring that OpenClaw is
+cleanly installed and decommissioned on managed devices. When resources outside
+the package registration must also be removed, administrators may invoke
+supported reset tooling or perform equivalent documented operations through
+their device-management system, including stopping running Gateway instances
+and applying the organization's state-retention policy.
+
+Package removal and destructive reset are separate operations. Ordinary
+uninstall may preserve Gateway state for reinstall or recovery; reset may
+permanently remove selected state and therefore requires explicit
+administrative intent. The detailed decommissioning sequence and its
+interaction with future session isolation can be defined by the corresponding
+implementation or isolation design.
 
 #### Updating OpenClaw through MSIX (preferred)
 
@@ -277,7 +329,9 @@ After the MSIX release reaches the readiness bar below, the Windows companion
 app setup UI should replace its current WSL recommendation with **Install
 OpenClaw MSIX** as the default or preferred option for creating a local Gateway.
 Selecting it should download/launch the approved MSIX installation flow or direct the
-user to the appropriate artifact.
+user to the appropriate artifact. This setup integration does not change how
+the companion app discovers, authenticates to, or selects its role with a
+Gateway.
 
 ### Release readiness
 
@@ -291,6 +345,11 @@ MSIX should become the preferred Windows installation mechanism for enterprise o
   automated and manual coverage.
 - Gateway state ownership and cleanup are documented, including behavior for
   multiple Windows users.
+- Package removal and destructive reset have distinct, documented behavior,
+  including administrator responsibility for managed-device decommissioning.
+- Host lifecycle operations and native `openclaw gateway` commands cannot
+  create conflicting managed Gateway instances or bypass staged-payload
+  activation.
 - Package capability changes are reviewable and release-blocking.
 - Existing local Gateway users, including WSL users, have a documented migration
   path to the packaged deployment.
