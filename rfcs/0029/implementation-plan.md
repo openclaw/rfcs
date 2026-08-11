@@ -79,6 +79,8 @@ Control UI and independent-host reducers for the adopted conversation slice.
 - Enumerate authorized descriptors cheaply and materialize only the selected
   deferred view.
 - Preserve sanitized artifact data through live projection and history.
+- Preserve one artifact identity across inline chat and dedicated product
+  surfaces, including higher revisions published by later turns.
 - Adapt existing MCP App and Canvas previews into explicit fallbacks.
 - Add revision, expiry, bound, and structured failure behavior.
 - Keep renderer registries outside the package.
@@ -91,6 +93,8 @@ Control UI and independent-host reducers for the adopted conversation slice.
 - Malformed/oversized data.
 - Increasing, duplicate, stale, and conflicting revisions.
 - History reload and reconnect.
+- Inline and dedicated projections of the same artifact ID.
+- Later-turn revision without creating a duplicate artifact.
 - MCP App fallback and expiry.
 - Proof that metadata cannot select an import or register a component.
 

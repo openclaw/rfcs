@@ -74,6 +74,19 @@ content is ignored. A duplicate revision with different content is a
 structured conflict. A lower revision is stale and must not replace current
 state.
 
+An artifact's presentation location is not part of its identity. A client may
+project the current revision inline beside its source message, in an expanded
+panel, or in a dedicated artifact surface. Later conversation turns and tool
+runs may publish a higher revision for the same logical `id`, subject to normal
+authorization and reconciliation rules.
+
+V1 durability is scoped to the owning session: current artifact identity and
+revision survive authoritative history reload and reconnect. Permanent
+document storage, cross-session retention, collaborative editing, and merging
+concurrent user-authored revisions are outside this contract. A product may
+persist or promote an artifact through a separate explicitly authorized
+operation.
+
 An artifact from a retired connection epoch may be reconciled only through
 authoritative history. It must not update live state directly.
 
@@ -347,6 +360,8 @@ Fixtures must cover:
 - duplicate, stale, conflicting, and increasing revisions;
 - history reload;
 - reconnect with a retired live revision;
+- inline and dedicated-surface projections of the same artifact identity;
+- a later turn publishing a higher revision of an existing artifact;
 - expired fallback;
 - allowed, denied, unknown, and stale-revision actions;
 - component schema evolution;

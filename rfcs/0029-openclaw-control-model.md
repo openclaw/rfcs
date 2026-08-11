@@ -263,6 +263,14 @@ view is deferred until the client selects it and requests materialization
 through a typed, read-only Control Model command. Materialization remains
 extension-owned and Gateway-authorized.
 
+Presentation placement does not define artifact identity. A client may render
+the same artifact revision inline in chat, in an expanded panel, or in a
+dedicated artifact surface. Its stable `id` and monotonic `revision` let later
+turns or tool runs update that logical artifact instead of emitting unrelated
+cards. V1 durability means addressable, revisioned session state that survives
+history reload and reconnect. It does not require permanent document storage,
+cross-session retention, or a collaborative document protocol.
+
 V1 uses complete immutable revisions. It does not standardize JSON Patch,
 JSONL, or a renderer-specific component tree. A later extension may introduce a
 negotiated patch dialect after conformance evidence demonstrates a shared need.
