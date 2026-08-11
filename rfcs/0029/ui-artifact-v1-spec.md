@@ -34,13 +34,18 @@ export interface UiArtifact {
   version: 1;
   id: string;
   revision: number;
-  templateUri: string;
-  dataVersion: number;
-  data: JsonValue;
   structuredContent?: JsonValue;
+  views: UiArtifactView[];
   state: "pending" | "ready" | "failed" | "expired";
   source: UiArtifactSource;
   error?: UiArtifactError;
+}
+
+export interface UiArtifactView {
+  id: string;
+  templateUri: string;
+  dataVersion: number;
+  data: JsonValue;
   fallback?: UiArtifactFallback;
 }
 
@@ -57,8 +62,9 @@ shape must retain the semantics below.
 
 ## Identity and revisions
 
-`id` is stable for one logical artifact in one conversation. It must not be
-derived only from `templateUri`.
+`id` is stable for one logical artifact in one conversation. A view ID is
+stable within that artifact. Neither identity may be derived only from
+`templateUri`.
 
 `revision` is a non-negative integer that increases monotonically for accepted
 updates to that artifact. A duplicate revision with byte-equivalent normalized
@@ -69,7 +75,13 @@ state.
 An artifact from a retired connection epoch may be reconciled only through
 authoritative history. It must not update live state directly.
 
-## Template URI
+## Offered views and template URI
+
+OpenClaw core and installed extensions may contribute zero or more applicable
+views for an artifact. Multiple views may represent the same structured
+content as a calendar, list, table, summary, form, dashboard, or sandboxed app.
+View order is deterministic but is not a requirement that the client render
+the first view.
 
 `templateUri` is a bounded absolute URI. Schemes are not globally trusted.
 Hosts may register product-specific schemes such as
@@ -92,9 +104,15 @@ registration. A registration declares the versions it accepts and any pure,
 bounded migration into its current schema. Tool output cannot declare a
 migration.
 
+A client selects a view by exact compatibility, product policy, surface,
+accessibility, and user preference. OpenClaw may mark one view as recommended,
+but the recommendation neither grants trust nor overrides the client choice.
+A client may ignore every offered view and project `structuredContent` into its
+own product view model.
+
 ## Data and structured content
 
-`data` contains component-shaped untrusted JSON. A native renderer registration
+Each view's `data` contains component-shaped untrusted JSON. A native renderer registration
 must provide a schema and reject invalid data before component construction.
 
 `structuredContent` contains model- or transcript-relevant domain output when
@@ -145,7 +163,9 @@ adapter reads artifacts and invokes the host registry.
 An exact local renderer registration is the authority for native-renderer
 support. A client may advertise a bounded set of supported template URI and
 data-version pairs during connection or tool invocation when the Gateway
-contract provides such a carrier.
+contract provides such a carrier. OpenClaw can use that information to filter
+or rank view offers, but the client makes the final selection against its
+current registry.
 
 Capability advertisement:
 
@@ -156,9 +176,9 @@ Capability advertisement:
 - must not be required for structured/text or sandboxed fallback output.
 
 An extension that emits an artifact remains responsible for useful structured
-or text output when practical. The client independently resolves the artifact
-against its current registry. If no exact compatible registration exists, it
-uses the declared safe fallback or renders the structured/text result.
+or text output when practical. The client independently resolves all offered
+views against its current registry. If no exact compatible registration exists,
+it uses an accepted declared fallback or renders the structured/text result.
 
 ## Actions
 
@@ -264,6 +284,7 @@ raw credentials, capability URLs, hidden model context, or unbounded tool data.
 Fixtures must cover:
 
 - registered native URI;
+- multiple compatible views with a non-first client selection;
 - unknown URI with structured output only;
 - unknown URI with accepted MCP App fallback;
 - malformed and oversized data;
@@ -274,4 +295,5 @@ Fixtures must cover:
 - allowed, denied, unknown, and stale-revision actions;
 - component schema evolution;
 - registration provenance and data-version rejection/migration; and
+- client-owned projection into a product view model without native rendering;
 - proof that tool output cannot register or import native code.

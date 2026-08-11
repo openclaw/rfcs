@@ -81,8 +81,9 @@ making OpenClaw own those products.
   selected conversation.
 - Reconcile history, live events, reconnects, and tool lifecycle once.
 - Return typed command failures without success-shaped fallbacks.
-- Preserve renderer-neutral UI artifacts long enough for a host to select a
-  native renderer, structured fallback, or sandboxed MCP App.
+- Preserve renderer-neutral UI artifacts and all applicable OpenClaw-provided
+  view offers long enough for a host to select its preferred native renderer,
+  product view model, structured fallback, or sandboxed MCP App.
 - Let OpenClaw Control UI become a reference adopter without changing its
   presentation.
 - Support independently owned browser, desktop, mobile, terminal, and hosted
@@ -220,10 +221,8 @@ A UI artifact is data and identity, not executable presentation:
 export interface UiArtifact {
   id: string;
   revision: number;
-  templateUri: string;
-  dataVersion: number;
-  data: JsonValue;
   structuredContent?: JsonValue;
+  views: UiArtifactView[];
   state: "pending" | "ready" | "failed" | "expired";
   source: {
     sessionKey: string;
@@ -232,17 +231,29 @@ export interface UiArtifact {
   };
   fallback?: McpAppArtifact | CanvasArtifact;
 }
+
+export interface UiArtifactView {
+  id: string;
+  templateUri: string;
+  dataVersion: number;
+  data: JsonValue;
+  fallback?: McpAppArtifact | CanvasArtifact;
+}
 ```
 
+OpenClaw core and installed extensions may offer zero or more views of the same
+artifact, such as calendar, list, table, summary, or an MCP App. A view's
 `templateUri` is opaque. It does not grant trust, select a JavaScript import,
 or authorize an action. A host may map a locally registered URI to a native
-component. It must schema-validate artifact data before rendering. If no native
-renderer is registered, the host may show structured/text output or use an
-explicit sandboxed fallback.
+component. It must schema-validate view data before rendering.
 
-`dataVersion` selects a schema version within the host's exact local
+Each view's `dataVersion` selects a schema version within the host's exact local
 registration. Registration and component code ship through the host's ordinary
 reviewed supply chain; tool output cannot add, replace, or widen a registration.
+OpenClaw may identify a recommended default, but the client remains free to
+choose any compatible offered view or project the underlying structured content
+into its own product view model. If no compatible renderer is registered, the
+host may show structured/text output or use an explicitly sandboxed fallback.
 
 V1 uses complete immutable revisions. It does not standardize JSON Patch,
 JSONL, or a renderer-specific component tree. A later extension may introduce a
@@ -295,30 +306,33 @@ They do not choose whether a host trusts a native renderer.
 ### Extension and client capability split
 
 Installed and enabled OpenClaw extensions determine which tools, structured
-results, and optional UI artifacts can be produced. The client determines which
-artifact versions and native renderers it has installed, registered, and
-trusted.
+results, UI artifacts, and alternative view offers can be produced. The client
+determines which artifact views and native renderers it has installed,
+registered, and trusted, and which product view model should consume the
+projection.
 
 The Control Model does not generate UI capabilities independently of either
 side. It normalizes the artifact emitted by the active extension, exposes the
 current client-rendering decision, and preserves a safe fallback:
 
 ```text
-installed extension emits artifact
+installed extension emits artifact plus view offers
              |
              v
-Control Model normalizes identity, data, lifecycle, and fallback
+Control Model normalizes identity, views, data, lifecycle, and fallback
              |
              v
-client registry selects native renderer
+client selects a compatible view and local view-model projection
         or structured/MCP App fallback
 ```
 
 Client capability advertisement may let an extension avoid producing an
 unsupported optional artifact, but it is an optimization rather than an
 authorization grant. Extensions should preserve useful structured or text
-output when no native renderer is available. A client must not claim support
-unless an exact compatible local registration exists.
+output when no native renderer is available. A client must not claim native
+support unless an exact compatible local registration exists. OpenClaw owns
+the available view offers and their semantics; Lobster or another host owns
+which offer it selects and how it maps that projection into its own view model.
 
 ### Compatibility and release
 

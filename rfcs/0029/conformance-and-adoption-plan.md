@@ -43,7 +43,7 @@ proof, and deletion agree.
 | Tools | call/result association, out-of-order result, duplicate ID, bounded progress |
 | Approvals/questions | allowed action, denial, expiry, reconnect, stale action |
 | Commands | success, forbidden, conflict, timeout, abort, unsupported, idempotent retry |
-| Artifacts | native, unknown, malformed, fallback, revisions, history, expiry |
+| Artifacts | multiple view offers, client selection, native, unknown, malformed, fallback, revisions, history, expiry |
 | Capability split | extension absent/disabled, renderer absent, version mismatch, stale advertisement |
 | Bounds | messages, progress, artifacts, bytes/depth, inactive conversations |
 
@@ -80,6 +80,7 @@ Each fixture identifies:
 ### Native artifact adoption
 
 - exact local registry and schema version;
+- multiple OpenClaw view offers and a client-selected non-default view;
 - valid and invalid artifact data;
 - allowed and denied action;
 - stale artifact action;
@@ -152,8 +153,8 @@ The following are blocking:
 The first independent adopter should:
 
 1. consume the package through an existing supported Gateway route;
-2. adapt snapshots into its existing view model rather than create another
-   shared vocabulary;
+2. choose among OpenClaw-provided views and adapt the selected projection into
+   its existing view model rather than create another shared vocabulary;
 3. render one representative conversation;
 4. register one native artifact;
 5. exercise one denied action;
