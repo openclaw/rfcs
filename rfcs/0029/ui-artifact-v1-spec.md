@@ -10,6 +10,8 @@ Status: draft. This is a fork-only preview.
 ## Principles
 
 - An artifact is data and identity, not executable code.
+- Installed and enabled extensions determine which artifacts can be produced.
+- The client determines which native artifact renderers it supports and trusts.
 - A template URI is a lookup key, not a trust or authorization claim.
 - Native rendering is host-registered and allowlist-only.
 - Unknown artifacts remain useful through structured/text output.
@@ -137,6 +139,26 @@ component marketplace.
 
 The Control Model does not import or execute registry components. A framework
 adapter reads artifacts and invokes the host registry.
+
+## Capability discovery
+
+An exact local renderer registration is the authority for native-renderer
+support. A client may advertise a bounded set of supported template URI and
+data-version pairs during connection or tool invocation when the Gateway
+contract provides such a carrier.
+
+Capability advertisement:
+
+- is optional and may be stale;
+- lets an extension omit an unsupported optional native artifact;
+- does not install a component or grant trust;
+- does not authorize an OpenClaw operation; and
+- must not be required for structured/text or sandboxed fallback output.
+
+An extension that emits an artifact remains responsible for useful structured
+or text output when practical. The client independently resolves the artifact
+against its current registry. If no exact compatible registration exists, it
+uses the declared safe fallback or renders the structured/text result.
 
 ## Actions
 

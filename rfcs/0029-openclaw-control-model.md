@@ -292,6 +292,34 @@ Independent products own:
 Tool and MCP server authors own structured domain results and UI resources.
 They do not choose whether a host trusts a native renderer.
 
+### Extension and client capability split
+
+Installed and enabled OpenClaw extensions determine which tools, structured
+results, and optional UI artifacts can be produced. The client determines which
+artifact versions and native renderers it has installed, registered, and
+trusted.
+
+The Control Model does not generate UI capabilities independently of either
+side. It normalizes the artifact emitted by the active extension, exposes the
+current client-rendering decision, and preserves a safe fallback:
+
+```text
+installed extension emits artifact
+             |
+             v
+Control Model normalizes identity, data, lifecycle, and fallback
+             |
+             v
+client registry selects native renderer
+        or structured/MCP App fallback
+```
+
+Client capability advertisement may let an extension avoid producing an
+unsupported optional artifact, but it is an optimization rather than an
+authorization grant. Extensions should preserve useful structured or text
+output when no native renderer is available. A client must not claim support
+unless an exact compatible local registration exists.
+
 ### Compatibility and release
 
 The package follows the OpenClaw calendar release train and declares its
