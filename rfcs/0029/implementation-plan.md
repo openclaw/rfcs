@@ -76,6 +76,8 @@ Control UI and independent-host reducers for the adopted conversation slice.
 - Define and validate v1 artifacts.
 - Preserve all applicable OpenClaw core/extension view offers and let the
   client select among compatible views.
+- Enumerate authorized descriptors cheaply and materialize only the selected
+  deferred view.
 - Preserve sanitized artifact data through live projection and history.
 - Adapt existing MCP App and Canvas previews into explicit fallbacks.
 - Add revision, expiry, bound, and structured failure behavior.
@@ -85,6 +87,7 @@ Control UI and independent-host reducers for the adopted conversation slice.
 
 - Known and unknown template URIs.
 - Multiple offered views with client-owned selection.
+- Authorization-filtered discovery and selected-only materialization.
 - Malformed/oversized data.
 - Increasing, duplicate, stale, and conflicting revisions.
 - History reload and reconnect.
@@ -127,6 +130,8 @@ Superseded UI-local session/conversation capability and reconciliation code.
 - Map model snapshots into M's existing `SessionView`.
 - Select the Lobster-compatible OpenClaw view projection without making that
   choice canonical for other clients.
+- Keep a compatible user selection stable across reconnect and artifact
+  revisions.
 - Keep the renderer passive.
 - Preserve current desktop and web service-port boundaries.
 - Add a runtime flag and incumbent fallback.
@@ -152,6 +157,7 @@ The adopted web-specific Gateway fold/reducer path after parity.
 - Add schema validation and named action binding.
 - Pin registration and artifact data versions and emit safe action correlation.
 - Preserve text and MCP App fallback.
+- Request deferred data only after Lobster selects that view.
 
 ### Proof
 

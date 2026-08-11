@@ -43,8 +43,8 @@ proof, and deletion agree.
 | Tools | call/result association, out-of-order result, duplicate ID, bounded progress |
 | Approvals/questions | allowed action, denial, expiry, reconnect, stale action |
 | Commands | success, forbidden, conflict, timeout, abort, unsupported, idempotent retry |
-| Artifacts | multiple view offers, client selection, native, unknown, malformed, fallback, revisions, history, expiry |
-| Capability split | extension absent/disabled, renderer absent, version mismatch, stale advertisement |
+| Artifacts | multiple view descriptors, lazy materialization, client selection, native, unknown, malformed, fallback, revisions, history, expiry |
+| Capability split | extension absent/disabled, renderer absent, version mismatch, stale/private advertisement, authorization-filtered discovery |
 | Bounds | messages, progress, artifacts, bytes/depth, inactive conversations |
 
 Each fixture identifies:
@@ -64,8 +64,8 @@ Each fixture identifies:
 - formatting, lint, typecheck, and diff hygiene;
 - affected package tests;
 - browser-safe import graph;
-- fixture schema validation; and
-- no framework or product imports in core.
+- fixture schema validation;
+- no framework or product imports in core; and
 - no subscriber/render work in the Gateway receive stack.
 
 ### Per-PR
@@ -81,6 +81,7 @@ Each fixture identifies:
 
 - exact local registry and schema version;
 - multiple OpenClaw view offers and a client-selected non-default view;
+- deferred descriptors with only the selected payload materialized;
 - valid and invalid artifact data;
 - allowed and denied action;
 - stale artifact action;
@@ -125,6 +126,7 @@ The package must measure:
 - per-event reconciliation cost;
 - snapshot allocation rate during streaming;
 - retained bytes for messages, progress, tools, and artifacts;
+- descriptor enumeration and selected-view materialization latency/bytes;
 - inactive conversation eviction; and
 - reconnect/resync latency.
 
@@ -146,7 +148,10 @@ The following are blocking:
 - implicit executable fallback for unknown artifacts;
 - loss of MCP App sandbox/CSP/expiry behavior; and
 - deletion of the incumbent path before rollback proof;
-- unreviewed renderer registration or unsupported artifact data version.
+- unreviewed renderer registration or unsupported artifact data version;
+- eager materialization of unselected deferred views;
+- discovery that reveals unauthorized extension/tool/view availability; and
+- verbatim extension access to unrelated client renderer inventory.
 
 ## Independent adopter proof
 

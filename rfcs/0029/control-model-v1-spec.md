@@ -211,6 +211,7 @@ Candidate v1 commands are:
 - abort the active run;
 - answer a question;
 - approve or deny a pending request; and
+- materialize one exact deferred UI view for the current artifact revision; and
 - retry only where the Gateway exposes a safe retry contract.
 
 Each command defines:

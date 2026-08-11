@@ -35,17 +35,19 @@ export interface UiArtifact {
   id: string;
   revision: number;
   structuredContent?: JsonValue;
-  views: UiArtifactView[];
+  views: UiArtifactViewOffer[];
   state: "pending" | "ready" | "failed" | "expired";
   source: UiArtifactSource;
   error?: UiArtifactError;
 }
 
-export interface UiArtifactView {
+export interface UiArtifactViewOffer {
   id: string;
   templateUri: string;
   dataVersion: number;
-  data: JsonValue;
+  availability: "inline" | "deferred";
+  data?: JsonValue;
+  recommended?: boolean;
   fallback?: UiArtifactFallback;
 }
 
@@ -83,6 +85,16 @@ content as a calendar, list, table, summary, form, dashboard, or sandboxed app.
 View order is deterministic but is not a requirement that the client render
 the first view.
 
+OpenClaw exposes all authorized applicable view descriptors. It does not need
+to eagerly compute every view payload:
+
+- `inline` includes bounded validated `data` in the offer.
+- `deferred` omits `data` until the client selects the view and requests
+  materialization through a typed Control Model command.
+
+A deferred view must not perform external work, access protected data, or
+consume a tool invocation merely because its descriptor was enumerated.
+
 `templateUri` is a bounded absolute URI. Schemes are not globally trusted.
 Hosts may register product-specific schemes such as
 `clawpilot://widgets/calendar` or use a standardized `ui://` resource
@@ -110,10 +122,16 @@ but the recommendation neither grants trust nor overrides the client choice.
 A client may ignore every offered view and project `structuredContent` into its
 own product view model.
 
+A client should keep a compatible user selection stable across artifact
+revisions and reconnects. It must not silently switch to a newly recommended
+view while the current choice remains valid. A fallback caused by an invalid,
+expired, or unavailable selection is observable to the product UX.
+
 ## Data and structured content
 
-Each view's `data` contains component-shaped untrusted JSON. A native renderer registration
-must provide a schema and reject invalid data before component construction.
+An inline or materialized view's `data` contains component-shaped untrusted
+JSON. A native renderer registration must provide a schema and reject invalid
+data before component construction.
 
 `structuredContent` contains model- or transcript-relevant domain output when
 available. It is not a private channel for secrets, hidden instructions,
@@ -167,6 +185,11 @@ contract provides such a carrier. OpenClaw can use that information to filter
 or rank view offers, but the client makes the final selection against its
 current registry.
 
+The Gateway filters discovery to views authorized for the authenticated caller,
+selected session, enabled extension surface, and current policy. Enumeration
+must not reveal hidden extensions, unavailable tools, tenant-external
+capabilities, or view data that would require a denied operation.
+
 Capability advertisement:
 
 - is optional and may be stale;
@@ -175,10 +198,41 @@ Capability advertisement:
 - does not authorize an OpenClaw operation; and
 - must not be required for structured/text or sandboxed fallback output.
 
+Renderer advertisement is bounded client metadata delivered to the trusted
+Gateway. The Gateway must not forward the client's complete renderer inventory
+verbatim to extensions by default. It may answer an extension's bounded
+compatibility question or select/rank offers without disclosing unrelated
+client capabilities.
+
 An extension that emits an artifact remains responsible for useful structured
 or text output when practical. The client independently resolves all offered
 views against its current registry. If no exact compatible registration exists,
 it uses an accepted declared fallback or renders the structured/text result.
+
+## Deferred materialization
+
+The candidate Control Model command is conceptually:
+
+```ts
+materializeView(input: {
+  artifactId: string;
+  artifactRevision: number;
+  viewId: string;
+  signal?: AbortSignal;
+}): Promise<UiArtifactViewOffer>;
+```
+
+The final method name may differ. The contract must:
+
+- require the current artifact revision and exact offered view ID;
+- be read-only and idempotent for that revision;
+- re-enter Gateway authentication, session scope, extension availability, and
+  policy checks;
+- enforce finite time, result bytes, depth, and retained cache;
+- return the same view ID with `availability: "inline"` and validated data;
+- reject stale, removed, unsupported, forbidden, expired, and oversized views
+  distinctly; and
+- avoid materializing any unselected sibling view.
 
 ## Actions
 
@@ -285,6 +339,8 @@ Fixtures must cover:
 
 - registered native URI;
 - multiple compatible views with a non-first client selection;
+- deferred view enumeration without payload computation;
+- selected materialization and proof that sibling views remain unmaterialized;
 - unknown URI with structured output only;
 - unknown URI with accepted MCP App fallback;
 - malformed and oversized data;
@@ -296,4 +352,6 @@ Fixtures must cover:
 - component schema evolution;
 - registration provenance and data-version rejection/migration; and
 - client-owned projection into a product view model without native rendering;
+- authorization-filtered discovery and renderer-advertisement privacy;
+- stable user selection across revisions and reconnect; and
 - proof that tool output cannot register or import native code.
