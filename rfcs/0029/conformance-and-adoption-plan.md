@@ -44,6 +44,7 @@ proof, and deletion agree.
 | Approvals/questions | allowed action, denial, expiry, reconnect, stale action |
 | Commands | success, forbidden, conflict, timeout, abort, unsupported, idempotent retry |
 | Artifacts | native, unknown, malformed, fallback, revisions, history, expiry |
+| Capability split | extension absent/disabled, renderer absent, version mismatch, stale advertisement |
 | Bounds | messages, progress, artifacts, bytes/depth, inactive conversations |
 
 Each fixture identifies:
@@ -83,6 +84,8 @@ Each fixture identifies:
 - allowed and denied action;
 - stale artifact action;
 - unknown renderer;
+- extension-installed but renderer-unsupported and renderer-installed but
+  extension-absent cases;
 - MCP App/structured fallback;
 - theme, accessibility, localization, and responsive behavior owned by the
   adopter; and
