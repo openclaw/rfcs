@@ -222,7 +222,7 @@ export interface UiArtifact {
   id: string;
   revision: number;
   structuredContent?: JsonValue;
-  views: UiArtifactView[];
+  views: UiArtifactViewOffer[];
   state: "pending" | "ready" | "failed" | "expired";
   source: {
     sessionKey: string;
@@ -232,11 +232,13 @@ export interface UiArtifact {
   fallback?: McpAppArtifact | CanvasArtifact;
 }
 
-export interface UiArtifactView {
+export interface UiArtifactViewOffer {
   id: string;
   templateUri: string;
   dataVersion: number;
-  data: JsonValue;
+  availability: "inline" | "deferred";
+  data?: JsonValue;
+  recommended?: boolean;
   fallback?: McpAppArtifact | CanvasArtifact;
 }
 ```
@@ -254,6 +256,12 @@ OpenClaw may identify a recommended default, but the client remains free to
 choose any compatible offered view or project the underlying structured content
 into its own product view model. If no compatible renderer is registered, the
 host may show structured/text output or use an explicitly sandboxed fallback.
+
+OpenClaw exposes every authorized applicable descriptor, not every fully
+materialized payload. A bounded view may be inline. An expensive or sensitive
+view is deferred until the client selects it and requests materialization
+through a typed, read-only Control Model command. Materialization remains
+extension-owned and Gateway-authorized.
 
 V1 uses complete immutable revisions. It does not standardize JSON Patch,
 JSONL, or a renderer-specific component tree. A later extension may introduce a
@@ -333,6 +341,11 @@ output when no native renderer is available. A client must not claim native
 support unless an exact compatible local registration exists. OpenClaw owns
 the available view offers and their semantics; Lobster or another host owns
 which offer it selects and how it maps that projection into its own view model.
+
+View discovery is filtered to the authenticated caller, selected session,
+enabled extension surface, and current policy. It must not disclose hidden
+extensions or unavailable tools. Client renderer advertisement is delivered to
+the trusted Gateway and is not exposed verbatim to extensions by default.
 
 ### Compatibility and release
 
