@@ -515,7 +515,24 @@ archived `lifecycle` start but no terminal event and settles their orphaned draf
    reasoning dedup (F2/OpenRouter).
 2. **Gateway**: base mirror tests + thinking-mirror + archive tap (events persisted with
    all flags off, Control UI hidden) + delta-only flow + no-archive-replay-after-end +
-   archive unreadable from channel-session scope.
+   archive unreadable from channel-session scope. That last item is a negative test and
+   must assert absence rather than that the operator path works. State each case as
+   (route, auth mode, effective scopes after negotiation, expected result); note that
+   `operator.write` and `operator.admin` both satisfy `operator.read`, so "lacks read"
+   means holding none of the three:
+   - **Projection path**: rendering a turn retrieves no archived event *content*, and
+     no archived thinking under any condition — assert on the projection code's
+     reachable surface, not on the identity of the surrounding process. This is the
+     one that proves the gate. Scope the assertion to content: §7.3's crash-orphaned
+     draft settle legitimately reads lifecycle markers from the store, so a blanket
+     "no store dependency" assertion would fail a conforming channel.
+   - **Under-scoped operator client**: a paired `operator` client holding none of
+     `operator.read`/`.write`/`.admin` is refused an archived-thinking read with a
+     missing-scope error, not an empty success.
+   - **Shared-secret HTTP**: tested separately as a deliberately *allowed* case. Bearer
+     auth restores the full default operator scope set on session-history endpoints
+     even when the caller declares narrower scopes, so a refusal assertion here would
+     encode a boundary that does not exist.
 3. **Channel**: truth-table cells reproduced against a scripted event sequence on a real
    configured channel, **primary AND queued origin — projections must be identical**;
    reconnect (mid-turn) produces no duplicates; crash-orphaned draft settles; overflow

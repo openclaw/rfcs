@@ -307,6 +307,17 @@ happening:
   contents unless a channel-specific setting explicitly enables that detail.
 - Never send private reasoning to external channels as commentary.
 - Treat `commentary` as user-visible progress, not as hidden thought.
+- Reading archived reasoning is an operator-surface action: it requires
+  `operator.read` (or a scope satisfying it) on the session-history surface.
+  Some rendering surfaces legitimately hold that scope — the Control UI and CLI
+  connect as `operator` clients. The constraint is on the projection path, not
+  on the surface: render a turn from mirrored events subject to the
+  presentation gate, never by retrieving the stored record, on any tier.
+  **[RFC 0015 amendment]**
+- `operator.read` is not a per-user privacy boundary, and shared-secret bearer
+  auth restores full operator scopes on HTTP session-history endpoints. Archive
+  reads inherit both limits; see RFC 0015, *Archive access-control
+  precondition*. **[RFC 0015 amendment]**
 
 ### User promise
 

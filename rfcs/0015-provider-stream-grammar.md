@@ -211,12 +211,15 @@ discovered later:
   the recoverability/auditability trade made in the Rationale, stated here as
   the user-facing expectation: reasoning the model generated exists in the
   session record regardless of what any channel rendered.
-- **No new retention, access, or export surface.** Bus events are in-process.
+- **No new reader identity, endpoint, retention class, or export path.** Bus
+  events are in-process.
   The archive tap writes into the *existing* session-record store and inherits
-  its retention, access control, and operator-only visibility unchanged —
-  adapters already persist reasoning replay state there today for
-  continuation. This RFC adds no export path and no external mirror; the only
-  new persistence is completeness of what the existing store records.
+  its retention and access control unchanged — adapters already persist
+  reasoning replay state there today for continuation. This RFC adds no export
+  path and no external mirror; the only new persistence is completeness of
+  what the existing store records. That inherited model is named and bounded
+  under *Archive access-control precondition* below, rather than left to
+  inheritance.
 - **Mirroring stays inside the gateway trust boundary.** The hidden
   session-subscriber mirror delivers thinking to channel *sessions*, not to
   users; a channel adapter must apply the presentation gate before anything
@@ -243,6 +246,104 @@ envelope explicitly, and its merge (2026-07-04) answered it — maintainers
 accepted raw thinking reaching the bus/archive with presentation gated
 downstream for the CLI path as well. This section states that already-shipped
 policy at the RFC level, for maintainers to ratify or amend.
+
+#### Archive access-control precondition
+
+"Inherits the existing store's access control" is only load-bearing if that
+model is named, so it is named here. Nothing in this subsection changes the
+Gateway's authorization model; it states the model this contract relies on,
+and the limits that come with it.
+
+**Authorized readers.** Archived thinking is an operator-surface read. A
+client reaches it only by holding `operator.read` — or a scope that satisfies
+it — in the Gateway's operator domain, through the session-history RPC and
+HTTP endpoints. Authorization is by negotiated operator scope, independent of
+the connecting client's `client.id` or `client.mode`.
+
+**Enforcement point, stated as a constraint on code rather than on labels.**
+It is tempting to say "channels cannot read the archive," and it would be
+wrong. Some channel surfaces *are* operator clients: the Control UI and the
+CLI connect with the `operator` role, and `operator.read` is exactly the scope
+that covers `chat.history`, `sessions.list`, and `sessions.subscribe`. A
+surface can legitimately hold the credential that reads archived reasoning and
+also be a place where turns are rendered. The boundary is therefore not the
+identity of the surface. It is what the projection path is permitted to do:
+
+- The hidden session-subscriber mirror carries the events a channel renders.
+  It is an in-process delivery path and carries no authorization context of
+  its own; it is not, and must not become, an archive read.
+- **Projection code must not populate rendering from archived content.** A
+  channel renders a turn from mirrored events subject to its presentation
+  gate, never by retrieving stored event content — and raw thinking is never a
+  legitimate projection input from the archive at all. This holds regardless
+  of what credential the surrounding surface happens to hold for other
+  purposes. The prohibition is on content, not on the store: §7.3's
+  crash-orphaned draft settle reads *lifecycle markers* for runs with a start
+  and no terminal event, which is metadata-only recovery and remains
+  required.
+- An operator deliberately retrieving session history is a *different act*,
+  separately authorized by `operator.read`, and out of scope for the
+  presentation gate. Showing an operator archived reasoning they explicitly
+  asked for is the authority they already have; rendering it into a live turn
+  that the user gated off is the thing this contract forbids.
+
+This is what §8.2 of the vendored spec means by *archive unreadable from
+channel-session scope*, and stating it as a capability constraint is what
+makes it testable: the assertion is about the absence of a store dependency
+and a history client in the projection path, not about the role a process
+authenticated with.
+
+**Two inherited limits, stated rather than assumed.** Both predate this RFC
+and neither is introduced by it. Both become more consequential once thinking
+is archived independently of display, so neither should be discovered later:
+
+1. `operator.read` is not a per-user or hostile multi-tenant privacy
+   boundary. Every client holding it in a Gateway operator domain may read
+   what that domain retains. Operators who must keep session data separate
+   need separate Gateway trust domains.
+2. Shared-secret bearer auth restores the full default operator scope set on
+   the HTTP session-history endpoints even when the caller declares narrower
+   scopes. On a Gateway configured that way, possession of the gateway
+   token is sufficient to read archived thinking.
+
+State the trade precisely, because the tempting one-liner — "this widens what
+a record contains, not who can read it" — is not quite true, and the gap is
+the whole point of the question. **No new reader identity and no new endpoint
+is introduced. Every existing session-history reader is newly authorized to
+receive raw reasoning**, including reasoning for turns the user rendered with
+`/reasoning off`, which under the prior behavior no reader could obtain
+because it was never retained. Applied to limit 2 above, the sharpest case is
+concrete: a shared-secret HTTP caller that explicitly declares narrower scopes
+is upgraded to the default operator set anyway, and can now retrieve raw
+reasoning that previously did not exist in the record. That is a real
+expansion of authority over a new datum, and it is the substance of what this
+RFC asks maintainers to accept.
+
+**Retention.** No new retention class and no separate knob. Archived thinking
+is a field of the session record that contains it, and ages, compacts, and is
+deleted with that record.
+
+**On the question as originally posed.** The review asked for proof that
+channel-session scopes cannot read raw thinking. This section answers a
+deliberately different question, because the original premise does not hold:
+there is no channel-session scope separable from `operator.read`, and some
+rendering surfaces hold that scope legitimately. A proof of the literal claim
+would be either vacuous or an assertion about a boundary the Gateway does not
+implement. What is provable, and what §8.2 now specifies, is that the
+projection path retrieves no archived content — which is the property a user
+is relying on when they set `/reasoning off`. Maintainers who want the literal
+boundary are choosing the alternative below, which is a different RFC.
+
+**The decision this asks maintainers to make.** The RFC proposes ratifying the
+model above as written: raw thinking is operator-readable under the existing
+scope, with the two limits disclosed in the docs rather than implied. The
+alternative — gating raw-thinking fields behind a distinct scope, for example
+an `operator.read.reasoning` that `operator.read` does not satisfy — is
+coherent and would make the archive a genuine privacy boundary, but it is a
+new entry in the operator-scopes table, a compatibility break for existing
+`operator.read` clients that read session history today, and properly its own
+RFC. This RFC does not propose it, and records it here so the choice is
+visible rather than foreclosed.
 
 ### Conformance (§8)
 
