@@ -251,8 +251,39 @@ policy at the RFC level, for maintainers to ratify or amend.
 
 "Inherits the existing store's access control" is only load-bearing if that
 model is named, so it is named here. Nothing in this subsection changes the
-Gateway's authorization model; it states the model this contract relies on,
-and the limits that come with it.
+Gateway's authorization model, and nothing in it proposes new behavior: the
+landed implementations on `main` already work this way, across seven
+separately reviewed and merged PRs covering F1, F1e, F2, the codex envelope,
+Discord, and Telegram (see *Implementation status*). This states the model
+those landings already implement, and the limits that come with it.
+
+**Two classes of thinking content, not three.** §3.2 labels three variants by
+provenance, but the normative truth table in §4.3 collapses them into the two
+that matter for this boundary, and adapters already treat them that way:
+
+- **Readable** (`raw` and `summary` — a single row in §4.3). Where a provider
+  withholds chain-of-thought and offers a summary instead, that summary *is*
+  the readable content and is handled identically; Gemini's `includeThoughts`
+  is the worked case (§6, F5). Archived as content, gated at presentation by
+  `/reasoning`.
+- **Encrypted or withheld** (`redacted`). Archived as a content-free marker
+  carrying at most a token count. Where a provider encrypts its own
+  chain-of-thought, the privacy decision was made upstream at the API and is
+  not ours to gate or to undo.
+
+This rests on an invariant the spec already states and red-teamed (§2,
+AS5-02): **two persistence stores, never to be conflated.** The adapter
+provider-native transcript holds byte-stable blocks needed for API replay —
+F1 signed and redacted thinking including signatures, F3 `encrypted_content`,
+OpenRouter `reasoning_details[].data` and `.signature` — and opaque material
+never leaves it. The gateway archive tap holds the normalized event sequence:
+displayable content and markers only, never signatures or encrypted blobs.
+
+Opaque material in the archive is therefore a contract violation, not a
+configuration outcome — the separation is normative and conformance-tested
+(§8.2), though nothing structurally prevents an implementation from breaking
+it. On that basis the exposure question concerns exactly one class: readable
+thinking the provider chose to emit in the clear.
 
 **Authorized readers.** Archived thinking is an operator-surface read. A
 client reaches it only by holding `operator.read` — or a scope that satisfies
@@ -306,18 +337,29 @@ is archived independently of display, so neither should be discovered later:
    scopes. On a Gateway configured that way, possession of the gateway
    token is sufficient to read archived thinking.
 
-State the trade precisely, because the tempting one-liner — "this widens what
-a record contains, not who can read it" — is not quite true, and the gap is
-the whole point of the question. **No new reader identity and no new endpoint
-is introduced. Every existing session-history reader is newly authorized to
-receive raw reasoning**, including reasoning for turns the user rendered with
-`/reasoning off`, which under the prior behavior no reader could obtain
-because it was never retained. Applied to limit 2 above, the sharpest case is
-concrete: a shared-secret HTTP caller that explicitly declares narrower scopes
-is upgraded to the default operator set anyway, and can now retrieve raw
-reasoning that previously did not exist in the record. That is a real
-expansion of authority over a new datum, and it is the substance of what this
-RFC asks maintainers to accept.
+State the trade precisely, and scope it to the one class it applies to. **No
+new reader identity and no new endpoint is introduced.** Encrypted reasoning
+is unaffected: it is a marker in the archive and opaque to everyone. What
+changes is that an existing session-history reader may now retrieve *readable*
+thinking for turns rendered with `/reasoning off`, which earlier behavior
+would not have retained.
+
+Two privilege systems bound who that is, and they nest. The display directive
+is gated by sender authorization — slash commands and directives are honored
+only for authorized senders, derived from channel allowlists and pairing plus
+`commands.useAccessGroups`. The history read is gated by `operator.read` on
+the Gateway. A channel participant who cannot turn `/reasoning` back on is, by
+construction, not an operator either: the archive is not a surface they can
+reach at all. The distinction this contract preserves is exactly that one —
+between an operator inspecting a session record and a chat participant from
+whom output was deliberately gated.
+
+Two caveats belong in the open rather than in a reviewer's discovery: on a
+channel whose allowlist is empty or contains `"*"`, directives are effectively
+open, so the nesting above is a property of a configured deployment rather
+than a guarantee of the design; and per limit 2, a shared-secret HTTP caller
+is upgraded to the default operator scope set even when it declares narrower
+ones.
 
 **Retention.** No new retention class and no separate knob. Archived thinking
 is a field of the session record that contains it, and ages, compacts, and is
