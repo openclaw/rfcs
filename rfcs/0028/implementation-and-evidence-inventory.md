@@ -10,8 +10,8 @@ semantics.
 | Repository / surface | Reviewed head | Status |
 | --- | --- | --- |
 | `openclaw/openclaw` foundation PR #116050 | `1aaec0c5a56` | Draft; rebased Rust client/host plus Linux Tauri consumer |
-| `openclaw/openclaw` follow-up PR #116450 | `55e4ca459bf` | Draft; logically stacked on #116050; generated native models current |
-| `openclaw/openclaw` sidecar PR #116863 | `8ead00ab024` | Draft; logically stacked on #116450; includes real cross-process authenticated IPC proof |
+| `openclaw/openclaw` follow-up PR #116450 | `bfd5c4d14e2` | Draft; logically stacked on #116050; generated native models preserve the established nullable-string invocation API |
+| `openclaw/openclaw` sidecar PR #116863 | `71c1c8cb23c` | Draft; logically stacked on #116450; includes complete configured cross-process authenticated IPC proof |
 | `openclaw/openclaw` cancellation contract PR #115390 | `3cac3e4a3aa` | Draft; required `{ invokeId, nodeId }` schema consumed by TypeScript and Swift |
 | `openclaw/openclaw-windows-node` PR #1068 | `711fe095` | Draft; rebased seam plus independent sidecar adapter; C# remains production default |
 | Experimental Rust launch proof #12 | `3d1357f` | Draft, fork-only; protected bootstrap plus deterministic pinned aggregate evidence |
@@ -166,9 +166,9 @@ policy, or rollout controls to the product.
 | Foundation Rust workspace | Ubuntu 24.04 WSL2, Rust 1.93, `1aaec0c5a56` | 56 tests; strict Clippy/format/diff pass; Gateway challenge timestamp shared by Tauri and node-host | No deployed production Gateway at latest head |
 | Foundation host/socket proof | Ubuntu 24.04 WSL2, Rust 1.93, `13242763f3d` | Health 200, pre-ready 503, clean shutdown, real loopback invocation | Earlier proof head; in-process Gateway harness |
 | Linux Tauri suite | Linux proof head | 98/98 passed | Not a packaged desktop UI build |
-| Embeddable stack | Ubuntu 24.04 WSL2, Rust 1.93, `55e4ca459bf` | 73 workspace tests; strict Clippy/format/diff and full protocol-generation checks pass | In-process Gateway peer for follow-up behaviors |
-| Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers plus focused TypeScript schema/integration tests pass at `55e4ca459bf` | Live production-Gateway compatibility remains a release gate |
-| OpenClaw sidecar bridge | Rust workspace, `8ead00ab024` | 124 workspace tests; strict Clippy/format/diff pass; exact three-corpus proof plus a separate OS child exchanging authenticated frames over real TCP IPC | Test process/transport; no protected bootstrap, artifact verification, product supervisor, or live Gateway |
+| Embeddable stack | Ubuntu 24.04 WSL2, Rust 1.93, `bfd5c4d14e2` | 73 workspace tests; strict Clippy/format/diff and Swift/Kotlin protocol-generation checks pass; native `paramsJSON` remains nullable string | Android generator output is verified, but the local Android unit test is pending a Java-enabled hosted lane |
+| Shared fixtures | Rust current-head consumer plus canonical TypeScript validators | Rust lifecycle and Gateway-authority consumers plus focused TypeScript schema/integration tests pass at `bfd5c4d14e2` | Live production-Gateway compatibility remains a release gate |
+| OpenClaw sidecar bridge | Rust workspace, `71c1c8cb23c` | 124 workspace tests; strict Clippy/format/diff pass; exact three-corpus proof plus a separate OS child completing authenticated configuration/manifest acknowledgement, admission, invocation, and result over real TCP IPC | Test process/transport; no protected bootstrap, artifact verification, product supervisor, or live Gateway |
 | Windows adopter | Windows 11, `711fe095` | 3,701 Shared tests and 22 focused Connection tests pass after rebase; the prior head additionally passed the full build, exact three-corpus reproduction, 60 focused, 2,023 Tray, and 519 Connection tests; Codex and three-model reviews were clean | C# remains selected; adapter is in-process and non-selectable; the larger suites are prior-head evidence pending CI at the rebased head |
 | Protected process launch | Windows 11, Rust `3d1357f`, Windows `199eaa1fcba` | 122 shared Rust and 64 focused Windows tests; three exact fixture blobs; deterministic junction-path, hash, and handshake-identity rejection; private bootstrap and real invocation | Test artifact and source harness; no platform signature, package/update or production selection |
 | Windows live MXC | Windows host + isolated Ubuntu WSL + live loopback Gateway | 2/2 allowed/denied `system.run` cases pass | Proves shared dispatcher on C# default path |

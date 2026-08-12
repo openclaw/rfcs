@@ -144,11 +144,11 @@ The current drafts provide:
 - #116050: reusable Gateway client, bounded host, Tauri migration, real
   loopback node/health proof, and 56 Rust workspace tests at `1aaec0c5a56`;
 - #116450: lifecycle/signing/token, duplex/admission/manifest conformance and
-  73 stacked Rust tests plus current generated native models at `55e4ca459bf`;
+  73 stacked Rust tests plus current generated native models at `bfd5c4d14e2`;
 - #116863: consolidated authenticated sidecar framing, handshake, immutable
   configuration, ordinary-command bridge, three exact corpora, a real
-  cross-process authenticated IPC test, and 124 stacked Rust tests at
-  `8ead00ab024`;
+  cross-process authenticated configuration, manifest, admission, invocation,
+  and result test, and 124 stacked Rust tests at `71c1c8cb23c`;
 - Windows #1068: replaceable runtime boundary, shared dispatcher, independent
   C# sidecar consumer, 3,701 Shared and 22 focused Connection tests at
   `711fe095`; the prior head also passed its larger focused, Tray, and full
