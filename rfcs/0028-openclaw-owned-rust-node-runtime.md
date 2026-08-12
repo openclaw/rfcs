@@ -292,11 +292,12 @@ PRs plus one initial Windows adopter PR:
    first.
 3. **OpenClaw authenticated sidecar bridge:** add transport-neutral framing,
    negotiation, immutable configuration, an ordinary-command runtime bridge,
-   and exact cross-language corpora
+   exact cross-language corpora, and a real child-process authenticated IPC test
    ([openclaw/openclaw#116863](https://github.com/openclaw/openclaw/pull/116863)).
    This draft is logically stacked on #116450. It defines the shared primitive
-   but deliberately stops before choosing product IPC, credential bootstrap,
-   process supervision, or rollout policy.
+   and proves it across a real process/transport boundary, but deliberately
+   stops before choosing product IPC, protected credential bootstrap, process
+   supervision, or rollout policy.
 4. **Windows adopter:** keep the existing C# runtime as the production default
    while adding one replaceable runtime boundary and one Windows-owned shared
    capability dispatcher, plus an independent non-selectable C# consumer of
@@ -339,8 +340,9 @@ The existing official C# Windows node now has one consolidated draft adopter
 It introduces an injectable node-runtime contract and extracts a single
 Windows-owned capability dispatcher shared by the current C# transport and the
 new non-selectable sidecar adapter, while keeping the C# client as the
-production default. Fork evidence now replaces the in-process-only uncertainty
-with a verified, privately bootstrapped process over authenticated, versioned
+production default. The public OpenClaw draft now proves authenticated framing
+across a real child process. Fork evidence extends that proof with a verified,
+privately bootstrapped process over authenticated, versioned
 anonymous pipes. A future product adoption slice can wire that launcher into
 an opt-in runtime and add signing, packaging, supervision, and rollback:
 Rust owns Gateway transport, registration, invocation, cancellation, reconnect,

@@ -9,8 +9,9 @@ another concrete IPC encoding.
 Status: draft and not implemented by upstream OpenClaw PRs #116050 or #116450.
 Upstream draft OpenClaw PR #116863 consolidates the reviewed fork evidence from
 #193-#195 and implements the transport-neutral authenticated framing, handshake,
-immutable configuration, and ordinary-command runtime bridge for review. It
-does not implement a production sidecar. Windows PR #1068 now combines the replaceable client,
+immutable configuration, ordinary-command runtime bridge, and a real OS
+child-process IPC test for review. It is a shared primitive and proof harness;
+it does not implement a production sidecar. Windows PR #1068 now combines the replaceable client,
 capability-dispatch seam, and independent C# reproduction of all three Rust
 corpora while keeping C# as the production runtime. Its adapter routes ordinary
 native invocations through the shared dispatcher. It is a non-selectable

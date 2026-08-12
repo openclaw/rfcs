@@ -26,7 +26,7 @@ supported.
 | N1 bounded node foundation | OpenClaw #116050 | Real loopback Gateway invocation plus health/readiness/shutdown | Per-adopter basic node session/runtime scaffolding |
 | N2 embeddable lifecycle | OpenClaw #116450 | Shared fixtures and real socket lifecycle, signing, token, reconnect, duplex, manifest, admission tests | Per-adopter signing/reconnect/invocation lifecycle |
 | A1 adopter seam | Windows #1068 | Existing C# default, full unit suites, real Gateway MXC path | Duplicate Windows routing when Rust adapter arrives |
-| A2 sidecar adapter | OpenClaw #116863 plus Windows #1068 | Independent authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, dispatcher routing, and exact cross-language corpora | No deletion; process/IPC and production adoption gates remain |
+| A2 sidecar adapter | OpenClaw #116863 plus Windows #1068 | Independent authenticated/versioned framing, handshake/configuration, typed ordinary-command bridge, dispatcher routing, exact cross-language corpora, and a real OS child exchanging authenticated frames over TCP | No deletion; product bootstrap/supervision and production adoption gates remain |
 | A3a launch/bootstrap evidence | Rust fork #12 plus Windows fork #4 | Exact artifact SHA-256 and reparse-path rejection, path locks through launch, self-identity handshake binding, bounded private-pipe bootstrap, real process admission/invocation | No deletion; signing, packaging, Gateway parity and operational adoption remain |
 | A3b Gateway connection control | RFC connection fixture plus future OpenClaw and adopter PRs | Negotiated feature gate, per-attempt material acquisition, external signing, issued-token acknowledgement, generation retirement, redaction, and protected-IPC live Gateway proof | Environment/file credential proof paths only; no incumbent production deletion |
 | A3 sidecar adoption | Future Windows adopter PR | Verified artifact/launch, protected bootstrap, concrete IPC, Gateway/pairing/token parity, crash, revocation, audit, resource, rollout and rollback proof | Incumbent product-owned Gateway transport after observation window |
@@ -142,16 +142,18 @@ Workspace tests alone do not authorize publication.
 The current drafts provide:
 
 - #116050: reusable Gateway client, bounded host, Tauri migration, real
-  loopback node/health proof, and 56 Rust workspace tests at `41f4e705887`;
+  loopback node/health proof, and 56 Rust workspace tests at `1aaec0c5a56`;
 - #116450: lifecycle/signing/token, duplex/admission/manifest conformance and
-  73 stacked Rust tests at `894d125ee76`;
+  73 stacked Rust tests plus current generated native models at `55e4ca459bf`;
 - #116863: consolidated authenticated sidecar framing, handshake, immutable
-  configuration, ordinary-command bridge, three exact corpora, and 110 stacked
-  Rust tests at `8d0a1b013ea`;
+  configuration, ordinary-command bridge, three exact corpora, a real
+  cross-process authenticated IPC test, and 124 stacked Rust tests at
+  `8ead00ab024`;
 - Windows #1068: replaceable runtime boundary, shared dispatcher, independent
-  C# sidecar consumer, 60 focused, 3,462 Shared, 2,023 Tray, and 519 Connection
-  tests at `3ca913a43a6`; the unchanged C# default path also has 2/2 live
-  Gateway MXC proof;
+  C# sidecar consumer, 3,701 Shared and 22 focused Connection tests at
+  `711fe095`; the prior head also passed its larger focused, Tray, and full
+  Connection suites, and the unchanged C# default path has 2/2 live Gateway
+  MXC proof;
 - fork-only Rust #11/#12 and Windows #3/#4: real child-process pipes, exact
   artifact hash verification with reparse-safe path locks through launch, bounded secret bootstrap outside arguments,
   environment and files, required handshake artifact binding, 122 shared Rust
