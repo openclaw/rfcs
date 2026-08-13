@@ -180,6 +180,25 @@ owner-authored substrate for optional recovery workflows, but those workflows
 must compose the landed command rather than reinterpret live SQLite files or
 duplicate snapshot creation, verification, repository, or restore behavior.
 
+For scale-to-zero, the goal is simple: let an idle OpenClaw Gateway stop using
+compute, then wake a replacement when work arrives without losing state or
+sending work to it before it is ready.
+
+Most of the OpenClaw-side foundation already exists. Vincent's snapshot work
+provides durable state capture and restore. Peter's Gateway suspension and Cron
+work provides a cooperative way to stop and reconcile tracked work. The
+remaining need is a small handoff between OpenClaw and its host:
+
+1. the host remembers that work is waiting and wakes the replacement;
+2. OpenClaw restores the accepted state and reports when the Gateway is ready;
+3. the host waits for that readiness before sending the queued work.
+
+This follow-on does not add a host scheduler, Teams transport, compute
+placement service, or retained-payload store to OpenClaw. It defines the
+application-consistency facts a host needs to use its existing infrastructure
+safely. The detailed contracts below preserve generation fencing, replay, and
+failure handling for implementations.
+
 The scale-to-zero outcome and user evidence are tracked in
 [openclaw/openclaw#114145](https://github.com/openclaw/openclaw/issues/114145).
 This follow-on deliberately builds on, rather than replaces, work Vincent and
@@ -199,7 +218,7 @@ they are not a required decomposition. If maintainers prefer a smaller or
 different core seam that satisfies the same recovery and restored-admission
 outcomes, that is a valid resolution of the umbrella issue.
 
-#### Why a recovery lifecycle is needed
+#### What snapshots and suspension do not finish
 
 Per-user and event-driven hosts can stop paying for resident compute only when
 they can retire one Gateway generation and later admit work on a replacement
@@ -312,7 +331,7 @@ durable host acceptance, publication, host wake, or source-compute retirement
 into
 OpenClaw.
 
-#### Current main leverage and remaining gaps
+#### What already exists and what remains
 
 OpenClaw has added useful owner-level foundations since this follow-on was
 first drafted:
@@ -337,18 +356,16 @@ first drafted:
   relevant evidence for owner-local reconciliation, but it is not a portable
   recovery receipt or a restored-admission signal.
 
-The remaining end-to-end gaps are therefore narrower but still host/runtime
-integration work:
+The remaining gaps are narrower and sit at the host/OpenClaw boundary:
 
-1. resolve the authoritative selected-agent inventory, recovery-journal
-   lifecycle, and public `gateway.restore.status` ownership;
-2. bind one durable accepted-final-handoff lookup to the destination runtime
-   generation;
-3. retain and coalesce Teams, API, and Cron wake causes while compute is absent;
-4. place or wake replacement compute without granting callers recovery-point
-   or admission authority; and
-5. replay each retained cause only after exact restored readiness, with durable
-   acknowledgement and crash recovery.
+1. agree who owns the selected-agent inventory, recovery journal, and public
+   `gateway.restore.status` method;
+2. let the host find the accepted recovery point and choose one fenced
+   replacement generation;
+3. remember and combine Teams, API, and Cron reasons to wake while compute is
+   absent; and
+4. send each queued item only after OpenClaw reports exact restored readiness,
+   with durable acknowledgement and crash replay.
 
 There is also an RFC-ownership decision before merge: repository review has
 asked whether this lifecycle belongs in a standalone draft RFC rather than as
@@ -371,7 +388,7 @@ capture, and restored-admission slices. Host acceptance, retained ingress,
 wake, and source-compute retirement remain separate review and implementation
 work.
 
-#### One bidirectional host/runtime contract
+#### Keep the host/OpenClaw handoff small
 
 The recommended V1 surface is one bidirectional protocol contract without an
 OpenClaw-owned lifecycle coordinator or abstract `Host` base class:
@@ -499,7 +516,7 @@ Gateway admission state, or central retained-payload store. The Gateway
 Protocol package should own the new wire schemas beside `gateway-suspend`; a
 separate lifecycle SDK package is not required for V1.
 
-#### Deferred cron and retained-ingress wake composition
+#### Wake and deliver work after compute reaches zero
 
 The current three-PR evidence stack intentionally stops at restored admission.
 A complete scale-to-zero host also needs to wake without relying on an
