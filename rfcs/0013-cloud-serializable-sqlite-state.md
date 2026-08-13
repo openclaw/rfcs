@@ -3,7 +3,7 @@ title: SQLite Snapshot Backup Artifacts
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-07-26
+last_updated: 2026-08-13
 status: completed
 issue: https://github.com/openclaw/openclaw/pull/105718
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -311,6 +311,50 @@ not move Gateway suspension, external ingress fencing, clean process shutdown,
 durable host acceptance, publication, host wake, or source-compute retirement
 into
 OpenClaw.
+
+#### Current main leverage and remaining gaps
+
+OpenClaw has added useful owner-level foundations since this follow-on was
+first drafted:
+
+- [openclaw/openclaw#118393](https://github.com/openclaw/openclaw/pull/118393)
+  now binds Cron cancellation settlement to each active run and keeps
+  unresolved work visible to Gateway suspension through bounded shutdown.
+  This strengthens the source-work fence; it does not register or deliver a
+  wake after compute reaches zero.
+- [openclaw/openclaw#117705](https://github.com/openclaw/openclaw/pull/117705)
+  keeps Gateway-backed agent turns on a cold CLI path. This reduces replacement
+  startup overhead; it does not provide retained ingress, compute wake, or
+  restored-readiness gating.
+- Vincent's snapshot durability campaign in
+  [openclaw/openclaw#113306](https://github.com/openclaw/openclaw/issues/113306)
+  has landed durable parent publication and pending-snapshot recovery. The
+  generic helper's staging-cleanup ownership contract remains an explicit
+  maintainer decision.
+- Vincent's open
+  [openclaw/openclaw#117258](https://github.com/openclaw/openclaw/pull/117258)
+  isolates post-commit auth snapshot publication per runtime owner. It is
+  relevant evidence for owner-local reconciliation, but it is not a portable
+  recovery receipt or a restored-admission signal.
+
+The remaining end-to-end gaps are therefore narrower but still host/runtime
+integration work:
+
+1. resolve the authoritative selected-agent inventory, recovery-journal
+   lifecycle, and public `gateway.restore.status` ownership;
+2. bind one durable accepted-final-handoff lookup to the destination runtime
+   generation;
+3. retain and coalesce Teams, API, and Cron wake causes while compute is absent;
+4. place or wake replacement compute without granting callers recovery-point
+   or admission authority; and
+5. replay each retained cause only after exact restored readiness, with durable
+   acknowledgement and crash recovery.
+
+There is also an RFC-ownership decision before merge: repository review has
+asked whether this lifecycle belongs in a standalone draft RFC rather than as
+an optional follow-on to completed RFC 0013. Until maintainers settle that
+placement, RFC 0013 remains authoritative only for the completed SQLite
+artifact contract and these lifecycle sections remain review material.
 
 The intended observable outcome of the complete host composition is:
 
