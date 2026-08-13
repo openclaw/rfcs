@@ -5,7 +5,7 @@ specification for RFC 0016, Claws. It defines how one Claw manifest and its
 referenced files are identified, validated, published, resolved, and handed to
 an OpenClaw lifecycle implementation.
 
-Status: experimental draft, tied to RFC 0016.
+Status: accepted experimental contract, tied to RFC 0016.
 
 ## Scope
 
@@ -22,6 +22,9 @@ This specification defines:
 The grouped manifest schema and `CLAW.md` envelope are defined by
 [`claw-md-v1-spec.md`](claw-md-v1-spec.md). Equivalent grouped JSON passes
 through the same validator and lifecycle.
+The OpenClaw-native profile and project authoring contracts are defined by
+[`openclaw-profile-v1-spec.md`](openclaw-profile-v1-spec.md) and
+[`claw-project-v1-spec.md`](claw-project-v1-spec.md).
 
 This specification does not define:
 
@@ -65,6 +68,7 @@ definition. It contains:
 
 - package identity in `package.json`;
 - one `CLAW.md` or equivalent grouped JSON manifest;
+- optional conventional harness profiles and package-root `BOOTSTRAP.md`;
 - every workspace source file referenced by that manifest.
 
 The package composes existing skills, plugins, MCP declarations, workspace
@@ -114,16 +118,19 @@ An illustrative package is:
 github-triage/
 |-- package.json
 |-- CLAW.md
+|-- BOOTSTRAP.md
+|-- profiles/
+|   `-- openclaw.yml
 `-- workspace/
     |-- AGENTS.md
-    |-- SOUL.md
     `-- reference/
         `-- triage-policy.md
 ```
 
-All manifest paths and referenced workspace sources must resolve inside the
-unpacked package root. A registry must verify that every declared source exists
-in the uploaded artifact before accepting a version.
+All manifest paths, recognized conventional profiles, optional package-root
+`BOOTSTRAP.md`, and referenced workspace sources must resolve inside the
+unpacked package root. A registry must verify every selected source before
+accepting a version.
 
 ## Portable Path Rules
 
@@ -167,8 +174,13 @@ Both forms pass through the same strict schema version 1 validator.
 
 A package must not select behavior from package scripts or another undeclared
 manifest. Installing or inspecting a Claw package must not execute package
-lifecycle scripts merely to discover its manifest. The `CLAW.md` body remains
-documentation only.
+lifecycle scripts merely to discover its manifest.
+
+A non-whitespace `CLAW.md` body is the portable prompt. OpenClaw materializes
+its exact bytes as managed `SOUL.md`. Grouped JSON expresses equivalent behavior
+with an explicit workspace source. An optional package-root `BOOTSTRAP.md` is a
+separate seed-once native first-run input and must not be targeted through
+ordinary managed workspace fields.
 
 ## Publication Validation Pipeline
 
@@ -180,8 +192,9 @@ A conforming registry must validate a publication in this order:
 4. Resolve `openclaw.claw` inside the package root.
 5. Parse the selected `CLAW.md` or JSON document.
 6. Validate the strict schema version 1 manifest.
-7. Verify that every workspace source exists and is a safe regular file, and
-   that any local avatar resolves through a declared workspace destination.
+7. Verify every recognized conventional profile, optional package-root
+   `BOOTSTRAP.md`, and workspace source as a safe regular file, and verify that
+   any local avatar resolves through a declared workspace destination.
 8. Apply registry ownership, visibility, moderation, malware, and security
    scanning rules.
 9. Compute and retain the immutable artifact digest over the exact distributed
@@ -215,8 +228,9 @@ trusted registry or signed feed binds that digest to package identity; the
 digest alone proves byte equality, not publisher identity, review, or safety.
 
 A local development source must be materialized as one immutable planning
-snapshot containing the exact manifest bytes and every referenced workspace
-source path and byte sequence. Its development digest must cover that complete
+snapshot containing the exact manifest bytes, the recognized conventional
+profile, optional package-root `BOOTSTRAP.md`, and every referenced workspace
+source path and byte sequence. Its development digest covers that complete
 snapshot plus the canonical source location. Hashing only the manifest is not
 sufficient. Development and registry digests identify different trust layers
 and must not be presented as interchangeable proofs.
@@ -264,8 +278,9 @@ authoritative full declaration; a summary must not replace or contradict it.
 
 ## Read-Only Planning and Consent
 
-Inspection validates package metadata and the manifest without reading or
-mutating local lifecycle state. Add dry-run resolves the final local agent id,
+Inspection validates package metadata, manifest, optional native bootstrap, and
+recognized conventional profile without reading or mutating local lifecycle
+state. Add dry-run resolves the final local agent id,
 workspace, dependencies, MCP servers, files, scheduled work, local credential
 prerequisites, and every external executable or downloadable artifact. It
 reports all actions, retained resources, conflicts, blockers, and post-add
@@ -328,6 +343,8 @@ At minimum, provenance must identify:
 - the consented plan identity and applied manifest schema version;
 - generated agent configuration digest and owned field paths;
 - managed workspace paths and content digests;
+- `CLAW.md` body-to-`SOUL.md` digest and optional native bootstrap seed state;
+- recognized harness-profile integrity and applied native settings;
 - exact skill and plugin dependency edges, resource origin
   (`claw-introduced` or `pre-existing`), and current non-Claw ownership;
 - MCP names, managed or referenced relationship, resource origin, current
@@ -370,6 +387,8 @@ A conforming add implementation must:
 - fail the complete add when any declared component is unsupported, blocked,
   invalid, or unavailable;
 - use existing skill and plugin installers and safety checks;
+- apply the recognized strict harness profile through canonical owners;
+- seed optional package-root `BOOTSTRAP.md` through the native bootstrap owner;
 - write only confined workspace files;
 - map MCP declarations to the existing MCP owner;
 - create scheduler records pinned to the final local agent id;
@@ -410,6 +429,11 @@ It does not imply artifact uninstall during the update transaction. Irreversible
 or uncertain owner outcomes must be retained in current provenance and reported
 as `status: partial`, including in structured CLI output.
 
+Update never recreates or rewrites a consumed package-root `BOOTSTRAP.md`.
+Expected native consumption is not drift. Managed `SOUL.md`, whether sourced
+from the `CLAW.md` body or an explicit JSON workspace source, follows ordinary
+managed-file digest and local-edit protection.
+
 Before changing or removing a scheduler record, update and remove must read the
 live record through the scheduler owner and compare its owned definition with
 provenance. Operator-modified jobs are conflicts and must not be overwritten or
@@ -417,10 +441,11 @@ deleted.
 
 ## Resource Limits
 
-A consumer must reject a Claw manifest larger than 1 MiB and package metadata
-larger than 256 KiB before parsing. Reads must remain bounded if a file grows
-after an initial metadata check. Existing canonical extraction, workspace-file,
-aggregate-workspace, and plan-output limits continue to apply.
+A consumer must reject a Claw manifest larger than 1 MiB, package metadata
+larger than 256 KiB, or an OpenClaw profile larger than 256 KiB before parsing.
+Reads must remain bounded if a file grows after an initial metadata check.
+Existing canonical bootstrap, extraction, workspace-file, aggregate-workspace,
+and plan-output limits continue to apply.
 
 ## Remove Semantics
 
@@ -481,6 +506,10 @@ credentials, operator settings, and any resource whose ownership or expected
 state cannot be proven. Failed cleanup remains visible to status and
 diagnostics.
 
+A pending package-root `BOOTSTRAP.md` is removed only when its bytes still match
+the recorded seed digest. A consumed or modified bootstrap and all user-owned
+interview output are preserved.
+
 ## Development Sources and Export
 
 A local unpackaged manifest may be inspected and, when explicitly supported,
@@ -495,10 +524,14 @@ reject links, and referenced workspace sources remain regular, non-linked
 files.
 
 Export creates a new package directory and must fail if the output directory
-already exists. It emits `package.json`, `CLAW.md`, and confined
-workspace sources. Export includes only portable supported state and excludes
-secrets, resolved environment values, models, providers, bindings, sessions,
-logs, caches, and unrelated global configuration.
+already exists. It emits `package.json`, `CLAW.md`, confined workspace sources,
+and `profiles/openclaw.yml` when supported OpenClaw settings are present.
+Unchanged valid UTF-8 managed `SOUL.md` content becomes the `CLAW.md` body;
+whitespace-only, non-UTF-8, conflicting, or over-limit content remains one
+explicit `SOUL.md` sidecar. Export includes only portable supported state and
+excludes secrets, resolved environment values, models, providers, bindings,
+sessions, logs, caches, consumed bootstrap rituals, user personalization, and
+unrelated global configuration.
 
 Export may preserve an original package name and version only by returning the
 byte-for-byte original artifact with the same digest. Any regenerated package,
@@ -513,12 +546,11 @@ Package v1 is identified by a manifest with `schemaVersion: 1` and the metadata
 contract above. Registry transport may evolve independently as long as it still
 delivers the exact identity, version, digest, and package bytes.
 
-Package and manifest v1 define the OpenClaw application profile. A different
-harness may inspect the portable data or implement that complete profile, and a
-future specification may define additional harness profiles. A consumer must
-not claim v1 application conformance if it drops, translates approximately, or
-cannot own a declared component. It may inspect such a package, but add must
-fail the complete plan rather than silently degrade the Claw.
+Package and manifest v1 define portable core. Conventional harness profiles
+define native realization without changing that core. A consumer must not claim
+v1 application conformance if it drops, approximately translates, or cannot own
+a declared component. It may inspect such a package, but add must fail the
+complete plan rather than silently degrade the Claw.
 
 ## Registry Conformance
 
@@ -527,6 +559,8 @@ A conforming registry must:
 - authenticate publication and bind it to exact package identity;
 - enforce package containment and portable path collision rules;
 - parse and validate the selected manifest strictly;
+- validate every conventional profile it claims to understand and an optional
+  package-root bootstrap as bounded safe content;
 - verify every referenced source file;
 - retain exact artifact length and SHA-256 integrity;
 - retain a bounded public summary derived from the validated artifact without
@@ -540,6 +574,7 @@ A conforming registry must:
 A conforming applying client must:
 
 - verify package identity, containment, manifest schema, and integrity locally;
+- discover and validate its conventional profile and native bootstrap;
 - resolve exact dependencies before planning;
 - expose a complete read-only plan and require explicit consent;
 - bind mutation to the consented artifact, destinations, actions, and expected

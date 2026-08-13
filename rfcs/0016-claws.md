@@ -3,9 +3,8 @@ title: Claws
 authors:
   - Gio
 created: 2026-07-03
-last_updated: 2026-07-19
-status: draft
-issue:
+last_updated: 2026-08-12
+status: accepted
 rfc_pr: https://github.com/openclaw/rfcs/pull/27
 ---
 
@@ -30,9 +29,17 @@ remains agent configuration, and cron jobs remain Gateway scheduler records.
 The Claw owns their composition and lifecycle for the new agent; it does not
 replace the underlying owner surfaces.
 
-The public lifecycle is `add`, `status`, `update`, `remove`, and `export`.
-`add --dry-run` is the non-mutating preview. Artifact-level `install` and
-`uninstall` remain the underlying operations for individual skills and plugins.
+The public runtime lifecycle is `inspect`, `add`, `status`, `update`, `remove`,
+and `export`. The public authoring lifecycle is `create`, `validate`, `dev`, and
+`build`. `add --dry-run` and `dev` are non-mutating previews. Artifact-level
+`install` and `uninstall` remain the underlying operations for individual
+skills and plugins.
+
+OpenClaw's shipped Claws implementation is the reference behavior for this
+contract. This RFC standardizes the portable package, authoring, and lifecycle
+invariants around that working owner system. It does not transfer OpenClaw's
+catalogs, runtime policy, rendering, publication, or review policy into a
+central cross-harness owner.
 
 ## Motivation
 
@@ -47,7 +54,7 @@ Adding a Claw always plans the following owned resources:
 1. One new `agents.list[]` entry.
 2. One new workspace assigned to that agent.
 3. Canonical bootstrap files and supporting files in that workspace.
-4. Workspace skills and global plugin dependencies.
+4. Workspace skills and exact shared plugin requirements.
 5. Declared MCP servers in OpenClaw's top-level `mcp.servers` configuration.
 6. Declared cron jobs stored in the Gateway scheduler and pinned to the new
    agent id.
@@ -116,11 +123,13 @@ principles.
 | Unit of ownership | One Claw describes exactly one new agent and its owned setup. |
 | Existing agents | `add` never merges into or updates an existing agent. Agent-id and workspace collisions fail closed. |
 | Lifecycle verb | The creation operation is `claws add`; `install` remains an artifact-level operation. |
-| Public schema | The manifest uses grouped `agent`, `workspace`, `packages`, `mcpServers`, and `cronJobs` fields rather than a generic flat entry list. |
+| Public schema | The manifest uses strict grouped `agent`, `metadata`, `workspace`, `packages`, `mcpServers`, and `cronJobs` fields rather than a generic flat entry list. |
 | Completeness | Every declared component is part of the Claw. Unsupported, blocked, or invalid components block `add`; there is no optional `required` flag. |
 | Package identity | Package name and version come from the enclosing package metadata and authenticated publish operation, following the ClawHub plugin precedent. |
 | Operator control | Models, providers, credentials, channel bindings, and local runtime defaults are not portable Claw settings. |
-| Agent configuration | Only explicitly supported portable job settings can be copied into the new `agents.list[]` entry. |
+| Agent configuration | Portable identity stays in `agent`; OpenClaw-specific operating policy stays in the strict conventional `profiles/openclaw.yml` sidecar. |
+| Prompt | A non-whitespace `CLAW.md` body is the portable prompt; OpenClaw materializes it as managed `SOUL.md`. |
+| First run | Package-root `BOOTSTRAP.md` is a seed-once native bootstrap input, not an ordinary managed workspace file. |
 | Skills | Skill packages install into the new agent's workspace and are discovered normally; the Claw does not set `agent.skills`. |
 | Plugins | Plugin packages use existing plugin installers, safety checks, enablement rules, and install records. |
 | Discovery and composition | Hosted feeds discover and govern plugin and skill packages; a Claw composes exact resolved package versions and direct MCP declarations rather than defining another catalog. |
@@ -167,8 +176,12 @@ resources while retaining referenced resources by default.
 The implementer-facing package contract is captured in
 [`0016/claw-package-v1-spec.md`](0016/claw-package-v1-spec.md). The experimental
 human-readable envelope is captured separately in
-[`0016/claw-md-v1-spec.md`](0016/claw-md-v1-spec.md). This RFC remains the
-product rationale, ownership model, lifecycle, and rollout plan.
+[`0016/claw-md-v1-spec.md`](0016/claw-md-v1-spec.md). OpenClaw's native profile
+is captured in
+[`0016/openclaw-profile-v1-spec.md`](0016/openclaw-profile-v1-spec.md), and the
+authoring lifecycle is captured in
+[`0016/claw-project-v1-spec.md`](0016/claw-project-v1-spec.md). This RFC remains
+the product rationale, ownership model, lifecycle, and rollout plan.
 
 A published Claw follows the current ClawHub plugin precedent. Registry identity,
 version, and publisher ownership come from the enclosing package and the
@@ -193,9 +206,12 @@ be inspected during development, but mutating local add must synthesize an
 explicit development identity and record its canonical source path and digest.
 
 The experimental implementation accepts the strict grouped JSON representation
-and `CLAW.md`, in which YAML frontmatter carries the same typed manifest and the
-Markdown body is documentation only. Export emits `CLAW.md`; JSON remains a
-fully supported serialization of the same grouped schema.
+and `CLAW.md`, in which YAML frontmatter carries the same typed manifest and a
+non-whitespace Markdown body carries the portable agent prompt. OpenClaw
+materializes that prompt as managed `SOUL.md`; grouped JSON expresses equivalent
+behavior with an explicit `workspace.bootstrapFiles["SOUL.md"]` source. Export
+emits `CLAW.md`; JSON remains a fully supported serialization of the same
+grouped schema.
 
 Both representations are covered by the existing
 `OPENCLAW_EXPERIMENTAL_CLAWS=1` gate. `CLAW.md` adds only reader/export format
@@ -221,38 +237,14 @@ The initial public shape is grouped by OpenClaw ownership boundary:
     "identity": {
       "name": "Triage",
       "emoji": "🔎"
-    },
-    "groupChat": {
-      "mentionPatterns": ["@triage", "@github-triage"]
-    },
-    "sandbox": {
-      "mode": "all",
-      "scope": "agent",
-      "workspaceAccess": "rw"
-    },
-    "tools": {
-      "allow": ["read", "write", "edit", "web_fetch", "memory_search", "memory_get"],
-      "deny": ["exec", "browser", "nodes"]
-    },
-    "heartbeat": {
-      "every": "30m",
-      "activeHours": {
-        "start": "08:00",
-        "end": "18:00"
-      },
-      "lightContext": true,
-      "isolatedSession": true,
-      "skipWhenBusy": true,
-      "timeoutSeconds": 120
-    },
-    "humanDelay": {
-      "mode": "natural"
     }
+  },
+  "metadata": {
+    "com.acme.category": "developer-productivity"
   },
   "workspace": {
     "bootstrapFiles": {
       "AGENTS.md": { "source": "workspace/AGENTS.md" },
-      "SOUL.md": { "source": "workspace/SOUL.md" },
       "IDENTITY.md": { "source": "workspace/IDENTITY.md" },
       "TOOLS.md": { "source": "workspace/TOOLS.md" },
       "HEARTBEAT.md": { "source": "workspace/HEARTBEAT.md" }
@@ -312,8 +304,9 @@ The initial public shape is grouped by OpenClaw ownership boundary:
 }
 ```
 
-The schema version 1 field set, validation rules, JSON representation, and
-`CLAW.md` envelope are normative for the experimental implementation.
+The schema version 1 field set, validation rules, JSON representation,
+`CLAW.md` envelope, conventional OpenClaw profile, package-root bootstrap, and
+project lifecycle are normative for the experimental implementation.
 Implementation slices may land separately behind the experimental gate, but a
 producer or consumer must not claim schema v1 conformance until it implements
 the complete grouped data model. Version 1 is strict: new portable fields,
@@ -325,17 +318,30 @@ component and still call the agent complete.
 
 ### Agent settings boundary
 
-Portable agent settings describe the job and its safe operating posture. The
-initial allowlist should be drawn from existing OpenClaw agent configuration and
-can include:
+The portable `agent` object contains only `id`, `name`, `description`, and
+identity presentation. OpenClaw-specific operating posture belongs in the
+optional strict package file `profiles/openclaw.yml`, which may contain:
 
-- `id`, `name`, and `description`;
-- agent identity presentation;
-- group-chat mention patterns;
-- sandbox boundaries;
-- tool allow and deny policy;
-- heartbeat behavior;
-- human-delay behavior.
+- group-chat mention patterns and sandbox boundaries;
+- a registered built-in tool profile plus bounded `allow` or `alsoAllow`,
+  `deny`, and restrictive `fs.workspaceOnly` policy;
+- memory-search enablement, explicit cross-conversation memory opt-in, and the
+  `memory` and `sessions` sources;
+- heartbeat and human-delay behavior; and
+- exact native extension requirements delegated to the canonical plugin owner.
+
+The profile is required to contain `schemaVersion: 1` and `agent`, which may be
+an empty object. OpenClaw discovers `profiles/openclaw.yml` conventionally,
+validates it strictly, and binds its bytes into source integrity. Absence means
+inherited OpenClaw defaults.
+
+For shipped compatibility, `metadata` is an optional string-to-string map that
+defaults to empty. Unknown keys are opaque descriptive hints. The legacy
+`metadata.openclaw.config` key may point to a safe package-relative YAML profile
+and is accepted with a deprecation warning; it must not conflict with a
+different conventional `profiles/openclaw.yml`. Canonical producers must omit
+that pointer and use the conventional path. No other metadata key changes
+runtime behavior or carries executable configuration.
 
 The following remain operator controlled and are rejected in a Claw manifest:
 
@@ -344,14 +350,60 @@ The following remain operator controlled and are rejected in a Claw manifest:
 - channel account ids, group ids, and bindings;
 - default-agent selection and global `agents.defaults`;
 - `agent.skills` allowlists;
-- arbitrary config fragments or unknown future agent fields.
+- arbitrary config fragments, custom tool profiles, memory provider/storage
+  tuning, or unknown future agent fields.
 
 The generated `agents.list[]` entry inherits operator defaults. Add appends one
 entry and does not rewrite existing list members or defaults.
 
-For example, adding the illustrative manifest above with local agent id
-`github-triage` appends an agent entry while preserving the operator's current
-defaults and agents:
+For example, the package may include this strict `profiles/openclaw.yml`:
+
+```yaml
+schemaVersion: 1
+agent:
+  groupChat:
+    mentionPatterns: ["@triage", "@github-triage"]
+  sandbox:
+    mode: all
+    scope: agent
+    workspaceAccess: rw
+  tools:
+    allow: [read, write, web_fetch]
+    deny: [exec, browser, nodes]
+    fs:
+      workspaceOnly: true
+  memory:
+    search:
+      enabled: true
+      rememberAcrossConversations: true
+      sources: [memory, sessions]
+  heartbeat:
+    every: 30m
+    activeHours:
+      start: "08:00"
+      end: "18:00"
+    lightContext: true
+    isolatedSession: true
+    timeoutSeconds: 120
+  humanDelay:
+    mode: natural
+extensions:
+  - id: github-actions
+    kind: plugin
+    format: openclaw
+    source: clawhub
+    ref: "@acme/github-actions"
+    version: 2.1.0
+```
+
+Every field above is accepted by the shipped strict profile schema. Heartbeat
+supports only the fields listed in the profile sidecar; unknown busy-state
+policy is rejected. A bounded `tools.allow` without a profile is valid.
+`profile: full` requires a bounded `allow`; profiles whose resolved policy
+contains an unbounded dynamic selector must be narrowed to concrete tool names.
+
+Adding the illustrative package with local agent id `github-triage` appends an
+agent entry while preserving the operator's current defaults and agents:
 
 ```jsonc
 {
@@ -382,8 +434,19 @@ defaults and agents:
           "workspaceAccess": "rw"
         },
         "tools": {
-          "allow": ["read", "write", "edit", "web_fetch", "memory_search", "memory_get"],
-          "deny": ["exec", "browser", "nodes"]
+          "profile": "full",
+          "allow": ["read", "write", "web_fetch"],
+          "deny": ["exec", "browser", "nodes"],
+          "fs": {
+            "workspaceOnly": true
+          }
+        },
+        "memory": {
+          "search": {
+            "enabled": true,
+            "rememberAcrossConversations": true,
+            "sources": ["memory", "sessions"]
+          }
         },
         "heartbeat": {
           "every": "30m",
@@ -393,7 +456,6 @@ defaults and agents:
           },
           "lightContext": true,
           "isolatedSession": true,
-          "skipWhenBusy": true,
           "timeoutSeconds": 120
         },
         "humanDelay": {
@@ -438,6 +500,20 @@ existing agent workspace or a Claw-managed workspace.
 `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `TOOLS.md`, and `HEARTBEAT.md`. Supporting
 content belongs in `workspace.files` with explicit package-relative source and
 workspace-relative destination paths.
+
+For `CLAW.md`, a non-whitespace Markdown body is an implicit managed `SOUL.md`
+source. Its exact bytes participate in source integrity; its digest and action,
+not prompt text, appear in the default plan. A package must not combine that
+body with an explicit destination equal to, beneath, or containing `SOUL.md`.
+Whitespace-only bodies create no implicit file. Markdown headings have no
+command semantics.
+
+An optional package-root `BOOTSTRAP.md` is a seed-once input to OpenClaw's
+existing first-run bootstrap owner. It is not ordinary managed workspace
+content. Expected consumption and deletion are not drift; update never
+recreates it, and remove may delete only a still-pending, digest-identical seed.
+User-owned interview output is preserved. Ordinary workspace declarations must
+not target root `BOOTSTRAP.md` or a colliding ancestor or descendant.
 
 All paths must remain within the unpacked Claw package or the new agent
 workspace after realpath resolution. Symlink, hardlink, device-file, oversized,
@@ -523,7 +599,8 @@ is not a Claw package dependency, hosted-feed entry, or provenance key.
 
 Heartbeat and cron jobs are distinct existing OpenClaw concepts:
 
-- `agent.heartbeat` controls when and how the new agent wakes.
+- `profiles/openclaw.yml` `agent.heartbeat` controls when and how the new agent
+  wakes.
 - `workspace.bootstrapFiles["HEARTBEAT.md"]` contains what the agent checks.
 - `cronJobs` contains exact scheduled jobs stored by the Gateway scheduler.
 
@@ -543,7 +620,7 @@ the new agent to local channels separately.
 
 #### Experimental incubation gate
 
-While this RFC remains draft, every Claws CLI surface is gated behind the
+While Claws remain experimental, every Claws CLI surface is gated behind the
 process-level opt-in `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
 
 When the gate is absent or false:
@@ -569,7 +646,7 @@ silently carried into later releases or fleet config.
 When enabled, text-mode commands print a concise experimental compatibility
 warning before mutation, and machine-readable results include
 `stability: "experimental"` plus their exact output schema version. During the
-draft period, the manifest schema, CLI flags, JSON result shapes, and SQLite
+experimental period, CLI flags, JSON result shapes, and SQLite
 tables may change without backward-compatibility guarantees. Destructive
 commands still require their normal explicit consent; the experimental gate is
 not consent and does not weaken any safety check.
@@ -582,6 +659,10 @@ does not itself establish those contracts.
 The public CLI is:
 
 ```bash
+openclaw claws create [path] [--name <name>] [--agent-id <id>]
+openclaw claws validate [path]
+openclaw claws dev [path] [--agent-id <id>] [--workspace <path>]
+openclaw claws build [path] --out <artifact.tgz>
 openclaw claws inspect <source>
 openclaw claws add <source> --dry-run --json
 openclaw claws add <source> [--agent-id <id>] [--workspace <path>] --yes --plan-integrity <digest>
@@ -593,8 +674,19 @@ openclaw claws remove <claw-or-agent> --yes --plan-integrity <digest> [cleanup s
 openclaw claws export <agent> --out <path>
 ```
 
-`inspect` validates package metadata and the grouped manifest without reading or
-mutating local lifecycle state. `add --dry-run` resolves the final agent id,
+`create` writes a minimal valid `package.json` and `CLAW.md` into an absent or
+empty directory without installing or applying anything. `validate` discovers
+one project root and validates the exact selected package inputs without
+mutation. `build` validates and creates a deterministic, no-overwrite `.tgz`
+artifact containing only selected package inputs, then reopens it through the
+canonical reader. `dev` validates, builds a temporary artifact, and runs the
+canonical add planner offline without mutation, delivery, network execution, or
+durable Claw state. The exact project contract is in
+[`0016/claw-project-v1-spec.md`](0016/claw-project-v1-spec.md).
+
+`inspect` validates package metadata, the grouped manifest, optional native
+bootstrap, and the recognized conventional profile without reading or mutating
+local lifecycle state. `add --dry-run` resolves the final agent id,
 workspace, packages, MCP servers, and cron jobs and emits the complete action
 plan. `add` without `--dry-run` requires `--yes` and the exact
 `--plan-integrity` digest from that dry run. Update uses the source recorded in
@@ -606,13 +698,16 @@ the choice is included in the plan digest. `--yes` alone never broadens a plan.
 Add ordering is transactional where owner APIs permit it and resumable where
 external installers or the scheduler cannot share one transaction:
 
-1. Validate package metadata and manifest.
+1. Validate package metadata, manifest, optional package-root bootstrap, and
+   recognized conventional profile.
 2. Resolve exact dependencies and run install safety checks.
 3. Resolve the final unused agent id and workspace.
 4. Preflight all config, file, MCP, and cron collisions.
 5. Create the agent entry and workspace state.
-6. Write bootstrap and supporting files.
-7. Install workspace skills and plugin dependencies.
+6. Seed native `BOOTSTRAP.md` when present and write managed files, including
+   body-sourced `SOUL.md`.
+7. Apply the strict OpenClaw profile and install exact workspace skill and
+   shared extension requirements through canonical owners.
 8. Configure MCP servers.
 9. Create agent-pinned cron jobs.
 10. Persist one complete apply record and per-resource provenance.
@@ -753,8 +848,8 @@ must share the schema and fixtures rather than maintain divergent validators.
   `acknowledge` parameter must not make the warning disappear from preview.
 - Claws do not introduce capability-specific resource quotas. Existing
   canonical owner limits apply. Claw manifests are limited to 1 MiB and package
-  metadata to 256 KiB; extraction, managed workspace, and plan limits remain
-  parser and resource-safety policy.
+  metadata and OpenClaw profiles to 256 KiB each; native bootstrap, extraction,
+  managed workspace, and plan limits remain parser and resource-safety policy.
 
 ## Rationale
 
@@ -776,16 +871,17 @@ The earlier prototype used `openclaw.claw.v1`, a flat `entries[]` list, and
 `claws apply` against a caller-selected workspace. That prototype is not the
 accepted public compatibility contract. Before any implementation PR is made
 ready, it must be restacked around the grouped schema and one-new-agent
-invariant. Prototype SQLite tables may be discarded or migrated during the
-draft phase; no released migration promise exists until the RFC is accepted.
+invariant. Prototype SQLite tables may be discarded or migrated while the feature remains
+experimental; the released migration promise is set when the gate is removed.
 
 ## Rollout plan
 
 Implementation should widen the trust boundary in reviewable slices:
 
-1. **Schema and read-only plan.** Parse package metadata and grouped manifests;
-   implement `inspect` and `add --dry-run`; prove agent/workspace collision
-   behavior and complete blockers without mutation.
+1. **Schema and read-only plan.** Parse package metadata, grouped manifests,
+   conventional profiles, and optional native bootstrap; implement `inspect`
+   and `add --dry-run`; prove agent/workspace collision behavior and complete
+   blockers without mutation.
 2. **Agent and workspace creation.** Add one `agents.list[]` entry, derive a new
    workspace, preserve defaults and existing agents, and persist the root apply
    record.
@@ -796,7 +892,7 @@ Implementation should widen the trust boundary in reviewable slices:
    uninstall when Claws reference an artifact.
 5. **MCP servers.** Add validated top-level MCP configuration, collision checks,
    redacted digest provenance, status, and cleanup.
-6. **Heartbeat and cron jobs.** Apply portable heartbeat config and create
+6. **Heartbeat and cron jobs.** Apply OpenClaw profile heartbeat config and create
    scheduler records pinned to the new agent id with status/disable/remove proof.
 7. **Status, doctor, and remove.** Diagnose complete and partial agents, drift,
    orphaned resources, and conservative cleanup.
@@ -807,145 +903,83 @@ Implementation should widen the trust boundary in reviewable slices:
 10. **ClawHub publication and feeds.** Share schema fixtures, publish a package,
     expose it through hosted feeds, and prove source resolution and add dry-run.
 
-### Current OpenClaw implementation stack
+### Implementation authority and consolidation
 
-The experimental implementation is one RFC plus twelve ordered OpenClaw PRs. Each
-implementation PR is based on the preceding head so reviewers can evaluate one
-ownership boundary at a time:
+The implementation authority for this reconciliation is shipped OpenClaw Claws
+at baseline `f8c0e1b8325b`. The accepted portable contract follows its strict
+schema, conventional profile, prompt/body mapping, native bootstrap behavior,
+extension ownership, project commands, and lifecycle tests. Owner-specific
+catalog, UI, plugin-mapping, policy, and publication decisions remain with
+OpenClaw and ClawHub rather than becoming portable schema.
 
-1. [#101328](https://github.com/openclaw/openclaw/pull/101328) - grouped schema,
-   inspect, and read-only add planning.
-2. [#101755](https://github.com/openclaw/openclaw/pull/101755) - new agent,
-   workspace root, and root install provenance.
-3. [#101973](https://github.com/openclaw/openclaw/pull/101973) - managed
-   workspace bootstrap and supporting files.
-4. [#102228](https://github.com/openclaw/openclaw/pull/102228) - exact ClawHub
-   skill/plugin installation and shared uninstall-reference warnings.
-5. [#102296](https://github.com/openclaw/openclaw/pull/102296) - plan-first
-   status and conservative remove.
-6. [#102306](https://github.com/openclaw/openclaw/pull/102306) - agent-centric
-   grouped export.
-7. [#102383](https://github.com/openclaw/openclaw/pull/102383) - Gateway-owned
-   cron jobs and scheduler provenance.
-8. [#102406](https://github.com/openclaw/openclaw/pull/102406) - stdio and remote
-   MCP ownership, including credential-free OAuth intent.
-9. [#102427](https://github.com/openclaw/openclaw/pull/102427) - lifecycle and
-   drift diagnostics.
-10. [#102959](https://github.com/openclaw/openclaw/pull/102959) - read-only
-    grouped update planning.
-11. [#102982](https://github.com/openclaw/openclaw/pull/102982) - consented
-    grouped update apply and compensation.
-12. [#111391](https://github.com/openclaw/openclaw/pull/111391) - thin
-    `CLAW.md` YAML-frontmatter input/export adaptation with grouped JSON read
-    compatibility and no separate lifecycle behavior. It supersedes #106888,
-    which was merged only into an obsolete stack head.
+This consolidated RFC change supersedes the still-open fragmented RFC drafts:
 
-Public documentation follows the same staged boundary as the implementation.
-#101328 introduces the experimental guide, navigation, opt-in, schema, inspect,
-and add preview. Each later PR extends that guide only with the command or
-resource behavior implemented at that stage. #111391 adds only `CLAW.md`
-authoring and canonical export documentation. At every intermediate stack head,
-the guide must describe no later command or ownership behavior.
+- [RFC PR #48](https://github.com/openclaw/rfcs/pull/48), portable core and
+  OpenClaw profile;
+- [RFC PR #52](https://github.com/openclaw/rfcs/pull/52), application
+  composition, native bootstrap, extensions, and clients; and
+- [RFC PR #56](https://github.com/openclaw/rfcs/pull/56), project authoring and
+  deterministic build lifecycle.
 
-These PRs replace the old workspace-apply prototype rather than
-extending its compatibility contract. Every experimental CLI PR remains behind
-`OPENCLAW_EXPERIMENTAL_CLAWS=1`; command registration, help, completion, and
-direct-handler tests must prove the disabled state as well as the enabled state.
-
-### Current ClawHub implementation stack
-
-ClawHub follows the OpenClaw schema and lifecycle contract in four ordered PRs:
-
-1. [#3089](https://github.com/openclaw/clawhub/pull/3089) - shared manifest
-   validation, derived summaries, and storage data model. Existing generic
-   publication remains closed to Claws.
-2. [#3090](https://github.com/openclaw/clawhub/pull/3090) - guarded publication,
-   package ingestion, source-file checks, CLI authoring support, and author
-   guidance. It also owns the fail-closed public-read boundary while disabled
-   and strips full manifests from every public release serializer. Publication
-   retains the exact immutable artifact bytes and bounded summary, validates
-   every package path, requires exact manifest/source spelling, applies strict
-   UTF-8 and pre-parse size limits, and accepts Claw npm packs without requiring
-   a plugin manifest.
-3. [#3091](https://github.com/openclaw/clawhub/pull/3091) - enabled search,
-   detail, and version APIs that expose only the latest or requested release's
-   bounded summary.
-4. [#3092](https://github.com/openclaw/clawhub/pull/3092) - separately gated
-   hosted Claw feed with its own experimental wire contract, safe summaries,
-   and exact artifact digests, plus a repeatable published-package proof through
-   real OpenClaw add dry-run. The versioned route is gated before publication
-   lookup and has no ungated unversioned redirect. The proof bounds download,
-   entry count, per-file and aggregate expansion; rejects unsafe or colliding
-   paths, links, and special archive entries; and supports npm-pack and legacy
-   ZIP package roots.
-
-The #3092 proof is a registry-to-OpenClaw bridge: it selects an exact candidate
-from the experimental Claw feed, verifies and extracts the artifact, then hands
-the package directory to OpenClaw. It proves that the published package produces
-a real non-mutating OpenClaw plan; native OpenClaw Claw-feed resolution remains
-a separate dependent integration.
-
-The ClawHub runtime surfaces in this track require
-`CLAWHUB_EXPERIMENTAL_CLAWS=1`. The deployment gate is independent of
-`OPENCLAW_EXPERIMENTAL_CLAWS=1` in the OpenClaw client and is not a replacement
-for explicit add/update consent.
-
-The experimental ClawHub contract accepts both `CLAW.md` and the equivalent
-grouped JSON manifest behind `CLAWHUB_EXPERIMENTAL_CLAWS=1`; it does not add a
-second format-specific gate. Search, detail, and feed APIs expose bounded
-summaries and immutable artifact coordinates; the applying client reviews the
-full declaration from the resolved artifact.
+Their useful normative content is incorporated here and in the organized RFC
+0016 sidecars. Their independent RFC numbers, draft metadata, dependency
+markers, and implementation-stack inventories are not part of this contract.
 
 ## Acceptance criteria
 
 The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 
-1. Inspect validates package identity and the grouped manifest without mutation.
-2. Without `OPENCLAW_EXPERIMENTAL_CLAWS=1`, the `claws` command is unregistered,
+1. Create produces a minimal project that validate accepts offline; validate,
+   dev, and build are read-only outside their declared project/artifact outputs.
+2. Inspect validates package identity, the grouped manifest, recognized
+   conventional profile, and optional package-root bootstrap without mutation.
+3. Without `OPENCLAW_EXPERIMENTAL_CLAWS=1`, the `claws` command is unregistered,
    absent from help and completions, and cannot be enabled by package content;
    the public experimental guide remains non-executable documentation.
-3. Add dry-run shows one new agent, one new workspace, every file/package/MCP/
+4. Add dry-run shows one new agent, one new workspace, every file/package/MCP/
    cron action, all collisions, and stable machine-readable blockers.
-4. An existing agent id or workspace blocks add unless an explicit unused
+5. An existing agent id or workspace blocks add unless an explicit unused
    override is supplied.
-5. Add appends one agent without changing defaults or existing agents.
-6. Canonical and supporting files are confined to the new workspace.
-7. Skills install into that workspace without setting `agent.skills`.
-8. Plugins use existing safety checks and preserve shared/direct ownership;
+6. Add appends one agent without changing defaults or existing agents.
+7. Canonical and supporting files are confined to the new workspace.
+8. Skills install into that workspace without setting `agent.skills`.
+9. Plugins use existing safety checks and preserve shared/direct ownership;
    CLI, Gateway, and Control UI uninstall paths all emit Claw-reference warnings
    through the shared lifecycle owner.
-9. Portable stdio and remote MCP declarations write only validated top-level
+10. Portable stdio and remote MCP declarations write only validated top-level
    config, store no secrets or completed OAuth state in provenance, and do not
    depend on a feed-backed connector identity.
-10. Cron jobs are scheduler records pinned to the final local agent id.
-11. Any declared unsupported or blocked component fails the complete add.
-12. Partial failures remain visible and cleanable; they are not reported as a
+11. Cron jobs are scheduler records pinned to the final local agent id.
+12. Any declared unsupported or blocked component fails the complete add.
+13. Partial failures remain visible and cleanable; they are not reported as a
     successfully added Claw.
-13. Status and doctor explain agent, workspace, package, MCP, cron, and managed
+14. Status and doctor explain agent, workspace, package, MCP, cron, and managed
     file drift.
-14. Update changes only Claw-owned state, preserves local/operator edits,
+15. Update changes only Claw-owned state, preserves local/operator edits,
     revalidates owner state before mutation, compensates only safely reversible
     completed owners, retains uncertain provenance, and reports uncertain or
     irreversible outcomes as partial.
-15. Remove uses canonical owner lifecycles, selects managed resources for
+16. Remove uses canonical owner lifecycles, selects managed resources for
     cleanup, retains referenced resources by default, offers integrity-bound
     `remove-if-unused` and explicitly selected referenced cleanup, warns about
     every known affected Claw or direct owner, and preserves modified or
     unrelated state.
-16. Export emits `CLAW.md`, excludes secrets and operator runtime settings,
+17. Export emits `CLAW.md`, excludes secrets and operator runtime settings,
     retains grouped JSON read compatibility, and can be added in a fresh state
     directory as a new equivalent agent.
-17. Feed approval does not bypass dependency policy or install safety checks.
-18. Every implementation stage documents its newly available surface without
-    claiming commands or ownership behavior from a later stage.
-19. Add and update plans disclose capability escalations separately from
+18. Feed approval does not bypass dependency policy or install safety checks.
+19. Schema-v1 metadata accepts an opaque string map, preserves the deprecated
+    shipped OpenClaw profile pointer with a warning, and gives no runtime
+    semantics to other unknown keys.
+20. A non-whitespace `CLAW.md` body is managed `SOUL.md`; package-root
+    `BOOTSTRAP.md` is seed-once native state; profiles, memory settings, and
+    native extensions follow their strict sidecar contracts.
+21. Add and update plans disclose capability escalations separately from
     ordinary content, include them in plan integrity, and reject mutation when
     the reviewed capability set changes.
 
 ## Unresolved questions
 
-- Before removing the experimental gate, should `CLAW.md` remain the default
-  authoring/export representation or should export return to grouped JSON?
 - What exact default workspace naming rule should resolve cross-platform path
   and case-folding collisions?
 - Should ordinary `agents delete` eventually delegate attached-Claw recurring
@@ -957,7 +991,7 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
   bindings?
 - What package transports should mutating v1 support beyond ClawHub and local
   development packages?
-- What is the minimum released SQLite migration contract before Claws leave
-  draft status?
-- How should OpenClaw and ClawHub publish and version one shared schema and
-  fixture suite?
+- What released SQLite migration contract is required before the experimental
+  gate is removed?
+- How should OpenClaw and ClawHub publish and version shared conformance
+  fixtures without transferring either product's policy ownership?

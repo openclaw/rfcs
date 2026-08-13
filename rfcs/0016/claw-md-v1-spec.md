@@ -5,7 +5,7 @@ Claws. The RFC explains the product model, ownership boundaries, lifecycle, and
 rollout plan. This file defines the schema version 1 data contract shared by
 OpenClaw and Claw registries and its human-readable `CLAW.md` envelope.
 
-Status: experimental draft, tied to RFC 0016.
+Status: accepted experimental contract, tied to RFC 0016.
 
 ## Incubation Status
 
@@ -13,12 +13,10 @@ The experimental implementation reads `CLAW.md` and equivalent grouped JSON,
 and exports `CLAW.md`. Both forms use the existing
 `OPENCLAW_EXPERIMENTAL_CLAWS=1` gate; there is no format-specific flag.
 
-`CLAW.md` is intentionally a thin serialization layer over the grouped schema.
-It does not define separate lifecycle, ownership, provenance, or capability
-semantics and introduces no new runtime dependency. Until the Claws gate is
-removed, maintainers may revise or remove this envelope without preserving it
-as a stable compatibility contract. Feedback remains welcome on the YAML
-frontmatter boundary, Markdown-body role, portability, and authoring ergonomics.
+`CLAW.md` is a portable prompt envelope over the grouped schema. A
+non-whitespace body maps to the harness's managed agent-instruction primitive;
+OpenClaw maps it to managed `SOUL.md`. This adds no separate lifecycle,
+ownership, provenance, or capability semantics.
 
 ## Scope
 
@@ -46,8 +44,8 @@ The enclosing package contract is defined by
 ## Design Goals
 
 `CLAW.md` is intended to be understandable in a code review while remaining a
-strict input to lifecycle tooling. Its Markdown body can explain the agent to a
-human. Its YAML frontmatter is the only executable declaration.
+strict input to lifecycle tooling. Its Markdown body is the portable agent
+prompt. Its YAML frontmatter carries typed resources and identity.
 
 The same data model may also be represented as JSON. Markdown and JSON are two
 serializations of one schema, not different capability levels.
@@ -86,11 +84,12 @@ The following rules apply:
 2. The opening delimiter must be followed by LF or CRLF.
 3. The YAML frontmatter ends at the next line containing exactly `---`.
 4. The closing delimiter must be followed by LF, CRLF, or end of file.
-5. The Markdown body after the closing delimiter is documentation only. A
-   consumer must not derive runtime behavior, package dependencies, policy, or
-   lifecycle actions from it.
-6. Producers should include a short heading and description in the Markdown
-   body, but consumers must accept an empty body.
+5. A body containing at least one non-whitespace character is the portable
+   agent prompt. Consumers preserve its complete UTF-8 bytes when materializing
+   the managed instruction file.
+6. OpenClaw maps that body to `SOUL.md`. An empty or whitespace-only body
+   creates no implicit file.
+7. Markdown structure has no command, package, policy, or lifecycle semantics.
 
 ## YAML Conversion
 
@@ -122,7 +121,8 @@ The top-level value must be an object with these fields:
 | Field | Type | Required | Semantics |
 | --- | --- | --- | --- |
 | `schemaVersion` | integer | Yes | Must be exactly `1`. |
-| `agent` | object | Yes | Portable configuration for the one new agent. |
+| `agent` | object | Yes | Portable identity for the one new agent. |
+| `metadata` | string map | No | Portable descriptive hints. Defaults to empty. |
 | `workspace` | object | No | Bootstrap and supporting files. Defaults to empty. |
 | `packages` | array | No | Exact skill and plugin dependencies. Defaults to empty. |
 | `mcpServers` | object | No | Portable MCP declarations keyed by server name. Defaults to empty. |
@@ -138,6 +138,22 @@ prevents package authors from claiming deletion authority over pre-existing or
 shared host resources. Operator-selected referenced cleanup is remove-plan
 input, not portable package content.
 
+## Metadata and Harness Profiles
+
+`metadata` is a string-to-string map. Unknown keys are opaque descriptive hints
+and must not be interpreted as executable configuration. Canonical producers
+use globally unique or namespaced keys.
+
+The shipped compatibility key `metadata.openclaw.config` may point to a safe
+package-relative `.yml` or `.yaml` OpenClaw profile. OpenClaw accepts it with a
+deprecation warning. It must not conflict with a different conventional
+`profiles/openclaw.yml`. Canonical producers omit the key and use the
+conventional path.
+
+Harness profiles are package sidecars, not nested manifest values. OpenClaw
+recognizes `profiles/openclaw.yml` and binds its exact bytes into source
+integrity. Consumers do not reinterpret another harness's profile.
+
 ## Agent
 
 `agent.id` is required. It must start with a lowercase ASCII letter, contain
@@ -145,7 +161,7 @@ only lowercase ASCII letters, digits, `_`, or `-`, and contain at most 64
 characters. It is the default local id; add still fails if that id or its
 derived workspace is already in use.
 
-The portable agent object is:
+The strict portable agent object is:
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
@@ -156,36 +172,9 @@ The portable agent object is:
 | `identity.theme` | string | No | Non-empty after trimming. |
 | `identity.emoji` | string | No | Non-empty after trimming. |
 | `identity.avatar` | string | No | Non-empty portable avatar described below. |
-| `groupChat.mentionPatterns` | string array | No | At least one non-empty string when present. |
-| `sandbox.mode` | enum | No | `off`, `non-main`, or `all`. |
-| `sandbox.scope` | enum | No | `session`, `agent`, or `shared`. |
-| `sandbox.workspaceAccess` | enum | No | `none`, `ro`, or `rw`. |
-| `tools.allow` | string array | No | At least one non-empty string when present. |
-| `tools.deny` | string array | No | At least one non-empty string when present. |
-| `heartbeat` | object | No | Exact portable heartbeat object below. |
-| `humanDelay` | object | No | Exact portable human-delay object below. |
-
-All objects are strict. Consumers may accept empty optional objects, but
-canonical producers must omit an optional object when none of its members are
-present.
-
-`heartbeat` may contain only:
-
-| Field | Type | Constraints |
-| --- | --- | --- |
-| `every` | string | A non-negative OpenClaw duration using `ms`, `s`, `m`, `h`, or `d`; composite forms such as `1h30m` are allowed and a bare number means minutes. |
-| `activeHours.start` | string | `HH:MM` in 24-hour form from `00:00` through `23:59`. |
-| `activeHours.end` | string | `HH:MM` in 24-hour form from `00:00` through `24:00`; no other `24:xx` value is valid. |
-| `activeHours.timezone` | string | Non-empty IANA timezone recognized by the scheduler. |
-| `lightContext` | boolean | No additional constraint. |
-| `isolatedSession` | boolean | No additional constraint. |
-| `skipWhenBusy` | boolean | No additional constraint. |
-| `timeoutSeconds` | integer | Greater than zero. |
-
-`humanDelay` may contain only `mode`, `minMs`, and `maxMs`. `mode`, when
-present, is `off`, `natural`, or `custom`. The millisecond values are optional
-non-negative integers. Version 1 imposes no relationship between them; runtime
-behavior uses the declared values only when the selected mode requires them.
+Runtime policy, tools, memory, heartbeat, delay, credentials, bindings, and
+provider configuration are not portable `agent` fields. OpenClaw settings use
+[`openclaw-profile-v1-spec.md`](openclaw-profile-v1-spec.md).
 
 `identity.avatar` may be an image data URL no larger than 2 MiB decoded or
 2,796,230 characters encoded, or a workspace-relative path with a `.png`,
@@ -211,6 +200,18 @@ sources. The only v1 keys are:
 - `IDENTITY.md`
 - `TOOLS.md`
 - `HEARTBEAT.md`
+
+In `CLAW.md`, a non-whitespace body implicitly targets `SOUL.md`. A manifest
+with such a body must not also declare a destination equal to, beneath, or
+containing `SOUL.md` under portable collision rules. Grouped JSON has no body
+and uses an explicit `SOUL.md` source for equivalent behavior.
+
+Package-root `BOOTSTRAP.md` is separate from this map. It is a seed-once
+first-run input handled by the harness's native bootstrap owner. OpenClaw treats
+expected consumption as success, never recreates it during update, removes only
+a still-pending digest-identical seed, and preserves user-owned interview
+output. Ordinary workspace declarations must not target root `BOOTSTRAP.md` or
+a colliding ancestor or descendant.
 
 Each value has one required `source` field. `workspace.files` contains objects
 with required `source` and `path` fields. `source` is relative to the package
@@ -340,17 +341,12 @@ agent:
   id: github-triage
   name: GitHub Triage
   description: Reviews incoming issues and prepares a daily summary.
-  tools:
-    allow: [read, write, web_fetch]
-    deny: [exec]
-  heartbeat:
-    every: 30m
+metadata:
+  com.acme.category: developer-productivity
 workspace:
   bootstrapFiles:
     AGENTS.md:
       source: workspace/AGENTS.md
-    SOUL.md:
-      source: workspace/SOUL.md
   files:
     - source: workspace/reference/triage-policy.md
       path: reference/triage-policy.md
@@ -383,15 +379,37 @@ cronJobs:
 
 # GitHub Triage
 
-Adds one GitHub triage agent and the reviewed resources it needs.
+You review incoming GitHub issues, identify severity and ownership, and prepare
+concise evidence-backed handoffs.
+```
+
+The same package may include `profiles/openclaw.yml`:
+
+```yaml
+schemaVersion: 1
+agent:
+  tools:
+    allow: [read, write, web_fetch]
+    deny: [exec]
+    fs:
+      workspaceOnly: true
+  memory:
+    search:
+      enabled: true
+      rememberAcrossConversations: true
+      sources: [memory, sessions]
+  heartbeat:
+    every: 30m
 ```
 
 ## JSON Compatibility
 
 The package contract may point `openclaw.claw` at a JSON file containing the
 grouped top-level object. JSON input passes through the same strict schema,
-defaults, diagnostics, and lifecycle. `CLAW.md` and JSON are two serializations
-of the same schema version, not different capability levels.
+defaults, diagnostics, and lifecycle. `CLAW.md` and JSON carry the same portable
+capability level. JSON represents the body prompt through an explicit
+`SOUL.md` workspace source. Both forms use the same conventionally discovered
+harness profile.
 
 ## Compatibility and Evolution
 
@@ -425,7 +443,13 @@ A conforming consumer must:
 - reject duplicate YAML keys and unknown schema fields;
 - validate all identifiers, exact versions, paths, environment references,
   cron expressions, timezones, and uniqueness constraints;
-- ignore the Markdown body for runtime behavior;
+- treat unknown metadata keys as opaque strings and support the deprecated
+  shipped OpenClaw profile pointer as specified;
+- map a non-whitespace Markdown body to the managed instruction primitive,
+  using `SOUL.md` in OpenClaw;
+- reject body conflicts with explicit `SOUL.md` destinations;
+- discover and strictly validate the recognized conventional harness profile;
+- treat package-root `BOOTSTRAP.md` as seed-once native first-run state;
 - preserve original bytes for integrity calculations;
 - reject a `CLAW.md` file larger than 1 MiB before parsing, including when it
   grows during the read;
@@ -443,6 +467,9 @@ A conforming producer must:
 - keep all referenced workspace sources inside the enclosing package;
 - use exact package and package-manager dependency versions and explicit cron
   timezones;
-- place human explanation, not executable declarations, in the Markdown body;
+- place the portable agent prompt in the Markdown body and avoid a duplicate
+  explicit `SOUL.md` source;
 - exclude credentials and operator-owned runtime choices;
+- place supported OpenClaw settings in `profiles/openclaw.yml`;
+- emit package-root `BOOTSTRAP.md` only for seed-once conversational setup;
 - validate the result against this specification before publication or export.
