@@ -1,6 +1,6 @@
 # OpenClaw Claw Profile v1
 
-Status: accepted experimental contract, tied to RFC 0016.
+Status: draft experimental contract, tied to RFC 0016.
 
 This document defines the OpenClaw-owned harness profile at
 `profiles/openclaw.yml`. Shipped OpenClaw behavior is authoritative for this

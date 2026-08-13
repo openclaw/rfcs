@@ -5,7 +5,7 @@ specification for RFC 0016, Claws. It defines how one Claw manifest and its
 referenced files are identified, validated, published, resolved, and handed to
 an OpenClaw lifecycle implementation.
 
-Status: accepted experimental contract, tied to RFC 0016.
+Status: draft experimental contract, tied to RFC 0016.
 
 ## Scope
 
@@ -475,6 +475,11 @@ The operator must be offered these referenced-resource dispositions:
   resources after showing all known affected Claws and non-Claw owners. A
   remaining dependency or pre-existing origin requires stronger explicit
   confirmation but is not a hidden uninstall lock.
+
+Global plugins and profile extension artifacts are never eligible for generic
+`remove-if-unused`. Their dependency edges are released, while uninstall
+requires a separately selected canonical plugin-owner operation with conflict
+disclosure.
 
 The chosen disposition and affected resource identities must be part of the
 integrity-bound remove plan. Non-interactive mutation must identify its cleanup

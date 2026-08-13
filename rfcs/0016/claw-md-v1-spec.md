@@ -5,7 +5,7 @@ Claws. The RFC explains the product model, ownership boundaries, lifecycle, and
 rollout plan. This file defines the schema version 1 data contract shared by
 OpenClaw and Claw registries and its human-readable `CLAW.md` envelope.
 
-Status: accepted experimental contract, tied to RFC 0016.
+Status: draft experimental contract, tied to RFC 0016.
 
 ## Incubation Status
 

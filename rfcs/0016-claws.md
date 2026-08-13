@@ -4,7 +4,7 @@ authors:
   - Gio
 created: 2026-07-03
 last_updated: 2026-08-12
-status: accepted
+status: draft
 rfc_pr: https://github.com/openclaw/rfcs/pull/27
 ---
 
@@ -51,7 +51,7 @@ unrelated workspace.
 
 Adding a Claw always plans the following owned resources:
 
-1. One new `agents.list[]` entry.
+1. One new `agents.entries` member keyed by the final agent id.
 2. One new workspace assigned to that agent.
 3. Canonical bootstrap files and supporting files in that workspace.
 4. Workspace skills and exact shared plugin requirements.
@@ -101,7 +101,7 @@ adopting or merging into an existing agent or managed workspace.
 - Embedding model, provider, thinking-level, authentication, or other
   operator-controlled runtime defaults.
 - Embedding channel account ids, group ids, credentials, or bindings.
-- Setting `agents.list[].skills`; workspace-installed skills remain naturally
+- Setting `agents.entries.<id>.skills`; workspace-installed skills remain naturally
   discoverable and must not replace inherited allowlists.
 - Defining a generic `connector` installation concept. Channel capabilities are
   supplied by normal channel plugins and configured or bound locally.
@@ -262,12 +262,6 @@ The initial public shape is grouped by OpenClaw ownership boundary:
       "source": "clawhub",
       "ref": "@acme/issue-triage-playbook",
       "version": "1.4.0"
-    },
-    {
-      "kind": "plugin",
-      "source": "clawhub",
-      "ref": "@acme/github-actions",
-      "version": "2.1.0"
     }
   ],
   "mcpServers": {
@@ -353,8 +347,9 @@ The following remain operator controlled and are rejected in a Claw manifest:
 - arbitrary config fragments, custom tool profiles, memory provider/storage
   tuning, or unknown future agent fields.
 
-The generated `agents.list[]` entry inherits operator defaults. Add appends one
-entry and does not rewrite existing list members or defaults.
+The generated `agents.entries` member inherits operator defaults. Add inserts
+one member keyed by the final agent id and does not rewrite existing entries or
+defaults.
 
 For example, the package may include this strict `profiles/openclaw.yml`:
 
@@ -411,13 +406,9 @@ agent entry while preserving the operator's current defaults and agents:
     "defaults": {
       // Existing operator-owned defaults remain unchanged.
     },
-    "list": [
-      {
-        "id": "main",
-        "default": true
-      },
-      {
-        "id": "github-triage",
+    "entries": {
+      "main": {},
+      "github-triage": {
         "name": "GitHub Triage",
         "description": "Reviews incoming GitHub issues and prepares a daily triage summary.",
         "workspace": "~/.openclaw/workspace-github-triage",
@@ -462,7 +453,7 @@ agent entry while preserving the operator's current defaults and agents:
           "mode": "natural"
         }
       }
-    ]
+    }
   },
   "plugins": {
     "entries": {
@@ -533,7 +524,7 @@ exact version, or unsupported source blocks the complete add.
 
 Skill packages install into the new agent workspace through existing skill
 installers. They are discovered from the workspace normally. Add must not set
-`agents.list[].skills`.
+`agents.entries.<id>.skills`.
 
 Plugin packages install through existing plugin installers and safety checks.
 Plugin artifacts can be shared with direct user installs or other Claws. Claw
@@ -546,9 +537,12 @@ releases dependency edges and retains shared artifacts.
 The remove plan must offer explicit cleanup choices for referenced artifacts:
 
 1. `retain` releases only this Claw's dependency edge and is the default.
-2. `remove-if-unused` invokes the canonical artifact lifecycle only when no
+2. `remove-if-unused` applies only to shared skill artifacts and invokes the
+   canonical artifact lifecycle only when no
    other Claw dependency edge or known non-Claw owner remains and the artifact
-   is complete, unchanged, and unambiguous.
+   is complete, unchanged, and unambiguous. Global plugins and profile
+   extensions are excluded; plugin uninstall remains a separately selected
+   canonical plugin-owner action.
 3. `remove-selected` invokes canonical removal for artifacts explicitly chosen
    by the operator. It must show every known affected Claw and direct owner and
    require stronger confirmation when dependencies remain.
@@ -703,14 +697,16 @@ external installers or the scheduler cannot share one transaction:
 2. Resolve exact dependencies and run install safety checks.
 3. Resolve the final unused agent id and workspace.
 4. Preflight all config, file, MCP, and cron collisions.
-5. Create the agent entry and workspace state.
-6. Seed native `BOOTSTRAP.md` when present and write managed files, including
+5. Install exact shared extension requirements through the canonical plugin
+   owner.
+6. Create the agent entry and workspace state.
+7. Seed native `BOOTSTRAP.md` when present and write managed files, including
    body-sourced `SOUL.md`.
-7. Apply the strict OpenClaw profile and install exact workspace skill and
-   shared extension requirements through canonical owners.
-8. Configure MCP servers.
-9. Create agent-pinned cron jobs.
-10. Persist one complete apply record and per-resource provenance.
+8. Apply the strict OpenClaw profile and install exact workspace skill
+   requirements through canonical owners.
+9. Configure MCP servers.
+10. Create agent-pinned cron jobs.
+11. Persist one complete apply record and per-resource provenance.
 
 Any failure stops later phases. Pending provenance is written before external
 mutation and successful resources are recorded immediately. Safe local
@@ -830,7 +826,7 @@ must share the schema and fixtures rather than maintain divergent validators.
 - MCP config writes use validated, concurrent-write-safe config APIs.
 - Cron jobs require explicit consent, visible cadence/action previews, stable
   ownership, live-definition revalidation, and disable/remove handles.
-- Config mutation preserves `agents.defaults`, existing `agents.list[]` entries,
+- Config mutation preserves `agents.defaults`, existing `agents.entries` members,
   channel bindings, and unrelated plugin/MCP settings.
 - Partial adds persist enough state for diagnosis and cleanup.
 - Update and remove revalidate expected presence, content/config digests, and
@@ -882,7 +878,7 @@ Implementation should widen the trust boundary in reviewable slices:
    conventional profiles, and optional native bootstrap; implement `inspect`
    and `add --dry-run`; prove agent/workspace collision behavior and complete
    blockers without mutation.
-2. **Agent and workspace creation.** Add one `agents.list[]` entry, derive a new
+2. **Agent and workspace creation.** Add one `agents.entries` member, derive a new
    workspace, preserve defaults and existing agents, and persist the root apply
    record.
 3. **Workspace bootstrap and supporting files.** Add confined file writes,
@@ -906,16 +902,15 @@ Implementation should widen the trust boundary in reviewable slices:
 ### Implementation authority and consolidation
 
 The implementation authority for this reconciliation is shipped OpenClaw Claws
-at baseline `f8c0e1b8325b`. The accepted portable contract follows its strict
+at baseline `f8c0e1b8325b`. The portable contract follows its strict
 schema, conventional profile, prompt/body mapping, native bootstrap behavior,
 extension ownership, project commands, and lifecycle tests. Owner-specific
 catalog, UI, plugin-mapping, policy, and publication decisions remain with
 OpenClaw and ClawHub rather than becoming portable schema.
 
-This consolidated RFC change supersedes the still-open fragmented RFC drafts:
+This consolidation incorporates the useful normative content of the closed
+fragmented RFC drafts:
 
-- [RFC PR #48](https://github.com/openclaw/rfcs/pull/48), portable core and
-  OpenClaw profile;
 - [RFC PR #52](https://github.com/openclaw/rfcs/pull/52), application
   composition, native bootstrap, extensions, and clients; and
 - [RFC PR #56](https://github.com/openclaw/rfcs/pull/56), project authoring and

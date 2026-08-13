@@ -1,6 +1,6 @@
 # Claw Project v1 Specification
 
-Status: accepted experimental contract, tied to RFC 0016.
+Status: draft experimental contract, tied to RFC 0016.
 
 This document defines the source-project, validation, deterministic-build, and
 offline-development contract implemented by shipped OpenClaw Claws. It does not
@@ -165,7 +165,9 @@ A conforming implementation proves:
 
 1. Fresh create passes offline validate.
 2. Validate rejects unsafe or unsupported inputs without mutation.
-3. Build output is deterministic for identical selected inputs.
+3. Build output is byte-for-byte deterministic for identical selected inputs
+   across supported Linux, macOS, Windows, and WSL environments, with one
+   shared golden-artifact digest.
 4. The built artifact passes the canonical package reader.
 5. Unselected project and secret-bearing ambient files are absent.
 6. Dev produces canonical offline planning with no durable or delivery effects.
