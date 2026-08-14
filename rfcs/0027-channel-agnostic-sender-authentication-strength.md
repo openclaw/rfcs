@@ -95,6 +95,13 @@ where possible," tracked as recommendation R-008 at `docs/security/THREAT-MODEL-
 - Defining what "authenticated" means for any specific transport. Each channel owns that
   judgment and must document it.
 - Composing this with approval flows. RFC 0011 already owns plugin-attested approvals.
+- Becoming a second identity system. `IdentifierAuthentication` grades how strongly a
+  transport bound a sender identifier at channel ingress. It is not a principal, grant,
+  or `ExecutionIdentityContextV1` assurance strength, and `verified` must never map
+  automatically to execution-assurance levels such as `boundary-verified` or
+  `cryptographic`, which grade how execution evidence was established. The gate reports
+  into the existing admission-evidence and decision-receipt owners as bounded, redacted
+  facts; it does not mint its own store.
 - Adding a new operator-facing config surface in v1. The default policy minimum stays
   `asserted`, which is exactly today's default behavior, so no current deployment changes;
   requiring `verified` is new and opt-in, declared in code by a channel. A public
@@ -387,12 +394,19 @@ risk from asserted-but-unauthenticated risk, which it does not currently do.
 
 Sequential, each independently landable and testable, smallest first.
 
+*August 2026 refresh.* The original PR 2/3 implementations were closed unmerged while
+`main` gained the execution-identity architecture (admission evidence, decision
+receipts), and were superseded by rebuilt equivalents on that architecture: #123782
+(kernel, with exact match provenance) and #123793 (SDK plus the PR 4 channel migration,
+folded in). Landing order is #123782 then #123793; the kernel must not ship alone
+because it already widens SDK-re-exported types.
+
 | # | PR | Scope | Risk |
 | --- | --- | --- | --- |
 | 1 | Threat model and terminology | Define the gap and the trust boundary in `docs/security/THREAT-MODEL-ATLAS.md` and channel security docs. No runtime change. | Minimal |
-| 2 | Kernel internalization ([#116281](https://github.com/openclaw/openclaw/pull/116281)) | Add `IdentifierAuthentication`, resolve it during normalization for both entries and subjects, add the per-message subject strength map, replace `applyMutableIdentifierPolicy` with the `min()` gate, add the reason code. No new exported names; see the note below. Tests in `src/channels/message-access/`. | Low, fully unit-testable |
-| 3 | SDK compat ([#117121](https://github.com/openclaw/openclaw/pull/117121)) | Export `authentication`, the subject strength map, and `minIdentifierAuthentication` through `src/plugin-sdk/channel-ingress-runtime.ts`, deprecate `dangerous` and `mutableIdentifierMatching`, update the API baseline, add precedence tests. | Medium, public surface |
-| 4 | Bundled channel migration | Migrate the six channels declaring `dangerous: true` to explicit strength. Each channel's docs state what backs its claim. First PR exercising the model across real transports. | Medium, six owners |
+| 2 | Kernel internalization ([#123782](https://github.com/openclaw/openclaw/pull/123782), superseding closed [#116281](https://github.com/openclaw/openclaw/pull/116281)) | Add `IdentifierAuthentication`, resolve it during normalization for both entries and subjects, add the per-message subject strength map, replace `applyMutableIdentifierPolicy` with the `min()` gate, add the reason code. No new exported names; see the note below. Tests in `src/channels/message-access/`. | Low, fully unit-testable |
+| 3 | SDK compat ([#123793](https://github.com/openclaw/openclaw/pull/123793), superseding closed [#117121](https://github.com/openclaw/openclaw/pull/117121)) | Export `authentication`, the subject strength map, and `minIdentifierAuthentication` through `src/plugin-sdk/channel-ingress-runtime.ts`, deprecate `dangerous` and `mutableIdentifierMatching`, update the API baseline, add precedence tests. | Medium, public surface |
+| 4 | Bundled channel migration (folded into [#123793](https://github.com/openclaw/openclaw/pull/123793)) | Migrate the six channels declaring `dangerous: true` to explicit strength. Each channel's docs state what backs its claim. First PR exercising the model across real transports. | Medium, six owners |
 | 5 | Audit and doctor findings | Widen `audit-channel` wording, add the lockout-preview doctor finding. | Medium |
 | 6 | Downstream consumer | Private email channel maps its mail-auth facts onto the primitive. Not in this repo. | Downstream |
 
@@ -878,8 +892,11 @@ cleanup at the end.
   (Apple Mail, only if it ever presents more than one authenticated address per subject)
   should associate authentication with the exact matched identifier via match provenance —
   binding each matched entry to the identifiers that matched it, and reading strength from
-  those — rather than by kind. Until a channel needs it, the kind collapse stays; making the
-  change is a correctness improvement that removes false denials, not a security fix.
+  those — rather than by kind. *Resolved in the August 2026 refresh:*
+  [#123782](https://github.com/openclaw/openclaw/pull/123782) implements exact match
+  provenance — each matched entry binds to the specific identifier and identity field
+  that matched it, and effective strength is computed from that exact pair — so the
+  kind collapse no longer exists in the implementation.
 - **Where does the shared mail-auth mapping live?** The worked example places it in a
   mail-specific package shared across email plugins rather than the plugin SDK. If OpenClaw
   ever ships a first-party email channel, that boundary should be revisited before the
