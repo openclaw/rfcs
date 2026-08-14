@@ -1,7 +1,7 @@
 # Control Model conformance and adoption plan
 
-This plan turns RFC 0029 into independently reviewable gates. A package, UI
-artifact, or adopter is not supported until source behavior, fixtures, live
+This plan turns RFC 0029 into independently reviewable gates. A model subpath,
+UI artifact, or adopter is not supported until source behavior, fixtures, live
 proof, and deletion agree.
 
 ## Evidence principles
@@ -22,13 +22,13 @@ proof, and deletion agree.
 
 | Layer | Review surface | Required proof | Deletion unlocked |
 | --- | --- | --- | --- |
-| M1 package boundary | OpenClaw PR 1 | Browser-safe module graph, lifecycle, immutable store contract | Consumer scaffolding for connection/session snapshots |
+| M1 Gateway Client model boundary | OpenClaw PR 1 | Browser-safe module graph, lifecycle, immutable store contract | Consumer scaffolding for connection/session snapshots |
 | M2 conversation projection | OpenClaw PR 2 | Shared history/live/reconnect/tool/approval corpus | Per-consumer chat reducers and event folding |
 | A1 UI artifacts | OpenClaw PR 3 | Native, structured-only, MCP fallback, malformed, stale, history cases | Tool-specific presentation interpretation |
 | O1 Control UI adoption | OpenClaw PR 4 | Existing Control UI behavior unchanged on shared fixtures and E2E | Adopted UI-local capability/reducer code |
 | H1 independent host | Lobster/M PR 1 | Real hosted Gateway projected into existing host view model | Host-owned Gateway reconciliation for adopted slice |
 | H2 native artifact | Lobster/M PR 2 | One allowlisted component plus denied action and fallback | One bespoke tool-output rendering path |
-| R1 publication | OpenClaw PR 5/release | Two consumers, package acceptance, compatibility and support policy | Workspace-only distribution |
+| R1 publication | OpenClaw PR 5/release | Two consumers, package acceptance, compatibility and support policy | Fork-only distribution |
 
 ## Shared fixture families
 
@@ -70,7 +70,7 @@ Each fixture identifies:
 
 ### Per-PR
 
-- complete `@openclaw/control-model` tests;
+- complete `@openclaw/gateway-client/model` tests;
 - Gateway protocol compatibility tests;
 - current Control UI tests for affected behavior;
 - source fixture and real loopback Gateway proof;
@@ -157,7 +157,8 @@ The following are blocking:
 
 The first independent adopter should:
 
-1. consume the package through an existing supported Gateway route;
+1. consume the Gateway Client model through an existing supported Gateway
+   route;
 2. choose among OpenClaw-provided views and adapt the selected projection into
    its existing view model rather than create another shared vocabulary;
 3. render one representative conversation;

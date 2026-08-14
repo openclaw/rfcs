@@ -14,18 +14,18 @@ prove the contract.
   application framework.
 - Keep OpenClaw Control UI behavior unchanged during adoption.
 
-## OpenClaw PR 1: package and session snapshots
+## OpenClaw PR 1: Gateway Client model foundation
 
 ### Scope
 
-- Add workspace package `packages/control-model`.
+- Add optional `@openclaw/gateway-client/model` subpaths.
 - Define host Gateway binding, immutable external-store contract, lifecycle,
   structured errors, and bounds configuration.
 - Isolate bounded reconciliation and subscriber notification from the Gateway
   receive stack.
 - Project connection state and session catalog.
 - Reuse canonical protocol types without re-exporting the entire protocol.
-- Add package documentation and browser-safe import checks.
+- Add Gateway Client model documentation and browser-safe import checks.
 
 ### Explicit exclusions
 
@@ -41,7 +41,7 @@ prove the contract.
 - Session list plus create/update/delete reconciliation.
 - Connection-epoch retirement.
 - Retryable observer outage and authoritative refresh.
-- Package graph contains no framework, DOM component, or product import.
+- Model graph contains no framework, DOM component, or product import.
 
 ### Deletion target
 
@@ -83,7 +83,7 @@ Control UI and independent-host reducers for the adopted conversation slice.
   surfaces, including higher revisions published by later turns.
 - Adapt existing MCP App and Canvas previews into explicit fallbacks.
 - Add revision, expiry, bound, and structured failure behavior.
-- Keep renderer registries outside the package.
+- Keep renderer registries outside the model.
 
 ### Proof
 
@@ -107,7 +107,7 @@ association logic.
 
 ### Scope
 
-- Adapt the existing Control UI Gateway store to the package binding.
+- Adapt the existing Control UI Gateway store to the model binding.
 - Move the session catalog and one complete conversation route to Control Model
   snapshots.
 - Keep Lit components, routes, styling, and behavior unchanged.
@@ -130,7 +130,8 @@ Superseded UI-local session/conversation capability and reconciliation code.
 
 ### Scope
 
-- Consume the workspace or fork package through Lobster's hosted Gateway seam.
+- Consume the fork-only Gateway Client model through Lobster's hosted Gateway
+  seam.
 - Map model snapshots into M's existing `SessionView`.
 - Select the Lobster-compatible OpenClaw view projection without making that
   choice canonical for other clients.
@@ -204,10 +205,10 @@ One bespoke tool-output parsing/rendering path.
 
 ### Scope
 
-- Publish `@openclaw/control-model`.
+- Publish the optional `@openclaw/gateway-client/model` subpaths.
 - Document supported versions and migration policy.
 - Add framework-neutral quickstart and conformance fixtures.
-- Keep optional framework adapters outside the core package unless separately
+- Keep optional framework adapters outside the core model unless separately
   justified.
 
 ## Deferred work
