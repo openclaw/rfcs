@@ -1,9 +1,9 @@
 # Control Model v1 specification
 
 This document defines the candidate behavioral contract for
-`@openclaw/control-model`. It specifies framework-neutral state and commands
-above a supported OpenClaw Gateway client. It does not define presentation,
-product authentication, or another wire protocol.
+`@openclaw/gateway-client/model`. It specifies framework-neutral state and
+commands above the Gateway Client browser transport. It does not define
+presentation, product authentication, or another wire protocol.
 
 Status: draft. This is a fork-only preview and has not been submitted or
 accepted upstream.

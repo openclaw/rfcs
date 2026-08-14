@@ -1,9 +1,9 @@
 # UI artifact v1 specification
 
 This document defines a renderer-neutral UI artifact projected by
-`@openclaw/control-model`. An artifact lets a host select native first-party
-presentation while preserving structured output and sandboxed third-party
-fallback.
+`@openclaw/gateway-client/model`. An artifact lets a host select native
+first-party presentation while preserving structured output and sandboxed
+third-party fallback.
 
 Status: draft. This is a fork-only preview.
 

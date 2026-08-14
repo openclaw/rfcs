@@ -3,7 +3,7 @@ title: OpenClaw Control Model
 authors:
   - Gio Della-Libera
 created: 2026-08-11
-last_updated: 2026-08-11
+last_updated: 2026-08-14
 status: draft
 issue:
 rfc_pr:
@@ -13,13 +13,13 @@ rfc_pr:
 
 ## Summary
 
-OpenClaw should provide a framework-neutral Control Model above
-`@openclaw/gateway-client`. The model would expose immutable state snapshots,
-typed commands, history/live reconciliation, and renderer-neutral UI artifacts
-without depending on Lit, React, routes, or product presentation. OpenClaw's
-Control UI and independently owned product shells could consume the same
-behavior while retaining their own components, navigation, theming,
-authentication, and rollout.
+OpenClaw should provide a framework-neutral Control Model as optional
+`@openclaw/gateway-client/model` subpaths above the existing browser transport.
+The model would expose immutable state snapshots, typed commands, history/live
+reconciliation, and renderer-neutral UI artifacts without depending on Lit,
+React, routes, or product presentation. OpenClaw's Control UI and independently
+owned product shells could consume the same behavior while retaining their own
+components, navigation, theming, authentication, and rollout.
 
 This document is a fork-only design preview. It does not request RFC intake,
 open an upstream pull request, or claim maintainer acceptance.
@@ -55,18 +55,17 @@ the existing projection.
 
 The desired architecture is:
 
-```text
-OpenClaw Gateway
-       |
-@openclaw/gateway-client
-       |
-@openclaw/control-model
-  snapshots / commands / UI artifacts
-       |
-       +-------------------------+
-       |                         |
-OpenClaw Control UI       Independent product shell
-Lit presentation          React/native presentation
+```mermaid
+flowchart TB
+  gateway["OpenClaw Gateway"]
+  transport["@openclaw/gateway-client/browser<br/>transport, authentication, reconnect"]
+  model["@openclaw/gateway-client/model<br/>sessions, conversations, commands, artifacts"]
+  controlUi["OpenClaw Control UI<br/>Lit presentation"]
+  product["Independent product shell<br/>React or native presentation"]
+
+  gateway --> transport --> model
+  model --> controlUi
+  model --> product
 ```
 
 One OpenClaw-owned behavioral model can serve multiple presentations without
@@ -123,15 +122,28 @@ documents:
 - [Conformance and adoption plan](0029/conformance-and-adoption-plan.md)
 - [Implementation and PR plan](0029/implementation-plan.md)
 
-### Package boundary
+### Draft implementation stack
 
-Add `@openclaw/control-model` to the OpenClaw monorepo. The package is
-framework-neutral and browser-safe. Its public module graph must not import
-Lit, React, DOM components, route definitions, product authentication,
-localization catalogs, CSS, or Control UI presentation helpers.
+The proposed boundary has four fork-only implementation drafts:
 
-The package consumes a narrow host-supplied Gateway binding compatible with the
-public Gateway client:
+1. [OC1: Gateway Client model foundation](https://github.com/giodl73-repo/openclaw/pull/230)
+2. [OC2: conversation model and commands](https://github.com/giodl73-repo/openclaw/pull/231)
+3. [OC3: renderer-neutral UI artifacts](https://github.com/giodl73-repo/openclaw/pull/232)
+4. [OC4: Control UI reference adoption](https://github.com/giodl73-repo/openclaw/pull/238)
+
+These drafts are evidence for review, not an upstream submission or accepted
+roadmap.
+
+### Module boundary
+
+Add the framework-neutral, browser-safe Control Model as optional exports from
+`@openclaw/gateway-client`: `model`, `model/catalog`, and
+`model/session-event-refresh`. The model module graph must not import Lit,
+React, DOM components, route definitions, product authentication, localization
+catalogs, CSS, or Control UI presentation helpers.
+
+The model consumes a narrow host-supplied Gateway binding compatible with the
+public Gateway Client:
 
 ```ts
 export interface ControlGateway {
@@ -142,7 +154,7 @@ export interface ControlGateway {
 }
 ```
 
-The binding lets the package reuse OpenClaw's browser, Node, or hosted transport
+The binding lets the model reuse OpenClaw's browser, Node, or hosted transport
 without owning credential persistence, product routing, or socket creation.
 
 The Control Model exposes immutable snapshots and typed commands:
@@ -159,7 +171,7 @@ export interface ControlModel {
 
 Subscriptions are invalidation signals. Consumers read the current immutable
 snapshot after notification. This works with framework adapters without
-embedding framework hooks in the package.
+embedding framework hooks in the model.
 
 ### V1 capability boundary
 
@@ -183,7 +195,7 @@ Snapshots are serializable except for explicitly documented command handles.
 They use stable identifiers, finite retained state, and typed lifecycle states.
 They do not expose mutable Control UI objects.
 
-The package owns:
+The model owns:
 
 - the initial history snapshot;
 - live event application;
@@ -298,7 +310,7 @@ The Control Model is presentation support, not an authorization authority.
 
 OpenClaw maintainers own:
 
-- package contracts and implementation;
+- Gateway Client model contracts and implementation;
 - Gateway-to-model normalization and reconciliation;
 - stable state, command, error, and artifact semantics;
 - compatibility fixtures and release versioning;
@@ -331,15 +343,17 @@ The Control Model does not generate UI capabilities independently of either
 side. It normalizes the artifact emitted by the active extension, exposes the
 current client-rendering decision, and preserves a safe fallback:
 
-```text
-installed extension emits artifact plus view offers
-             |
-             v
-Control Model normalizes identity, views, data, lifecycle, and fallback
-             |
-             v
-client selects a compatible view and local view-model projection
-        or structured/MCP App fallback
+```mermaid
+flowchart TB
+  extension["Installed extension emits artifact and view offers"]
+  model["Control Model normalizes identity, views, data, lifecycle, and fallback"]
+  selection{"Client selects a compatible trusted view"}
+  native["Local view-model projection<br/>and native renderer"]
+  fallback["Structured or sandboxed<br/>MCP App fallback"]
+
+  extension --> model --> selection
+  selection -->|compatible registration| native
+  selection -->|no compatible registration| fallback
 ```
 
 Client capability advertisement may let an extension avoid producing an
@@ -357,12 +371,13 @@ the trusted Gateway and is not exposed verbatim to extensions by default.
 
 ### Compatibility and release
 
-The package follows the OpenClaw calendar release train and declares its
-compatible Gateway protocol window. Additive fields must not break consumers.
-Incompatible snapshot or command changes require a documented migration and a
-major contract-version decision independent of the wire protocol number.
+The Gateway Client model follows the OpenClaw calendar release train and
+declares its compatible Gateway protocol window. Additive fields must not break
+consumers. Incompatible snapshot or command changes require a documented
+migration and a major contract-version decision independent of the wire
+protocol number.
 
-The package begins as a monorepo workspace package. Publication requires:
+The model subpaths begin as fork-only exports. Publication requires:
 
 - adoption by OpenClaw Control UI;
 - adoption by one independent host;
@@ -379,7 +394,7 @@ throwing subscriber cannot be awaited by protocol event delivery.
 
 The implementation is intentionally incremental:
 
-1. package boundary plus connection and session-catalog snapshots;
+1. Gateway Client model boundary plus connection and session-catalog snapshots;
 2. selected-conversation projection and commands;
 3. renderer-neutral artifact projection and existing MCP App/Canvas adapters;
 4. OpenClaw Control UI adoption of one complete slice; and
@@ -399,12 +414,12 @@ application internals. Making that graph injectable would still require an
 independent host to load the Lit application and track private module changes.
 The reusable boundary belongs below the application.
 
-### Why not use the Gateway client directly
+### Why not use the Gateway Client browser transport directly
 
-The Gateway client deliberately exposes protocol methods and events. It should
-not absorb session catalogs, conversation snapshots, tool outcomes, and UI
-artifacts. Those are a distinct state-and-command layer, and every UI otherwise
-reimplements them.
+The browser transport deliberately exposes protocol methods and events. Session
+catalogs, conversation snapshots, tool outcomes, and UI artifacts remain a
+distinct optional state-and-command layer under `gateway-client/model`; every UI
+otherwise reimplements them.
 
 ### Why not publish Control UI's application context
 
@@ -447,7 +462,7 @@ independent UX.
 ## Unresolved questions
 
 - Which exact session and chat commands form the smallest useful v1?
-- Should the first package release be public or remain workspace-only until
+- When should the optional Gateway Client model subpaths publish after
   independent adoption lands?
 - Which existing Control UI normalizers can move unchanged, and which require a
   clean implementation because they mix UI concerns?
@@ -457,5 +472,5 @@ independent UX.
   Gateway first publish a narrower sanitized artifact envelope?
 - What finite size, depth, count, and retention defaults should v1 require?
 - Which Control UI slice should become the first reference adopter?
-- Which maintainers own package compatibility and security review if the
-  package is published?
+- Which maintainers own model compatibility and security review if the subpaths
+  are published?
