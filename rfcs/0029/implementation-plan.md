@@ -186,14 +186,17 @@ identity, and renderer deduplication.
 ## Adjacent surfaces
 
 - **Dashboards and widgets:** host OpenClaw's existing dashboard routes first.
-  A future native surface must project OpenClaw's board identity, registered
-  widget providers, layout, persistence, focus, docking, and tool operations;
-  it must not recreate dashboards from generic conversation artifacts.
+  The first fork-only Board Model proof now extracts selected-session board
+  reconciliation into `@openclaw/gateway-client/model/board` and keeps Control
+  UI as the reference adopter. A native Lobster adapter must use a board-capable
+  OpenClaw generation and must not recreate dashboards from generic
+  conversation artifacts.
 - **Settings:** host OpenClaw settings first, read-only when Lobster lacks
-  secure write authority. A future native settings surface should consume a
-  sibling configuration model with descriptors, effective value, provenance,
-  owner, writability and lock reason, validation findings, candidate diff,
-  generation, and transactional apply/reload status.
+  secure write authority. The read-only Config Model and Lobster LC1 proof now
+  render selected authored values with descriptors and reload impact through a
+  main-process adapter. Effective defaults, provenance, owner, writability and
+  lock reason, validation findings, candidate diff, generation, and
+  transactional apply/reload status remain Managed Configuration work.
 - **Canvas and MCP Apps:** preserve them as explicit sandboxed fallbacks rather
   than converting their executable state into trusted native React.
 
