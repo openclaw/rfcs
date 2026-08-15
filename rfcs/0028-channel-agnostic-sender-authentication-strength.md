@@ -3,9 +3,9 @@ title: Channel-Agnostic Sender Authentication Strength
 authors:
   - Omar Shahine
 created: 2026-07-27
-last_updated: 2026-07-27
-status: draft
-issue:
+last_updated: 2026-08-15
+status: accepted
+issue: https://github.com/openclaw/openclaw/issues/124218
 rfc_pr: https://github.com/openclaw/rfcs/pull/51
 ---
 
