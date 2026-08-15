@@ -126,72 +126,31 @@ association logic.
 
 Superseded UI-local session/conversation capability and reconciliation code.
 
-## Lobster/M PR 1: adapter into existing SessionView
+## Lobster/M evidence series
 
-### Scope
+The bounded independent-adopter series is complete in fork-local drafts. It
+uses Lobster's existing hosted Gateway seam and keeps M's `SessionView` as the
+passive renderer vocabulary.
 
-- Consume the fork-only Gateway Client model through Lobster's hosted Gateway
-  seam.
-- Map model snapshots into M's existing `SessionView`.
-- Select the Lobster-compatible OpenClaw view projection without making that
-  choice canonical for other clients.
-- Keep a compatible user selection stable across reconnect and artifact
-  revisions.
-- Keep the renderer passive.
-- Preserve current desktop and web service-port boundaries.
-- Add a runtime flag and incumbent fallback.
+| Slice | Scope and result | Deletion or boundary proved |
+| --- | --- | --- |
+| L0 | Temporarily carries OC1-OC3 into Lobster and preserves sanitized artifacts through the pinned OpenClaw history projection. | Source-resolved evidence only; not the publication shape. |
+| LM1 | Maps canonical conversation snapshots into existing `SessionView` while preserving host-owned raw operational lanes. | React does not parse Gateway events and no second M view model is introduced. |
+| LM2 | Renders an exact allowlisted `clawpilot://widgets/table` v1 artifact with schema bounds, durable history identity, and visible fallback. | One trusted native first-party artifact works without importing Control UI. |
+| LM3 | Adds one host-owned Refresh action, validates current artifact identity/revision, and dispatches through `conversation.send`. | Native components receive no raw Gateway authority; stale and denied actions fail visibly. |
+| LM4 | Routes ordinary sends through `ControlModelConversation.send` while retaining Lobster attachment preprocessing and operational turn tracking. | Deletes the duplicate raw ordinary `chat.send` request path. |
+| LM5 | Routes active foreground aborts through `ControlModelConversation.abort`. | Deletes duplicate raw active-run abort dispatch while retaining no-run abort-all recovery. |
+| LM6 | Explicitly refreshes and projects canonical selected-session history through the model. | Deletes duplicate selected-session raw `chat.history` normalization. |
 
-### Proof
+The series stops at LM6. Operator/security approvals, no-run abort-all,
+session administration, memory, automation compatibility, attachment
+preprocessing, and host run ownership remain outside this bounded deletion
+case.
 
-- Existing `SessionView` fixtures.
-- Hosted auth and real Gateway.
-- Session list, selection, one conversation, tool result, and approval.
-- Mid-stream reconnect without duplication.
-
-### Deletion target
-
-The adopted web-specific Gateway fold/reducer path after parity.
-
-## Lobster/M PR 2: first native UI artifact
-
-### Scope
-
-- Add a host-owned exact-URI renderer registry.
-- Register one bounded first-party component, preferably a calendar golden
-  scenario already represented by structured tool output.
-- Add schema validation and named action binding.
-- Pin registration and artifact data versions and emit safe action correlation.
-- Preserve text and MCP App fallback.
-- Request deferred data only after Lobster selects that view.
-
-### Proof
-
-- Valid, invalid, unknown, fallback, and expired artifacts.
-- Fluent/M365 theme, accessibility, localization, and responsive behavior.
-- Allowed and server-denied action.
-- No dynamic import from artifact metadata.
-
-### Deletion target
-
-One bespoke tool-output parsing/rendering path.
-
-## Lobster/M PR 3: streaming, actions, and operations
-
-### Scope
-
-- Apply complete artifact revisions during live tool execution.
-- Add stale-revision action protection.
-- Add telemetry for projection lag, renderer selection, validation failure,
-  fallback, and action outcome.
-- Prove reconnect and rollback.
-
-### Proof
-
-- Progressive pending/ready revisions.
-- Duplicate/stale revision handling.
-- Mid-stream disconnect/resync.
-- Slow native renderer does not block Gateway processing.
-- Product telemetry contains no raw sensitive artifact payload.
+Cross-client user-message correlation is a separate future contract rather
+than LM7. It must align Lobster `clientMessageId`, model idempotency,
+retry/reconnect, non-renderer callers, persisted history, canonical user
+identity, and renderer deduplication.
 
 ## OpenClaw PR 5: publication
 
@@ -211,13 +170,42 @@ One bespoke tool-output parsing/rendering path.
 - Keep optional framework adapters outside the core model unless separately
   justified.
 
+## Productization after publication
+
+1. Land the supported package surface and replace Lobster's temporary source
+   carry with a released OpenClaw dependency.
+2. Resolve Lobster required checks and land the bounded stack behind a runtime
+   flag with rollback.
+3. Run a live hosted-Gateway proof covering authentication, reconnect,
+   history, streaming, native artifact action, send, and abort.
+4. Add safe telemetry for projection lag, fallback, validation failure, action
+   outcome, and rollback without recording raw artifact data.
+5. Finish Fluent quality, accessibility, localization, security review, and
+   shareable screenshots or recordings.
+
+## Adjacent surfaces
+
+- **Dashboards and widgets:** host OpenClaw's existing dashboard routes first.
+  A future native surface must project OpenClaw's board identity, registered
+  widget providers, layout, persistence, focus, docking, and tool operations;
+  it must not recreate dashboards from generic conversation artifacts.
+- **Settings:** host OpenClaw settings first, read-only when Lobster lacks
+  secure write authority. A future native settings surface should consume a
+  sibling configuration model with descriptors, effective value, provenance,
+  owner, writability and lock reason, validation findings, candidate diff,
+  generation, and transactional apply/reload status.
+- **Canvas and MCP Apps:** preserve them as explicit sandboxed fallbacks rather
+  than converting their executable state into trusted native React.
+
 ## Deferred work
 
-- Config/settings capability.
 - Channels, skills, nodes, workboards, and admin surfaces.
 - JSON Patch/JSONL artifact dialect.
-- Model-visible component catalogs and generative dashboards.
+- Model-visible component catalogs and generic generated layouts.
 - Third-party native component SDK.
 - Stable framework-specific adapters.
+- Cross-client user-message identity and retry correlation.
+- First-class action-run lifecycle, typed interaction payloads, stateful
+  artifact evolution, and durable document semantics.
 
 Each deferred surface requires a separate owner-first slice and deletion case.

@@ -98,6 +98,13 @@ content as a calendar, list, table, summary, form, dashboard, or sandboxed app.
 View order is deterministic but is not a requirement that the client render
 the first view.
 
+A dashboard-shaped artifact view is only a presentation of one conversation
+artifact. It does not replace OpenClaw's authoritative dashboard/workboard
+model, registered widget providers, board identity, layout, persistence,
+focus, docking, or `show_widget`/`dashboard` tool operations. A native client
+for those capabilities requires a separate projection of the existing board
+model.
+
 OpenClaw exposes all authorized applicable view descriptors. It does not need
 to eagerly compute every view payload:
 

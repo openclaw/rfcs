@@ -30,6 +30,25 @@ proof, and deletion agree.
 | H2 native artifact | Lobster/M PR 2 | One allowlisted component plus denied action and fallback | One bespoke tool-output rendering path |
 | R1 publication | OpenClaw PR 5/release | Two consumers, package acceptance, compatibility and support policy | Fork-only distribution |
 
+## Evidence to date
+
+Fork-only evidence now covers the full bounded V1 thesis:
+
+| Evidence | Result |
+| --- | --- |
+| OC1 | Immutable bounded catalog snapshots, explicit host binding, epoch-safe refresh, typed errors, and subscriber isolation. |
+| OC2 | Lazy conversations, deterministic history/live reconciliation, bounded messages/runs/tools/interactions, typed commands, reconnect, and retention. |
+| OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
+| OC4 | Control UI adoption of canonical active-session and selected-chat state without visual or startup-budget regression. |
+| LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
+| LM4-LM6 | Ordinary send, active-run abort, and selected-session history cut over to the model, deleting equivalent raw Lobster paths. |
+
+The independent-adopter gate is therefore demonstrated, not merely planned.
+Publication is still blocked on upstream acceptance, package ownership,
+compatibility/security gates, and a released dependency. Product shipment is
+additionally blocked on Lobster CI, live hosted-Gateway proof, rollout and
+rollback controls, telemetry, UX quality, and shareable evidence.
+
 ## Shared fixture families
 
 | Family | Minimum cases |
@@ -167,6 +186,11 @@ The first independent adopter should:
 6. fall back safely when registration is absent;
 7. reconnect mid-stream; and
 8. identify exact reducer/projection code deleted after parity.
+
+LM1-LM6 satisfy this bounded proof. Future work should not extend the stack
+merely to remove every raw Gateway call. Remaining raw lanes must be classified
+by ownership first; host operational/security behavior is not Control Model
+duplication.
 
 ## Promotion and deletion ledger
 

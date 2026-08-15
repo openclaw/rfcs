@@ -107,10 +107,14 @@ making OpenClaw own those products.
 - Requiring JSON Render or any other renderer library.
 - Adding a sidecar, service, or new process boundary. The Control Model is an
   in-process library over an existing Gateway client.
-- Defining generic model-authored dashboards, arbitrary layout generation, or a
-  public component marketplace in v1.
+- Replacing OpenClaw's existing dashboard/workboard model, registered widget
+  providers, layout persistence, or `show_widget`/`dashboard` tool semantics.
+- Defining generic model-authored layouts or a public component marketplace in
+  v1. A dashboard-shaped artifact view is presentation, not the authoritative
+  OpenClaw board model.
 - Including config forms, settings navigation, channels, skills, workboards,
-  or every existing Control UI capability in v1.
+  or every existing Control UI capability in v1. Configuration requires a
+  separate authority- and provenance-aware model.
 
 ## Proposal
 
@@ -133,6 +137,22 @@ The proposed boundary has four fork-only implementation drafts:
 
 These drafts are evidence for review, not an upstream submission or accepted
 roadmap.
+
+The independent Lobster evidence is also available as a temporary carry plus
+six bounded adopter slices:
+
+1. [L0: temporary Control Model carry](https://microsoft.ghe.com/bic/lobster/pull/8165)
+2. [LM1: adapt canonical snapshots into `SessionView`](https://microsoft.ghe.com/giodl/lobster/pull/63)
+3. [LM2: render one allowlisted native table artifact](https://microsoft.ghe.com/giodl/lobster/pull/64)
+4. [LM3: route one native refresh action through the model](https://microsoft.ghe.com/giodl/lobster/pull/65)
+5. [LM4: route ordinary sends through the model](https://microsoft.ghe.com/giodl/lobster/pull/66)
+6. [LM5: route active-run aborts through the model](https://microsoft.ghe.com/giodl/lobster/pull/67)
+7. [LM6: hydrate selected-session history through the model](https://microsoft.ghe.com/giodl/lobster/pull/68)
+
+This series proves native React rendering, actions, send, abort, reconnect, and
+history while deleting duplicate Lobster Gateway behavior. It intentionally
+stops at LM6: remaining raw paths are host-owned operational/security or
+compatibility lanes rather than equivalent Control Model behavior.
 
 ### Module boundary
 
@@ -398,11 +418,24 @@ The implementation is intentionally incremental:
 2. selected-conversation projection and commands;
 3. renderer-neutral artifact projection and existing MCP App/Canvas adapters;
 4. OpenClaw Control UI adoption of one complete slice; and
-5. publication after independent adoption and compatibility evidence.
+5. independent Lobster adoption through `SessionView`, including native
+   artifact, action, send, abort, and history deletion evidence;
+6. package publication and support ownership after compatibility, security,
+   and package-acceptance gates; and
+7. product rollout with live hosted-Gateway proof, flags, rollback, telemetry,
+   accessibility, localization, and shareable demo evidence.
 
 No later layer is required to accept an earlier bounded layer.
 Adding another capability after v1 requires an independent consumer, a bounded
 contract, and a named duplicate implementation or inference path it can delete.
+
+Existing OpenClaw dashboards and settings follow separate adoption paths.
+Lobster can host version-matched dashboard and settings routes immediately.
+Native dashboards require an optional projection of OpenClaw's existing board
+model; native settings require an optional sibling configuration model that
+preserves schema, effective value, provenance, authority, validation, candidate
+diffs, generation, and transactional activation. Neither belongs in the
+conversation snapshot.
 
 ## Rationale
 
@@ -461,16 +494,18 @@ independent UX.
 
 ## Unresolved questions
 
-- Which exact session and chat commands form the smallest useful v1?
 - When should the optional Gateway Client model subpaths publish after
-  independent adoption lands?
-- Which existing Control UI normalizers can move unchanged, and which require a
-  clean implementation because they mix UI concerns?
+  fork-only two-consumer evidence is accepted?
 - Does artifact streaming need complete revisions only, or does adoption
   evidence justify a negotiated patch dialect?
-- Should generic MCP tool-result metadata be projected directly, or should the
-  Gateway first publish a narrower sanitized artifact envelope?
 - What finite size, depth, count, and retention defaults should v1 require?
-- Which Control UI slice should become the first reference adopter?
 - Which maintainers own model compatibility and security review if the subpaths
   are published?
+- Should a future dashboard projection be a Gateway Client optional subpath or
+  a separate workboard client while retaining OpenClaw board authority?
+- Should the settings projection be
+  `@openclaw/gateway-client/model/config` or a separate Managed Configuration
+  client surface?
+- If cross-client user-message delivery becomes required, what identity
+  contract aligns host `clientMessageId`, model idempotency, retry/reconnect,
+  persisted history, and renderer deduplication?
