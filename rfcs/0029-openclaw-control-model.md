@@ -156,12 +156,14 @@ compatibility lanes rather than equivalent Control Model behavior.
 
 Two adjacent owner-first projections now have separate fork-only evidence:
 
-- `@openclaw/gateway-client/model/board` extracts the existing selected-session
-  board reconciliation from Control UI while preserving OpenClaw board,
+- [Board Model fork proof](https://github.com/giodl73-repo/openclaw/pull/240)
+  extracts the existing selected-session reconciliation into
+  `@openclaw/gateway-client/model/board` from Control UI while preserving OpenClaw board,
   provider, ticket, grant, persistence, and sandbox authority. Control UI is
   the reference adopter. A Lobster adopter remains blocked on selecting an
   OpenClaw/LobsterClaw generation that contains the coordinated board stack.
-- `@openclaw/gateway-client/model/config` provides read-only authored
+- [Config Model LC1 fork proof](https://microsoft.ghe.com/giodl/lobster/pull/69)
+  provides `@openclaw/gateway-client/model/config` read-only authored
   configuration snapshots and read-scoped schema lookup. Lobster LC1 consumes
   it through Electron-owned Gateway transport and renders one native read-only
   settings category without exposing raw config or write authority to React.
