@@ -160,13 +160,19 @@ Two adjacent owner-first projections now have separate fork-only evidence:
   extracts the existing selected-session reconciliation into
   `@openclaw/gateway-client/model/board` from Control UI while preserving OpenClaw board,
   provider, ticket, grant, persistence, and sandbox authority. Control UI is
-  the reference adopter. A Lobster adopter remains blocked on selecting an
-  OpenClaw/LobsterClaw generation that contains the coordinated board stack.
+  the reference adopter. Release ancestry shows no stable tag contains the
+  coordinated board stack. `v2026.8.1-beta.2` is the first tag containing the
+  full implementation plus the later ownership and UI hardening; the extraction
+  applies cleanly there with 55 focused tests and a Gateway Client build.
+  Lobster adoption therefore remains gated on a stable board-capable generation
+  or an explicit beta-admission decision.
 - [Config Model LC1 fork proof](https://microsoft.ghe.com/giodl/lobster/pull/69)
   provides `@openclaw/gateway-client/model/config` read-only authored
   configuration snapshots and read-scoped schema lookup. Lobster LC1 consumes
   it through Electron-owned Gateway transport and renders one native read-only
-  settings category without exposing raw config or write authority to React.
+  settings category without exposing raw config or write authority to React. A
+  real Electron Gateway fixture now proves the populated native page, authored
+  value boundary, and restart guidance.
 
 ### Module boundary
 
@@ -447,11 +453,14 @@ Existing OpenClaw dashboards and settings follow separate adoption paths.
 Lobster can host version-matched dashboard and settings routes immediately.
 The Board Model proof now demonstrates the optional projection of OpenClaw's
 existing board model, but not a Lobster adopter on the pinned pre-board
-generation. The Config Model and LC1 proof demonstrate a native read-only
-settings surface over authored values and schema descriptors. Governed writes
-still require provenance, authority, validation, candidate diffs, generation,
-and transactional activation from Managed Configuration. Neither model belongs
-in the conversation snapshot.
+generation. No stable OpenClaw tag currently contains the coordinated board
+stack; `v2026.8.1-beta.2` is the first fully compatible tag and passes the
+Board Model extraction proof. The Config Model and LC1 proof demonstrate a
+native read-only settings surface over authored values and schema descriptors,
+including a real Electron screenshot. Governed writes still require provenance,
+authority, validation, candidate diffs, generation, and transactional
+activation from Managed Configuration. Neither model belongs in the
+conversation snapshot.
 
 ## Rationale
 
