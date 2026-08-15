@@ -42,6 +42,8 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC4 | Control UI adoption of canonical active-session and selected-chat state without visual or startup-budget regression. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
 | LM4-LM6 | Ordinary send, active-run abort, and selected-session history cut over to the model, deleting equivalent raw Lobster paths. |
+| Board Model | Existing Control UI board reconciliation extracted to `@openclaw/gateway-client/model/board`; 55 focused tests, Gateway Client build, and clean review. A second host waits on a board-capable LobsterClaw generation. |
+| Config Model + LC1 | Read-only authored config snapshots and schema lookup consumed by a native Lobster settings category through Electron-owned transport; principal-scoped cache, structured failure states, focused tests, and clean review. |
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
 Publication is still blocked on upstream acceptance, package ownership,

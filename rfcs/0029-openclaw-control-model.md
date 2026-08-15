@@ -154,6 +154,18 @@ history while deleting duplicate Lobster Gateway behavior. It intentionally
 stops at LM6: remaining raw paths are host-owned operational/security or
 compatibility lanes rather than equivalent Control Model behavior.
 
+Two adjacent owner-first projections now have separate fork-only evidence:
+
+- `@openclaw/gateway-client/model/board` extracts the existing selected-session
+  board reconciliation from Control UI while preserving OpenClaw board,
+  provider, ticket, grant, persistence, and sandbox authority. Control UI is
+  the reference adopter. A Lobster adopter remains blocked on selecting an
+  OpenClaw/LobsterClaw generation that contains the coordinated board stack.
+- `@openclaw/gateway-client/model/config` provides read-only authored
+  configuration snapshots and read-scoped schema lookup. Lobster LC1 consumes
+  it through Electron-owned Gateway transport and renders one native read-only
+  settings category without exposing raw config or write authority to React.
+
 ### Module boundary
 
 Add the framework-neutral, browser-safe Control Model as optional exports from
@@ -431,11 +443,13 @@ contract, and a named duplicate implementation or inference path it can delete.
 
 Existing OpenClaw dashboards and settings follow separate adoption paths.
 Lobster can host version-matched dashboard and settings routes immediately.
-Native dashboards require an optional projection of OpenClaw's existing board
-model; native settings require an optional sibling configuration model that
-preserves schema, effective value, provenance, authority, validation, candidate
-diffs, generation, and transactional activation. Neither belongs in the
-conversation snapshot.
+The Board Model proof now demonstrates the optional projection of OpenClaw's
+existing board model, but not a Lobster adopter on the pinned pre-board
+generation. The Config Model and LC1 proof demonstrate a native read-only
+settings surface over authored values and schema descriptors. Governed writes
+still require provenance, authority, validation, candidate diffs, generation,
+and transactional activation from Managed Configuration. Neither model belongs
+in the conversation snapshot.
 
 ## Rationale
 
@@ -501,11 +515,11 @@ independent UX.
 - What finite size, depth, count, and retention defaults should v1 require?
 - Which maintainers own model compatibility and security review if the subpaths
   are published?
-- Should a future dashboard projection be a Gateway Client optional subpath or
-  a separate workboard client while retaining OpenClaw board authority?
-- Should the settings projection be
-  `@openclaw/gateway-client/model/config` or a separate Managed Configuration
-  client surface?
+- What release and support gates should promote the proven optional
+  `@openclaw/gateway-client/model/board` subpath?
+- Should governed settings writes extend the proven read-only
+  `@openclaw/gateway-client/model/config` surface or remain a separate Managed
+  Configuration client?
 - If cross-client user-message delivery becomes required, what identity
   contract aligns host `clientMessageId`, model idempotency, retry/reconnect,
   persisted history, and renderer deduplication?
