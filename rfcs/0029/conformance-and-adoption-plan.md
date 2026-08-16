@@ -42,7 +42,7 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC2 | Lazy conversations, deterministic history/live reconciliation, bounded messages/runs/tools/interactions, typed commands, reconnect, and retention. |
 | OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
 | OC4 | Initial Control UI adoption: lazy runtime binding, canonical active-session catalog, and selected-chat history/subscription state without visual or startup-budget regression. Ordinary commands, interactions, artifacts, and operational callers remain outside this draft. |
-| OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; repair of a package-only browser export failure; and an asserted artifact-heavy projection benchmark with exact finite-snapshot checks. The latest test-only slice is fork [OpenClaw PR #245](https://github.com/giodl73-repo/openclaw/pull/245), stacked on fixture PR #244. Its Testbox proof projects 24,000 measured events at 2,211.45 ms p95 per 4,000 events, 52,272 bytes retained heap growth, and 8,482.51 bytes/batch retained slope. |
+| OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; repair of a package-only browser export failure; an asserted artifact-heavy projection benchmark with exact finite-snapshot checks; and an asserted candidate/predecessor/main wire-compatibility matrix. The latest test-only slice is fork [OpenClaw PR #246](https://github.com/giodl73-repo/openclaw/pull/246), stacked on performance PR #245. It proves baseline Control Model methods, scopes, requests, and representative events against the candidate protocol, published predecessor `2026.7.2-beta.7`, and current main while explicitly treating run-fenced send as unavailable on the predecessor. |
 | CU4 | Fork-only Control UI ordinary-command adoption: selected composer sends and connected exact-run aborts route through the existing conversation handle while reconnect-resume, steer/inject, background/non-selected, realtime, replay, and session-wide abort paths remain raw. Session identity, attachments, reply/fencing inputs, retry metadata, and active-leaf recovery details are preserved. |
 | CU5 | Fork-only selected-session interaction and artifact adoption: exact pending question answer/cancel commands route through the cached conversation identity while Control UI retains prompt lifecycle and raw fallback. Validated ready Canvas/MCP artifact snapshots feed only existing sandboxed adapters, with canonical-first provenance and occurrence-aware compatibility dedupe. Global/operator approval queues remain raw. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
@@ -52,10 +52,10 @@ Fork-only evidence now covers the full bounded V1 thesis:
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
 Publication is still blocked on upstream acceptance, the remaining performance
-scenarios, compatibility canaries, security review, package ownership, and a
-released dependency through PR 6. The bounded steady-state projection and
-retained-memory threshold slice is now measured in PR #245. Control UI CU5
-remains fork-only adopter evidence in
+scenarios, security review, package ownership, and a released dependency
+through PR 6. The bounded steady-state projection and retained-memory threshold
+slice is measured in PR #245, and the wire-compatibility canary is measured in
+PR #246. Control UI CU5 remains fork-only adopter evidence in
 [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243).
 Incumbent cleanup remains CU6/PR 7 after
 observation and rollback proof. Product shipment is additionally blocked on
@@ -151,6 +151,17 @@ The Control Model contract version and Gateway wire protocol version are
 distinct. A wire-compatible server may still require an additive model
 projection update. An incompatible model change requires migration guidance
 and a declared support-window decision.
+
+The first asserted compatibility slice is fork
+[OpenClaw PR #246](https://github.com/giodl73-repo/openclaw/pull/246). It checks
+the candidate schema, published predecessor
+`@openclaw/gateway-protocol@2026.7.2-beta.7`, and current `main` for the exact
+methods, authorization scopes, request payloads, and representative events used
+by the Control Model. Blacksmith Testbox `tbx_01m05spdcyy97ht168pfy3tqv1`
+passed against `main@63401b730b55b40f691b004308cab45b66c8eb89`. The predecessor
+accepts the baseline ordinary-send contract but rejects `expectedRunId`; the
+canary records that capability boundary instead of promising an unsupported
+fenced-send downgrade.
 
 ## Performance and memory gates
 
