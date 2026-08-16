@@ -241,8 +241,15 @@ adds an asserted artifact-heavy projection benchmark with exact finite-snapshot
 checks and Testbox-oriented thresholds for p95 latency, retained heap growth,
 and retained heap slope. Its Blacksmith Testbox proof projects 24,000 measured
 events at 2,211.45 ms p95 per 4,000 events, 52,272 bytes retained growth, and
-8,482.51 bytes/batch retained slope. OC5 still does not satisfy the remaining
-performance scenarios, compatibility, security-owner, or publication gates.
+8,482.51 bytes/batch retained slope. A third test-only continuation in
+[giodl73-repo/openclaw#246](https://github.com/giodl73-repo/openclaw/pull/246)
+adds an asserted wire-compatibility matrix for the candidate protocol,
+published predecessor `@openclaw/gateway-protocol@2026.7.2-beta.7`, and current
+OpenClaw `main`. It preserves baseline catalog, subscription, history, ordinary
+send, exact abort, approval, question, and representative event contracts while
+recording run-fenced send as a candidate-era capability rather than claiming
+unsupported predecessor behavior. OC5 still does not satisfy the remaining
+performance scenarios, security-owner, or publication gates.
 
 ### Preconditions
 
@@ -360,7 +367,8 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 
 This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
 fork-only hardening drafts for package/shared-fixture evidence and bounded
-projection/retained-memory thresholds; no upstream branch or PR was opened.
-OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further implementation
-drafts should remain in the author's forks until RFC intake and the relevant
-OpenClaw owners approve the surface.
+projection/retained-memory thresholds plus candidate/predecessor/main wire
+compatibility; no upstream branch or PR was opened. OC6, OC7, BM2, CFG1, and
+CFG2 remain proposals only. Any further implementation drafts should remain in
+the author's forks until RFC intake and the relevant OpenClaw owners approve
+the surface.
