@@ -29,7 +29,7 @@ proof, and deletion agree.
 | H1 independent host | Lobster/M PR 1 | Real hosted Gateway projected into existing host view model | Host-owned Gateway reconciliation for adopted slice |
 | H2 native artifact | Lobster/M PR 2 | One allowlisted component plus denied action and fallback | One bespoke tool-output rendering path |
 | C1 shared conformance | OpenClaw PR 5 | Shared fixtures, finite defaults, browser/Node package acceptance, compatibility canaries, performance bounds, and security review | Publication uncertainty |
-| R1 publication | OpenClaw PR 6/release | Accepted conformance, two consumers, compatibility window, migration policy, release and support ownership | Fork-only distribution |
+| R1 publication | OpenClaw PR 6/release | Accepted conformance, two consumers, compatibility window, migration policy, release and support ownership, and clean install/import proof from the packed release artifact | Fork-only distribution |
 | D1 incumbent cleanup | OpenClaw PR 7 | Observation window, rollback proof, and exact deletion ledger | Superseded Control UI reconciliation |
 
 ## Evidence to date
@@ -135,6 +135,8 @@ Before publication, test:
 - the declared predecessor release where compatibility is promised;
 - OpenClaw `main` as a drift canary;
 - browser and Node host bindings; and
+- a packed release artifact installed into clean browser and Node consumers,
+  including every supported subpath and declaration entrypoint; and
 - every supported serialized fixture version.
 
 The Control Model contract version and Gateway wire protocol version are
