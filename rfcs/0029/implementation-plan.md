@@ -152,27 +152,86 @@ than LM7. It must align Lobster `clientMessageId`, model idempotency,
 retry/reconnect, non-renderer callers, persisted history, canonical user
 identity, and renderer deduplication.
 
-## OpenClaw PR 5: publication
+The adjacent native adopter evidence is also complete:
+
+| Slice | Scope and result | Boundary proved |
+| --- | --- | --- |
+| Config LC1 | Consumes a private read-only Config Model through Electron-owned transport and renders authored values plus schema guidance in native React. | Read projection can remain OpenClaw-owned without giving React raw config or write authority. |
+| Board LB1 | Consumes a private Board Model through main-process routing, renders one exact native status-summary widget, and keeps HTML/Canvas/MCP/unknown widgets inert. | OpenClaw board semantics can drive a product-owned Dashboard without importing Control UI or granting renderer authority. |
+
+Board LB1 uses a mocked beta-generation board protocol because pinned
+LobsterClaw 2026.6.33 predates boards. It is conformance evidence, not release
+admission.
+
+## OpenClaw PR 5: shared conformance and package hardening
 
 ### Preconditions
 
-- Control UI and independent host are live on the same contract.
-- Compatibility and package acceptance pass.
-- Bounds and security review pass.
-- At least one duplicate implementation is deleted.
-- Named package, protocol, security, and release owners agree.
+- RFC scope and ownership boundary are accepted for implementation.
+- OC1-OC4 evidence is reviewed against current source.
+- Control UI and independent-host fixtures agree on the bounded contract.
+
+### Scope
+
+- Promote the proven fixture families into shared conformance assets.
+- Finalize finite defaults and explicit truncation/partial-state behavior.
+- Add browser and Node import/package acceptance checks.
+- Add compatibility canaries for the supported release, predecessor where
+  promised, and `main`.
+- Measure projection, reconciliation, retained-memory, and resync bounds.
+- Complete malformed-data, authorization, retired-epoch, and subscriber
+  isolation security coverage.
+- Keep the subpaths private or fork-only until the release/support gate passes.
+
+### Deletion target
+
+None. This PR hardens the contract before publication.
+
+## OpenClaw PR 6: supported model subpaths
+
+### Preconditions
+
+- PR 5 conformance, compatibility, performance, package, and security gates
+  pass.
+- Named package, protocol, Control UI, security, and release owners agree.
+- The independent-host proof remains valid against the candidate release.
 
 ### Scope
 
 - Publish the optional `@openclaw/gateway-client/model` subpaths.
-- Document supported versions and migration policy.
-- Add framework-neutral quickstart and conformance fixtures.
-- Keep optional framework adapters outside the core model unless separately
-  justified.
+- Document supported versions, compatibility window, and migration policy.
+- Add a framework-neutral quickstart and release notes.
+- Define support ownership and deprecation policy.
+- Keep framework adapters outside the core model unless separately justified.
+
+### Deletion target
+
+Fork-only source carries after adopters move to a released dependency.
+
+## OpenClaw PR 7: incumbent-path cleanup
+
+### Preconditions
+
+- PR 6 is released and adopted by Control UI.
+- The model-backed path has an agreed observation window and rollback proof.
+- The exact superseded implementation is named and no supported fallback
+  depends on it.
+
+### Scope
+
+- Remove only the superseded Control UI reconciliation and compatibility paths
+  for the adopted catalog/conversation slice.
+- Retain operational, diagnostic, or unsupported-capability paths that the
+  Control Model does not own.
+- Update ownership docs and deletion ledger.
+
+### Deletion target
+
+The incumbent UI-local state/reconciliation path identified by OC4 adoption.
 
 ## Productization after publication
 
-1. Land the supported package surface and replace Lobster's temporary source
+1. Land the supported package surface from PR 6 and replace Lobster's temporary source
    carry with a released OpenClaw dependency.
 2. Resolve Lobster required checks and land the bounded stack behind a runtime
    flag with rollback.
@@ -188,15 +247,17 @@ identity, and renderer deduplication.
 - **Dashboards and widgets:** host OpenClaw's existing dashboard routes first.
   The first fork-only Board Model proof now extracts selected-session board
   reconciliation into `@openclaw/gateway-client/model/board` and keeps Control
-  UI as the reference adopter. A native Lobster adapter must use a board-capable
-  OpenClaw generation and must not recreate dashboards from generic
-  conversation artifacts.
+  UI as the reference adopter. Lobster Board LB1 proves the native adapter
+  boundary with a mocked beta protocol. A future BM2 proposal must reconstruct
+  the proof against an admitted board-capable release and must not recreate
+  dashboards from generic conversation artifacts.
 - **Settings:** host OpenClaw settings first, read-only when Lobster lacks
   secure write authority. The read-only Config Model and Lobster LC1 proof now
   render selected authored values with descriptors and reload impact through a
-  main-process adapter. Effective defaults, provenance, owner, writability and
-  lock reason, validation findings, candidate diff, generation, and
-  transactional apply/reload status remain Managed Configuration work.
+  main-process adapter. A future CM1 may upstream only that read projection.
+  Effective defaults, provenance, owner, writability and lock reason,
+  validation findings, candidate diff, generation, and transactional
+  apply/reload status remain the separate CM2/Managed Configuration work.
 - **Canvas and MCP Apps:** preserve them as explicit sandboxed fallbacks rather
   than converting their executable state into trusted native React.
 
@@ -212,3 +273,10 @@ identity, and renderer deduplication.
   artifact evolution, and durable document semantics.
 
 Each deferred surface requires a separate owner-first slice and deletion case.
+
+## Fork-only proposal policy
+
+This plan names OC5-OC7, BM2, CM1, and CM2 for maintainer review. It does not
+open those PRs, create upstream branches, or claim roadmap acceptance. Any
+implementation drafts should remain in the author's forks until RFC intake and
+the relevant OpenClaw owners approve the surface.

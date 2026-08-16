@@ -3,10 +3,10 @@ title: OpenClaw Control Model
 authors:
   - Gio Della-Libera
 created: 2026-08-11
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/giodl73-repo/rfcs/pull/8
 ---
 
 # Proposal: OpenClaw Control Model
@@ -126,7 +126,18 @@ documents:
 - [Conformance and adoption plan](0029/conformance-and-adoption-plan.md)
 - [Implementation and PR plan](0029/implementation-plan.md)
 
-### Draft implementation stack
+### Review scope
+
+RFC acceptance would cover only the framework-neutral Control Model v1 and UI
+artifact contracts defined here and in the two specifications. It would not
+accept a Lobster product roadmap, a framework adapter, a generic dashboard
+system, or writable configuration.
+
+The Board Model and Config Model evidence below is non-normative. It tests the
+same owner-first extraction pattern against adjacent OpenClaw domains, but each
+surface keeps its own contract, release gate, and implementation review.
+
+### Fork-only implementation evidence
 
 The proposed boundary has four fork-only implementation drafts:
 
@@ -164,8 +175,12 @@ Two adjacent owner-first projections now have separate fork-only evidence:
   coordinated board stack. `v2026.8.1-beta.2` is the first tag containing the
   full implementation plus the later ownership and UI hardening; the extraction
   applies cleanly there with 55 focused tests and a Gateway Client build.
-  Lobster adoption therefore remains gated on a stable board-capable generation
-  or an explicit beta-admission decision.
+  [Lobster Board LB1](https://microsoft.ghe.com/giodl/lobster/pull/70)
+  independently consumes a private carry through a main-process safe projection
+  and renders one allowlisted native status widget plus inert unsupported
+  fallbacks. Its Electron proof uses a mocked beta-generation board protocol;
+  it is not release admission and does not make pinned LobsterClaw 2026.6.33
+  board-capable.
 - [Config Model LC1 fork proof](https://microsoft.ghe.com/giodl/lobster/pull/69)
   provides `@openclaw/gateway-client/model/config` read-only authored
   configuration snapshots and read-scoped schema lookup. Lobster LC1 consumes
@@ -173,6 +188,31 @@ Two adjacent owner-first projections now have separate fork-only evidence:
   settings category without exposing raw config or write authority to React. A
   real Electron Gateway fixture now proves the populated native page, authored
   value boundary, and restart guidance.
+
+### Proposed future OpenClaw PR sequence
+
+No additional upstream PRs or branches are opened by this RFC update. The
+remaining work is proposed here so maintainers can review the intended shape
+before any implementation is prepared, and any drafts should remain fork-only
+until RFC intake and owner approval.
+
+| Candidate | Scope | Gate |
+| --- | --- | --- |
+| OC5: shared conformance and package hardening | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, add browser/Node import checks, performance bounds, package acceptance, and security-focused malformed-data coverage. | OC1-OC4 contract accepted; package, protocol, security, and Control UI owners agree on the support surface. |
+| OC6: supported model subpaths | Publish the optional model subpaths with compatibility window, migration policy, framework-neutral quickstart, release notes, and support ownership. Replace fork-only consumption only after a released package exists. | OC5 passes on the supported release, predecessor where promised, and `main`; independent-host evidence remains valid. |
+| OC7: incumbent-path cleanup | After an observation window and rollback proof, remove only the superseded Control UI reconciliation and compatibility paths for the adopted slice. | OC6 is released, Control UI is stable on the model, and deletion evidence identifies the exact old path. |
+
+Adjacent proposals remain separate from Control Model v1 acceptance:
+
+| Candidate | Scope | Gate |
+| --- | --- | --- |
+| BM2: Board Model release admission | Reconstruct the Board Model extraction and native-host conformance against an accepted board-capable OpenClaw release, then decide whether `model/board` is supportable. | Stable board-capable tag, or explicit beta admission with complete persistence, grants, tickets, sandbox, and compatibility review. |
+| CM1: read-only Config Model | Extract framework-neutral authored config snapshots and read-scoped schema descriptors into an OpenClaw-owned optional model with Control UI reference adoption. | Config owner review, secret redaction, schema compatibility, and proof that read projection does not imply write authority. |
+| CM2: governed configuration commands | Add provenance, owner, lock reason, candidate preview, validation findings, generation, commit, and activation status only through Managed Configuration contracts. | Separate owner approval and transactional write/activation design; not implied by this RFC or CM1. |
+
+Cross-client user-message identity, generic generated layouts, framework
+adapters, and third-party native component SDKs remain separate future
+proposals rather than implied follow-up PRs.
 
 ### Module boundary
 
@@ -452,15 +492,16 @@ contract, and a named duplicate implementation or inference path it can delete.
 Existing OpenClaw dashboards and settings follow separate adoption paths.
 Lobster can host version-matched dashboard and settings routes immediately.
 The Board Model proof now demonstrates the optional projection of OpenClaw's
-existing board model, but not a Lobster adopter on the pinned pre-board
-generation. No stable OpenClaw tag currently contains the coordinated board
-stack; `v2026.8.1-beta.2` is the first fully compatible tag and passes the
-Board Model extraction proof. The Config Model and LC1 proof demonstrate a
-native read-only settings surface over authored values and schema descriptors,
+existing board model and a bounded Lobster native adopter, but only with a
+mocked beta-generation protocol. No stable OpenClaw tag currently contains the
+coordinated board stack; `v2026.8.1-beta.2` is the first fully compatible tag
+and passes the extraction proof. The adopter does not change the pinned
+2026.6.33 support boundary. The Config Model and LC1 proof demonstrate a native
+read-only settings surface over authored values and schema descriptors,
 including a real Electron screenshot. Governed writes still require provenance,
 authority, validation, candidate diffs, generation, and transactional
-activation from Managed Configuration. Neither model belongs in the
-conversation snapshot.
+activation from Managed Configuration. Neither adjacent model belongs in the
+conversation snapshot or expands Control Model v1.
 
 ## Rationale
 
@@ -519,18 +560,19 @@ independent UX.
 
 ## Unresolved questions
 
-- When should the optional Gateway Client model subpaths publish after
-  fork-only two-consumer evidence is accepted?
-- Does artifact streaming need complete revisions only, or does adoption
-  evidence justify a negotiated patch dialect?
-- What finite size, depth, count, and retention defaults should v1 require?
-- Which maintainers own model compatibility and security review if the subpaths
-  are published?
-- What release and support gates should promote the proven optional
-  `@openclaw/gateway-client/model/board` subpath?
-- Should governed settings writes extend the proven read-only
-  `@openclaw/gateway-client/model/config` surface or remain a separate Managed
-  Configuration client?
+- Do maintainers accept the optional Gateway Client model subpaths as the
+  correct owner boundary, with OC5 conformance hardening before OC6
+  publication?
+- Which package, protocol, Control UI, security, and release maintainers own
+  compatibility decisions and support after publication?
+- What finite size, depth, count, retention, and performance defaults should
+  v1 standardize rather than leave configurable?
+- Should v1 remain on complete immutable artifact revisions, or is there
+  sufficient two-renderer evidence for a separately negotiated patch dialect?
+- What observation window and rollback evidence must pass before OC7 can
+  delete incumbent Control UI paths?
+- Should Board Model and Config Model proceed as the separate BM2/CM1 proposals
+  above, or remain fork-only evidence until a later RFC?
 - If cross-client user-message delivery becomes required, what identity
   contract aligns host `clientMessageId`, model idempotency, retry/reconnect,
   persisted history, and renderer deduplication?

@@ -28,7 +28,9 @@ proof, and deletion agree.
 | O1 Control UI adoption | OpenClaw PR 4 | Existing Control UI behavior unchanged on shared fixtures and E2E | Adopted UI-local capability/reducer code |
 | H1 independent host | Lobster/M PR 1 | Real hosted Gateway projected into existing host view model | Host-owned Gateway reconciliation for adopted slice |
 | H2 native artifact | Lobster/M PR 2 | One allowlisted component plus denied action and fallback | One bespoke tool-output rendering path |
-| R1 publication | OpenClaw PR 5/release | Two consumers, package acceptance, compatibility and support policy | Fork-only distribution |
+| C1 shared conformance | OpenClaw PR 5 | Shared fixtures, finite defaults, browser/Node package acceptance, compatibility canaries, performance bounds, and security review | Publication uncertainty |
+| R1 publication | OpenClaw PR 6/release | Accepted conformance, two consumers, compatibility window, migration policy, release and support ownership | Fork-only distribution |
+| D1 incumbent cleanup | OpenClaw PR 7 | Observation window, rollback proof, and exact deletion ledger | Superseded Control UI reconciliation |
 
 ## Evidence to date
 
@@ -42,14 +44,15 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC4 | Control UI adoption of canonical active-session and selected-chat state without visual or startup-budget regression. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
 | LM4-LM6 | Ordinary send, active-run abort, and selected-session history cut over to the model, deleting equivalent raw Lobster paths. |
-| Board Model | Existing Control UI board reconciliation extracted to `@openclaw/gateway-client/model/board`; 55 focused tests, Gateway Client build, and clean review. A second host waits on a board-capable LobsterClaw generation. |
+| Board Model + LB1 | Existing Control UI board reconciliation extracted to `@openclaw/gateway-client/model/board`; 55 focused tests, Gateway Client build, and clean review. Lobster LB1 independently renders one safe native status widget and inert unsupported fallbacks through a main-process projection. Its mocked beta protocol is evidence only; release admission remains open. |
 | Config Model + LC1 | Read-only authored config snapshots and schema lookup consumed by a native Lobster settings category through Electron-owned transport; principal-scoped cache, structured failure states, focused tests, and clean review. |
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
-Publication is still blocked on upstream acceptance, package ownership,
-compatibility/security gates, and a released dependency. Product shipment is
-additionally blocked on Lobster CI, live hosted-Gateway proof, rollout and
-rollback controls, telemetry, UX quality, and shareable evidence.
+Publication is still blocked on upstream acceptance, PR 5 conformance
+hardening, package ownership, compatibility/security gates, and a released
+dependency through PR 6. Incumbent cleanup remains PR 7 after observation and
+rollback proof. Product shipment is additionally blocked on Lobster CI, live
+hosted-Gateway proof, rollout and rollback controls, telemetry, and UX quality.
 
 ## Shared fixture families
 
