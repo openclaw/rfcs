@@ -230,8 +230,13 @@ catalog fixture pair, proves clean packed-package Node/declaration/browser
 consumption, and fixes a package-only browser export failure found by that
 proof. Its second slice promotes representative history/live overlap,
 gap-triggered authoritative refresh, retired-epoch rejection, and approval
-authorization/terminal-state behavior into the shared corpus. It does not yet
-satisfy the full PR 5 gate.
+authorization/terminal-state behavior into the shared corpus. A test-only
+continuation in
+[giodl73-repo/openclaw#244](https://github.com/giodl73-repo/openclaw/pull/244)
+adds representative run, tool, question, artifact, and retained-bounds
+families, including exact non-active abort targeting and selected-only deferred
+materialization. OC5 still does not satisfy the performance, compatibility,
+security-owner, or publication gates.
 
 ### Preconditions
 
@@ -348,7 +353,7 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 ## Fork-only proposal policy
 
 This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
-one fork-only draft for its first bounded hardening slice; no upstream branch or
-PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further
-implementation drafts should remain in the author's forks until RFC intake and
-the relevant OpenClaw owners approve the surface.
+fork-only hardening drafts for package/shared-fixture evidence; no upstream
+branch or PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only.
+Any further implementation drafts should remain in the author's forks until
+RFC intake and the relevant OpenClaw owners approve the surface.
