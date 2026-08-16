@@ -107,8 +107,9 @@ association logic.
 
 OC4 is the initial reference-adoption draft, not the entire Control UI
 migration. It completes the runtime, catalog, and selected-conversation
-projection slices while deliberately leaving ordinary commands, interactions,
-artifacts, and operational callers for later bounded work.
+projection slices. Fork-only CU4 now adds ordinary foreground commands while
+deliberately leaving interactions, artifacts, and operational callers for
+later bounded work.
 
 ### Completed scope
 
@@ -138,13 +139,28 @@ observation, and rollback proof.
 | CU1 runtime binding | Lazy Control Model runtime over the existing Gateway store. | Complete in OC4; no new process, route, or framework adapter. |
 | CU2 catalog and selection | Active roster and selected-session lookup from catalog snapshots. | Complete in OC4; archived/all rosters remain raw until separately modeled. |
 | CU3 selected conversation projection | History, live subscription, reconnect, and retryable fallback from the conversation handle. | Complete in OC4; OC5 now owns representative overlap/gap/retired-epoch fixtures. |
-| CU4 ordinary conversation commands | Standard composer send and foreground active-run abort through `ControlModelConversation`. | Do not absorb steer/inject, realtime talk, background-task history, no-run abort-all, or other operational paths without separate ownership proof. |
+| CU4 ordinary conversation commands | Standard composer send and foreground active-run abort through `ControlModelConversation`. Complete in fork-only [OpenClaw PR #242](https://github.com/giodl73-repo/openclaw/pull/242), stacked on OC5. | Preserves session identity, attachment/reply/fencing inputs, reconnect-resume and steer fallback, structured active-leaf recovery errors, and raw no-run/session-wide abort ownership. Do not absorb realtime talk, background-task history, or other operational paths without separate ownership proof. |
 | CU5 interactions and artifacts | Selected-session approvals/questions plus Canvas, MCP App, and structured fallback through snapshot projections and an exact Control UI-local registry. | Global/operator approval lanes remain outside the slice unless they prove semantic equivalence; artifact data never selects executable code. |
 | CU6 observation and deletion | Roll out the model-backed route, retain rollback, and remove only named incumbent reducers/requests/adapters. | Post-OC6 and implemented as OC7 with an exact deletion ledger. |
 
 Board and settings are separate Board Model and Config Model adoption series,
 not CU7/CU8. Their authority and persistence contracts are non-normative to
 Control Model v1.
+
+### CU4 fork-only result
+
+CU4 reuses the selected conversation handle already owned by OC4 rather than
+creating a second runtime or command client. Ordinary selected sends pass
+message content, attachments, idempotency, reply targets, expected leaf/run
+fences, queue mode, and authoritative session identity through
+`ControlModelConversation.send`. Connected exact-run stops use
+`ControlModelConversation.abort`.
+
+Reconnect-resume sends, steer/inject, background or non-selected routes,
+realtime talk, skill-workshop revisions, queued replay, and session-wide
+`sessions.abort` remain on their incumbent paths. Model command errors retain
+structured Gateway details so existing active-leaf recovery and retry behavior
+remain visible rather than becoming generic failures.
 
 ## Lobster/M evidence series
 
