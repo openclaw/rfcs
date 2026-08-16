@@ -42,17 +42,20 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC2 | Lazy conversations, deterministic history/live reconciliation, bounded messages/runs/tools/interactions, typed commands, reconnect, and retention. |
 | OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
 | OC4 | Control UI adoption of canonical active-session and selected-chat state without visual or startup-budget regression. |
+| OC5 first slice | Centralized finite defaults, reusable accepted/malformed catalog fixtures, packed protocol/client installation, every Gateway Client export imported from the tarball, declaration consumption, browser bundling, and repair of a package-only browser export failure. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
 | LM4-LM6 | Ordinary send, active-run abort, and selected-session history cut over to the model, deleting equivalent raw Lobster paths. |
 | Board Model + LB1 | Existing Control UI board reconciliation extracted to `@openclaw/gateway-client/model/board`; 55 focused tests, Gateway Client build, and clean review. Lobster LB1 independently renders one safe native status widget and inert unsupported fallbacks through a main-process projection. Its mocked beta protocol is evidence only; release admission remains open. |
 | Config Model + LC1 | Read-only authored config snapshots and schema lookup consumed by a native Lobster settings category through Electron-owned transport; principal-scoped cache, structured failure states, focused tests, and clean review. |
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
-Publication is still blocked on upstream acceptance, PR 5 conformance
-hardening, package ownership, compatibility/security gates, and a released
-dependency through PR 6. Incumbent cleanup remains PR 7 after observation and
-rollback proof. Product shipment is additionally blocked on Lobster CI, live
-hosted-Gateway proof, rollout and rollback controls, telemetry, and UX quality.
+Publication is still blocked on upstream acceptance, completion of the broader
+PR 5 history/live/reconnect and authorization corpus, measured
+performance/memory thresholds, compatibility canaries, security review, package
+ownership, and a released dependency through PR 6. Incumbent cleanup remains
+PR 7 after observation and rollback proof. Product shipment is additionally
+blocked on Lobster CI, live hosted-Gateway proof, rollout and rollback controls,
+telemetry, and UX quality.
 
 ## Shared fixture families
 
