@@ -235,8 +235,14 @@ continuation in
 [giodl73-repo/openclaw#244](https://github.com/giodl73-repo/openclaw/pull/244)
 adds representative run, tool, question, artifact, and retained-bounds
 families, including exact non-active abort targeting and selected-only deferred
-materialization. OC5 still does not satisfy the performance, compatibility,
-security-owner, or publication gates.
+materialization. A second test-only continuation in
+[giodl73-repo/openclaw#245](https://github.com/giodl73-repo/openclaw/pull/245)
+adds an asserted artifact-heavy projection benchmark with exact finite-snapshot
+checks and Testbox-oriented thresholds for p95 latency, retained heap growth,
+and retained heap slope. Its Blacksmith Testbox proof projects 24,000 measured
+events at 2,211.45 ms p95 per 4,000 events, 52,272 bytes retained growth, and
+8,482.51 bytes/batch retained slope. OC5 still does not satisfy the remaining
+performance scenarios, compatibility, security-owner, or publication gates.
 
 ### Preconditions
 
@@ -353,7 +359,8 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 ## Fork-only proposal policy
 
 This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
-fork-only hardening drafts for package/shared-fixture evidence; no upstream
-branch or PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only.
-Any further implementation drafts should remain in the author's forks until
-RFC intake and the relevant OpenClaw owners approve the surface.
+fork-only hardening drafts for package/shared-fixture evidence and bounded
+projection/retained-memory thresholds; no upstream branch or PR was opened.
+OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further implementation
+drafts should remain in the author's forks until RFC intake and the relevant
+OpenClaw owners approve the surface.

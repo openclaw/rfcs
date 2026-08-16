@@ -42,7 +42,7 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC2 | Lazy conversations, deterministic history/live reconciliation, bounded messages/runs/tools/interactions, typed commands, reconnect, and retention. |
 | OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
 | OC4 | Initial Control UI adoption: lazy runtime binding, canonical active-session catalog, and selected-chat history/subscription state without visual or startup-budget regression. Ordinary commands, interactions, artifacts, and operational callers remain outside this draft. |
-| OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; and repair of a package-only browser export failure. The latest test-only slice is fork [OpenClaw PR #244](https://github.com/giodl73-repo/openclaw/pull/244). |
+| OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; repair of a package-only browser export failure; and an asserted artifact-heavy projection benchmark with exact finite-snapshot checks. The latest test-only slice is fork [OpenClaw PR #245](https://github.com/giodl73-repo/openclaw/pull/245), stacked on fixture PR #244. Its Testbox proof projects 24,000 measured events at 2,211.45 ms p95 per 4,000 events, 52,272 bytes retained heap growth, and 8,482.51 bytes/batch retained slope. |
 | CU4 | Fork-only Control UI ordinary-command adoption: selected composer sends and connected exact-run aborts route through the existing conversation handle while reconnect-resume, steer/inject, background/non-selected, realtime, replay, and session-wide abort paths remain raw. Session identity, attachments, reply/fencing inputs, retry metadata, and active-leaf recovery details are preserved. |
 | CU5 | Fork-only selected-session interaction and artifact adoption: exact pending question answer/cancel commands route through the cached conversation identity while Control UI retains prompt lifecycle and raw fallback. Validated ready Canvas/MCP artifact snapshots feed only existing sandboxed adapters, with canonical-first provenance and occurrence-aware compatibility dedupe. Global/operator approval queues remain raw. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
@@ -51,10 +51,11 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | Config Model + LC1 | Read-only authored config snapshots and schema lookup consumed by a native Lobster settings category through Electron-owned transport; principal-scoped cache, structured failure states, focused tests, and clean review. |
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
-Publication is still blocked on upstream acceptance, measured
-performance/memory thresholds, compatibility canaries, security review,
-package ownership, and a released dependency through PR 6. Control UI CU5 remains
-fork-only adopter evidence in
+Publication is still blocked on upstream acceptance, the remaining performance
+scenarios, compatibility canaries, security review, package ownership, and a
+released dependency through PR 6. The bounded steady-state projection and
+retained-memory threshold slice is now measured in PR #245. Control UI CU5
+remains fork-only adopter evidence in
 [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243).
 Incumbent cleanup remains CU6/PR 7 after
 observation and rollback proof. Product shipment is additionally blocked on
@@ -166,6 +167,17 @@ The package must measure:
 No renderer callback runs in the Gateway receive loop. Slow subscribers must
 not block protocol event processing. Unbounded history, progress, artifact, or
 listener retention blocks release.
+
+The first asserted performance slice is fork
+[OpenClaw PR #245](https://github.com/giodl73-repo/openclaw/pull/245). It runs
+six measured batches after warmup, with 1,000 artifact-heavy cycles and 4,000
+events per batch. The gate requires p95 projection latency at or below 4,000 ms,
+retained heap growth at or below 2 MiB, retained heap slope at or below 256 KiB
+per batch, and exact finite snapshot lengths with truncation evidence.
+Blacksmith Testbox `tbx_01m05mrxhzajxpdqb6ggdzx4y1` passed at 2,211.45 ms p95,
+52,272 bytes retained growth, and 8,482.51 bytes/batch retained slope. Initial
+projection, selected-view materialization, inactive eviction, and
+reconnect/resync measurements remain separate OC5 evidence slices.
 
 ## Security gates
 
