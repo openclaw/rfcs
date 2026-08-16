@@ -139,20 +139,21 @@ surface keeps its own contract, release gate, and implementation review.
 
 ### Fork-only implementation evidence
 
-The proposed boundary has four fork-only implementation drafts:
+The proposed boundary has five fork-only implementation drafts:
 
 1. [OC1: Gateway Client model foundation](https://github.com/giodl73-repo/openclaw/pull/230)
 2. [OC2: conversation model and commands](https://github.com/giodl73-repo/openclaw/pull/231)
 3. [OC3: renderer-neutral UI artifacts](https://github.com/giodl73-repo/openclaw/pull/232)
 4. [OC4: Control UI reference adoption](https://github.com/giodl73-repo/openclaw/pull/238)
-5. [OC5: first conformance and package-hardening slice](https://github.com/giodl73-repo/openclaw/pull/241)
+5. [OC5: conformance and package-hardening slices](https://github.com/giodl73-repo/openclaw/pull/241)
 
 These drafts are evidence for review, not an upstream submission or accepted
-roadmap. OC5 currently proves finite defaults, one reusable catalog
-accepted/failure fixture pair, and clean packed-package Node, declaration, and
-browser consumption. Compatibility canaries, measured performance/memory
-thresholds, the broader fixture corpus, security review, and support-owner
-assignment remain open.
+roadmap. OC5 currently proves finite defaults, reusable catalog
+accepted/failure fixtures, representative history/live overlap, sequence-gap
+recovery with retired-epoch rejection, approval authorization and terminal
+state, and clean packed-package Node, declaration, and browser consumption.
+Compatibility canaries, measured performance/memory thresholds, the remaining
+fixture families, security review, and support-owner assignment remain open.
 
 The independent Lobster evidence is also available as a temporary carry plus
 six bounded adopter slices:
@@ -201,11 +202,28 @@ remaining work is proposed here so maintainers can review the intended shape
 before any implementation is prepared, and any drafts should remain fork-only
 until RFC intake and owner approval.
 
+Control UI adoption is also intentionally incremental. OC4 already proves the
+first three slices; it does not yet make every Control UI command, interaction,
+or artifact path model-backed.
+
+| Slice | Scope | Status and gate |
+| --- | --- | --- |
+| CU1: runtime binding | Create one lazy Control Model runtime over the existing Control UI Gateway client and forward connection/event invalidations without changing Lit presentation. | Complete in OC4. |
+| CU2: catalog and selection | Drive the active session roster and selected-session lookup from immutable catalog snapshots while retaining unsupported archived/all roster behavior. | Complete in OC4. |
+| CU3: selected conversation projection | Drive selected-chat history, live subscription, reconnect, and retryable fallback from the lazy conversation handle. | Complete in OC4; the representative overlap/gap/retired-epoch fixtures are now shared in OC5. |
+| CU4: ordinary conversation commands | Route the normal composer send and foreground active-run abort through typed conversation commands. Keep steer/inject, realtime talk, background tasks, no-run abort-all, and other operational callers raw until separately classified. | Next fork-only adopter slice after the relevant OC5 command fixtures are stable. |
+| CU5: interactions and artifacts | Project selected-session approvals/questions and current Canvas/MCP/structured fallbacks through conversation snapshots plus a Control UI-local exact renderer registry. Preserve global/operator approval lanes and sandbox ownership where they are not equivalent. | Requires authorization, stale-action, malformed-artifact, and fallback conformance plus focused browser proof. |
+| CU6: observation and deletion | Run the model-backed path through an observation window, retain rollback, then delete only the superseded UI-local reducers, requests, and compatibility adapters named by the earlier slices. | Maps to OC7 and cannot precede OC6 publication, rollback proof, and an exact deletion ledger. |
+
+Board and configuration adoption are not hidden CU slices. They remain the
+separate Board Model and Config Model proposals because their authority,
+persistence, and release contracts differ from conversation state.
+
 | Candidate | Scope | Gate |
 | --- | --- | --- |
-| [OC5: shared conformance and package hardening](https://github.com/giodl73-repo/openclaw/pull/241) | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, add browser/Node import checks, performance bounds, package acceptance, and security-focused malformed-data coverage. The fork draft contains the first bounded slice only. | OC1-OC4 contract accepted; package, protocol, security, and Control UI owners agree on the support surface. |
+| [OC5: shared conformance and package hardening](https://github.com/giodl73-repo/openclaw/pull/241) | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, add browser/Node import checks, performance bounds, package acceptance, and security-focused malformed-data coverage. The fork draft now contains catalog/package proof plus representative history/live/reconnect and authorization fixtures; it is still not the complete gate. | OC1-OC4 contract accepted; package, protocol, security, and Control UI owners agree on the support surface. |
 | OC6: supported model subpaths | Publish the optional model subpaths with compatibility window, migration policy, framework-neutral quickstart, release notes, support ownership, and install/import proof from the packed release artifact rather than a workspace checkout. Replace fork-only consumption only after a released package exists. | OC5 passes on the supported release, predecessor where promised, and `main`; the packed artifact passes clean browser and Node consumer checks; independent-host evidence remains valid. |
-| OC7: incumbent-path cleanup | After an observation window and rollback proof, remove only the superseded Control UI reconciliation and compatibility paths for the adopted slice. | OC6 is released, Control UI is stable on the model, and deletion evidence identifies the exact old path. |
+| OC7: incumbent-path cleanup | After an observation window and rollback proof, remove only the superseded Control UI reconciliation, standard command, interaction, artifact-adapter, and compatibility paths actually replaced by CU1-CU5. | OC6 is released, Control UI is stable on the model, and deletion evidence identifies each exact old path. |
 
 Adjacent proposals remain separate from Control Model v1 acceptance:
 

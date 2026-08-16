@@ -25,7 +25,7 @@ proof, and deletion agree.
 | M1 Gateway Client model boundary | OpenClaw PR 1 | Browser-safe module graph, lifecycle, immutable store contract | Consumer scaffolding for connection/session snapshots |
 | M2 conversation projection | OpenClaw PR 2 | Shared history/live/reconnect/tool/approval corpus | Per-consumer chat reducers and event folding |
 | A1 UI artifacts | OpenClaw PR 3 | Native, structured-only, MCP fallback, malformed, stale, history cases | Tool-specific presentation interpretation |
-| O1 Control UI adoption | OpenClaw PR 4 | Existing Control UI behavior unchanged on shared fixtures and E2E | Adopted UI-local capability/reducer code |
+| O1 Control UI adoption | OC4 plus CU4-CU6 | Existing Control UI behavior unchanged as runtime, catalog, selected conversation, ordinary commands, interactions, and artifacts move through the model in bounded slices | Only the UI-local capability/reducer/request code replaced by each observed slice |
 | H1 independent host | Lobster/M PR 1 | Real hosted Gateway projected into existing host view model | Host-owned Gateway reconciliation for adopted slice |
 | H2 native artifact | Lobster/M PR 2 | One allowlisted component plus denied action and fallback | One bespoke tool-output rendering path |
 | C1 shared conformance | OpenClaw PR 5 | Shared fixtures, finite defaults, browser/Node package acceptance, compatibility canaries, performance bounds, and security review | Publication uncertainty |
@@ -41,21 +41,22 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC1 | Immutable bounded catalog snapshots, explicit host binding, epoch-safe refresh, typed errors, and subscriber isolation. |
 | OC2 | Lazy conversations, deterministic history/live reconciliation, bounded messages/runs/tools/interactions, typed commands, reconnect, and retention. |
 | OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
-| OC4 | Control UI adoption of canonical active-session and selected-chat state without visual or startup-budget regression. |
-| OC5 first slice | Centralized finite defaults, reusable accepted/malformed catalog fixtures, packed protocol/client installation, every Gateway Client export imported from the tarball, declaration consumption, browser bundling, and repair of a package-only browser export failure. |
+| OC4 | Initial Control UI adoption: lazy runtime binding, canonical active-session catalog, and selected-chat history/subscription state without visual or startup-budget regression. Ordinary commands, interactions, artifacts, and operational callers remain outside this draft. |
+| OC5 current slices | Centralized finite defaults; reusable accepted/malformed catalog fixtures; representative history/live overlap, gap recovery, retired-epoch rejection, approval denial/allow forwarding, and terminal approval projection; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; and repair of a package-only browser export failure. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
 | LM4-LM6 | Ordinary send, active-run abort, and selected-session history cut over to the model, deleting equivalent raw Lobster paths. |
 | Board Model + LB1 | Existing Control UI board reconciliation extracted to `@openclaw/gateway-client/model/board`; 55 focused tests, Gateway Client build, and clean review. Lobster LB1 independently renders one safe native status widget and inert unsupported fallbacks through a main-process projection. Its mocked beta protocol is evidence only; release admission remains open. |
 | Config Model + LC1 | Read-only authored config snapshots and schema lookup consumed by a native Lobster settings category through Electron-owned transport; principal-scoped cache, structured failure states, focused tests, and clean review. |
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
-Publication is still blocked on upstream acceptance, completion of the broader
-PR 5 history/live/reconnect and authorization corpus, measured
+Publication is still blocked on upstream acceptance, completion of the
+remaining PR 5 run/tool/question/artifact/bounds fixture families, measured
 performance/memory thresholds, compatibility canaries, security review, package
-ownership, and a released dependency through PR 6. Incumbent cleanup remains
-PR 7 after observation and rollback proof. Product shipment is additionally
-blocked on Lobster CI, live hosted-Gateway proof, rollout and rollback controls,
-telemetry, and UX quality.
+ownership, and a released dependency through PR 6. Control UI CU4 and CU5
+remain fork-only adopter work. Incumbent cleanup remains CU6/PR 7 after
+observation and rollback proof. Product shipment is additionally blocked on
+Lobster CI, live hosted-Gateway proof, rollout and rollback controls, telemetry,
+and UX quality.
 
 ## Shared fixture families
 
