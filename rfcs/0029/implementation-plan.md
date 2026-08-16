@@ -54,7 +54,7 @@ One duplicate session-catalog reducer in an adopter, after later adoption.
 - Add lazy conversation models.
 - Extract deterministic history/live merge.
 - Project messages, runs, tools, approvals, and questions.
-- Add typed chat/session commands and command errors.
+- Add typed conversation commands, catalog/history refresh, and command errors.
 - Add finite progress and inactive-conversation retention.
 
 ### Proof
@@ -201,6 +201,9 @@ None. This PR hardens the contract before publication.
 - Publish the optional `@openclaw/gateway-client/model` subpaths.
 - Document supported versions, compatibility window, and migration policy.
 - Add a framework-neutral quickstart and release notes.
+- Pack the release artifact and prove clean browser and Node consumers can
+  install it, resolve every supported subpath, and consume its declarations
+  without workspace-only files or dependencies.
 - Define support ownership and deprecation policy.
 - Keep framework adapters outside the core model unless separately justified.
 
@@ -254,10 +257,10 @@ The incumbent UI-local state/reconciliation path identified by OC4 adoption.
 - **Settings:** host OpenClaw settings first, read-only when Lobster lacks
   secure write authority. The read-only Config Model and Lobster LC1 proof now
   render selected authored values with descriptors and reload impact through a
-  main-process adapter. A future CM1 may upstream only that read projection.
+  main-process adapter. A future CFG1 may upstream only that read projection.
   Effective defaults, provenance, owner, writability and lock reason,
   validation findings, candidate diff, generation, and transactional
-  apply/reload status remain the separate CM2/Managed Configuration work.
+  apply/reload status remain the separate CFG2/Managed Configuration work.
 - **Canvas and MCP Apps:** preserve them as explicit sandboxed fallbacks rather
   than converting their executable state into trusted native React.
 
@@ -276,7 +279,7 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 
 ## Fork-only proposal policy
 
-This plan names OC5-OC7, BM2, CM1, and CM2 for maintainer review. It does not
+This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. It does not
 open those PRs, create upstream branches, or claim roadmap acceptance. Any
 implementation drafts should remain in the author's forks until RFC intake and
 the relevant OpenClaw owners approve the surface.

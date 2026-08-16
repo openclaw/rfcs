@@ -3,7 +3,7 @@ title: OpenClaw Control Model
 authors:
   - Gio Della-Libera
 created: 2026-08-11
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 status: draft
 issue:
 rfc_pr: https://github.com/giodl73-repo/rfcs/pull/8
@@ -199,7 +199,7 @@ until RFC intake and owner approval.
 | Candidate | Scope | Gate |
 | --- | --- | --- |
 | OC5: shared conformance and package hardening | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, add browser/Node import checks, performance bounds, package acceptance, and security-focused malformed-data coverage. | OC1-OC4 contract accepted; package, protocol, security, and Control UI owners agree on the support surface. |
-| OC6: supported model subpaths | Publish the optional model subpaths with compatibility window, migration policy, framework-neutral quickstart, release notes, and support ownership. Replace fork-only consumption only after a released package exists. | OC5 passes on the supported release, predecessor where promised, and `main`; independent-host evidence remains valid. |
+| OC6: supported model subpaths | Publish the optional model subpaths with compatibility window, migration policy, framework-neutral quickstart, release notes, support ownership, and install/import proof from the packed release artifact rather than a workspace checkout. Replace fork-only consumption only after a released package exists. | OC5 passes on the supported release, predecessor where promised, and `main`; the packed artifact passes clean browser and Node consumer checks; independent-host evidence remains valid. |
 | OC7: incumbent-path cleanup | After an observation window and rollback proof, remove only the superseded Control UI reconciliation and compatibility paths for the adopted slice. | OC6 is released, Control UI is stable on the model, and deletion evidence identifies the exact old path. |
 
 Adjacent proposals remain separate from Control Model v1 acceptance:
@@ -207,8 +207,8 @@ Adjacent proposals remain separate from Control Model v1 acceptance:
 | Candidate | Scope | Gate |
 | --- | --- | --- |
 | BM2: Board Model release admission | Reconstruct the Board Model extraction and native-host conformance against an accepted board-capable OpenClaw release, then decide whether `model/board` is supportable. | Stable board-capable tag, or explicit beta admission with complete persistence, grants, tickets, sandbox, and compatibility review. |
-| CM1: read-only Config Model | Extract framework-neutral authored config snapshots and read-scoped schema descriptors into an OpenClaw-owned optional model with Control UI reference adoption. | Config owner review, secret redaction, schema compatibility, and proof that read projection does not imply write authority. |
-| CM2: governed configuration commands | Add provenance, owner, lock reason, candidate preview, validation findings, generation, commit, and activation status only through Managed Configuration contracts. | Separate owner approval and transactional write/activation design; not implied by this RFC or CM1. |
+| CFG1: read-only Config Model | Extract framework-neutral authored config snapshots and read-scoped schema descriptors into an OpenClaw-owned optional model with Control UI reference adoption. | Config owner review, secret redaction, schema compatibility, and proof that read projection does not imply write authority. |
+| CFG2: governed configuration commands | Add provenance, owner, lock reason, candidate preview, validation findings, generation, commit, and activation status only through Managed Configuration contracts. | Separate owner approval and transactional write/activation design; not implied by this RFC or CFG1. |
 
 Cross-client user-message identity, generic generated layouts, framework
 adapters, and third-party native component SDKs remain separate future
@@ -236,6 +236,10 @@ export interface ControlGateway {
 
 The binding lets the model reuse OpenClaw's browser, Node, or hosted transport
 without owning credential persistence, product routing, or socket creation.
+It is a construction-time capability owned by the host and model
+implementation. It is not exposed through snapshots, conversations, artifacts,
+renderer registrations, or framework adapters, so consumers cannot use it to
+bypass typed model commands.
 
 The Control Model exposes immutable snapshots and typed commands:
 
@@ -263,11 +267,14 @@ V1 contains:
 - canonical ordered messages;
 - active run, stream, tool invocation, approval, and question state needed by
   conversation presentation;
-- typed chat/session commands supported by the selected Gateway; and
+- typed conversation commands plus explicit catalog and history refresh; and
 - renderer-neutral UI artifacts associated with messages or tool invocations.
 
 V1 excludes broader Control UI capabilities until each has a bounded,
 framework-neutral contract and an independent consumer.
+Session create, rename, archive, delete, and other administration commands are
+not required by v1 conformance. They remain host-owned or future optional model
+capabilities until they have the same independent-adopter and deletion proof.
 
 ### Snapshot and event semantics
 
@@ -293,8 +300,9 @@ Control Model's stable UI contract.
 ### Command semantics
 
 Commands express typed user intent. Candidate v1 commands include session
-refresh, select, create, rename, archive/delete where authorized, chat send,
-abort, retry where supported, answer, approve, and deny.
+catalog refresh, conversation history refresh, chat send, active-run abort,
+retry where the Gateway exposes a safe contract, answer, approve, deny, and
+exact deferred-view materialization.
 
 The model may expose command availability for presentation. The Gateway remains
 authoritative. A command must return a typed result or throw a typed error. It
@@ -571,7 +579,7 @@ independent UX.
   sufficient two-renderer evidence for a separately negotiated patch dialect?
 - What observation window and rollback evidence must pass before OC7 can
   delete incumbent Control UI paths?
-- Should Board Model and Config Model proceed as the separate BM2/CM1 proposals
+- Should Board Model and Config Model proceed as the separate BM2/CFG1 proposals
   above, or remain fork-only evidence until a later RFC?
 - If cross-client user-message delivery becomes required, what identity
   contract aligns host `clientMessageId`, model idempotency, retry/reconnect,

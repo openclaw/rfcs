@@ -31,6 +31,10 @@ The model consumes one host-owned Gateway binding. The binding must provide:
 - the accepted hello/protocol metadata required for feature detection; and
 - typed request and connection errors.
 
+The binding is a construction-only capability for the host and model
+implementation. It must not be exposed through public snapshots, conversation
+handles, artifacts, renderer registrations, or framework adapters.
+
 The host owns:
 
 - socket creation and route selection;
@@ -101,8 +105,8 @@ requires the required initial snapshots or an explicit partial state.
 ## Session catalog
 
 The catalog contains stable session keys and the Gateway-authoritative fields
-needed to list, select, and mutate sessions. Unknown additive fields must not
-break projection.
+needed to list and identify sessions. Unknown additive fields must not break
+projection.
 
 The model owns:
 
@@ -115,8 +119,8 @@ The model owns:
 - bounded retry for retryable observer errors; and
 - typed loading, refreshing, stale, and error state.
 
-Local optimistic mutation may be used only when reconciliation and rollback are
-specified. A failed mutation must not leave success-shaped catalog state.
+Any future optional catalog mutation must specify reconciliation and rollback.
+A failed mutation must not leave success-shaped catalog state.
 
 ## Conversation model
 
@@ -205,7 +209,6 @@ replace the server-provided allowed-action set.
 Candidate v1 commands are:
 
 - refresh session catalog;
-- create/select/rename/archive/delete session where supported;
 - load/refresh conversation history;
 - send chat content and supported attachments;
 - abort the active run;
@@ -213,6 +216,11 @@ Candidate v1 commands are:
 - approve or deny a pending request; and
 - materialize one exact deferred UI view for the current artifact revision; and
 - retry only where the Gateway exposes a safe retry contract.
+
+Session creation, rename, archive, delete, and other administration operations
+are not required by v1 conformance. A later optional capability must add its own
+independent-adopter, authorization, reconciliation, rollback, and deletion
+evidence.
 
 Each command defines:
 
