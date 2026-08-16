@@ -105,26 +105,46 @@ association logic.
 
 ## OpenClaw PR 4: Control UI reference adoption
 
-### Scope
+OC4 is the initial reference-adoption draft, not the entire Control UI
+migration. It completes the runtime, catalog, and selected-conversation
+projection slices while deliberately leaving ordinary commands, interactions,
+artifacts, and operational callers for later bounded work.
+
+### Completed scope
 
 - Adapt the existing Control UI Gateway store to the model binding.
-- Move the session catalog and one complete conversation route to Control Model
-  snapshots.
+- Move the active session catalog and selected-chat history/subscription route
+  to Control Model snapshots.
 - Keep Lit components, routes, styling, and behavior unchanged.
-- Render current Canvas/MCP fallbacks through a Control UI-local artifact
-  registry/adapter.
+- Retain retryable Gateway fallback when the lazy model cannot load.
 
 ### Proof
 
 - Existing focused Control UI tests.
 - Shared model fixtures.
 - Real browser/Gateway chat flow.
-- No regression in reconnect, approval, tool cards, MCP Apps, or history.
+- No regression in catalog selection, reconnect, or history.
 - Bundle and startup impact measured.
 
 ### Deletion target
 
-Superseded UI-local session/conversation capability and reconciliation code.
+Superseded UI-local catalog and selected-history capability after publication,
+observation, and rollback proof.
+
+### Remaining Control UI adoption slices
+
+| Slice | Scope | Explicit boundary |
+| --- | --- | --- |
+| CU1 runtime binding | Lazy Control Model runtime over the existing Gateway store. | Complete in OC4; no new process, route, or framework adapter. |
+| CU2 catalog and selection | Active roster and selected-session lookup from catalog snapshots. | Complete in OC4; archived/all rosters remain raw until separately modeled. |
+| CU3 selected conversation projection | History, live subscription, reconnect, and retryable fallback from the conversation handle. | Complete in OC4; OC5 now owns representative overlap/gap/retired-epoch fixtures. |
+| CU4 ordinary conversation commands | Standard composer send and foreground active-run abort through `ControlModelConversation`. | Do not absorb steer/inject, realtime talk, background-task history, no-run abort-all, or other operational paths without separate ownership proof. |
+| CU5 interactions and artifacts | Selected-session approvals/questions plus Canvas, MCP App, and structured fallback through snapshot projections and an exact Control UI-local registry. | Global/operator approval lanes remain outside the slice unless they prove semantic equivalence; artifact data never selects executable code. |
+| CU6 observation and deletion | Roll out the model-backed route, retain rollback, and remove only named incumbent reducers/requests/adapters. | Post-OC6 and implemented as OC7 with an exact deletion ledger. |
+
+Board and settings are separate Board Model and Config Model adoption series,
+not CU7/CU8. Their authority and persistence contracts are non-normative to
+Control Model v1.
 
 ## Lobster/M evidence series
 
@@ -170,7 +190,10 @@ Fork-only draft:
 Its first slice centralizes finite defaults, adds an authoritative/malformed
 catalog fixture pair, proves clean packed-package Node/declaration/browser
 consumption, and fixes a package-only browser export failure found by that
-proof. It does not yet satisfy the full PR 5 gate.
+proof. Its second slice promotes representative history/live overlap,
+gap-triggered authoritative refresh, retired-epoch rejection, and approval
+authorization/terminal-state behavior into the shared corpus. It does not yet
+satisfy the full PR 5 gate.
 
 ### Preconditions
 
@@ -222,22 +245,22 @@ Fork-only source carries after adopters move to a released dependency.
 
 ### Preconditions
 
-- PR 6 is released and adopted by Control UI.
+- PR 6 is released and CU1-CU5 are adopted by Control UI.
 - The model-backed path has an agreed observation window and rollback proof.
 - The exact superseded implementation is named and no supported fallback
   depends on it.
 
 ### Scope
 
-- Remove only the superseded Control UI reconciliation and compatibility paths
-  for the adopted catalog/conversation slice.
+- Remove only the superseded Control UI reconciliation, standard command,
+  interaction, artifact-adapter, and compatibility paths named by CU1-CU5.
 - Retain operational, diagnostic, or unsupported-capability paths that the
   Control Model does not own.
 - Update ownership docs and deletion ledger.
 
 ### Deletion target
 
-The incumbent UI-local state/reconciliation path identified by OC4 adoption.
+The exact incumbent UI-local paths identified by CU1-CU5 adoption.
 
 ## Productization after publication
 
