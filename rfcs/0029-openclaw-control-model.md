@@ -145,9 +145,14 @@ The proposed boundary has four fork-only implementation drafts:
 2. [OC2: conversation model and commands](https://github.com/giodl73-repo/openclaw/pull/231)
 3. [OC3: renderer-neutral UI artifacts](https://github.com/giodl73-repo/openclaw/pull/232)
 4. [OC4: Control UI reference adoption](https://github.com/giodl73-repo/openclaw/pull/238)
+5. [OC5: first conformance and package-hardening slice](https://github.com/giodl73-repo/openclaw/pull/241)
 
 These drafts are evidence for review, not an upstream submission or accepted
-roadmap.
+roadmap. OC5 currently proves finite defaults, one reusable catalog
+accepted/failure fixture pair, and clean packed-package Node, declaration, and
+browser consumption. Compatibility canaries, measured performance/memory
+thresholds, the broader fixture corpus, security review, and support-owner
+assignment remain open.
 
 The independent Lobster evidence is also available as a temporary carry plus
 six bounded adopter slices:
@@ -198,7 +203,7 @@ until RFC intake and owner approval.
 
 | Candidate | Scope | Gate |
 | --- | --- | --- |
-| OC5: shared conformance and package hardening | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, add browser/Node import checks, performance bounds, package acceptance, and security-focused malformed-data coverage. | OC1-OC4 contract accepted; package, protocol, security, and Control UI owners agree on the support surface. |
+| [OC5: shared conformance and package hardening](https://github.com/giodl73-repo/openclaw/pull/241) | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, add browser/Node import checks, performance bounds, package acceptance, and security-focused malformed-data coverage. The fork draft contains the first bounded slice only. | OC1-OC4 contract accepted; package, protocol, security, and Control UI owners agree on the support surface. |
 | OC6: supported model subpaths | Publish the optional model subpaths with compatibility window, migration policy, framework-neutral quickstart, release notes, support ownership, and install/import proof from the packed release artifact rather than a workspace checkout. Replace fork-only consumption only after a released package exists. | OC5 passes on the supported release, predecessor where promised, and `main`; the packed artifact passes clean browser and Node consumer checks; independent-host evidence remains valid. |
 | OC7: incumbent-path cleanup | After an observation window and rollback proof, remove only the superseded Control UI reconciliation and compatibility paths for the adopted slice. | OC6 is released, Control UI is stable on the model, and deletion evidence identifies the exact old path. |
 

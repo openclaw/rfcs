@@ -165,6 +165,13 @@ admission.
 
 ## OpenClaw PR 5: shared conformance and package hardening
 
+Fork-only draft:
+[giodl73-repo/openclaw#241](https://github.com/giodl73-repo/openclaw/pull/241).
+Its first slice centralizes finite defaults, adds an authoritative/malformed
+catalog fixture pair, proves clean packed-package Node/declaration/browser
+consumption, and fixes a package-only browser export failure found by that
+proof. It does not yet satisfy the full PR 5 gate.
+
 ### Preconditions
 
 - RFC scope and ownership boundary are accepted for implementation.
@@ -279,7 +286,8 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 
 ## Fork-only proposal policy
 
-This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. It does not
-open those PRs, create upstream branches, or claim roadmap acceptance. Any
+This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
+one fork-only draft for its first bounded hardening slice; no upstream branch or
+PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further
 implementation drafts should remain in the author's forks until RFC intake and
 the relevant OpenClaw owners approve the surface.
