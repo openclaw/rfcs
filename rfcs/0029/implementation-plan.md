@@ -254,8 +254,14 @@ asserts initial catalog/conversation projection, selected deferred-view
 materialization, bounded inactive-conversation eviction, and authoritative
 reconnect/resync latency. Its Blacksmith Testbox proof passed at 14.32 ms,
 0.58 ms, 26.23 ms, and 8.07 ms p95 respectively, with exact disposal and
-resync invariants. OC5 still does not satisfy the security-owner or publication
-gates.
+resync invariants. A fifth continuation in
+[giodl73-repo/openclaw#248](https://github.com/giodl73-repo/openclaw/pull/248)
+records the independent full-stack security review and fixes its one accepted
+finding by retiring materialized deferred-view payloads on disconnect and
+connection-epoch replacement. Refreshed history may restore the inert
+descriptor, but the payload requires fresh server materialization under the
+new authority context. Post-fix review found no actionable vulnerabilities.
+OC5 still does not satisfy the named-owner or publication gates.
 
 ### Preconditions
 
@@ -374,7 +380,7 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
 fork-only hardening drafts for package/shared-fixture evidence and bounded
 projection/retained-memory thresholds, candidate/predecessor/main wire
-compatibility, and lifecycle performance bounds; no upstream branch or PR was
-opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further
-implementation drafts should remain in the author's forks until RFC intake and
-the relevant OpenClaw owners approve the surface.
+compatibility, lifecycle performance bounds, and reviewed security hardening;
+no upstream branch or PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain
+proposals only. Any further implementation drafts should remain in the author's
+forks until RFC intake and the relevant OpenClaw owners approve the surface.
