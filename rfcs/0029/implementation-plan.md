@@ -248,8 +248,14 @@ published predecessor `@openclaw/gateway-protocol@2026.7.2-beta.7`, and current
 OpenClaw `main`. It preserves baseline catalog, subscription, history, ordinary
 send, exact abort, approval, question, and representative event contracts while
 recording run-fenced send as a candidate-era capability rather than claiming
-unsupported predecessor behavior. OC5 still does not satisfy the remaining
-performance scenarios, security-owner, or publication gates.
+unsupported predecessor behavior. A fourth test-only continuation in
+[giodl73-repo/openclaw#247](https://github.com/giodl73-repo/openclaw/pull/247)
+asserts initial catalog/conversation projection, selected deferred-view
+materialization, bounded inactive-conversation eviction, and authoritative
+reconnect/resync latency. Its Blacksmith Testbox proof passed at 14.32 ms,
+0.58 ms, 26.23 ms, and 8.07 ms p95 respectively, with exact disposal and
+resync invariants. OC5 still does not satisfy the security-owner or publication
+gates.
 
 ### Preconditions
 
@@ -367,8 +373,8 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 
 This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
 fork-only hardening drafts for package/shared-fixture evidence and bounded
-projection/retained-memory thresholds plus candidate/predecessor/main wire
-compatibility; no upstream branch or PR was opened. OC6, OC7, BM2, CFG1, and
-CFG2 remain proposals only. Any further implementation drafts should remain in
-the author's forks until RFC intake and the relevant OpenClaw owners approve
-the surface.
+projection/retained-memory thresholds, candidate/predecessor/main wire
+compatibility, and lifecycle performance bounds; no upstream branch or PR was
+opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further
+implementation drafts should remain in the author's forks until RFC intake and
+the relevant OpenClaw owners approve the surface.
