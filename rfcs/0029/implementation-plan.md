@@ -107,9 +107,10 @@ association logic.
 
 OC4 is the initial reference-adoption draft, not the entire Control UI
 migration. It completes the runtime, catalog, and selected-conversation
-projection slices. Fork-only CU4 now adds ordinary foreground commands while
-deliberately leaving interactions, artifacts, and operational callers for
-later bounded work.
+projection slices. Fork-only CU4 adds ordinary foreground commands, and
+fork-only CU5 adds selected-session question commands plus safe Canvas/MCP
+artifact projection. Operational callers and global/operator interaction queues
+remain outside these bounded adoption slices.
 
 ### Completed scope
 
@@ -140,7 +141,7 @@ observation, and rollback proof.
 | CU2 catalog and selection | Active roster and selected-session lookup from catalog snapshots. | Complete in OC4; archived/all rosters remain raw until separately modeled. |
 | CU3 selected conversation projection | History, live subscription, reconnect, and retryable fallback from the conversation handle. | Complete in OC4; OC5 now owns representative overlap/gap/retired-epoch fixtures. |
 | CU4 ordinary conversation commands | Standard composer send and foreground active-run abort through `ControlModelConversation`. Complete in fork-only [OpenClaw PR #242](https://github.com/giodl73-repo/openclaw/pull/242), stacked on OC5. | Preserves session identity, attachment/reply/fencing inputs, reconnect-resume and steer fallback, structured active-leaf recovery errors, and raw no-run/session-wide abort ownership. Do not absorb realtime talk, background-task history, or other operational paths without separate ownership proof. |
-| CU5 interactions and artifacts | Selected-session approvals/questions plus Canvas, MCP App, and structured fallback through snapshot projections and an exact Control UI-local registry. | Global/operator approval lanes remain outside the slice unless they prove semantic equivalence; artifact data never selects executable code. |
+| CU5 interactions and artifacts | Exact selected-session question answer/cancel commands plus Canvas, MCP App, and structured fallback through snapshot projections. Complete in fork-only [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243), stacked on CU4. | Preserves the incumbent prompt lifecycle, expiry deadline, local resolution publication, and raw fallback. Global/operator approval lanes remain outside the slice because their ownership and resolver semantics differ. Artifact data never selects executable code. |
 | CU6 observation and deletion | Roll out the model-backed route, retain rollback, and remove only named incumbent reducers/requests/adapters. | Post-OC6 and implemented as OC7 with an exact deletion ledger. |
 
 Board and settings are separate Board Model and Config Model adoption series,
@@ -161,6 +162,27 @@ realtime talk, skill-workshop revisions, queued replay, and session-wide
 `sessions.abort` remain on their incumbent paths. Model command errors retain
 structured Gateway details so existing active-leaf recovery and retry behavior
 remain visible rather than becoming generic failures.
+
+### CU5 fork-only result
+
+CU5 reuses the exact cached selected-conversation route and its authoritative
+agent identity, including main aliases. Pending question answer/cancel commands
+pass through the conversation model with the incumbent question deadline while
+Control UI retains submitting/error state, response validation, local
+resolution confirmation, shared-client publication, and raw compatibility
+fallback.
+
+Validated ready artifact snapshots feed only the existing sandboxed Canvas and
+MCP App presentation adapters. Model metadata cannot choose an import, module,
+custom element, or executable template. Correlation prefers canonical message
+and tool-call provenance; ordered tool-only matching is restricted to
+source-less compatibility data, and occurrence/timestamp evidence prevents
+reused tool IDs or persisted/live overlap from hiding distinct views.
+
+Global/operator approval queues remain raw because they are not selected-
+conversation commands and use different resolver ownership. Unknown,
+malformed, failed, source-less, and unsupported artifacts continue through the
+incumbent compatibility behavior.
 
 ## Lobster/M evidence series
 
