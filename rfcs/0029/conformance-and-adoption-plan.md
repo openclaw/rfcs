@@ -51,13 +51,13 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | Config Model + LC1 | Read-only authored config snapshots and schema lookup consumed by a native Lobster settings category through Electron-owned transport; principal-scoped cache, structured failure states, focused tests, and clean review. |
 
 The independent-adopter gate is therefore demonstrated, not merely planned.
-Publication is still blocked on upstream acceptance, named package, protocol,
-Control UI, security, and release ownership, and a released dependency through
-PR 6. The bounded steady-state projection and retained-memory threshold slice
-is measured in PR #245, the wire-compatibility canary is measured in PR #246,
-and the lifecycle performance scenarios are measured in PR #247. The security
-gate is reviewed and remediated in PR #248. Control UI CU5 remains fork-only
-adopter evidence in
+Publication is still blocked on upstream acceptance, explicit acceptance of the
+[ownership and support plan](ownership-and-support-plan.md), and a released
+dependency through PR 6. The bounded steady-state projection and
+retained-memory threshold slice is measured in PR #245, the wire-compatibility
+canary is measured in PR #246, and the lifecycle performance scenarios are
+measured in PR #247. The security gate is reviewed and remediated in PR #248.
+Control UI CU5 remains fork-only adopter evidence in
 [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243).
 Incumbent cleanup remains CU6/PR 7 after
 observation and rollback proof. Product shipment is additionally blocked on

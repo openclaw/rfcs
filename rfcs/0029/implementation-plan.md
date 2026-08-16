@@ -291,7 +291,9 @@ None. This PR hardens the contract before publication.
 
 - PR 5 conformance, compatibility, performance, package, and security gates
   pass.
-- Named package, protocol, Control UI, security, and release owners agree.
+- Named package, protocol, Control UI, security, and release owners accept the
+  obligations in the
+  [ownership and support plan](ownership-and-support-plan.md).
 - The independent-host proof remains valid against the candidate release.
 
 ### Scope
