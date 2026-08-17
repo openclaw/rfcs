@@ -43,6 +43,7 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
 | OC4 | Initial Control UI adoption: lazy runtime binding, canonical active-session catalog, and selected-chat history/subscription state without visual or startup-budget regression. Ordinary commands, interactions, artifacts, and operational callers remain outside this draft. |
 | OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; repair of a package-only browser export failure; asserted steady-state projection and retained-memory bounds; an asserted candidate/predecessor/main wire-compatibility matrix; asserted initial projection, selected-view materialization, inactive eviction, and reconnect/resync lifecycle bounds; and an independent security review with authority-epoch cache remediation. The latest slice is fork [OpenClaw PR #248](https://github.com/giodl73-repo/openclaw/pull/248), stacked on lifecycle PR #247. |
+| Whole-series review | Independent GPT-5.6 Terra, Claude Opus 5, and Gemini 3.1 Pro Preview reviews covered OC1-OC5 and CU4-CU5, followed by a clean Codex branch review. Accepted findings were fixed at core head `a158436f085` in PR #248 and Control UI head `0a8ad4188a6` in PR #243. Final focused proof passed 59 Gateway lifecycle/model tests, 61 integrated Control UI tests, 6 prompt tests, and packed-package acceptance. |
 | CU4 | Fork-only Control UI ordinary-command adoption: selected composer sends and connected exact-run aborts route through the existing conversation handle while reconnect-resume, steer/inject, background/non-selected, realtime, replay, and session-wide abort paths remain raw. Session identity, attachments, reply/fencing inputs, retry metadata, and active-leaf recovery details are preserved. |
 | CU5 | Fork-only selected-session interaction and artifact adoption: exact pending question answer/cancel commands route through the cached conversation identity while Control UI retains prompt lifecycle and raw fallback. Validated ready Canvas/MCP artifact snapshots feed only existing sandboxed adapters, with canonical-first provenance and occurrence-aware compatibility dedupe. Global/operator approval queues remain raw. |
 | LM1-LM3 | Existing `SessionView` adaptation, exact native table rendering, visible fallback, and a host-owned action routed through the model. |
@@ -59,6 +60,9 @@ canary is measured in PR #246, and the lifecycle performance scenarios are
 measured in PR #247. The security gate is reviewed and remediated in PR #248.
 Control UI CU5 remains fork-only adopter evidence in
 [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243).
+The whole-series review closes the technical review gate but does not satisfy
+the explicit acceptance records required by the
+[ownership and support plan](ownership-and-support-plan.md).
 Incumbent cleanup remains CU6/PR 7 after
 observation and rollback proof. Product shipment is additionally blocked on
 Lobster CI, live hosted-Gateway proof, rollout and rollback controls, telemetry,
@@ -232,6 +236,13 @@ materialization request under the new epoch. Post-fix security review found no
 remaining actionable vulnerabilities. Blacksmith Testbox
 `tbx_01m05yh2krdyggq814g2jzyxf6` passed 55 Gateway Client security/conformance
 tests and 46 Control UI Gateway-store tests.
+
+The subsequent whole-series review exercised the complete OC1-OC5 and CU4-CU5
+stack across lifecycle/concurrency, security/compatibility/package, and Control
+UI ownership/routing/artifact lenses. Accepted findings were fixed on the
+owning branches. The final Codex branch review against
+`42a4d0a9b8b3da55123217b8aa1ac495238d4ffd` reported no accepted or actionable
+findings.
 
 ## Independent adopter proof
 

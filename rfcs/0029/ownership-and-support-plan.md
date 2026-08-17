@@ -40,6 +40,10 @@ Each accountable owner must comment on the RFC or OC6 publication PR with:
 Silence, code review, team membership, or approval of a lower-stack evidence PR
 does not count as support ownership.
 
+Use the [owner acceptance record](owner-acceptance-record.md) to make each
+decision explicit and comparable. The record is a template, not an assignment
+or default acceptance.
+
 ## Role obligations
 
 ### Gateway Client package
@@ -96,6 +100,9 @@ the RFC author, an adopter, or an unacknowledged reviewer.
 
 OC5 technical evidence is complete enough to request owner acceptance:
 conformance, package acceptance, performance, compatibility, lifecycle, and
-security gates all have fork-only proof. OC6 remains blocked until the
-acceptance records above are explicit and the owners choose the supported
-version window, release vehicle, observation period, and rollback authority.
+security gates all have fork-only proof. The complete OC1-OC5 and CU4-CU5 stack
+also passed independent GPT-5.6 Terra, Claude Opus 5, and Gemini 3.1 Pro Preview
+reviews plus a clean Codex branch review after accepted findings were fixed.
+OC6 remains blocked until the acceptance records above are explicit and the
+owners choose the supported version window, release vehicle, observation
+period, and rollback authority.

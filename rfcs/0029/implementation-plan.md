@@ -261,7 +261,14 @@ finding by retiring materialized deferred-view payloads on disconnect and
 connection-epoch replacement. Refreshed history may restore the inert
 descriptor, but the payload requires fresh server materialization under the
 new authority context. Post-fix review found no actionable vulnerabilities.
-OC5 still does not satisfy the named-owner or publication gates.
+
+A final whole-series review covered OC1-OC5 and CU4-CU5 with independent
+GPT-5.6 Terra, Claude Opus 5, and Gemini 3.1 Pro Preview passes, followed by a
+clean Codex branch review. Accepted findings were fixed at core head
+`a158436f085` in PR #248 and Control UI head `0a8ad4188a6` in PR #243. Focused
+proof passed 59 Gateway lifecycle/model tests, 61 integrated Control UI tests,
+6 prompt tests, and packed-package acceptance. OC5 still does not satisfy the
+named-owner or publication gates.
 
 ### Preconditions
 
@@ -383,6 +390,7 @@ This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
 fork-only hardening drafts for package/shared-fixture evidence and bounded
 projection/retained-memory thresholds, candidate/predecessor/main wire
 compatibility, lifecycle performance bounds, and reviewed security hardening;
-no upstream branch or PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain
-proposals only. Any further implementation drafts should remain in the author's
-forks until RFC intake and the relevant OpenClaw owners approve the surface.
+the complete OC1-OC5 and CU4-CU5 stack is now review-clean. No upstream branch
+or PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any
+further implementation drafts should remain in the author's forks until RFC
+intake and the relevant OpenClaw owners approve the surface.
