@@ -126,6 +126,7 @@ documents:
 - [Conformance and adoption plan](0029/conformance-and-adoption-plan.md)
 - [Implementation and PR plan](0029/implementation-plan.md)
 - [Ownership and support plan](0029/ownership-and-support-plan.md)
+- [Owner acceptance record](0029/owner-acceptance-record.md)
 
 ### Review scope
 
@@ -161,7 +162,14 @@ roadmap. OC5 now proves finite defaults, the representative fixture families,
 clean packed-package Node/declaration/browser consumption, measured
 steady-state and lifecycle performance, candidate/predecessor/main wire
 compatibility, and full-stack security review with the confirmed finding
-remediated. Owner acceptance remains open under the
+remediated. A final whole-series review then covered OC1-OC5 and CU4-CU5 with
+independent GPT-5.6 Terra, Claude Opus 5, and Gemini 3.1 Pro Preview passes,
+followed by a clean Codex branch review. Accepted lifecycle, observer
+ownership, canonical-session alias, metadata-bound, history, roster, routing,
+and question-state findings were fixed at core head `a158436f085` in PR #248
+and Control UI head `0a8ad4188a6` in PR #243. Final focused proof passed 59
+Gateway lifecycle/model tests, 61 integrated Control UI tests, 6 prompt tests,
+and packed-package acceptance. Owner acceptance remains open under the
 [ownership and support plan](0029/ownership-and-support-plan.md).
 
 The independent Lobster evidence is also available as a temporary carry plus
@@ -503,7 +511,9 @@ The model subpaths begin as fork-only exports. Publication requires:
 - adoption by one independent host;
 - exact shared conformance fixtures;
 - package-acceptance and browser-safe module-graph checks;
-- a declared support and compatibility policy; and
+- a declared support and compatibility policy;
+- explicit owner acceptance recorded with the
+  [owner acceptance record](0029/owner-acceptance-record.md); and
 - evidence that one duplicate consumer implementation can be deleted.
 
 Subscriber callbacks run outside the Gateway receive stack. Model ingestion,
