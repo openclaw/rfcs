@@ -115,7 +115,11 @@ define a session-based runtime model" among its non-goals. Packaging gives the
 installation a reviewable identity so an administrator can inventory, approve,
 update, and remove it. Containment reduces what that installation can reach
 while it runs. An approved, signed, inventoried Gateway holding the user's full
-token is still an unbounded-blast-radius component.
+token is still an unbounded-blast-radius component. The two are also joined
+mechanically rather than only thematically: the containment provider accepts the
+calling application's package identity at provision time, specifically so a
+future OS contract can act on it, which makes a stable package identity an input
+to containment rather than a parallel concern.
 
 [`openclaw/openclaw#42026`](https://github.com/openclaw/openclaw/issues/42026)
 proposes splitting the gateway into a control plane and per-agent runtimes so
@@ -161,8 +165,8 @@ the contract below is unchanged.
 - **Defining the packaging or launch mechanism.** How a Gateway build is
   packaged, signed, distributed, and started on Windows belongs to [PR
   #58](https://github.com/openclaw/rfcs/pull/58) and its implementation. This
-  RFC describes the containment contract and deliberately does not specify the
-  process that establishes it.
+RFC describes the containment contract and deliberately does not specify the
+process that establishes it.
 - **Replacing per-session sandboxes.** `SandboxBackend` and the worker-provider
   direction in [PR #55](https://github.com/openclaw/rfcs/pull/55) contain a
   session's work. This RFC contains the Gateway. They compose; neither
@@ -216,11 +220,19 @@ because an overstated boundary is worse than no boundary. At minimum:
 | Capability | Meaning |
 |---|---|
 | `identityIsolation` | Whether the contained Gateway runs as a principal distinct from the invoking user, and whether that principal is per-instance or shared. |
-| `statePersistence` | Whether Gateway state survives the containment lifecycle, and across what unit — instance, host, or not at all. |
-| `hostPathSharing` | Whether, and how, host paths can be projected into the boundary. |
+| `statePersistence` | Whether state inside the boundary survives the containment lifecycle, and across what unit — instance, host, or not at all. |
+| `hostPathProjection` | Whether arbitrary host paths can be mapped into the boundary. |
+| `stagingChannel` | Whether the provider offers a directory for moving files across the boundary, its lifetime, and which side can see it. |
 | `networkPosture` | What the provider can enforce on inbound and outbound network access. Explicitly includes "nothing". |
 | `hostUiReach` | Whether contained code can observe or drive the user's desktop, clipboard, and input. |
+| `workloadIdentity` | Whether the contained unit can be given an identity of its own rather than borrowing the caller's. |
 | `lifecycleOwner` | Whether teardown is guaranteed by the OS or must be driven by OpenClaw. |
+
+`hostPathProjection` and `stagingChannel` are deliberately separate. A provider
+may offer a way to hand a file across the boundary without being able to give
+the contained unit access to the user's working tree, and treating those as one
+capability is how a deployment ends up believing it has the second when it only
+has the first.
 
 A provider must decline configuration it cannot enforce rather than accepting it
 silently. This mirrors the disposition MXC already takes for its own backends,
@@ -252,6 +264,22 @@ operation is idempotent: `provision` on an already-provisioned environment
 returns the existing one, and `stop` or `deprovision` on an absent one succeeds.
 And `deprovision` is the only destructive step, so a supervisor may retry any
 other operation without risking state.
+
+**Addressing and reuse.** `provision` returns an opaque identifier that the
+caller persists and uses to address the environment in every later phase, and it
+reports whether it created a new isolated identity or reused an existing one.
+This is what makes `attach` work across separate CLI invocations, and it is not
+theoretical: the Windows provider's underlying lifecycle is explicitly designed
+so a provisioned session can host multiple executions across separate caller
+processes rather than re-paying provisioning cost per command. A contained
+Gateway is therefore a durable environment that outlives the process that
+started it, and the supervisor's job is to re-address it, not to recreate it.
+
+The corollary is that the environment does not go away on its own. Because
+`deprovision` is explicit and destructive, a crashed or forgotten supervisor
+leaves a provisioned environment behind. Reconciling those orphans is an
+implementation obligation, not an edge case, and is called out in the readiness
+bar.
 
 **Failure semantics.** Providers report a small closed set of outcomes so
 OpenClaw can act on them without parsing provider text:
@@ -322,26 +350,67 @@ the signed-in user's grants.
 
 The boundary this provider delivers is an **identity** boundary, and the
 capability descriptor must say exactly that. Per the public MXC documentation
-for this backend, it has no host-folder-sharing primitive and rejects filesystem
-policy outright; its network is unrestricted, with a process inside able to
-listen on a port reachable via localhost; and it exposes no UI-restriction
+for this backend, its network is unrestricted, with a process inside able to
+listen on a port reachable via localhost, and it exposes no UI-restriction
 primitive, though contained code cannot reach the host's desktop or clipboard.
 So the honest descriptor is per-instance identity isolation and OS-owned
-teardown, with `hostPathSharing` and `networkPosture` reported as unsupported.
+teardown, with `networkPosture` reported as unsupported.
+
+`hostPathSharing` is more nuanced than "unsupported", and the distinction drives
+much of the design below. The backend rejects every filesystem policy field, so
+a caller cannot project an arbitrary host path — the user's documents folder
+cannot be mapped in. What it does provide is a single OS-created staging
+directory per sandbox, documented as "a directory shared between the calling
+user and this isolated agent user, through which the caller can stage files into
+the session", with three properties that matter:
+
+- **Asymmetric visibility.** Each isolated user can access only its own
+  workspace, while the caller can access every concurrent sandbox's workspace.
+  The caller is the more privileged side.
+- **Ephemeral.** It is created at provision and deleted at deprovision, so it is
+  a staging channel, not storage.
+- **Not the working directory.** It does not change where the workload runs.
+
+So the descriptor should report `hostPathSharing` as a *staging channel* rather
+than as path projection, and the seam must model those as different
+capabilities. A provider that can stage a file in is not a provider that can
+give an agent access to the user's working tree, and conflating them would let a
+deployment believe the second was available when only the first is.
+
+Two further provider inputs are worth recording because they shape the contract.
+Provisioning accepts an optional application identifier, documented as "the
+Package Family Name for a packaged app", carried verbatim so that "a future OS
+contract acting on the calling application's identity needs no breaking change"
+— which is a direct, concrete link to the package identity proposed in
+[#58](https://github.com/openclaw/rfcs/pull/58) rather than a thematic one.
+Provisioning also accepts an optional user-identity bundle, which is the hook by
+which a contained unit could carry an identity of its own instead of borrowing
+the caller's.
 
 ### Obligations this creates
 
 Naming the boundary honestly surfaces three obligations that the seam must
 account for and that the Windows provider does not yet satisfy.
 
-**State must outlive the environment.** A Gateway is not a one-shot workload.
-Its configuration, credentials, pairing records, and session history must
-survive restarts. If deprovisioning removes the account that owns that state,
-then either state lives outside the boundary through a mechanism the provider
-declares, or contained execution is limited to deployments that can tolerate
-losing it. The seam must therefore treat `statePersistence` as a first-class
-capability rather than an implementation footnote, and OpenClaw must not assume
-state survives unless the provider says it does.
+**State must outlive the environment, so it has to live outside it.** A Gateway
+is not a one-shot workload: its configuration, credentials, pairing records, and
+session history must survive restarts. On this provider, both the isolated
+account and the staging directory are destroyed at deprovision, so nothing kept
+inside the boundary is durable. That settles the design rather than leaving it
+open — durable state belongs to the host side, outside the boundary, and is
+staged in when the environment is created. Two consequences follow. The store
+becomes a boundary-crossing asset that must be protected as carefully as the
+Gateway itself, since it holds exactly the credentials the containment is
+supposed to be worth protecting. And the seam must treat `statePersistence` as a
+declared capability rather than an assumption, because a provider that *does*
+offer durable in-boundary state should not be forced through host-side staging.
+
+**Do not run the Gateway from the staging channel.** The staging directory is
+ephemeral, visible to the more privileged caller, and explicitly not the
+workload's working directory. Application content should be staged through it
+and then materialized inside the boundary, so that the running Gateway does not
+depend at runtime on a directory the host can rewrite underneath it and that
+disappears at deprovision.
 
 **Reachability must be explicit.** Clients, channels, and nodes must continue to
 reach the contained Gateway with no protocol change. Where the provider's
@@ -349,10 +418,15 @@ network posture is unrestricted this is straightforward, but it also means
 containment buys nothing at the network layer, and the RFC should not let the
 word "contained" imply otherwise.
 
-**Host reach is genuinely lost.** A contained Gateway cannot see the user's
-desktop or, on this provider, the user's files. For an agent expected to work on
-the user's behalf in the user's environment, that is a real capability
-regression, not a detail. It is the central unresolved question below.
+**Host reach is reduced to a staging channel.** A contained Gateway cannot see
+the user's desktop, and it cannot open the user's working tree, because
+arbitrary host paths cannot be projected in. What remains is a directory through
+which the host can hand it files. For an agent expected to work on the user's
+behalf in the user's environment, that is a real capability regression: "the
+user asks the agent to fix a file in their repository" is not expressible unless
+something explicitly stages that content across, which is a product decision
+about mediated access rather than a transparent capability. It remains the
+central unresolved question below.
 
 ### Ownership and why this belongs in core
 
@@ -387,7 +461,13 @@ Contained execution should be recommended for a class of deployment only once:
 - The provider's capability descriptor is accurate, and OpenClaw refuses
   configuration the provider cannot enforce.
 - Gateway state has defined, tested persistence across
-  `provision`/`deprovision`, including across host restarts.
+  `provision`/`deprovision`, including across host restarts, and the host-side
+  store holding it is protected commensurately with the credentials it contains.
+- Orphaned environments left by a crashed or replaced supervisor are reconciled
+  rather than accumulating, since `deprovision` is explicit and no other party
+  performs it.
+- Anything the host reads back from the staging channel is treated as untrusted
+  input, with the parsing boundary identified and tested.
 - Clients, channels, and nodes connect to a contained Gateway with no protocol
   change and no additional user step.
 - `attach` makes ordinary CLI use cheap, rather than paying provisioning cost
@@ -443,9 +523,18 @@ This is an identity boundary and nothing more. The following survive it:
   largest surviving path, and it means containment must not be described as a
   network control.
 - **Outbound egress.** Exfiltration to the internet is unrestricted.
-- **Whatever is deliberately shared in.** Any future host-path sharing
-  reintroduces exactly the reach it projects, and should be treated as reopening
-  the boundary for those paths rather than as a convenience feature.
+- **The staging channel, in both directions.** The shared directory crosses the
+  boundary, and its visibility is asymmetric in the caller's favour: each
+  contained unit sees only its own, while the caller sees every concurrent one.
+  Contained code can therefore write into a directory that a host-side process
+  running as the user will later read, so anything the host parses from it is
+  untrusted input — the most likely place for a boundary-crossing bug. Any
+  future arbitrary path projection reopens the boundary for exactly what it
+  projects and should be treated as such rather than as a convenience.
+- **The host-side state store.** Because durable state cannot live inside the
+  boundary, it lives on the host and holds the credentials containment is meant
+  to make less valuable to steal. Compromising the host side recovers them, so
+  containment moves the crown jewels rather than eliminating them.
 - **The user's own actions.** A contained agent can still return output that
   induces the user to run something themselves.
 
@@ -604,18 +693,20 @@ cheaper than retrofitting them around a shipped Windows-specific implementation.
 
 ### Blocking — these gate the readiness bar
 
-- **How does a contained Gateway reach the user's files?** This provider has no
-  host-folder-sharing primitive. An agent that cannot open the user's working
-  files is not useful for most of what OpenClaw is used for. Is the answer a
-  future OS sharing primitive, an explicit user-mediated projection of selected
-  paths, a filesystem bridge over the existing protocol similar to the remote
-  filesystem bridge already used for sandboxes, or an accepted restriction to
-  deployments where the Gateway operates on its own workspace? Whichever is
-  chosen, it reopens the boundary for whatever it projects.
-- **Where does Gateway state live?** If the OS-assigned account is removed at
-  deprovision, what persists configuration, credentials, and pairing records
-  across restarts? The migration and rollback design above depends on this
-  answer, so it blocks implementation phase 3.
+- **How does a contained Gateway reach the user's files?** Arbitrary host paths
+  cannot be projected in; what exists is a staging directory the host can write
+  into. So the question is not whether sharing is possible but what the product
+  should do with a mediated channel: stage an explicitly selected working set in
+  and results out, run a filesystem bridge over the existing protocol similar to
+  the remote filesystem bridge already used for sandboxes, wait for a future OS
+  projection primitive, or accept that a contained Gateway operates only on its
+  own workspace. Each reopens the boundary to a different degree, and the choice
+  determines how useful contained execution actually is.
+- **What holds durable state, and how is it protected?** State must live
+  host-side because the account and its staging directory are destroyed at
+  deprovision. What is that store, how is it protected given that it holds the
+  Gateway's credentials, and how does an existing uncontained installation
+  migrate into it? This blocks implementation phase 3.
 - **Is an identity-only boundary worth adopting?** The provider enforces nothing
   on the network and loopback survives containment. Should OpenClaw require a
   network-capable provider before recommending containment for any deployment
@@ -632,6 +723,14 @@ cheaper than retrofitting them around a shipped Windows-specific implementation.
   and requires a recent Windows build. How does OpenClaw express a containment
   posture that is unavailable on most hosts without fragmenting the Windows
   experience?
+- **Should the contained Gateway carry its own identity?** The provider accepts
+  an optional identity bundle at provision, so a contained unit could
+  authenticate as itself rather than inheriting whatever the caller holds. That
+  would narrow the credential blast radius the threat model calls out, and it
+  interacts with the per-agent secret isolation proposed in
+  [#42026](https://github.com/openclaw/openclaw/issues/42026). Out of scope for
+  phase 1, but the descriptor reserves `workloadIdentity` so it can be answered
+  without a breaking change.
 - **How is autostart handled?** A Gateway expected to run in the background must
   start without an interactive logon. What does contained startup look like
   before or without a signed-in user?
