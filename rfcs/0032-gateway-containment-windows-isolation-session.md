@@ -6,7 +6,7 @@ created: 2026-08-18
 last_updated: 2026-08-18
 status: draft
 issue:
-rfc_pr: <pull request URL>
+rfc_pr: https://github.com/openclaw/rfcs/pull/61
 ---
 
 # Proposal: Gateway Containment and Windows Isolation Sessions
