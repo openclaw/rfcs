@@ -23,10 +23,12 @@ the Gateway inside an OS-managed containment boundary instead of directly as the
 user. Windows Isolation Sessions are proposed as the first provider: the
 operating system provisions a fresh, OS-assigned agent account, runs the Gateway
 in a dedicated session bound to that account, and tears the session and account
-down when the owning process exits. The seam and the argument are the proposal;
-the Windows provider is currently preview-quality, so this RFC defines the
-readiness bar that adoption must clear rather than asking for immediate default
-adoption.
+down when the owning process exits. The seam is written against a *unit of
+containment* rather than a monolithic Gateway, so it survives a future split of
+the Gateway into a control plane and per-agent runtimes. The seam and the
+argument are the proposal; the Windows provider is currently preview-quality, so
+this RFC defines the readiness bar that adoption must clear rather than asking
+for immediate default adoption.
 
 ## Motivation
 
@@ -103,16 +105,35 @@ re-paying the provisioning / session-start cost each time" — but that is a cos
 paid once for a daemon that then stays up. For a long-lived agent process, that
 is the trade OpenClaw has been missing.
 
-### This composes with packaging, and does not duplicate it
+### This composes with neighbouring proposals rather than duplicating them
+
+Two active proposals touch the same area, and neither makes this one redundant.
 
 [RFC PR #58](https://github.com/openclaw/rfcs/pull/58) proposes MSIX packaging
 for Windows and explicitly lists "Defining runtime isolation. A separate RFC may
-define a session-based runtime model" among its non-goals. The two proposals
-answer different questions. Packaging gives the installation a reviewable
-identity so an administrator can inventory, approve, update, and remove it.
-Containment reduces what that installation can reach while it runs. An approved,
-signed, inventoried Gateway with the user's full token is still an
-unbounded-blast-radius component.
+define a session-based runtime model" among its non-goals. Packaging gives the
+installation a reviewable identity so an administrator can inventory, approve,
+update, and remove it. Containment reduces what that installation can reach
+while it runs. An approved, signed, inventoried Gateway holding the user's full
+token is still an unbounded-blast-radius component.
+
+[`openclaw/openclaw#42026`](https://github.com/openclaw/openclaw/issues/42026)
+proposes splitting the gateway into a control plane and per-agent runtimes so
+each agent can run in its own container, VM, or process, and argues for "true
+secret isolation" in which one agent's credentials never coexist with another's.
+That is a real reduction in blast radius, and it is a different axis from this
+proposal. Decomposition partitions *which component holds which secrets*;
+containment changes *what principal a component runs as*. A fully decomposed
+deployment on Windows still runs every control plane and every runtime as the
+signed-in user, so each piece keeps the same reach into that user's files,
+registry, and tokens — the partition is horizontal, between agents, and does not
+cross the user boundary. Conversely, containment without decomposition places
+all agents behind one contained identity.
+
+The two therefore compose, and the seam proposed here is deliberately written
+against a *unit of containment* rather than against a monolithic Gateway. If
+#42026 lands, the unit becomes the runtime, optionally the control plane, and
+the contract below is unchanged.
 
 ## Goals
 
@@ -128,20 +149,29 @@ unbounded-blast-radius component.
   protocol behavior are unchanged by containment.
 - Define explicit selection, fallback, and diagnostic behavior, including what
   happens when a requested provider is unavailable on the host.
+- Keep the seam neutral about the unit of containment so it remains valid if the
+  Gateway is later split into a control plane and per-agent runtimes.
+- Preserve existing uncontained deployments unchanged, with a defined migration
+  and rollback path for those that opt in.
 - Define the readiness bar that a provider must clear before contained execution
   can be recommended, and later defaulted, for a class of deployment.
 
 ## Non-Goals
 
 - **Defining the packaging or launch mechanism.** How a Gateway build is
-  packaged, signed, distributed, and started on Windows belongs to
-  [PR #58](https://github.com/openclaw/rfcs/pull/58) and its implementation.
-  This RFC describes the containment contract and deliberately does not specify
-  the process that establishes it.
+  packaged, signed, distributed, and started on Windows belongs to [PR
+  #58](https://github.com/openclaw/rfcs/pull/58) and its implementation. This
+  RFC describes the containment contract and deliberately does not specify the
+  process that establishes it.
 - **Replacing per-session sandboxes.** `SandboxBackend` and the worker-provider
   direction in [PR #55](https://github.com/openclaw/rfcs/pull/55) contain a
   session's work. This RFC contains the Gateway. They compose; neither
   substitutes for the other.
+- **Deciding how the Gateway is decomposed.** Whether the Gateway splits into a
+  control plane and per-agent runtimes is
+  [`openclaw/openclaw#42026`](https://github.com/openclaw/openclaw/issues/42026)
+  to settle. This RFC defines a contract that applies to whatever the resulting
+  deployable unit is.
 - **Specifying the Windows API surface.** The OS API is owned by Windows and is
   consumed, not defined, here.
 - **Requiring containment, or making it the default, in this RFC.** The Windows
@@ -157,9 +187,14 @@ unbounded-blast-radius component.
 
 ### What moves, and what does not
 
-Containment applies to the Gateway process and everything it hosts in-process:
-the agent loop, plugin code, the scheduler, and the Gateway's own working state.
-The following explicitly stay outside the boundary and are unchanged:
+The unit of containment is the deployable process that holds credentials and
+runs the agent loop. Today that is the Gateway. If
+[#42026](https://github.com/openclaw/openclaw/issues/42026) splits it, the unit
+becomes each per-agent runtime, and optionally the control plane, without
+changing the contract below. Containment applies to that unit and everything it
+hosts in-process: the agent loop, plugin code, the scheduler, and its own
+working state. The following explicitly stay outside the boundary and are
+unchanged:
 
 - Client, channel, and node connections, which continue to reach the Gateway
   through its existing endpoints.
@@ -192,6 +227,13 @@ silently. This mirrors the disposition MXC already takes for its own backends,
 where unenforceable policy is rejected rather than quietly dropped, and it is
 the property that makes the descriptor trustworthy.
 
+The descriptor is versioned. A provider reports the descriptor schema version it
+implements, and OpenClaw refuses to run against a descriptor whose version it
+does not understand rather than assuming absent fields mean "unsupported" — an
+unrecognised capability must never be silently downgraded into a claim about the
+boundary. Adding a capability is a minor version change; changing the meaning of
+an existing one is a major version change and requires a provider update.
+
 **Lifecycle.** Providers implement a lifecycle that a long-lived daemon can use:
 
 ```
@@ -200,10 +242,31 @@ probe -> provision -> start -> attach -> stop -> deprovision
 
 `probe` reports availability and the capability descriptor for the current host,
 without side effects. `provision` creates the isolated principal and
-environment. `start` launches the Gateway inside it. `attach` reconnects to an
-already-running contained Gateway across separate CLI invocations, so ordinary
-commands do not each pay provisioning cost. `stop` and `deprovision` end the
-Gateway and release the environment.
+environment. `start` launches the unit of containment inside it. `attach`
+reconnects to an already-running contained unit across separate CLI invocations,
+so ordinary commands do not each pay provisioning cost. `stop` and `deprovision`
+end the process and release the environment.
+
+Two invariants make the lifecycle safe to drive from a supervisor. Every
+operation is idempotent: `provision` on an already-provisioned environment
+returns the existing one, and `stop` or `deprovision` on an absent one succeeds.
+And `deprovision` is the only destructive step, so a supervisor may retry any
+other operation without risking state.
+
+**Failure semantics.** Providers report a small closed set of outcomes so
+OpenClaw can act on them without parsing provider text:
+
+| Outcome | Meaning | OpenClaw behavior |
+|---|---|---|
+| `unavailable` | The provider cannot run on this host: absent, feature-gated off, or unsupported build. | Fail closed unless fallback is configured. Report the reason. |
+| `policy_rejected` | Configuration was supplied that this provider cannot enforce. | Fail closed always. Never downgrade to a weaker boundary. |
+| `stale` | The referenced environment no longer exists. | Re-provision if the caller asked to start; otherwise surface. |
+| `lifecycle_failed` | A lifecycle operation failed for an operational reason. | Retry per policy, then fail closed. |
+
+`policy_rejected` never falls back, even when fallback is configured. A
+deployment that asked for a boundary the provider cannot deliver has a
+configuration error, not an availability problem, and silently running it with a
+weaker boundary is the outcome this contract exists to prevent.
 
 **Selection and fallback.** Containment is selected explicitly by configuration,
 never inferred. When a selected provider's `probe` fails, the default is
@@ -291,6 +354,32 @@ desktop or, on this provider, the user's files. For an agent expected to work on
 the user's behalf in the user's environment, that is a real capability
 regression, not a detail. It is the central unresolved question below.
 
+### Ownership and why this belongs in core
+
+The seam belongs in core; individual providers do not.
+
+Core owns the `GatewayContainmentProvider` interface, the capability descriptor
+and its schema version, the failure taxonomy, provider selection, the
+fail-closed rule, and the reporting of containment posture in status and
+diagnostics. This is the minimum that cannot live outside core: it decides
+whether the Gateway starts at all, it is the thing that must refuse to downgrade
+a security posture silently, and its guarantees are only as good as the
+component that enforces them. A containment boundary implemented by an optional,
+independently versioned plugin would be a boundary the Gateway could be
+persuaded to skip, which defeats the argument in the Motivation.
+
+Individual providers are platform integrations and should live wherever their
+platform dependency is maintainable — for the Windows provider, alongside the
+Windows packaging work rather than in the cross-platform Gateway, so that a
+preview OS dependency and its binding regeneration do not become a build
+requirement for every OpenClaw contributor. The seam must therefore support an
+out-of-tree provider without special-casing it.
+
+This satisfies the usual test for core ownership: the behavior is mandatory for
+the security and trust model rather than optional, it is a public contract with
+more than one credible implementer (Windows now, macOS and Linux primitives
+later), and it is not a one-off hook added for a single consumer.
+
 ### Readiness bar
 
 Contained execution should be recommended for a class of deployment only once:
@@ -315,6 +404,138 @@ Contained execution should be recommended for a class of deployment only once:
 
 Until then, contained execution should ship as an explicitly experimental,
 opt-in posture for deployments that want to exercise it.
+
+## Threat model and residual risk
+
+The threat this addresses is a Gateway that is induced to act against the user:
+prompt injection reaching the agent loop, a hostile or compromised plugin or
+skill, or a supply-chain compromise of a dependency loaded in-process. The
+attacker is assumed to achieve arbitrary code execution inside the Gateway
+process. Attackers who already hold the user's credentials, local administrator,
+or kernel-level access are out of scope, as is a malicious OpenClaw build.
+
+### What the identity boundary removes
+
+Contained, the attacker no longer runs as the signed-in user. Reads and writes
+against the user's profile, `HKCU`, browser and credential stores, SSH keys,
+startup entries, and any resource whose ACL grants that user are refused by the
+operating system rather than by OpenClaw's own policy. On this provider the
+attacker also cannot observe or drive the user's desktop, clipboard, or input,
+which removes screen-scraping and synthetic-input paths to the user's other
+applications. When the session is deprovisioned, the account and its session
+state go with it, so filesystem persistence inside the boundary is not durable.
+
+### What the attacker still has
+
+This is an identity boundary and nothing more. The following survive it:
+
+- **Everything the Gateway legitimately holds.** Provider API keys, channel
+  credentials, pairing records, and conversation history are inside the boundary
+  by construction. Containment limits reach into the *user's* assets; it does
+  not protect the Gateway's own secrets from code running as the Gateway.
+  Credential exfiltration remains fully available.
+- **The network, including loopback.** The provider enforces nothing on the
+  network, and a process inside can reach and be reached over localhost. Host
+  services that authenticate by origin rather than by credential — development
+  servers, local databases, metadata or agent endpoints, other OpenClaw
+  Gateways, and local MCP servers — remain reachable from inside the boundary.
+  For a workstation with local services listening on loopback, this is the
+  largest surviving path, and it means containment must not be described as a
+  network control.
+- **Outbound egress.** Exfiltration to the internet is unrestricted.
+- **Whatever is deliberately shared in.** Any future host-path sharing
+  reintroduces exactly the reach it projects, and should be treated as reopening
+  the boundary for those paths rather than as a convenience feature.
+- **The user's own actions.** A contained agent can still return output that
+  induces the user to run something themselves.
+
+### Consequences
+
+Two follow directly. First, containment reduces blast radius but does not reduce
+the value of the credentials the Gateway holds, so credential hygiene, scoping,
+and rotation remain as important as before. Second, because loopback survives, a
+deployment that relies on local services trusting their callers gets materially
+less protection than the headline claim suggests, and should be told so rather
+than left to infer it.
+
+Finally, the platform primitive is preview-gated and its own documentation
+declines to describe its profiles as security boundaries today. Until that
+changes, contained execution should be presented as defense in depth and a
+direction of travel, not as a control a deployment may rely on.
+
+## Compatibility, migration, and rollback
+
+**Existing deployments are unaffected.** Containment is opt-in and off by
+default. A deployment that does not configure a provider behaves exactly as it
+does today, on every platform, with no new dependency and no change to startup.
+
+**Adoption is a migration, not a flag.** Turning containment on moves the
+Gateway to a new principal, so state that lived under the user's profile is not
+automatically visible to it. Before this can be recommended, the implementation
+must provide a supported path that relocates or re-establishes configuration,
+credentials, and pairing records for the contained identity, and must report
+clearly when it cannot. Because the Windows provider's `statePersistence` is
+unresolved, this is a blocking dependency rather than a detail — a migration
+that silently produces an empty Gateway would look identical to a working one
+until the first channel fails to authenticate.
+
+**Rollback must be routine.** Disabling containment must return the deployment
+to its previous uncontained behavior without data loss, which requires that
+adoption never destroys the pre-migration state as part of moving it. Rollback
+should be a supported operation exercised in testing, not a recovery procedure
+discovered during an incident.
+
+**Downgrade.** An OpenClaw version that predates the seam ignores the
+configuration and starts uncontained. That is a silent posture change of exactly
+the kind this proposal argues against, so the configuration must be rejected as
+unknown rather than ignored on versions that cannot honor it, and the readiness
+bar should not be considered met until that behavior exists.
+
+**No protocol or wire compatibility impact.** Clients, channels, and nodes are
+unchanged, so a contained and an uncontained Gateway are indistinguishable to
+them.
+
+## Implementation plan
+
+Staged so that each phase produces something reviewable and none of them
+requires the preview OS dependency to be present.
+
+1. **Contract only.** Land the provider interface, versioned capability
+   descriptor, failure taxonomy, selection and fail-closed logic, and posture
+   reporting in status and diagnostics, with an in-tree null provider. Proof:
+   unit coverage for selection, refusal, and reporting, exercised through the
+   real interface rather than through source inspection.
+2. **Windows provider, behind experimental opt-in.** Implement `probe`,
+   `provision`, `start`, `attach`, `stop`, and `deprovision` against the OS
+   primitive, reporting the honest descriptor. Proof: a Gateway that starts
+   contained on a capable build, is reachable from a client, and reports its
+   posture; and a capable-build-absent host that fails closed with the reason.
+3. **State and migration.** Resolve persistence, then implement adoption and
+   rollback with tested restart, upgrade, and downgrade behavior. Proof: a
+   contained Gateway that survives host restart with its pairing intact, and a
+   rollback that restores the prior deployment.
+4. **Readiness review.** Re-evaluate against the readiness bar and decide
+   whether contained execution can be recommended for any deployment class.
+
+Phase 1 is owned by whoever owns Gateway startup; phases 2 and 3 need a Windows
+owner with access to the platform primitive. Phase 3 should not begin while the
+persistence question is open, and phase 4 is a maintainer decision rather than
+an implementation task.
+
+## Decision requested
+
+This RFC asks maintainers for one decision: **is an opt-in, capability-honest
+Gateway containment seam a direction OpenClaw wants to own in core, given that
+the first available provider offers identity isolation only and is
+preview-gated?**
+
+A "yes" authorizes phase 1 — the contract, with no provider and no default
+change. It does not commit OpenClaw to the Windows provider, to a default
+posture, or to a timeline.
+
+Two secondary decisions follow only from a "yes": whether providers may live
+out-of-tree, and whether this RFC's number is correct given the repository's
+current numbering practice. Both are noted rather than assumed.
 
 ## Rationale
 
@@ -357,6 +578,17 @@ MXC's default Windows backend uses it, but the principal is unchanged, so the
 per-user token reach that motivates this RFC is not removed. Isolation sessions
 change the principal, which is the property being argued for.
 
+**Why not rely on splitting the Gateway instead.**
+[#42026](https://github.com/openclaw/openclaw/issues/42026) would give each
+agent its own runtime and its own secrets, which is a genuine reduction in blast
+radius and independently worth doing. It is not a substitute, because it
+partitions between agents while leaving every resulting process running as the
+signed-in user. Decomposition means a compromised agent cannot reach another
+agent's secrets; containment means it cannot reach the user's. A deployment
+wants both, and adopting either does not foreclose the other. Writing the seam
+against a unit of containment rather than against "the Gateway" is what keeps
+that true.
+
 **Why fail-closed by default.** A containment control that silently degrades to
 no containment produces the worst outcome: an operator who believes they are
 protected and is not. Failing closed makes the absence of the boundary a visible
@@ -370,21 +602,27 @@ cheaper than retrofitting them around a shipped Windows-specific implementation.
 
 ## Unresolved questions
 
+### Blocking — these gate the readiness bar
+
 - **How does a contained Gateway reach the user's files?** This provider has no
   host-folder-sharing primitive. An agent that cannot open the user's working
   files is not useful for most of what OpenClaw is used for. Is the answer a
   future OS sharing primitive, an explicit user-mediated projection of selected
   paths, a filesystem bridge over the existing protocol similar to the remote
   filesystem bridge already used for sandboxes, or an accepted restriction to
-  deployments where the Gateway operates on its own workspace?
+  deployments where the Gateway operates on its own workspace? Whichever is
+  chosen, it reopens the boundary for whatever it projects.
 - **Where does Gateway state live?** If the OS-assigned account is removed at
   deprovision, what persists configuration, credentials, and pairing records
-  across restarts, and what is the migration path for an existing uncontained
-  installation adopting containment?
-- **What is the correct network posture?** The provider enforces nothing today
-  and the Gateway's endpoints are reachable via localhost. Should OpenClaw
-  require a network-capable provider before recommending containment, or is an
-  identity-only boundary sufficient for the stated threat?
+  across restarts? The migration and rollback design above depends on this
+  answer, so it blocks implementation phase 3.
+- **Is an identity-only boundary worth adopting?** The provider enforces nothing
+  on the network and loopback survives containment. Should OpenClaw require a
+  network-capable provider before recommending containment for any deployment
+  class, or is the reduction in user-asset reach sufficient on its own?
+
+### Non-blocking — these can be resolved during implementation
+
 - **How do Windows node capabilities survive?** Computer use, screen capture,
   and input injection (cf. [RFC 0025](0025-default-pluggable-computer-use.md))
   require the user's desktop, which contained code cannot reach. Does the
@@ -397,11 +635,15 @@ cheaper than retrofitting them around a shipped Windows-specific implementation.
 - **How is autostart handled?** A Gateway expected to run in the background must
   start without an interactive logon. What does contained startup look like
   before or without a signed-in user?
-- **Who owns the provider implementation?** Does it live in the OpenClaw
-  repository, alongside the Windows packaging work, or in a separate
-  platform-integration component, and what is the dependency and support
-  boundary?
+- **Should providers live out-of-tree?** The Ownership section proposes that
+  platform providers live with their platform dependency rather than in the
+  cross-platform Gateway. Maintainers should confirm that split and the support
+  boundary it implies.
 - **What is the acceptance criterion for calling this a security boundary?** The
   platform currently declines to make that claim for preview profiles. OpenClaw
   should state in advance what evidence it requires before describing contained
   execution as a defense to users.
+- **Is this RFC number correct?** It was chosen as the lowest unclaimed integer,
+  but the repository currently has several open proposals sharing a number, so
+  the allocation rule is not obviously sequential. A maintainer should confirm
+  or reassign it.
