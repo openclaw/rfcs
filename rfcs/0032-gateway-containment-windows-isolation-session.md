@@ -36,16 +36,26 @@ readiness bar to clear before anyone recommends it.
 
 We already have containment seams, and they're all narrower than the Gateway.
 `SandboxBackend` (`src/agents/sandbox/`, with Docker and SSH backends) is
-per-session and scoped to a workspace. It contains the commands an agent runs.
+per-session and scoped to a workspace. It contains the commands an agent runs,
+and it does real work: a sandboxed tool call that tries to read your SSH keys or
+write a startup entry doesn't reach them.
 
-It doesn't contain the process that loads plugins, holds channel and provider
-credentials, runs the scheduler, and picks the commands in the first place.
+What it doesn't contain is the process that loads plugins, holds channel and
+provider credentials, runs the scheduler, and picks the commands in the first
+place.
 
-That's backwards. A tool call gets a container; the thing that chose the tool
-call, and holds the tokens authorizing it, runs as you. On a Windows
-workstation, the blast radius of a prompt injection or a hostile skill is your
-whole profile: documents, browser and credential stores, `HKCU`, startup
-entries, SSH keys.
+That's backwards, and it leaves the full blast radius reachable by three
+distinct routes. A tool call that isn't sandboxed — because the session didn't
+select a backend, or the operation doesn't route through one — runs with your
+identity. A container escape puts the attacker back on the host as you. And the
+Gateway process is never sandboxed at all, so anything the agent loop, a plugin,
+or the scheduler does directly skips the boundary rather than escaping it.
+
+Down any of those routes, on a Windows workstation, the blast radius of a prompt
+injection or a hostile skill is your whole profile: documents, browser and
+credential stores, `HKCU`, startup entries, SSH keys. Tool sandboxing narrows
+the first route and does nothing about the third, which is the one this RFC is
+about.
 
 ACLs don't help here. They don't separate code running as you from data owned by
 you — that's exactly the grant they encode. Neither does a different working
@@ -501,6 +511,12 @@ stores, SSH keys, and per-user startup entries are refused by the OS rather than
 by our own policy. It can't drive your desktop directly — no screen capture off
 your session, no synthetic input into your other apps. What it writes lands in
 the Agent User's profile, not yours.
+
+It also devalues a tool-sandbox escape. Today, breaking out of a per-session
+sandbox lands the attacker on the host as you. With the Gateway contained, the
+same escape lands them in the Agent User — still bad, but bounded by the same
+boundary as the Gateway itself. The two seams genuinely compose rather than
+overlapping.
 
 That is the whole claim. It is narrower than "the Gateway is sandboxed."
 
