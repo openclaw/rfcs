@@ -24,11 +24,11 @@ boundary and starts the Gateway inside it. The Gateway needs no containment code
 of its own; it simply never runs anywhere else.
 
 Windows Isolation Sessions are the first provider: the OS mints a dedicated
-**Agent User** account, runs the Gateway in a session bound to it, and can tear
-both down on request. Crucially the account is not per-run — it's provisioned
-once and kept, so agent memory and state persist across runs and reboots. That
-provider is preview-quality today, so this asks for the contract and the
-direction, plus a readiness bar to clear before anyone recommends it.
+**Agent User** account and runs the Gateway in a session bound to it. The
+account is provisioned and deprovisioned explicitly, so we keep it between runs
+and agent memory and state persist across reboots. That provider is
+preview-quality today, so this asks for the contract and the direction, plus a
+readiness bar to clear before anyone recommends it.
 
 ## Motivation
 
@@ -402,37 +402,26 @@ build](https://learn.microsoft.com/en-us/windows-insider/release-notes/experimen
 
 ### State lives in the Agent User profile
 
-The Agent User is provisioned, not rented per run. Deprovisioning is an explicit
-act, and the account survives everything short of it — including the launcher
-exiting and the launcher binary being upgraded, since outliving the calling
-process is the premise of the state-aware lifecycle.
+The provider supports provisioning an Agent User per run, but this design
+deliberately doesn't. Deprovisioning is an explicit act, and the account
+survives everything short of it, so the shape we want is **provision once, keep
+it**. The Gateway's configuration, credentials, pairing records, conversation
+history, and memory live in that account's profile and persist across runs and
+reboots. There's no host-side shadow copy of Gateway state, and no need for one.
 
-So the intended shape is: **provision once, keep it.** The Gateway's
-configuration, credentials, pairing records, conversation history, and memory
-live in that account's own profile and persist across runs and reboots. There is
-no host-side shadow copy of Gateway state, and no need for one.
+That's a better outcome than it first appears. Durable state stays *inside* the
+boundary rather than parked on the host where the user's own token could reach
+it, so containment isn't just relocating the credentials it was supposed to
+protect. The staging channel goes back to being what its name says — a way to
+hand payload in at setup — rather than a data plane the Gateway depends on at
+runtime.
 
-That is a better outcome than it first appears. Durable state stays *inside* the
-boundary rather than being parked on the host where the user's own token could
-reach it, which means containment isn't just relocating the credentials it was
-supposed to protect. The staging channel goes back to being what its name says —
-a way to hand payload in at setup — rather than a data plane the Gateway depends
-on at runtime.
-
-Two consequences to design for:
-
-- **Deprovision is the reset button, and it is expensive.** Wiping a possibly
-  compromised environment also destroys the agent's accumulated memory and its
-  pairing records. Recovery-after-compromise and losing your agent's history are
-  the same operation, so a supported export — or an explicitly accepted loss —
-  has to exist before deprovision can be recommended as a remediation.
-- **Don't strand the account.** The provider's sandbox identifier is what
-  addresses the Agent User, and an identifier a newer build cannot decode is
-  refused, leaving a sandbox that "cannot be addressed through MXC afterwards".
-  For a long-lived launcher that will be upgraded many times over the life of
-  one Agent User, that is a live hazard: a stranded account takes all the
-  persisted OpenClaw state with it. Identifier compatibility across launcher
-  versions is a hard requirement, not a nice-to-have.
+One consequence to design for: **deprovision destroys the agent's memory along
+with the environment**, so wiping a possibly compromised Agent User and losing
+its accumulated history are the same operation. The fix is straightforward — the
+launcher exposes backup and restore through the staging directory, so state can
+be exported before a reset and reinstated after — but it has to exist before
+deprovision can be recommended as remediation.
 
 **Don't run the Gateway from the staging directory.** It's ephemeral,
 caller-writable, and explicitly not the working directory. Stage through it,
@@ -468,11 +457,9 @@ Recommend contained execution for a deployment class only once:
 
 - The capability descriptor is accurate and the launcher refuses what a provider
   can't enforce.
-- Gateway state survives restart and reboot in the Agent User profile, and
-  survives a launcher upgrade without stranding the account.
-- There's a supported way to export state before `deprovision`, so remediation
-  and rollback don't mean losing the agent's memory.
-- Orphaned environments get reconciled instead of accumulating.
+- Gateway state survives restart and reboot in the Agent User profile.
+- The launcher can back up and restore that state through the staging directory,
+  so remediation and rollback don't mean losing the agent's memory.
 - Anything the host reads back from the staging channel is treated as untrusted
   input, with the parsing boundary identified and tested.
 - Clients, channels, and nodes connect with no protocol change and no extra user
@@ -571,11 +558,10 @@ the leftovers.
   surface and the likeliest place for a bug. Keeping it to setup-time staging,
   rather than a runtime data plane, keeps that surface small.
 - **A long-lived account holding accumulated secrets.** Persisting across runs
-  is the point, but it means the Agent User profile accrues credentials,
-  history, and memory over months. It becomes a target worth attacking in its
-  own right, and it is not protected by your credentials — so how it is backed
-  up, and whether anything can read it from outside the boundary, are real
-  questions rather than deployment details.
+  is the point, but the Agent User profile accrues credentials, history, and
+  memory over months, and it isn't covered by the user's own backup. The
+  launcher's backup and restore path covers that; the residual question is who
+  else can read the backup once it's outside the boundary.
 - **The launcher,** which runs as you, supervises the Gateway for its whole
   lifetime, and can start, stop, and stage into the boundary. Compromising it
   defeats everything.
@@ -624,9 +610,9 @@ has to say so rather than failing at runtime.
 
 **Rollback is routine, not recovery.** Turning containment off returns to the
 previous behavior without data loss, which means adoption must never destroy
-pre-migration state while moving it — and it means a supported way to get state
-*out* of the Agent User profile before deprovisioning, since deprovision
-destroys it irreversibly.
+pre-migration state while moving it — and it's why the launcher's backup and
+restore path matters: state has to come *out* of the Agent User profile before
+deprovisioning, which destroys it irreversibly.
 
 **Downgrade is a real gap, not a requirement we can write our way out of.** A
 launcher version predating this contract ignores the containment config and
@@ -648,9 +634,9 @@ and the readiness bar depends on it existing.
    is reachable from a client, and runs under an account that demonstrably isn't
    the signed-in user; plus a host without the capability failing closed with a
    reason.
-3. **State and migration.** One-time migration into the Agent User profile,
-   export before deprovision, and tested restart, reboot, upgrade, and
-   downgrade.
+3. **State, migration, and backup.** One-time migration into the Agent User
+   profile, backup and restore through the staging directory, and tested
+   restart, reboot, upgrade, and downgrade.
 4. **Bypass resistance.** Make the launcher the managed entry point and make an
    unmanaged Gateway distinguishable. Proof: an admin-observable signal that
    doesn't involve asking the Gateway.
@@ -756,11 +742,10 @@ worst outcome: someone who believes they're protected and isn't.
   an OS projection primitive, or accept that a contained Gateway works only on
   its own workspace. Each reopens the boundary differently, and the choice
   decides how useful this actually is.
-- **How is the Agent User profile protected and backed up?** State living inside
-  the boundary is the right answer, but it creates a long-lived account holding
-  months of credentials, history, and memory that isn't covered by the user's
-  own backup or credential protection. What backs it up, what can read it from
-  outside, and what happens to it when the machine is reimaged?
+- **How is exported state protected?** Backup and restore through the staging
+  directory is the mechanism, but an export leaves the boundary carrying the
+  Gateway's credentials and history. What protects it at rest, and what happens
+  to the Agent User profile when the machine is reimaged?
 - **Is an identity-only boundary worth adopting?** Nothing is enforced on the
   network and loopback survives. Do we require a network-capable provider before
   recommending this, or is reduced reach into user assets enough on its own?
