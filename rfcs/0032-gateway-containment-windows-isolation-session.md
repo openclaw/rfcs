@@ -70,8 +70,9 @@ Gateway then has no uncontained mode to reach — not because it declines one, b
 because it's never started outside the boundary at all. It needs no containment
 code and no containment config.
 
-That also sets the bar for the launcher. It's the trusted computing base here,
-so it stays small, loads no plugins, and never runs agent-directed work.
+That also sets the bar for the launcher. It's the part of the trusted computing
+base we actually own, so it stays small, loads no plugins, and never runs
+agent-directed work.
 
 ### Today's Windows options are all bad trades
 
@@ -160,9 +161,12 @@ stays up, that's the right shape.
 - **Containing what the Gateway can command.** Authorized desktop nodes and
   other action fulfillers sit outside this boundary and need their own
   containment story. Out of scope here.
-- **Replacing per-session sandboxes.** `SandboxBackend` and
-  [#55](https://github.com/openclaw/rfcs/pull/55) contain a session's work. This
-  contains the Gateway.
+- **Replacing per-session sandboxes.** `SandboxBackend` contains a session's
+  work; this contains the process running it. They nest.
+- **Competing with [#55](https://github.com/openclaw/rfcs/pull/55).** Where an
+  operator-managed container platform is available, #55 is the better answer and
+  its credential brokering is stronger. This targets machines where that isn't
+  an option.
 - **Deciding how the Gateway is decomposed.** That's
   [#42026](https://github.com/openclaw/openclaw/issues/42026).
 - **Specifying the Windows API.** Owned by Windows; consumed, not defined, here.
@@ -177,8 +181,9 @@ Three parts, and which side of the boundary each lands on is the whole point.
 
 **The launcher runs outside, as the user.** It's the entry point. It selects a
 provider, provisions the boundary, stages the payload, starts the unit inside,
-and reports posture. It's the trusted computing base, so it stays minimal, loads
-no plugins, and never executes agent-directed work.
+and reports posture, and it stays alive supervising the Gateway. It's the part
+of the trusted computing base we own, so it stays minimal, loads no plugins, and
+never executes agent-directed work.
 
 On Windows this is #58's host app, not a new component. #58 defines it as "the
 packaged entry point" behind an `openclaw.exe` execution alias, whose job is
@@ -239,8 +244,9 @@ The descriptor is versioned. The launcher refuses a version it doesn't
 understand rather than treating absent fields as "unsupported" — an unrecognised
 capability must never quietly become a claim about the boundary.
 
-**Lifecycle.** This mirrors the provider's own phases rather than inventing new
-ones:
+**Lifecycle.** The middle phases mirror the provider's own rather than inventing
+new ones; `probe` is the launcher's own step, not something the provider
+defines:
 
 ```
 probe -> provision -> start -> exec -> stop -> deprovision
@@ -257,16 +263,16 @@ a fire-and-forget bootstrapper. It remains running as the Gateway's supervisor
 for as long as the Gateway runs, which means it owns crash detection, restart,
 and teardown. That is a real cost: it is a second always-on process, and it must
 stay in the trusted computing base for the whole session rather than just at
-startup. If the provider later supports detached execution, the launcher can
-shrink to a bootstrapper and reattach instead; the contract should not assume
-either.
+startup. Should the provider gain detached execution later, the launcher could
+shrink to a bootstrapper — but no such capability exists today, so the contract
+assumes supervision and treats anything better as a bonus.
 
 **Idempotency is per-operation, not universal.** The provider's phases behave
 differently on repeat, and a supervisor that assumes otherwise leaks accounts:
 
 | Operation | On repeat | What the launcher must do |
 |---|---|---|
-| `provision` | **Not idempotent** — mints a fresh identity every call | Write a durable operation record *before* calling, so a crash between call and persist is recoverable rather than orphaning an account |
+| `provision` | **Not idempotent** — mints a fresh identity every call | Write a durable record *before* calling, so a retry after a lost response doesn't blindly provision again |
 | `start` / `stop` | Provider-dependent failure on repeat | Track state; don't retry blindly |
 | `exec` | Runs the command again, no deduplication | Guard with the launcher's own supervision state |
 | `deprovision` | Returns "stale" once the identity is gone | Treat stale as success |
@@ -274,6 +280,15 @@ differently on repeat, and a supervisor that assumes otherwise leaks accounts:
 Only `deprovision` is destructive, but only `deprovision` is safely repeatable,
 which is the opposite of the convenient case. `provision` returns an opaque
 identifier the launcher persists and uses to address the environment later.
+
+One failure the launcher genuinely cannot fix on its own: if it dies *during*
+provisioning, the identity may exist while the identifier needed to address it
+does not. That environment is unreachable through the normal contract, and the
+provider treats cleaning it up as an out-of-band operator task. So a write-ahead
+record narrows the window but doesn't close it, and shipping this needs an
+out-of-band reclamation path for environments no launcher can name. That belongs
+in the readiness bar, and it is one of the costs of the provider being
+preview-quality.
 
 Because the environment survives until something explicitly deprovisions it, a
 crashed or replaced launcher leaves one behind. The launcher therefore needs to
@@ -324,14 +339,15 @@ flowchart TB
     gw --- sb
   end
 
-  launcher -->|"provision, stage, start"| svc
+  launcher -->|"provision, stage"| svc
   svc -->|"OS-assigned account"| iso
+  launcher -->|"exec, then supervise"| gw
   client -->|"existing endpoints,<br/>unchanged protocol"| gw
   user -.->|"no inherited grants"| iso
 ```
 
-**Figure 1.** The launcher establishes the boundary; the Gateway starts inside
-it and never runs outside it.
+**Figure 1.** The launcher establishes the boundary, `exec`s the Gateway inside
+it, and stays alive supervising it. The Gateway never runs outside the boundary.
 
 This is an **identity** boundary and the descriptor has to say so. Per [MXC's
 backend
@@ -428,14 +444,20 @@ Recommend contained execution for a deployment class only once:
 - Clients, channels, and nodes connect with no protocol change and no extra user
   step.
 - Ordinary CLI use doesn't pay provisioning cost per command.
-- Orphaned environments are enumerated and reconciled at launcher startup.
+- Orphaned environments are enumerated and reconciled at launcher startup, and
+  there's an out-of-band path for ones no launcher can address.
 - Startup, crash, restart, and teardown are covered, including ungraceful
   shutdown.
+- The Docker and SSH sandbox backends either work under containment or their
+  loss is a documented, accepted tradeoff.
+- Downgrade below the containment-capable launcher is prevented by packaging.
 - Posture is reported by the launcher, fallback is loud, and a managed install
   is distinguishable from one started outside it.
 - The platform primitive is generally available and its owner is willing to call
-  it a security boundary. The `microsoft/mxc` README currently says the opposite
-  about its preview backends, which alone blocks claiming this as a defense.
+  it a security boundary. The [`microsoft/mxc`
+  README](https://github.com/microsoft/mxc/blob/0aaa2afa6588d4aee34b35efb290308bb6f84fa1/README.md)
+  currently says the opposite about its preview backends, which alone blocks
+  claiming this as a defense.
 
 Until then it ships experimental and opt-in.
 
@@ -590,13 +612,26 @@ than duplicating it.
 ## Decision requested
 
 **Is launcher-established, opt-in Gateway containment a direction we want to
-support, given that the first provider offers identity isolation only and is
-preview-gated?**
+support, given that the first provider offers identity isolation only, is
+preview-gated, and requires a permanently running supervisor process?**
 
 A yes authorizes phase 1: the contract, in the launcher, no provider, no default
-change — and notably no change to OpenClaw core, since the Gateway is unchanged
-and unaware. It doesn't commit us to the Windows provider, a default posture, or
-a timeline.
+change — and no change to OpenClaw core, since the Gateway gains no containment
+code. It doesn't commit us to the Windows provider, a default posture, or a
+timeline.
+
+Be clear about what a yes accepts in principle, though, because these are
+structural rather than incidental:
+
+- **A second always-on process.** Because detached execution isn't available,
+  the launcher supervises the Gateway for its whole lifetime. Contained
+  deployments run two processes where they ran one.
+- **A larger trusted computing base,** including the provider SDK, a
+  SYSTEM-hosted OS service, and package integrity.
+- **A boundary that is identity-only.** It doesn't constrain the network, and it
+  doesn't contain what the Gateway is authorized to command.
+
+If those are unacceptable, it's better to say so now than after phase 1.
 
 ## Rationale
 
@@ -645,14 +680,15 @@ a Gateway. AppContainer is a *restriction* model: it keeps your token and takes
 access away, so every resource the workload needs has to be enumerated up front.
 A Gateway that loads arbitrary plugins, spawns a Node runtime, and starts MCP
 servers has an open-ended and unpredictable resource set, which is exactly the
-case an allowlist handles worst. It also cuts the other way: the tier available
-on every current Windows release enforces filesystem policy by adding ACEs to
-host paths, so broadening access means mutating DACLs on the user's real
-directories — persistent host-side side effects, granting access to paths that
-still belong to the user. Too restrictive to run the workload, too invasive when
-you loosen it. An isolation session gives a separate principal with an ordinary
-account instead, so nothing has to be enumerated and nothing on the host is
-rewritten.
+case an allowlist handles worst. There's a deployment cost too: the tier
+available on every current Windows release enforces filesystem policy through
+host path ACEs, and standing that up needs a separate **elevated** host-prep
+step that adds ACEs for AppContainer SIDs to the system-drive root. Those ACEs
+are removable again by a matching unprepare step, so this isn't permanent damage
+— but requiring an administrator to modify machine-wide ACLs before a per-user
+agent can run is a poor fit for a personal machine. An isolation session gives a
+separate principal with an ordinary account instead, so nothing has to be
+enumerated and nothing machine-wide is touched.
 
 **Why fail closed.** A control that silently degrades to no control produces the
 worst outcome: someone who believes they're protected and isn't.
