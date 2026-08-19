@@ -20,8 +20,8 @@ registry, and tokens.
 
 This proposes containing the Gateway itself — and, importantly, doing it from
 *outside* the Gateway. A small trusted launcher provisions an OS-managed
-boundary and starts the Gateway inside it. The Gateway is unchanged and unaware;
-it simply never runs anywhere else.
+boundary and starts the Gateway inside it. The Gateway needs no containment code
+of its own; it simply never runs anywhere else.
 
 Windows Isolation Sessions are the first provider: the OS mints a fresh
 throwaway account, runs the Gateway in a session bound to it, and tears both
@@ -94,7 +94,7 @@ with an opaque OS-assigned name, start a session for it, run processes inside,
 then stop the session and delete the account.
 
 [MXC states the
-requirements](https://github.com/microsoft/mxc/blob/main/docs/isolation-session/oneshot.md)
+requirements](https://github.com/microsoft/mxc/blob/0aaa2afa6588d4aee34b35efb290308bb6f84fa1/docs/isolation-session/oneshot.md)
 plainly: "per-execution OS-isolated identity so the workload's actions cannot
 pollute the calling user's NTFS / registry / token state", with an "OS-managed
 session lifecycle that the OS-side service tears down cleanly when the calling
@@ -121,15 +121,26 @@ stays up, that's the right shape.
   worth having, so the contract below targets a *unit of containment* rather
   than a monolithic Gateway.
 - [**#55 (OpenShell worker
-  provider)**](https://github.com/openclaw/rfcs/pull/55) contains a session's
-  worker. This contains the Gateway. They nest.
+  provider)**](https://github.com/openclaw/rfcs/pull/55) overlaps most and
+  deserves care: it also runs the long-lived Gateway inside a sandbox, and goes
+  further by brokering model credentials through `inference.local` so neither
+  Gateway nor worker holds provider credential values. That directly fixes the
+  residual risk this RFC can't — a contained Gateway still holds its own
+  secrets. The difference is deployment context. #55's Gateway sandbox is
+  *operator-created* on a container platform, which suits cloud and server
+  deployments; it doesn't help a personal Windows machine where there is no
+  operator and no OpenShell. The two are complementary: #55 is the better answer
+  wherever it's available, and its credential brokering is the direction this
+  RFC should follow rather than compete with.
 
 ## Goals
 
 - Establish the boundary in a launcher outside the Gateway, so a compromised
   Gateway has no uncontained mode to reach.
-- Keep the Gateway unchanged and unaware — no new config, no runtime branch, no
-  protocol change.
+- Add no containment code, config, or runtime branch to the Gateway, and no
+  protocol change. This is *not* a claim that the Gateway is unaffected — a new
+  principal means a different profile, registry hive, and credential store, and
+  what that breaks is tracked below.
 - Define a platform-agnostic `ContainmentProvider` contract so this isn't a
   Windows fork of the startup path.
 - Make each provider's limits explicit and machine-readable, so one that can't
@@ -144,7 +155,11 @@ stays up, that's the right shape.
 
 - **Packaging and distribution.** That's
   [#58](https://github.com/openclaw/rfcs/pull/58). This RFC doesn't depend on
-  MSIX; it needs *a* launcher, and on Windows #58 already builds one.
+  MSIX; it needs *a* launcher, and #58 proposes one for Windows. #58 is itself
+  an open draft, so this RFC depends on a proposal rather than on shipped code.
+- **Containing what the Gateway can command.** Authorized desktop nodes and
+  other action fulfillers sit outside this boundary and need their own
+  containment story. Out of scope here.
 - **Replacing per-session sandboxes.** `SandboxBackend` and
   [#55](https://github.com/openclaw/rfcs/pull/55) contain a session's work. This
   contains the Gateway.
@@ -174,13 +189,26 @@ This RFC adds one responsibility: establish the boundary first.
 
 **The unit of containment runs inside.** Today that's the Gateway, along with
 the agent loop, plugins, scheduler, and its working state. If
-[#42026](https://github.com/openclaw/openclaw/issues/42026) lands, the unit
-becomes each runtime instead, and nothing below changes.
+[#42026](https://github.com/openclaw/openclaw/issues/42026) lands, the unit is
+whichever process holds the credentials and runs the agent loop — likely each
+runtime, and possibly the control plane too, since it keeps channels, routing,
+and cron. The provider contract below still applies, but which unit to contain,
+and how many, becomes a live question rather than a given.
 
-**Everything else is untouched.** Clients, channels, and nodes reach the Gateway
-through existing endpoints. Per-session sandboxes still work; containment nests.
-The Gateway still owns its own config, credentials, and pairing records — the
+**The protocol surface is untouched, but the environment isn't.** Clients,
+channels, and nodes reach the Gateway through existing endpoints, and the
+Gateway still owns its own config, credentials, and pairing records — the
 launcher provisions an environment, it doesn't broker credentials.
+
+What does change is everything a process inherits from its principal: profile
+path, registry hive, and credential store. Two consequences we should not gloss
+over. Migration has to move or re-establish that state (see
+[Rollout](#rollout)). And per-session sandbox backends assume things about their
+environment — the Docker backend needs to reach a daemon, the SSH backend needs
+keys and known hosts — none of which is guaranteed for a throwaway account.
+Whether those keep working under containment is an implementation question phase
+2 has to answer, and if the answer is no for some backend, that is a real
+capability loss rather than a detail.
 
 ### The `ContainmentProvider` contract
 
@@ -189,18 +217,19 @@ what boundary can this host actually give me, and how do I start and stop
 something inside it.
 
 **Capabilities.** A provider declares its boundary honestly, because an
-overstated boundary is worse than none:
+overstated boundary is worse than none. These are enumerated values, not free
+text, so the launcher can compare two providers and refuse a weaker one:
 
-| Capability | Meaning |
+| Capability | Values |
 |---|---|
-| `identityIsolation` | Does the unit run as a principal distinct from the user, and is it per-instance? |
-| `statePersistence` | Does state inside survive the lifecycle, and across what — instance, host, nothing? |
-| `hostPathProjection` | Can arbitrary host paths be mapped in? |
-| `stagingChannel` | Is there a directory for moving files across, and what's its lifetime and visibility? |
-| `networkPosture` | What can be enforced on the network. Includes "nothing". |
-| `hostUiReach` | Can contained code see or drive the user's desktop, clipboard, input? |
-| `workloadIdentity` | Can the unit carry its own identity instead of borrowing the caller's? |
-| `lifecycleOwner` | Is teardown guaranteed by the OS, or do we have to drive it? |
+| `identityIsolation` | `none` (same principal), `shared` (one distinct principal), `perInstance` (fresh principal per environment) |
+| `statePersistence` | `none`, `perInstance`, `perHost` |
+| `hostPathProjection` | `none`, `explicitPaths` |
+| `stagingChannel` | `none`, or a directory with a declared lifetime (`ephemeral`, `durable`) and visibility (`callerSeesAll`, `mutual`) |
+| `networkPosture` | `unrestricted`, `egressFiltered`, `isolated` |
+| `hostUiReach` | `full`, `none` |
+| `lifecycleOwner` | `os` (teardown guaranteed), `caller` (we must drive it) |
+| `detachedExecution` | `supported`, `deferred` — whether the launcher may exit after starting the unit |
 
 `hostPathProjection` and `stagingChannel` are deliberately separate. Being able
 to hand a file across is not the same as giving an agent the user's working
@@ -210,39 +239,65 @@ The descriptor is versioned. The launcher refuses a version it doesn't
 understand rather than treating absent fields as "unsupported" — an unrecognised
 capability must never quietly become a claim about the boundary.
 
-**Lifecycle:**
+**Lifecycle.** This mirrors the provider's own phases rather than inventing new
+ones:
 
 ```
-probe -> provision -> start -> attach -> stop -> deprovision
+probe -> provision -> start -> exec -> stop -> deprovision
 ```
 
-`probe` reports availability and capabilities with no side effects. `attach`
-reconnects to an already-running unit across separate invocations, so ordinary
-commands don't each pay provisioning cost.
+`probe` reports availability and capabilities with no side effects. `exec` is
+what actually launches the Gateway inside the environment; the earlier phases
+only build the place it runs.
 
-Every operation is idempotent, and `deprovision` is the only destructive one, so
-a supervisor can retry anything else safely. `provision` returns an opaque
-identifier the launcher persists and reuses to address the environment later,
-and reports whether it reused an existing identity.
+**The launcher stays alive.** On the Windows provider, detached execution — a
+process outliving the call that started it — is explicitly deferred, and a
+spawned process stays tethered to the caller's lifetime. So the launcher is not
+a fire-and-forget bootstrapper. It remains running as the Gateway's supervisor
+for as long as the Gateway runs, which means it owns crash detection, restart,
+and teardown. That is a real cost: it is a second always-on process, and it must
+stay in the trusted computing base for the whole session rather than just at
+startup. If the provider later supports detached execution, the launcher can
+shrink to a bootstrapper and reattach instead; the contract should not assume
+either.
 
-The environment outlives the process that started it. That's what makes `attach`
-work, and it means a crashed launcher leaves an environment behind — reconciling
-orphans is an obligation, not an edge case.
+**Idempotency is per-operation, not universal.** The provider's phases behave
+differently on repeat, and a supervisor that assumes otherwise leaks accounts:
+
+| Operation | On repeat | What the launcher must do |
+|---|---|---|
+| `provision` | **Not idempotent** — mints a fresh identity every call | Write a durable operation record *before* calling, so a crash between call and persist is recoverable rather than orphaning an account |
+| `start` / `stop` | Provider-dependent failure on repeat | Track state; don't retry blindly |
+| `exec` | Runs the command again, no deduplication | Guard with the launcher's own supervision state |
+| `deprovision` | Returns "stale" once the identity is gone | Treat stale as success |
+
+Only `deprovision` is destructive, but only `deprovision` is safely repeatable,
+which is the opposite of the convenient case. `provision` returns an opaque
+identifier the launcher persists and uses to address the environment later.
+
+Because the environment survives until something explicitly deprovisions it, a
+crashed or replaced launcher leaves one behind. The launcher therefore needs to
+enumerate and reconcile environments it owns at startup. This is a required
+operation, not an edge case.
 
 **Failure outcomes** are a closed set, so the launcher can act without parsing
 provider text:
 
 | Outcome | Meaning | Behavior |
 |---|---|---|
-| `unavailable` | Provider can't run here — absent, gated off, unsupported build | Fail closed unless fallback is configured |
+| `unavailable` | Provider can't run here — absent, gated off, unsupported build | Fail closed, unless a fallback provider of equal or greater strength is configured |
 | `policy_rejected` | Config was supplied that this provider can't enforce | Fail closed, always |
 | `stale` | Referenced environment is gone | Re-provision if starting, else surface |
 | `lifecycle_failed` | Operational failure | Retry per policy, then fail closed |
 
-`policy_rejected` never falls back, even when fallback is on. Asking for a
-boundary the provider can't deliver is a config error, not an availability
-problem, and quietly running with a weaker boundary is the exact outcome this
-contract exists to prevent.
+Fallback never means "run uncontained." It means "try the next provider that
+still satisfies the requested capabilities." A deployment that wants uncontained
+execution turns containment off, which is a visible configuration change rather
+than a silent runtime degradation.
+
+`policy_rejected` never falls back at all, even to a stronger provider. Asking
+for a boundary that can't be delivered is a config error, not an availability
+problem.
 
 ### The Windows provider
 
@@ -280,11 +335,11 @@ it and never runs outside it.
 
 This is an **identity** boundary and the descriptor has to say so. Per [MXC's
 backend
-docs](https://github.com/microsoft/mxc/blob/main/docs/isolation-session/state-aware-rust.md),
+docs](https://github.com/microsoft/mxc/blob/0aaa2afa6588d4aee34b35efb290308bb6f84fa1/docs/isolation-session/state-aware-rust.md),
 the network is unrestricted — a process inside can listen on a port reachable
-over localhost — so `networkPosture` is unsupported. There's no UI-restriction
-primitive either, though contained code can't reach the host's desktop or
-clipboard.
+over localhost — so `networkPosture` is `unrestricted`. There's no
+UI-restriction primitive either, though contained code can't reach the host's
+desktop or clipboard.
 
 Host paths are the interesting part, and they drive much of the design.
 Arbitrary path projection is rejected outright — you can't map in the user's
@@ -299,13 +354,25 @@ three properties that matter:
   storage.
 - **Not the working directory.** It doesn't change where the workload runs.
 
-Two other provider inputs shape things. Provisioning takes an optional
-application identifier — documented as "the Package Family Name for a packaged
-app", carried so "a future OS contract acting on the calling application's
-identity needs no breaking change." That's a concrete, mechanical link to
-[#58](https://github.com/openclaw/rfcs/pull/58): package identity is an *input*
-to containment. It also takes an optional user-identity bundle, which is the
-hook for giving a contained unit an identity of its own.
+Provisioning also takes an optional application identifier — documented as "the
+Package Family Name for a packaged app", which MXC "neither interprets nor
+verifies" and which nothing consumes yet. It is carried verbatim so "a future OS
+contract acting on the calling application's identity needs no breaking change."
+Today that is inert forward-compatibility metadata, not an enforced link. Worth
+noting because it is where package identity from
+[#58](https://github.com/openclaw/rfcs/pull/58) would plug in if that OS
+contract ever lands — but this RFC should not claim a mechanical link that does
+not exist yet.
+
+**These facts are pinned deliberately.** Every claim here is cited against
+`microsoft/mxc` commit
+[`0aaa2af`](https://github.com/microsoft/mxc/commit/0aaa2afa6588d4aee34b35efb290308bb6f84fa1),
+verified 2026-08-18. This is not pedantry: an earlier draft of this RFC
+described an optional caller-supplied identity bundle that the backend accepted
+at provision. That surface was removed upstream within about a week, and the
+current docs state that `appId` is the only caller knob beyond the network
+acknowledgment. Anything preview-gated should be re-verified, not trusted from
+memory.
 
 Availability: the backend is experimental, gated behind both an explicit flag
 and an OS feature flag, and needs a recent [Insider
@@ -360,7 +427,8 @@ Recommend contained execution for a deployment class only once:
   input, with the parsing boundary identified and tested.
 - Clients, channels, and nodes connect with no protocol change and no extra user
   step.
-- `attach` keeps ordinary CLI use cheap.
+- Ordinary CLI use doesn't pay provisioning cost per command.
+- Orphaned environments are enumerated and reconciled at launcher startup.
 - Startup, crash, restart, and teardown are covered, including ungraceful
   shutdown.
 - Posture is reported by the launcher, fallback is loud, and a managed install
@@ -379,41 +447,97 @@ arbitrary code execution inside the Gateway. Out of scope: an attacker who
 already has your credentials, local admin, or kernel access, and a malicious
 OpenClaw build.
 
-**What the boundary removes.** The attacker no longer runs as you. Your profile,
-`HKCU`, browser and credential stores, SSH keys, and startup entries are refused
-by the OS rather than by our own policy. They also can't watch your screen or
-inject input, which kills the screen-scraping and synthetic-input paths into
-your other apps. Filesystem persistence inside the boundary dies at deprovision.
+The right comparison throughout is **against an uncontained Gateway today**, not
+against a perfect sandbox. Several things below survive containment, and it
+matters a great deal whether they survive *worse*, *the same*, or *newly*.
 
-**What survives.** This is an identity boundary and nothing more:
+### What containment removes
 
-- **Every credential the Gateway holds.** Provider keys, channel credentials,
-  pairing records, conversation history — all inside by construction.
-  Containment limits reach into *your* assets; it does nothing to protect the
-  Gateway's own secrets from code running as the Gateway. Exfiltration is fully
-  available.
-- **The network, including loopback.** Nothing is enforced, and a process inside
-  can reach and be reached over localhost. Host services that trust their caller
-  by origin — dev servers, local databases, other Gateways, local MCP servers —
-  stay reachable. On a workstation with local services listening, this is the
-  biggest surviving path, and it's why this must never be described as a network
-  control.
-- **The staging channel, both ways.** Contained code can write into a directory
-  a host-side process running as you will later read, so anything the host
-  parses from it is untrusted input. This is the likeliest place for a
-  boundary-crossing bug.
-- **The host-side state store,** which holds the credentials above. Containment
-  moves the crown jewels; it doesn't eliminate them.
-- **The launcher itself.** It runs as you and can start, stop, and stage into
-  the boundary, so compromising it defeats everything. Anything added to the
-  launcher is added to the TCB, which makes package integrity and signing a
-  dependency of this design rather than an adjacent concern.
+The attacker no longer runs as you. Your profile, `HKCU`, browser and credential
+stores, SSH keys, and per-user startup entries are refused by the OS rather than
+by our own policy. It can't drive your desktop directly — no screen capture off
+your session, no synthetic input into your other apps. Anything it writes into
+its own profile disappears when the account is deprovisioned.
+
+That is the whole claim. It is narrower than "the Gateway is sandboxed."
+
+### What is unchanged from today
+
+These survive containment, but a contained Gateway is **no worse than the
+uncontained one you're running now**. They are not regressions, and none of them
+is an argument against adopting containment — they're an argument against
+overselling it.
+
+- **Anything readable by `Users`, `Authenticated Users`, or `Everyone`.** The
+  contained account is a normal Windows account, so machine-wide files, `HKLM`,
+  and world-readable content stay reachable. Containment removes *your* grants,
+  not the machine's public surface.
+- **Local IPC and host services.** Named pipes, RPC/COM, ALPC, shared memory,
+  and anything on loopback. Services that trust a caller by origin rather than
+  by credential — dev servers, local databases, other Gateways, local MCP
+  servers — remain reachable. This is why containment must never be described as
+  a network control.
+- **Outbound egress,** which is unrestricted.
+- **Resource exhaustion** of host CPU, disk, and memory.
+- **Persistence — but scoped.** The account and its profile survive restarts
+  until something explicitly deprovisions, so an attacker can persist across
+  Gateway restarts. Uncontained, that persistence lands in *your* profile and
+  startup; contained, it is confined to a throwaway account that deprovisioning
+  destroys. Strictly better, and it makes deprovision cadence a real lever.
+- **Anything a compromised Gateway can order someone else to do.** Most
+  concretely an authorized desktop node (see [RFC
+  0025](0025-default-pluggable-computer-use.md)): the Gateway doesn't need
+  desktop access if it can command a node that has it. Containing the Gateway
+  does not contain what the Gateway is allowed to drive. Nodes need their own
+  containment story; that's out of scope here, and this RFC should not be read
+  as claiming model-directed action is fully contained.
 - **You.** A contained agent can still talk you into running something yourself.
 
-One consequence worth stating: **posture reported by the Gateway is not
-evidence.** A compromised Gateway can claim to be contained. Containment status
-is a launcher-side assertion, and anything that needs to be trustworthy — an
-admin verifying a managed device — has to observe from outside.
+### What containment shifts or newly introduces
+
+This is the list that deserves scrutiny, because these are the costs rather than
+the leftovers.
+
+- **The Gateway's own credentials stay with it.** Provider keys, channel
+  credentials, and pairing records live inside by construction. Containment
+  limits reach into your assets; it does nothing to stop code running as the
+  Gateway from exfiltrating what the Gateway legitimately holds. Fixing that
+  needs credential brokering, not containment — see
+  [#55](https://github.com/openclaw/rfcs/pull/55), which does exactly that.
+- **A host-side state store,** new to this design, holding those credentials
+  outside the boundary. Containment moves the crown jewels rather than
+  eliminating them, and this store now needs protecting like the Gateway did.
+- **The staging channel, in both directions.** Contained code writes into a
+  directory a host-side process running as you later reads, so anything the host
+  parses from it is untrusted input. This is a genuinely new boundary-crossing
+  surface and the likeliest place for a bug.
+- **The launcher,** which runs as you, supervises the Gateway for its whole
+  lifetime, and can start, stop, and stage into the boundary. Compromising it
+  defeats everything.
+
+### The trusted computing base
+
+Bigger than the launcher, and worth naming honestly:
+
+| Component | Why it's trusted |
+|---|---|
+| Launcher and its provider implementation | Establishes and supervises the boundary |
+| The provider SDK and native bindings | Everything reaches the OS through them |
+| The SYSTEM-hosted OS session service | Owns account and session lifecycle |
+| Windows kernel and session separation | The enforcement itself |
+| Host-side state store and staging parser | Cross-boundary data path |
+| Package integrity and signing | An attacker who replaces the launcher has won |
+
+Two consequences. "The provider declares its capabilities honestly" is a
+contract, not a security mechanism — providers must be trusted built-ins or
+independently verified, not arbitrary third-party code. And **posture reported
+by the Gateway is not evidence**: a compromised Gateway can claim to be
+contained, so anything that must be trustworthy has to observe from outside.
+
+Finally, the platform's own documentation declines to call these profiles
+security boundaries today, and session separation does not by itself stop a
+kernel-level escape. Contained execution is defense in depth and a direction of
+travel, not a control to rely on.
 
 ## Rollout
 
@@ -431,10 +555,14 @@ the unresolved persistence question.
 previous behavior without data loss, which means adoption must never destroy
 pre-migration state while moving it.
 
-**Downgrade.** A version predating the launcher contract would ignore the config
-and start uncontained — the silent posture change this whole RFC argues against.
-It must reject unknown config instead, and that behavior gates the readiness
-bar.
+**Downgrade is a real gap, not a requirement we can write our way out of.** A
+launcher version predating this contract ignores the containment config and
+starts uncontained — the silent posture change this RFC argues against. We can't
+retroactively teach an older build to reject config it has never heard of, so
+this has to be handled outside the config: a minimum launcher version enforced
+by the deployment, or an install that refuses to downgrade below the version
+that introduced containment. Whichever, it belongs to whoever owns packaging,
+and the readiness bar depends on it existing.
 
 **Phases.** None of the first three require the preview OS dependency to begin.
 
@@ -511,9 +639,20 @@ noticeable startup, and a lifecycle built for disposable sessions. The
 isolation-session cost profile is what makes contained execution plausible as an
 eventual default rather than an expert mode.
 
-**Why not AppContainer.** Process-level containment restricts a process that
-still runs as you — it's MXC's default Windows backend, and useful, but the
-principal is unchanged, so the token reach motivating this RFC survives.
+**Why not AppContainer.** MXC's default Windows backend is AppContainer-based,
+so this is a real option rather than a strawman — it's just the wrong shape for
+a Gateway. AppContainer is a *restriction* model: it keeps your token and takes
+access away, so every resource the workload needs has to be enumerated up front.
+A Gateway that loads arbitrary plugins, spawns a Node runtime, and starts MCP
+servers has an open-ended and unpredictable resource set, which is exactly the
+case an allowlist handles worst. It also cuts the other way: the tier available
+on every current Windows release enforces filesystem policy by adding ACEs to
+host paths, so broadening access means mutating DACLs on the user's real
+directories — persistent host-side side effects, granting access to paths that
+still belong to the user. Too restrictive to run the workload, too invasive when
+you loosen it. An isolation session gives a separate principal with an ordinary
+account instead, so nothing has to be enumerated and nothing on the host is
+rewritten.
 
 **Why fail closed.** A control that silently degrades to no control produces the
 worst outcome: someone who believes they're protected and isn't.
@@ -543,11 +682,13 @@ worst outcome: someone who believes they're protected and isn't.
   input injection (see [RFC 0025](0025-default-pluggable-computer-use.md)) need
   the user's desktop, which contained code can't reach. Does the node stay
   outside and connect in, and what does that do to the boundary's value?
-- **Should the contained Gateway carry its own identity?** The provider accepts
-  an identity bundle at provision, which would narrow the credential blast
-  radius above and interacts with per-agent secret isolation in
-  [#42026](https://github.com/openclaw/openclaw/issues/42026). Out of scope for
-  phase 1; `workloadIdentity` is reserved so it can be answered later.
+- **Should the contained Gateway carry its own identity?** Giving the unit its
+  own credentials rather than the Gateway holding provider keys would fix the
+  biggest residual risk above. The provider exposed a caller-supplied identity
+  bundle recently and no longer does, so there's nothing to build on today — but
+  [#55](https://github.com/openclaw/rfcs/pull/55) already solves this with
+  credential brokering, and that's the more promising direction regardless of
+  what the OS offers.
 - **How does autostart work?** A background Gateway has to start without an
   interactive logon, and the launcher is what starts it.
 - **How do we express a posture most hosts can't support** without fragmenting
