@@ -23,11 +23,12 @@ This proposes containing the Gateway itself — and, importantly, doing it from
 boundary and starts the Gateway inside it. The Gateway needs no containment code
 of its own; it simply never runs anywhere else.
 
-Windows Isolation Sessions are the first provider: the OS mints a fresh
-throwaway account, runs the Gateway in a session bound to it, and tears both
-down afterward. That provider is preview-quality today, so this asks for the
-contract and the direction, plus a readiness bar to clear before anyone
-recommends it.
+Windows Isolation Sessions are the first provider: the OS mints a dedicated
+**Agent User** account, runs the Gateway in a session bound to it, and can tear
+both down on request. Crucially the account is not per-run — it's provisioned
+once and kept, so agent memory and state persist across runs and reboots. That
+provider is preview-quality today, so this asks for the contract and the
+direction, plus a readiness bar to clear before anyone recommends it.
 
 ## Motivation
 
@@ -87,19 +88,19 @@ that nobody runs them for a background process.
 
 ### The OS now offers something better shaped
 
-Windows is exposing containment built around per-instance *identity* rather than
-a whole guest OS. Per the public
+Windows is exposing containment built around a distinct *identity* rather than a
+whole guest OS. Per the public
 [`microsoft/mxc`](https://github.com/microsoft/mxc) project, its
-`isolation_session` backend asks a Windows service to mint a fresh agent account
-with an opaque OS-assigned name, start a session for it, run processes inside,
-then stop the session and delete the account.
+`isolation_session` backend asks a Windows service to mint an **Agent User** —
+an account with an opaque OS-assigned name — start a session bound to it, and
+run processes inside. Both the account and the session are explicitly
+provisioned and explicitly removed; neither is torn down implicitly.
 
 [MXC states the
 requirements](https://github.com/microsoft/mxc/blob/0aaa2afa6588d4aee34b35efb290308bb6f84fa1/docs/isolation-session/oneshot.md)
-plainly: "per-execution OS-isolated identity so the workload's actions cannot
-pollute the calling user's NTFS / registry / token state", with an "OS-managed
-session lifecycle that the OS-side service tears down cleanly when the calling
-process exits."
+plainly: "OS-isolated identity so the workload's actions cannot pollute the
+calling user's NTFS / registry / token state", with an OS-managed session
+lifecycle.
 
 The unit is a session and an account, not a guest OS — no guest memory footprint
 or boot time. Provisioning isn't free, which is exactly why MXC's state-aware
@@ -210,10 +211,10 @@ path, registry hive, and credential store. Two consequences we should not gloss
 over. Migration has to move or re-establish that state (see
 [Rollout](#rollout)). And per-session sandbox backends assume things about their
 environment — the Docker backend needs to reach a daemon, the SSH backend needs
-keys and known hosts — none of which is guaranteed for a throwaway account.
-Whether those keep working under containment is an implementation question phase
-2 has to answer, and if the answer is no for some backend, that is a real
-capability loss rather than a detail.
+keys and known hosts — none of which is guaranteed for the Agent User. Whether
+those keep working under containment is an implementation question phase 2 has
+to answer, and if the answer is no for some backend, that is a real capability
+loss rather than a detail.
 
 ### The `ContainmentProvider` contract
 
@@ -228,7 +229,7 @@ text, so the launcher can compare two providers and refuse a weaker one:
 | Capability | Values |
 |---|---|
 | `identityIsolation` | `none` (same principal), `shared` (one distinct principal), `perInstance` (fresh principal per environment) |
-| `statePersistence` | `none`, `perInstance`, `perHost` |
+| `statePersistence` | `none`, `acrossRuns` (survives restart, dies on teardown), `external` (provider keeps no state) |
 | `hostPathProjection` | `none`, `explicitPaths` |
 | `stagingChannel` | `none`, or a directory with a declared lifetime (`ephemeral`, `durable`) and visibility (`callerSeesAll`, `mutual`) |
 | `networkPosture` | `unrestricted`, `egressFiltered`, `isolated` |
@@ -316,10 +317,14 @@ problem.
 
 ### The Windows provider
 
-`provision` asks the OS service for a fresh account, `start` boots a session
-bound to it, `stop` and `deprovision` tear both down. Each instance is a
-distinct account with no shared registration, so concurrent units are
-independent.
+`provision` mints the Agent User, `start` boots a session bound to it, `exec`
+runs the Gateway, `stop` ends the session, and `deprovision` removes the
+account. Each Agent User is distinct with no shared registration, so concurrent
+units are independent.
+
+In normal operation only `start`/`exec`/`stop` recur. `provision` happens once
+at setup and `deprovision` only when the deployment is being decommissioned or
+deliberately reset — which is what lets Gateway state persist across runs.
 
 ```mermaid
 flowchart TB
@@ -332,7 +337,7 @@ flowchart TB
   svc["Isolation Session<br/>service, SYSTEM<br/>owns lifecycle"]
 
   subgraph iso["Isolation session"]
-    gw["OpenClaw Gateway<br/>unchanged, unaware"]
+    gw["OpenClaw Gateway<br/>state in Agent User<br/>profile, persists"]
     plugins["Plugins, scheduler,<br/>agent loop"]
     sb["Per-session sandboxes"]
     gw --- plugins
@@ -340,7 +345,7 @@ flowchart TB
   end
 
   launcher -->|"provision, stage"| svc
-  svc -->|"OS-assigned account"| iso
+  svc -->|"mints Agent User"| iso
   launcher -->|"exec, then supervise"| gw
   client -->|"existing endpoints,<br/>unchanged protocol"| gw
   user -.->|"no inherited grants"| iso
@@ -364,10 +369,11 @@ documented as "a directory shared between the calling user and this isolated
 agent user, through which the caller can stage files into the session", with
 three properties that matter:
 
-- **Asymmetric.** Each isolated user sees only its own; the caller sees every
+- **Asymmetric.** Each Agent User sees only its own; the caller sees every
   concurrent sandbox's. The caller is the privileged side.
-- **Ephemeral.** Created at provision, deleted at deprovision. A channel, not
-  storage.
+- **Ephemeral.** Created at provision, deleted at deprovision — so it tracks the
+  Agent User's lifetime, not each run. Still a channel, not storage: the
+  Gateway's durable state belongs in the profile, not here.
 - **Not the working directory.** It doesn't change where the workload runs.
 
 Provisioning also takes an optional application identifier — documented as "the
@@ -394,17 +400,43 @@ Availability: the backend is experimental, gated behind both an explicit flag
 and an OS feature flag, and needs a recent [Insider
 build](https://learn.microsoft.com/en-us/windows-insider/release-notes/experimental/preview-build-26300-8553).
 
-### What this costs
+### State lives in the Agent User profile
 
-**Durable state has to live outside.** Both the account and the staging
-directory die at deprovision, so nothing kept inside is durable. That settles it
-rather than leaving it open: durable state is host-side and staged in. The catch
-is that this store then holds exactly the credentials containment was supposed
-to make less valuable, so it needs protecting accordingly.
+The Agent User is provisioned, not rented per run. Deprovisioning is an explicit
+act, and the account survives everything short of it — including the launcher
+exiting and the launcher binary being upgraded, since outliving the calling
+process is the premise of the state-aware lifecycle.
+
+So the intended shape is: **provision once, keep it.** The Gateway's
+configuration, credentials, pairing records, conversation history, and memory
+live in that account's own profile and persist across runs and reboots. There is
+no host-side shadow copy of Gateway state, and no need for one.
+
+That is a better outcome than it first appears. Durable state stays *inside* the
+boundary rather than being parked on the host where the user's own token could
+reach it, which means containment isn't just relocating the credentials it was
+supposed to protect. The staging channel goes back to being what its name says —
+a way to hand payload in at setup — rather than a data plane the Gateway depends
+on at runtime.
+
+Two consequences to design for:
+
+- **Deprovision is the reset button, and it is expensive.** Wiping a possibly
+  compromised environment also destroys the agent's accumulated memory and its
+  pairing records. Recovery-after-compromise and losing your agent's history are
+  the same operation, so a supported export — or an explicitly accepted loss —
+  has to exist before deprovision can be recommended as a remediation.
+- **Don't strand the account.** The provider's sandbox identifier is what
+  addresses the Agent User, and an identifier a newer build cannot decode is
+  refused, leaving a sandbox that "cannot be addressed through MXC afterwards".
+  For a long-lived launcher that will be upgraded many times over the life of
+  one Agent User, that is a live hazard: a stranded account takes all the
+  persisted OpenClaw state with it. Identifier compatibility across launcher
+  versions is a hard requirement, not a nice-to-have.
 
 **Don't run the Gateway from the staging directory.** It's ephemeral,
 caller-writable, and explicitly not the working directory. Stage through it,
-then materialize inside.
+then materialize into the profile.
 
 **Host reach drops to a staging channel.** No desktop, and no user working tree.
 "Fix a file in my repo" isn't expressible unless something explicitly stages
@@ -436,8 +468,10 @@ Recommend contained execution for a deployment class only once:
 
 - The capability descriptor is accurate and the launcher refuses what a provider
   can't enforce.
-- State persists across `provision`/`deprovision` and host restarts, and the
-  host-side store is protected like the credentials it holds.
+- Gateway state survives restart and reboot in the Agent User profile, and
+  survives a launcher upgrade without stranding the account.
+- There's a supported way to export state before `deprovision`, so remediation
+  and rollback don't mean losing the agent's memory.
 - Orphaned environments get reconciled instead of accumulating.
 - Anything the host reads back from the staging channel is treated as untrusted
   input, with the parsing boundary identified and tested.
@@ -478,8 +512,8 @@ matters a great deal whether they survive *worse*, *the same*, or *newly*.
 The attacker no longer runs as you. Your profile, `HKCU`, browser and credential
 stores, SSH keys, and per-user startup entries are refused by the OS rather than
 by our own policy. It can't drive your desktop directly — no screen capture off
-your session, no synthetic input into your other apps. Anything it writes into
-its own profile disappears when the account is deprovisioned.
+your session, no synthetic input into your other apps. What it writes lands in
+the Agent User's profile, not yours.
 
 That is the whole claim. It is narrower than "the Gateway is sandboxed."
 
@@ -501,11 +535,14 @@ overselling it.
   a network control.
 - **Outbound egress,** which is unrestricted.
 - **Resource exhaustion** of host CPU, disk, and memory.
-- **Persistence — but scoped.** The account and its profile survive restarts
-  until something explicitly deprovisions, so an attacker can persist across
-  Gateway restarts. Uncontained, that persistence lands in *your* profile and
-  startup; contained, it is confined to a throwaway account that deprovisioning
-  destroys. Strictly better, and it makes deprovision cadence a real lever.
+- **Persistence — relocated, not removed.** Because the Agent User is meant to
+  be kept between runs, an attacker who establishes persistence in that profile
+  keeps it across restarts and reboots, exactly as they would today. The
+  difference is *where* it lands: uncontained it goes in your profile, your
+  `HKCU`, and your startup; contained it is confined to the Agent User. Better
+  scoped and cleanly removable — but note the removal is `deprovision`, which
+  also destroys the agent's memory, so treat it as a real remediation cost
+  rather than a free reset.
 - **Anything a compromised Gateway can order someone else to do.** Most
   concretely an authorized desktop node (see [RFC
   0025](0025-default-pluggable-computer-use.md)): the Gateway doesn't need
@@ -521,18 +558,24 @@ This is the list that deserves scrutiny, because these are the costs rather than
 the leftovers.
 
 - **The Gateway's own credentials stay with it.** Provider keys, channel
-  credentials, and pairing records live inside by construction. Containment
-  limits reach into your assets; it does nothing to stop code running as the
-  Gateway from exfiltrating what the Gateway legitimately holds. Fixing that
-  needs credential brokering, not containment — see
-  [#55](https://github.com/openclaw/rfcs/pull/55), which does exactly that.
-- **A host-side state store,** new to this design, holding those credentials
-  outside the boundary. Containment moves the crown jewels rather than
-  eliminating them, and this store now needs protecting like the Gateway did.
+  credentials, and pairing records live inside the Agent User profile by
+  construction. Containment limits reach into your assets; it does nothing to
+  stop code running as the Gateway from exfiltrating what the Gateway
+  legitimately holds. Fixing that needs credential brokering, not containment —
+  see [#55](https://github.com/openclaw/rfcs/pull/55), which does exactly that.
+  Keeping state inside the boundary at least avoids the worse alternative of
+  parking those credentials on the host where your own token could reach them.
 - **The staging channel, in both directions.** Contained code writes into a
   directory a host-side process running as you later reads, so anything the host
   parses from it is untrusted input. This is a genuinely new boundary-crossing
-  surface and the likeliest place for a bug.
+  surface and the likeliest place for a bug. Keeping it to setup-time staging,
+  rather than a runtime data plane, keeps that surface small.
+- **A long-lived account holding accumulated secrets.** Persisting across runs
+  is the point, but it means the Agent User profile accrues credentials,
+  history, and memory over months. It becomes a target worth attacking in its
+  own right, and it is not protected by your credentials — so how it is backed
+  up, and whether anything can read it from outside the boundary, are real
+  questions rather than deployment details.
 - **The launcher,** which runs as you, supervises the Gateway for its whole
   lifetime, and can start, stop, and stage into the boundary. Compromising it
   defeats everything.
@@ -547,7 +590,7 @@ Bigger than the launcher, and worth naming honestly:
 | The provider SDK and native bindings | Everything reaches the OS through them |
 | The SYSTEM-hosted OS session service | Owns account and session lifecycle |
 | Windows kernel and session separation | The enforcement itself |
-| Host-side state store and staging parser | Cross-boundary data path |
+| Staging channel parser | Cross-boundary data path |
 | Package integrity and signing | An attacker who replaces the launcher has won |
 
 Two consequences. "The provider declares its capabilities honestly" is a
@@ -566,16 +609,24 @@ travel, not a control to rely on.
 **Nothing changes by default.** Containment is opt-in and off. Deployments that
 don't configure a provider behave exactly as they do now, everywhere.
 
-**Turning it on is a migration.** The Gateway moves to a new principal, so state
-under your profile isn't automatically visible to it. Adoption has to relocate
-or re-establish config, credentials, and pairing records, and say clearly when
-it can't — a migration that silently produces an empty Gateway looks identical
-to a working one until the first channel fails to authenticate. This depends on
-the unresolved persistence question.
+**Turning it on is a one-time migration.** The Gateway moves to the Agent User,
+so state under your profile isn't automatically visible to it. Adoption stages
+config, credentials, and pairing records across into the Agent User profile
+once, and says clearly when it can't — a migration that silently produces an
+empty Gateway looks identical to a working one until the first channel fails to
+authenticate. After that the Agent User profile is the Gateway's home and
+nothing needs re-staging on subsequent runs.
+
+Credentials protected by the old account's DPAPI keys won't decrypt under the
+new principal, so migration means re-establishing those secrets rather than
+copying ciphertext. Anything that can't be re-established without user action
+has to say so rather than failing at runtime.
 
 **Rollback is routine, not recovery.** Turning containment off returns to the
 previous behavior without data loss, which means adoption must never destroy
-pre-migration state while moving it.
+pre-migration state while moving it — and it means a supported way to get state
+*out* of the Agent User profile before deprovisioning, since deprovision
+destroys it irreversibly.
 
 **Downgrade is a real gap, not a requirement we can write our way out of.** A
 launcher version predating this contract ignores the containment config and
@@ -597,17 +648,17 @@ and the readiness bar depends on it existing.
    is reachable from a client, and runs under an account that demonstrably isn't
    the signed-in user; plus a host without the capability failing closed with a
    reason.
-3. **State and migration.** Resolve persistence, then adoption and rollback with
-   tested restart, upgrade, and downgrade.
+3. **State and migration.** One-time migration into the Agent User profile,
+   export before deprovision, and tested restart, reboot, upgrade, and
+   downgrade.
 4. **Bypass resistance.** Make the launcher the managed entry point and make an
    unmanaged Gateway distinguishable. Proof: an admin-observable signal that
    doesn't involve asking the Gateway.
 5. **Readiness review.** Maintainer decision against the bar.
 
 Phases 1–2 belong to whoever owns the launcher — on Windows, the
-[#58](https://github.com/openclaw/rfcs/pull/58) work. Phase 3 shouldn't start
-while persistence is open, and phase 4 builds on #58's entry-point work rather
-than duplicating it.
+[#58](https://github.com/openclaw/rfcs/pull/58) work. Phase 4 builds on #58's
+entry-point work rather than duplicating it.
 
 ## Decision requested
 
@@ -705,9 +756,11 @@ worst outcome: someone who believes they're protected and isn't.
   an OS projection primitive, or accept that a contained Gateway works only on
   its own workspace. Each reopens the boundary differently, and the choice
   decides how useful this actually is.
-- **What holds durable state, and how is it protected?** It has to be host-side.
-  What is it, how is it protected given it holds the Gateway's credentials, and
-  how does an existing install migrate into it? Blocks phase 3.
+- **How is the Agent User profile protected and backed up?** State living inside
+  the boundary is the right answer, but it creates a long-lived account holding
+  months of credentials, history, and memory that isn't covered by the user's
+  own backup or credential protection. What backs it up, what can read it from
+  outside, and what happens to it when the machine is reimaged?
 - **Is an identity-only boundary worth adopting?** Nothing is enforced on the
   network and loopback survives. Do we require a network-capable provider before
   recommending this, or is reduced reach into user assets enough on its own?
