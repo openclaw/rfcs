@@ -192,9 +192,8 @@ Three parts, and which side of the boundary each lands on is the whole point.
 
 **The launcher runs outside, as the user.** It's the entry point. It selects a
 provider, provisions the boundary, stages the payload, starts the unit inside,
-and reports posture, and it stays alive supervising the Gateway. It's the part
-of the trusted computing base we own, so it stays minimal, loads no plugins, and
-never executes agent-directed work.
+reports posture, and exits. It's the part of the trusted computing base we own,
+so it stays minimal, loads no plugins, and never executes agent-directed work.
 
 On Windows this is #58's host app, not a new component. #58 defines it as "the
 packaged entry point" behind an `openclaw.exe` execution alias, whose job is
@@ -245,7 +244,7 @@ text, so the launcher can compare two providers and refuse a weaker one:
 | `networkPosture` | `unrestricted`, `egressFiltered`, `isolated` |
 | `hostUiReach` | `full`, `none` |
 | `lifecycleOwner` | `os` (teardown guaranteed), `caller` (we must drive it) |
-| `detachedExecution` | `supported`, `deferred` — whether the launcher may exit after starting the unit |
+| `sessionLifetime` | `perCall` (environment dies with the calling process), `persistent` (survives until explicitly stopped) |
 
 `hostPathProjection` and `stagingChannel` are deliberately separate. Being able
 to hand a file across is not the same as giving an agent the user's working
@@ -267,19 +266,32 @@ probe -> provision -> start -> exec -> stop -> deprovision
 what actually launches the Gateway inside the environment; the earlier phases
 only build the place it runs.
 
-**The launcher stays alive.** On the Windows provider, detached execution — a
-process outliving the call that started it — is explicitly deferred, and a
-spawned process stays tethered to the caller's lifetime. So the launcher is not
-a fire-and-forget bootstrapper. It remains running as the Gateway's supervisor
-for as long as the Gateway runs, which means it owns crash detection, restart,
-and teardown. That is a real cost: it is a second always-on process, and it must
-stay in the trusted computing base for the whole session rather than just at
-startup. Should the provider gain detached execution later, the launcher could
-shrink to a bootstrapper — but no such capability exists today, so the contract
-assumes supervision and treats anything better as a bonus.
+**The launcher is transient.** It runs, provisions or rehydrates the
+environment, `exec`s, confirms the Gateway came up, and exits. It is not a
+resident supervisor, and containment does not add a second always-on process.
+
+That works because of two things. The session outlives the launcher — it is
+stopped explicitly, not when the calling process goes away — so the environment
+is still there next time. And while the provider's own `exec` call is
+synchronous, the workload can detach *inside* the boundary: the script the
+launcher execs starts the Gateway as a detached child and returns, so the
+Gateway outlives the call that created it. Nothing about the provider prevents a
+long-lived daemon; the detachment just happens on the inside rather than being
+handed out by the API.
+
+Supervision lives inside the boundary too — a small in-session launcher script
+owns the Gateway process, records its PID and status, and captures its exit —
+which keeps the host-side launcher out of the steady-state picture entirely.
+
+**So what starts it?** Not a resident process. On Windows the packaged flow
+registers a scheduled task at logon that re-runs the launcher, which rehydrates
+the existing session and starts the Gateway if it isn't already up. That's what
+makes the Gateway survive logoff and reboot, and it keeps each launcher
+invocation short-lived. Health and status are observational: a later invocation
+reads the status file and probes the port rather than holding a live handle.
 
 **Idempotency is per-operation, not universal.** The provider's phases behave
-differently on repeat, and a supervisor that assumes otherwise leaks accounts:
+differently on repeat, and a launcher that assumes otherwise leaks accounts:
 
 | Operation | On repeat | What the launcher must do |
 |---|---|---|
@@ -301,10 +313,12 @@ out-of-band reclamation path for environments no launcher can name. That belongs
 in the readiness bar, and it is one of the costs of the provider being
 preview-quality.
 
-Because the environment survives until something explicitly deprovisions it, a
-crashed or replaced launcher leaves one behind. The launcher therefore needs to
-enumerate and reconcile environments it owns at startup. This is a required
-operation, not an edge case.
+Because the environment survives until something explicitly deprovisions it —
+which is what we want — the launcher has to reconcile against what already
+exists rather than assume a clean slate. Every invocation rehydrates persisted
+state and adopts the running environment instead of provisioning a second one.
+That's the same mechanism that makes the transient-launcher model work, so it
+isn't extra machinery; it just has to be right.
 
 **Failure outcomes** are a closed set, so the launcher can act without parsing
 provider text:
@@ -341,28 +355,33 @@ flowchart TB
   subgraph host["Windows host"]
     user["User profile<br/>files, HKCU, tokens"]
     client["Clients, channels, nodes"]
-    launcher["Launcher (trusted)<br/>packaged entry point<br/>no plugins"]
+    task["Logon task"]
+    launcher["Launcher (trusted)<br/>transient, no plugins"]
   end
 
   svc["Isolation Session<br/>service, SYSTEM<br/>owns lifecycle"]
 
   subgraph iso["Isolation session"]
+    sup["In-session supervisor"]
     gw["OpenClaw Gateway<br/>state in Agent User<br/>profile, persists"]
     plugins["Plugins, scheduler,<br/>agent loop"]
     sb["Per-session sandboxes"]
+    sup --> gw
     gw --- plugins
     gw --- sb
   end
 
+  task -->|"at logon"| launcher
   launcher -->|"provision, stage"| svc
   svc -->|"mints Agent User"| iso
-  launcher -->|"exec, then supervise"| gw
+  launcher -->|"exec, then exit"| sup
   client -->|"existing endpoints,<br/>unchanged protocol"| gw
   user -.->|"no inherited grants"| iso
 ```
 
-**Figure 1.** The launcher establishes the boundary, `exec`s the Gateway inside
-it, and stays alive supervising it. The Gateway never runs outside the boundary.
+**Figure 1.** A logon task runs the launcher, which establishes the boundary,
+`exec`s a supervisor inside it, and exits. The session and the Gateway outlive
+it; the Gateway never runs outside the boundary.
 
 This is an **identity** boundary and the descriptor has to say so. Per [MXC's
 backend
@@ -475,10 +494,11 @@ Recommend contained execution for a deployment class only once:
 - Clients, channels, and nodes connect with no protocol change and no extra user
   step.
 - Ordinary CLI use doesn't pay provisioning cost per command.
-- Orphaned environments are enumerated and reconciled at launcher startup, and
-  there's an out-of-band path for ones no launcher can address.
-- Startup, crash, restart, and teardown are covered, including ungraceful
-  shutdown.
+- Repeat invocations adopt the existing environment rather than provisioning a
+  second one, and there's an out-of-band path for environments no launcher can
+  address.
+- The Gateway survives the launcher exiting, and comes back after logoff,
+  reboot, and its own crash.
 - The Docker and SSH sandbox backends either work under containment or their
   loss is a documented, accepted tradeoff.
 - Downgrade below the containment-capable launcher is prevented by packaging.
@@ -578,9 +598,14 @@ the leftovers.
   memory over months, and it isn't covered by the user's own backup. The
   launcher's backup and restore path covers that; the residual question is who
   else can read the backup once it's outside the boundary.
-- **The launcher,** which runs as you, supervises the Gateway for its whole
-  lifetime, and can start, stop, and stage into the boundary. Compromising it
-  defeats everything.
+- **The launcher,** which runs as you and can provision, start, stop, and stage
+  into the boundary. It's short-lived, so it isn't a standing target the way a
+  resident daemon would be — but its binary and its registered entry point are,
+  since replacing either means owning every subsequent start.
+- **The autostart registration.** Something has to start the Gateway at logon,
+  and whatever holds that registration can change what gets started. On Windows
+  that's a scheduled task, which is a well-understood thing to protect but is
+  now part of the design rather than an incidental detail.
 
 ### The trusted computing base
 
@@ -588,12 +613,13 @@ Bigger than the launcher, and worth naming honestly:
 
 | Component | Why it's trusted |
 |---|---|
-| Launcher and its provider implementation | Establishes and supervises the boundary |
+| Launcher and its provider implementation | Establishes the boundary and stages into it |
+| Its binary and autostart registration | Replacing either owns every subsequent start |
 | The provider SDK and native bindings | Everything reaches the OS through them |
 | The SYSTEM-hosted OS session service | Owns account and session lifecycle |
 | Windows kernel and session separation | The enforcement itself |
 | Staging channel parser | Cross-boundary data path |
-| Package integrity and signing | An attacker who replaces the launcher has won |
+| Package integrity and signing | Protects the above |
 
 Two consequences. "The provider declares its capabilities honestly" is a
 contract, not a security mechanism — providers must be trusted built-ins or
@@ -665,8 +691,8 @@ entry-point work rather than duplicating it.
 ## Decision requested
 
 **Is launcher-established, opt-in Gateway containment a direction we want to
-support, given that the first provider offers identity isolation only, is
-preview-gated, and requires a permanently running supervisor process?**
+support, given that the first provider offers identity isolation only and is
+preview-gated?**
 
 A yes authorizes phase 1: the contract, in the launcher, no provider, no default
 change — and no change to OpenClaw core, since the Gateway gains no containment
@@ -676,9 +702,10 @@ timeline.
 Be clear about what a yes accepts in principle, though, because these are
 structural rather than incidental:
 
-- **A second always-on process.** Because detached execution isn't available,
-  the launcher supervises the Gateway for its whole lifetime. Contained
-  deployments run two processes where they ran one.
+- **A launcher as the supported entry point.** Starting the Gateway goes through
+  it, including at logon, so the deployment owns an entry point it didn't have
+  before. The launcher is short-lived, so this isn't a resident process — but it
+  is a new required step in front of the Gateway.
 - **A larger trusted computing base,** including the provider SDK, a
   SYSTEM-hosted OS service, and package integrity.
 - **A boundary that is identity-only.** It doesn't constrain the network, and it
@@ -779,8 +806,10 @@ worst outcome: someone who believes they're protected and isn't.
   [#55](https://github.com/openclaw/rfcs/pull/55) already solves this with
   credential brokering, and that's the more promising direction regardless of
   what the OS offers.
-- **How does autostart work?** A background Gateway has to start without an
-  interactive logon, and the launcher is what starts it.
+- **Can the Gateway start without a logon?** A logon task covers the normal
+  case, but a Gateway expected to be reachable on a machine nobody has signed
+  into needs something else, and registering that something generally needs
+  elevation. Whether headless operation is in scope is a product question.
 - **How do we express a posture most hosts can't support** without fragmenting
   the Windows experience?
 - **Should this contract live here or in
