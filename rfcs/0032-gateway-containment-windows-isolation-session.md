@@ -144,6 +144,19 @@ stays up, that's the right shape.
   operator and no OpenShell. The two are complementary: #55 is the better answer
   wherever it's available, and its credential brokering is the direction this
   RFC should follow rather than compete with.
+- [**RFC 0027 (OpenClaw Enterprise)**](0027-openclaw-enterprise.md), accepted,
+  already defines a `SandboxDriver` whose invariants are close to the ones
+  below: the platform verifies the selected driver "supports the complete
+  policy" and rejects deployment when enforcement is "unsupported, unavailable,
+  or ambiguous"; the driver "establishes and verifies containment before the
+  Harness starts"; and "an implementation that cannot verify enforcement is
+  ineligible for the operation", with no substitution of an alternate. That's
+  capability honesty, boundary-before-start, and fail-closed — so treat what
+  follows as applying an accepted pattern in a new place rather than inventing
+  one. Two differences matter: 0027 assumes a control plane a personal machine
+  doesn't have, and its driver explicitly "does not manage the Namespace's
+  OpenClaw gateway". Even in the accepted enterprise design, the Gateway is the
+  piece left outside the boundary — which is the gap this RFC closes.
 
 ## Goals
 
@@ -339,6 +352,15 @@ than a silent runtime degradation.
 for a boundary that can't be delivered is a config error, not an availability
 problem.
 
+**Where the configuration lives.** With the launcher, not in `openclaw.json`.
+Provider selection, the requested capabilities, and the fallback policy are read
+by the launcher before the Gateway exists, so putting them in Gateway config
+would mean the contained process owned the settings governing its own
+containment — the same inversion the Motivation rejects. It also keeps the
+promise that OpenClaw core gains no containment surface: no new config keys, no
+new schema, nothing for a deployment to set in the wrong place. The Gateway
+never reads or writes these values, and can't.
+
 ### The Windows provider
 
 `provision` mints the Agent User, `start` boots a session bound to it, `exec`
@@ -511,6 +533,26 @@ Recommend contained execution for a deployment class only once:
   claiming this as a defense.
 
 Until then it ships experimental and opt-in.
+
+### Security properties
+
+The invariants a correct implementation has to hold, stated so they can be
+checked rather than assumed:
+
+- The boundary exists before any Gateway code runs; there is no window in which
+  the Gateway executes uncontained and is contained afterwards.
+- The Gateway holds no containment code, configuration, or decision. Nothing it
+  can do to itself removes the boundary.
+- A provider that cannot enforce a requested capability refuses, rather than
+  accepting it and enforcing something weaker.
+- No failure path silently produces uncontained execution. Fallback selects
+  another provider satisfying the same capabilities, or the start fails.
+- The contained unit runs as a principal that never held the user's grants,
+  rather than as the user with restrictions applied.
+- Containment posture is asserted by the launcher. A statement from the Gateway
+  about its own containment is not evidence.
+- Data crossing the boundary is one-directional in trust: anything the host
+  reads back from the staging channel is untrusted input.
 
 ## Threat model
 
