@@ -161,6 +161,15 @@ contracts. That lets maintainers review the complete architecture without
 making Control Model v1 responsible for every UI, dashboard, settings, or
 policy feature.
 
+RFC 0029's sidecar specifications are intentionally limited to Control Model
+v1 and UI artifact v1. Hosted Control UI policy is tracked as an adjacent
+proposal through [openclaw/openclaw#115423](https://github.com/openclaw/openclaw/issues/115423),
+[openclaw/openclaw#115408](https://github.com/openclaw/openclaw/pull/115408),
+and [openclaw/openclaw#116013](https://github.com/openclaw/openclaw/pull/116013).
+If maintainers want hosted policy to become normative rather than linked
+evidence, it should receive its own RFC sidecar or follow-up RFC instead of
+expanding the Control Model v1 contract.
+
 ### Upstream implementation drafts
 
 The proposed boundary is now filed upstream as five condensed draft PRs:
@@ -298,11 +307,11 @@ Adjacent proposals remain separate from Control Model v1 acceptance:
 
 | Candidate | Scope | Gate |
 | --- | --- | --- |
-| HCU1: hosted Control UI policy | Serve the version-matched OpenClaw Control UI in a host runtime, advertise host policy through bootstrap, and enforce route/method lockdown server-side. | Already has Lobster hosted-route evidence and OpenClaw hosted-policy drafts; this is the immediate hosted fallback path, not a Control Model dependency. |
+| HCU1: hosted Control UI policy | Serve the version-matched OpenClaw Control UI in a host runtime, advertise host policy through bootstrap, and enforce route/method lockdown server-side. | Tracked by the hosted-surface umbrella [#115423](https://github.com/openclaw/openclaw/issues/115423), host policy draft [#115408](https://github.com/openclaw/openclaw/pull/115408), and Gateway enforcement draft [#116013](https://github.com/openclaw/openclaw/pull/116013). This is the immediate hosted fallback path, not a Control Model dependency. |
 | BM2: Board Model release admission | Reconstruct the Board Model extraction and native-host conformance against an accepted board-capable OpenClaw release, then decide whether `model/board` is supportable. | Stable board-capable tag, or explicit beta admission with complete persistence, grants, tickets, sandbox, and compatibility review. |
 | CFG1: read-only Config Model | Extract framework-neutral authored config snapshots and read-scoped schema descriptors into an OpenClaw-owned optional model with Control UI reference adoption. | Config owner review, secret redaction, schema compatibility, and proof that read projection does not imply write authority. |
 | CFG2: governed configuration commands | Add provenance, owner, lock reason, candidate preview, validation findings, generation, commit, and activation status only through Managed Configuration contracts. | Separate owner approval and transactional write/activation design; not implied by this RFC or CFG1. |
-| POL1: hosted policy decisions for settings and Gateway actions | Reuse the hosted decision envelope for `enabled`, `readOnly`, and `disabled` behavior across Control UI settings and Gateway writes. | Policy remains the source of policy findings and constraints; Control Model consumers only receive presentation-safe state and command errors. |
+| POL1: hosted policy decisions for settings and Gateway actions | Reuse the hosted decision envelope for `enabled`, `readOnly`, and `disabled` behavior across Control UI settings and Gateway writes. | Fork-only policy-settings drafts [#196](https://github.com/giodl73-repo/openclaw/pull/196)-[#202](https://github.com/giodl73-repo/openclaw/pull/202) prove the shape. Policy remains the source of policy findings and constraints; Control Model consumers only receive presentation-safe state and command errors. |
 
 Cross-client user-message identity, generic generated layouts, framework
 adapters, and third-party native component SDKs remain separate future

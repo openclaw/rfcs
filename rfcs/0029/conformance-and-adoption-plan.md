@@ -39,11 +39,14 @@ supported architecture is additive:
 
 | Surface | Authority retained | Control Model relationship |
 | --- | --- | --- |
-| Hosted Control UI | OpenClaw owns the version-matched app; host runtime owns auth, route selection, rollout, and server-side policy enforcement. | Independent deployment/fallback path. It can use the same Gateway, but Control Model v1 does not gate or replace hosted policy enforcement. |
+| Hosted Control UI | OpenClaw owns the version-matched app; host runtime owns auth, route selection, rollout, and server-side policy enforcement. | Independent deployment/fallback path tracked by [openclaw/openclaw#115423](https://github.com/openclaw/openclaw/issues/115423), [#115408](https://github.com/openclaw/openclaw/pull/115408), and [#116013](https://github.com/openclaw/openclaw/pull/116013). It can use the same Gateway, but Control Model v1 does not gate or replace hosted policy enforcement. |
 | Native conversation UX | OpenClaw owns conversation semantics; host owns React/native composition. | Primary v1 target: immutable snapshots, typed commands, and renderer-neutral artifacts. |
 | Native board/dashboard UX | OpenClaw owns board identity, widgets, grants, tickets, layout, persistence, and sandbox semantics. | Sibling Board Model proposal. Dashboard-shaped conversation artifacts do not replace the board model. |
 | Native settings UX | OpenClaw owns schema meaning and config read/write semantics; Managed Configuration owns governed writes and activation. | Sibling Config Model proposal. V1 may show safe command-denial details, but it does not define settings writes. |
-| Policy and lockdown | Policy/Gateway/runtime enforcement owns allowed operations, read-only state, disabled state, and denial reasons. | Model consumers may project presentation-safe state and errors; they must not treat UI affordances as authorization. |
+| Policy and lockdown | Policy/Gateway/runtime enforcement owns allowed operations, read-only state, disabled state, and denial reasons. | Model consumers may project presentation-safe state and errors; they must not treat UI affordances as authorization. Fork-only settings-constraint drafts [giodl73-repo/openclaw#196](https://github.com/giodl73-repo/openclaw/pull/196)-[#202](https://github.com/giodl73-repo/openclaw/pull/202) are sibling evidence, not Control Model conformance. |
+
+RFC 0029 has sidecar specifications for Control Model v1 and UI artifact v1.
+It does not currently carry a hosted-policy sidecar specification.
 
 ## Evidence to date
 
