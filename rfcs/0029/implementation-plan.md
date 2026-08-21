@@ -4,6 +4,20 @@ This plan is a proposed review sequence, not an accepted roadmap. It keeps each
 OpenClaw layer independently useful and delays publication until two consumers
 prove the contract.
 
+The implementation evidence is now filed upstream as five draft review PRs:
+
+| Upstream draft | Condensed scope | Fork evidence |
+| --- | --- | --- |
+| [CM1 #127670](https://github.com/openclaw/openclaw/pull/127670) | Gateway Client model foundation, immutable connection/session snapshots, host binding, lifecycle, and shared event-refresh policy. | OC1 [#230](https://github.com/giodl73-repo/openclaw/pull/230) |
+| [CM2 #127671](https://github.com/openclaw/openclaw/pull/127671) | Lazy conversation models, bounded history/live state, runs, tools, approvals, questions, and typed commands. | OC2 [#231](https://github.com/giodl73-repo/openclaw/pull/231) |
+| [CM3 #127672](https://github.com/openclaw/openclaw/pull/127672) | Renderer-neutral UI artifacts, view offers, revisions, deferred materialization, and MCP/Canvas fallback. | OC3 [#232](https://github.com/giodl73-repo/openclaw/pull/232) |
+| [CM4 #127674](https://github.com/openclaw/openclaw/pull/127674) | Initial Control UI reference adoption plus conformance, package, performance, compatibility, lifecycle, and security hardening. | OC4 [#238](https://github.com/giodl73-repo/openclaw/pull/238), OC5 [#241](https://github.com/giodl73-repo/openclaw/pull/241), [#244](https://github.com/giodl73-repo/openclaw/pull/244)-[#248](https://github.com/giodl73-repo/openclaw/pull/248) |
+| [CM5 #127675](https://github.com/openclaw/openclaw/pull/127675) | Control UI ordinary commands, selected questions, and safe artifact-adapter adoption. | CU4 [#242](https://github.com/giodl73-repo/openclaw/pull/242), CU5 [#243](https://github.com/giodl73-repo/openclaw/pull/243) |
+
+These PRs are drafts until RFC intake, owner acceptance, and publication gates
+settle. They currently use the published fork heads; clean same-repository
+stacked branches may replace them before merge.
+
 ## Source extraction rules
 
 - Move behavior only after a shared fixture captures it.
@@ -14,7 +28,7 @@ prove the contract.
   application framework.
 - Keep OpenClaw Control UI behavior unchanged during adoption.
 
-## OpenClaw PR 1: Gateway Client model foundation
+## CM1 / OpenClaw PR 1: Gateway Client model foundation
 
 ### Scope
 
@@ -47,7 +61,7 @@ prove the contract.
 
 One duplicate session-catalog reducer in an adopter, after later adoption.
 
-## OpenClaw PR 2: selected conversation and commands
+## CM2 / OpenClaw PR 2: selected conversation and commands
 
 ### Scope
 
@@ -69,7 +83,7 @@ One duplicate session-catalog reducer in an adopter, after later adoption.
 
 Control UI and independent-host reducers for the adopted conversation slice.
 
-## OpenClaw PR 3: renderer-neutral UI artifacts
+## CM3 / OpenClaw PR 3: renderer-neutral UI artifacts
 
 ### Scope
 
@@ -103,14 +117,17 @@ Control UI and independent-host reducers for the adopted conversation slice.
 Tool-specific native rendering interpretation and duplicate Canvas/MCP
 association logic.
 
-## OpenClaw PR 4: Control UI reference adoption
+## CM4 / OpenClaw PR 4: Control UI reference adoption
 
 OC4 is the initial reference-adoption draft, not the entire Control UI
 migration. It completes the runtime, catalog, and selected-conversation
-projection slices. Fork-only CU4 adds ordinary foreground commands, and
-fork-only CU5 adds selected-session question commands plus safe Canvas/MCP
-artifact projection. Operational callers and global/operator interaction queues
-remain outside these bounded adoption slices.
+projection slices and is filed upstream as part of
+[CM4 #127674](https://github.com/openclaw/openclaw/pull/127674). CU4 adds
+ordinary foreground commands, and CU5 adds selected-session question commands
+plus safe Canvas/MCP artifact projection; both are filed upstream as
+[CM5 #127675](https://github.com/openclaw/openclaw/pull/127675). Operational
+callers and global/operator interaction queues remain outside these bounded
+adoption slices.
 
 ### Completed scope
 
@@ -140,15 +157,15 @@ observation, and rollback proof.
 | CU1 runtime binding | Lazy Control Model runtime over the existing Gateway store. | Complete in OC4; no new process, route, or framework adapter. |
 | CU2 catalog and selection | Active roster and selected-session lookup from catalog snapshots. | Complete in OC4; archived/all rosters remain raw until separately modeled. |
 | CU3 selected conversation projection | History, live subscription, reconnect, and retryable fallback from the conversation handle. | Complete in OC4; OC5 now owns representative overlap/gap/retired-epoch fixtures. |
-| CU4 ordinary conversation commands | Standard composer send and foreground active-run abort through `ControlModelConversation`. Complete in fork-only [OpenClaw PR #242](https://github.com/giodl73-repo/openclaw/pull/242), stacked on OC5. | Preserves session identity, attachment/reply/fencing inputs, reconnect-resume and steer fallback, structured active-leaf recovery errors, and raw no-run/session-wide abort ownership. Do not absorb realtime talk, background-task history, or other operational paths without separate ownership proof. |
-| CU5 interactions and artifacts | Exact selected-session question answer/cancel commands plus Canvas, MCP App, and structured fallback through snapshot projections. Complete in fork-only [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243), stacked on CU4. | Preserves the incumbent prompt lifecycle, expiry deadline, local resolution publication, and raw fallback. Global/operator approval lanes remain outside the slice because their ownership and resolver semantics differ. Artifact data never selects executable code. |
+| CU4 ordinary conversation commands | Standard composer send and foreground active-run abort through `ControlModelConversation`. Filed upstream in [CM5 #127675](https://github.com/openclaw/openclaw/pull/127675); fork evidence is [OpenClaw PR #242](https://github.com/giodl73-repo/openclaw/pull/242), stacked on OC5. | Preserves session identity, attachment/reply/fencing inputs, reconnect-resume and steer fallback, structured active-leaf recovery errors, and raw no-run/session-wide abort ownership. Do not absorb realtime talk, background-task history, or other operational paths without separate ownership proof. |
+| CU5 interactions and artifacts | Exact selected-session question answer/cancel commands plus Canvas, MCP App, and structured fallback through snapshot projections. Filed upstream in [CM5 #127675](https://github.com/openclaw/openclaw/pull/127675); fork evidence is [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243), stacked on CU4. | Preserves the incumbent prompt lifecycle, expiry deadline, local resolution publication, and raw fallback. Global/operator approval lanes remain outside the slice because their ownership and resolver semantics differ. Artifact data never selects executable code. |
 | CU6 observation and deletion | Roll out the model-backed route, retain rollback, and remove only named incumbent reducers/requests/adapters. | Post-OC6 and implemented as OC7 with an exact deletion ledger. |
 
 Board and settings are separate Board Model and Config Model adoption series,
 not CU7/CU8. Their authority and persistence contracts are non-normative to
 Control Model v1.
 
-### CU4 fork-only result
+### CU4 result
 
 CU4 reuses the selected conversation handle already owned by OC4 rather than
 creating a second runtime or command client. Ordinary selected sends pass
@@ -163,7 +180,7 @@ realtime talk, skill-workshop revisions, queued replay, and session-wide
 structured Gateway details so existing active-leaf recovery and retry behavior
 remain visible rather than becoming generic failures.
 
-### CU5 fork-only result
+### CU5 result
 
 CU5 reuses the exact cached selected-conversation route and its authoritative
 agent identity, including main aliases. Pending question answer/cancel commands
@@ -221,9 +238,10 @@ Board LB1 uses a mocked beta-generation board protocol because pinned
 LobsterClaw 2026.6.33 predates boards. It is conformance evidence, not release
 admission.
 
-## OpenClaw PR 5: shared conformance and package hardening
+## CM4 / OpenClaw PR 5: shared conformance and package hardening
 
-Fork-only draft:
+Filed upstream in
+[CM4 #127674](https://github.com/openclaw/openclaw/pull/127674). Fork evidence:
 [giodl73-repo/openclaw#241](https://github.com/giodl73-repo/openclaw/pull/241).
 Its first slice centralizes finite defaults, adds an authoritative/malformed
 catalog fixture pair, proves clean packed-package Node/declaration/browser
