@@ -387,9 +387,11 @@ The exact incumbent UI-local paths identified by CU1-CU5 adoption.
   [#116013](https://github.com/openclaw/openclaw/pull/116013). Policy-settings
   constraints remain fork-only sibling evidence in
   [giodl73-repo/openclaw#196](https://github.com/giodl73-repo/openclaw/pull/196)-[#202](https://github.com/giodl73-repo/openclaw/pull/202).
-  RFC 0029 does not define a hosted-policy sidecar spec; that contract should
-  be promoted through its own sidecar or follow-up RFC if maintainers want it
-  normative.
+  RFC 0029 now carries
+  [Hosted Control UI policy v1](hosted-control-ui-policy-v1-spec.md) as a
+  sibling sidecar with its own route, bootstrap, rollout, and
+  Gateway/runtime-enforcement gates. That sidecar is related evidence, not a
+  Control Model v1 dependency.
 - **Dashboards and widgets:** host OpenClaw's existing dashboard routes first.
   The first fork-only Board Model proof now extracts selected-session board
   reconciliation into `@openclaw/gateway-client/model/board` and keeps Control

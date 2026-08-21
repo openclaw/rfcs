@@ -123,6 +123,7 @@ documents:
 
 - [Control Model v1 specification](0029/control-model-v1-spec.md)
 - [UI artifact v1 specification](0029/ui-artifact-v1-spec.md)
+- [Hosted Control UI policy v1 specification](0029/hosted-control-ui-policy-v1-spec.md)
 - [Conformance and adoption plan](0029/conformance-and-adoption-plan.md)
 - [Implementation and PR plan](0029/implementation-plan.md)
 - [Ownership and support plan](0029/ownership-and-support-plan.md)
@@ -130,10 +131,12 @@ documents:
 
 ### Review scope
 
-RFC acceptance would cover only the framework-neutral Control Model v1 and UI
-artifact contracts defined here and in the two specifications. It would not
-accept a Lobster product roadmap, a framework adapter, a generic dashboard
-system, or writable configuration.
+RFC acceptance may cover the related family shape while keeping each contract's
+acceptance gate independent: framework-neutral Control Model v1, UI artifact
+v1, and hosted Control UI policy v1. Accepting one contract does not imply
+accepting or shipping the others. This RFC would not accept a Lobster product
+roadmap, a framework adapter, a generic dashboard system, or writable
+configuration.
 
 This RFC is additive to the hosted Control UI and policy work rather than a
 replacement for it:
@@ -161,14 +164,14 @@ contracts. That lets maintainers review the complete architecture without
 making Control Model v1 responsible for every UI, dashboard, settings, or
 policy feature.
 
-RFC 0029's sidecar specifications are intentionally limited to Control Model
-v1 and UI artifact v1. Hosted Control UI policy is tracked as an adjacent
-proposal through [openclaw/openclaw#115423](https://github.com/openclaw/openclaw/issues/115423),
+RFC 0029 therefore includes a hosted-policy sidecar, but that sidecar is not a
+Control Model v1 dependency. Hosted Control UI policy is tracked through
+[openclaw/openclaw#115423](https://github.com/openclaw/openclaw/issues/115423),
 [openclaw/openclaw#115408](https://github.com/openclaw/openclaw/pull/115408),
 and [openclaw/openclaw#116013](https://github.com/openclaw/openclaw/pull/116013).
-If maintainers want hosted policy to become normative rather than linked
-evidence, it should receive its own RFC sidecar or follow-up RFC instead of
-expanding the Control Model v1 contract.
+Its acceptance should be judged against hosted route, bootstrap, rollout, and
+Gateway/runtime enforcement evidence rather than native conversation-model
+conformance.
 
 ### Upstream implementation drafts
 

@@ -45,8 +45,9 @@ supported architecture is additive:
 | Native settings UX | OpenClaw owns schema meaning and config read/write semantics; Managed Configuration owns governed writes and activation. | Sibling Config Model proposal. V1 may show safe command-denial details, but it does not define settings writes. |
 | Policy and lockdown | Policy/Gateway/runtime enforcement owns allowed operations, read-only state, disabled state, and denial reasons. | Model consumers may project presentation-safe state and errors; they must not treat UI affordances as authorization. Fork-only settings-constraint drafts [giodl73-repo/openclaw#196](https://github.com/giodl73-repo/openclaw/pull/196)-[#202](https://github.com/giodl73-repo/openclaw/pull/202) are sibling evidence, not Control Model conformance. |
 
-RFC 0029 has sidecar specifications for Control Model v1 and UI artifact v1.
-It does not currently carry a hosted-policy sidecar specification.
+RFC 0029 has sidecar specifications for Control Model v1, UI artifact v1, and
+Hosted Control UI policy v1. These contracts share an owner-first family shape,
+but each has an independent conformance and acceptance gate.
 
 ## Evidence to date
 
