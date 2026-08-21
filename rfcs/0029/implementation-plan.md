@@ -379,7 +379,17 @@ The exact incumbent UI-local paths identified by CU1-CU5 adoption.
   proves host-owned auth/routing/rollout and policy enforcement, while Control
   Model proves framework-neutral conversation state, commands, and artifacts
   for native product shells. A stale or bypassed UI affordance is never
-  authoritative; Gateway/runtime policy remains the enforcement point.
+  authoritative; Gateway/runtime policy remains the enforcement point. The
+  linked hosted-policy surfaces are umbrella issue
+  [openclaw/openclaw#115423](https://github.com/openclaw/openclaw/issues/115423),
+  host-policy draft [#115408](https://github.com/openclaw/openclaw/pull/115408),
+  and Gateway enforcement draft
+  [#116013](https://github.com/openclaw/openclaw/pull/116013). Policy-settings
+  constraints remain fork-only sibling evidence in
+  [giodl73-repo/openclaw#196](https://github.com/giodl73-repo/openclaw/pull/196)-[#202](https://github.com/giodl73-repo/openclaw/pull/202).
+  RFC 0029 does not define a hosted-policy sidecar spec; that contract should
+  be promoted through its own sidecar or follow-up RFC if maintainers want it
+  normative.
 - **Dashboards and widgets:** host OpenClaw's existing dashboard routes first.
   The first fork-only Board Model proof now extracts selected-session board
   reconciliation into `@openclaw/gateway-client/model/board` and keeps Control
