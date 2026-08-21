@@ -6,7 +6,7 @@ created: 2026-08-11
 last_updated: 2026-08-21
 status: draft
 issue:
-rfc_pr: https://github.com/giodl73-repo/rfcs/pull/8
+rfc_pr: https://github.com/openclaw/rfcs/pull/62
 ---
 
 # Proposal: OpenClaw Control Model
