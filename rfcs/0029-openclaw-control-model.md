@@ -3,7 +3,7 @@ title: OpenClaw Control Model
 authors:
   - Gio Della-Libera
 created: 2026-08-11
-last_updated: 2026-08-16
+last_updated: 2026-08-21
 status: draft
 issue:
 rfc_pr: https://github.com/giodl73-repo/rfcs/pull/8
@@ -135,9 +135,31 @@ artifact contracts defined here and in the two specifications. It would not
 accept a Lobster product roadmap, a framework adapter, a generic dashboard
 system, or writable configuration.
 
-The Board Model and Config Model evidence below is non-normative. It tests the
-same owner-first extraction pattern against adjacent OpenClaw domains, but each
-surface keeps its own contract, release gate, and implementation review.
+This RFC is additive to the hosted Control UI and policy work rather than a
+replacement for it:
+
+- hosted Control UI remains the fastest way for a host to serve the
+  version-matched OpenClaw application, enforce route and method policy, and
+  roll back to the incumbent product shell;
+- the Control Model is the native-product path for conversation state,
+  commands, and renderer-neutral artifacts when the host owns presentation;
+- the hosted policy decision vocabulary remains the server/runtime authority
+  for browser lockdown, settings read-only state, and forbidden mutations; the
+  Control Model may preserve safe denial details, but it does not become the
+  policy engine;
+- Board Model and Config Model evidence tests the same owner-first extraction
+  pattern against adjacent OpenClaw domains, but each surface keeps its own
+  contract, release gate, and implementation review; and
+- Managed Configuration remains the authority-aware path for governed config
+  writes. A read-only Config Model projection does not imply write authority.
+
+The "one shot" upstream ask should therefore be the family shape and sequence:
+accept the optional Gateway Client Control Model and UI artifact contracts as
+the first supported native surface, while explicitly reserving hosted Control
+UI policy, Board Model, Config Model, and Managed Configuration as sibling
+contracts. That lets maintainers review the complete architecture without
+making Control Model v1 responsible for every UI, dashboard, settings, or
+policy feature.
 
 ### Fork-only implementation evidence
 
@@ -172,8 +194,8 @@ Gateway lifecycle/model tests, 61 integrated Control UI tests, 6 prompt tests,
 and packed-package acceptance. Owner acceptance remains open under the
 [ownership and support plan](0029/ownership-and-support-plan.md).
 
-The independent Lobster evidence is also available as a temporary carry plus
-six bounded adopter slices:
+The independent Lobster evidence started as a temporary carry plus six bounded
+adopter slices:
 
 1. [L0: temporary Control Model carry](https://microsoft.ghe.com/bic/lobster/pull/8165)
 2. [LM1: adapt canonical snapshots into `SessionView`](https://microsoft.ghe.com/giodl/lobster/pull/63)
@@ -187,6 +209,26 @@ This series proves native React rendering, actions, send, abort, reconnect, and
 history while deleting duplicate Lobster Gateway behavior. It intentionally
 stops at LM6: remaining raw paths are host-owned operational/security or
 compatibility lanes rather than equivalent Control Model behavior.
+
+Same-repository Lobster follow-up has since turned the most important adopter
+evidence into reviewable product slices:
+
+- [Lobster PR #9248](https://microsoft.ghe.com/bic/lobster/pull/9248) merged
+  the temporary OpenClaw v2026.6.33 Control Model and artifact projection carry
+  after required PullRequest, Build Validation, and POP gates passed.
+- [Lobster PR #9384](https://microsoft.ghe.com/bic/lobster/pull/9384) merged
+  canonical conversation snapshots into Lobster `SessionView` without changing
+  React renderers, behind the default-off
+  `EnableOpenClawControlModel` rollout flight. Its exact-head evidence covered
+  focused desktop tests, Loki schema tests, static checks, Vite build, branch
+  review, all six Rust E2E shards, all three Playwright runtime shards, both
+  Git-workspace hard gates, and the multiplayer hard gate.
+- [Lobster PR #9605](https://microsoft.ghe.com/bic/lobster/pull/9605) is the
+  separate native table follow-up. It keeps raw `chat.final` as the visual
+  commit owner while adding renderer-neutral artifact projection, exact
+  allowlisted native table rendering, artifact-only history hydration,
+  fallback coverage, live flight rollback, and Gateway/Electron proof. Its
+  rollout annotations inherit the existing `EnableOpenClawControlModel` gate.
 
 Two adjacent owner-first projections now have separate fork-only evidence:
 
@@ -246,9 +288,11 @@ Adjacent proposals remain separate from Control Model v1 acceptance:
 
 | Candidate | Scope | Gate |
 | --- | --- | --- |
+| HCU1: hosted Control UI policy | Serve the version-matched OpenClaw Control UI in a host runtime, advertise host policy through bootstrap, and enforce route/method lockdown server-side. | Already has Lobster hosted-route evidence and OpenClaw hosted-policy drafts; this is the immediate hosted fallback path, not a Control Model dependency. |
 | BM2: Board Model release admission | Reconstruct the Board Model extraction and native-host conformance against an accepted board-capable OpenClaw release, then decide whether `model/board` is supportable. | Stable board-capable tag, or explicit beta admission with complete persistence, grants, tickets, sandbox, and compatibility review. |
 | CFG1: read-only Config Model | Extract framework-neutral authored config snapshots and read-scoped schema descriptors into an OpenClaw-owned optional model with Control UI reference adoption. | Config owner review, secret redaction, schema compatibility, and proof that read projection does not imply write authority. |
 | CFG2: governed configuration commands | Add provenance, owner, lock reason, candidate preview, validation findings, generation, commit, and activation status only through Managed Configuration contracts. | Separate owner approval and transactional write/activation design; not implied by this RFC or CFG1. |
+| POL1: hosted policy decisions for settings and Gateway actions | Reuse the hosted decision envelope for `enabled`, `readOnly`, and `disabled` behavior across Control UI settings and Gateway writes. | Policy remains the source of policy findings and constraints; Control Model consumers only receive presentation-safe state and command errors. |
 
 Cross-client user-message identity, generic generated layouts, framework
 adapters, and third-party native component SDKs remain separate future
@@ -541,6 +585,13 @@ contract, and a named duplicate implementation or inference path it can delete.
 
 Existing OpenClaw dashboards and settings follow separate adoption paths.
 Lobster can host version-matched dashboard and settings routes immediately.
+The hosted policy stack supplies the deployment and lockdown controls for that
+path: runtime gates decide whether the hosted bundle is available, bootstrap
+declares the host-owned Gateway route and scopes, and server enforcement
+blocks forbidden mutations even if a browser affordance is stale or bypassed.
+Control Model consumers can mirror disabled/read-only state and safe denial
+reasons, but only the Gateway/runtime policy path is authoritative.
+
 The Board Model proof now demonstrates the optional projection of OpenClaw's
 existing board model and a bounded Lobster native adopter, but only with a
 mocked beta-generation protocol. No stable OpenClaw tag currently contains the

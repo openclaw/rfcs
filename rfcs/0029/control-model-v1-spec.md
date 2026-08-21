@@ -46,23 +46,31 @@ The host owns:
 The model must not start a network connection at import or construction time.
 It must not persist credentials.
 
-## Handshake & capability advertisement
+## Handshake and capability advertisement
 
-Recommendation: the client advertises a bounded capability object during the
-initial session handshake or subscription request so the server MAY filter or
-rank offered artifact views and avoid sending unsupported large artifacts.
-Advertisement is advisory only; it does not grant trust or authorization.
+The client may advertise a bounded capability object during the initial
+session handshake or subscription request so the server can filter or rank
+offered artifact views and avoid sending unsupported large artifacts.
+Advertisement is advisory only; it does not install a renderer, disclose the
+full local registry, grant trust, or authorize an operation.
 
-Suggested capability object (client → server):
+Suggested capability object (client to server):
 
-```
+```json
 {
   "clientId": "product/instance-version",
   "capabilities": {
-    "supports_html": true,
-    "supports_a2ui": false,
-    "supports_native_table": true,
-    "supports_streaming": true,
+    "artifactViews": [
+      {
+        "templateUri": "clawpilot://widgets/table",
+        "artifactVersion": 1,
+        "dataVersions": [1],
+        "surfaces": ["inline", "expanded"]
+      }
+    ],
+    "sandboxFallbacks": ["mcp-app", "canvas"],
+    "structuredFallback": true,
+    "progressiveRevisions": true,
     "supports_actions": true,
     "max_artifact_size_bytes": 65536
   }
@@ -71,21 +79,30 @@ Suggested capability object (client → server):
 
 Server guidance:
 
-1. If an offered view's renderer matches a supported capability, favor
-   sending the full view (streaming when streamable && supports_streaming).
+1. If an offered view matches an advertised template URI, artifact version, and
+   data version, the server may rank that view higher or include bounded inline
+   data.
 2. If the renderer is unsupported but a structured/text fallback exists,
    send the fallback instead.
-3. If artifact size exceeds `max_artifact_size_bytes` and the client
-   supports streaming, deliver as fragments (fragment/CID) with finalization
-   marker; otherwise send a summarized structured fallback.
+3. If artifact size exceeds `max_artifact_size_bytes`, send a bounded
+   structured fallback or expose the view as deferred. V1 publishes complete
+   immutable revisions; it does not standardize JSON Patch, JSONL, or
+   fragment/CID transport.
 4. Never expose private or scrubbed fields to clients lacking required
    authorization regardless of advertised capabilities.
 5. Treat capability advertisement as potentially stale or incomplete; the
    client may still decline or ignore offers at render time.
 
-Note: this section proposes a concrete handshake schema and server filtering
-rules. The full RFC update will include example exchanges, security privacy
-considerations, and an appendix mapping uiDetails fields to capability flags.
+Privacy guidance:
+
+- advertise exact supported template/version pairs, not unrelated installed
+  component inventory;
+- keep renderer capability metadata between the trusted client and Gateway by
+  default rather than forwarding it verbatim to extensions;
+- let extensions ask bounded compatibility questions when needed; and
+- require the host registry to validate the selected view again before native
+  rendering, because the advertisement may be stale.
+
 ## Root lifecycle
 
 Construction is inert except for validating options. `start()` may subscribe to

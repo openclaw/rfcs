@@ -353,35 +353,36 @@ The following fail artifact rendering without failing the surrounding message:
 Failures are observable and safe to log after redaction. They must not contain
 raw credentials, capability URLs, hidden model context, or unbounded tool data.
 
-### Appendix: mapping a2ui → uiDetails
+### Appendix: mapping a2ui to uiDetails
 
 This appendix shows a pragmatic mapping from common a2ui payload fields into the
 Control Model's uiDetails/view offer shape. Use this as an implementation guide
 when adapting an a2ui-producing tool or a2ui-capable Canvas to the Control Model.
 
-- a2ui.root -> UiArtifact.structuredContent or UiArtifactViewOffer.data
+- `a2ui.root` -> `UiArtifact.structuredContent` or
+  `UiArtifactViewOffer.data`
   - When a2ui produces a single root HTML/DOM fragment, place a sanitized
     structured representation under `structuredContent` and supply a `view` that
     declares `templateUri: "ui://a2ui/<component>"`.
-- a2ui.components[] -> view.data component array
+- `a2ui.components[]` -> `view.data` component array
   - Map named a2ui components to an array in `view.data.components` with the
     minimal typed props; include `dataVersion` for component schema validation.
-- a2ui.streamable -> view.streamable or UiArtifactViewOffer.meta.streamable
-  - If the a2ui renderer supports progressive hydration, set `streamable:true`
-    and provide a fragment/CID plan in `meta.streaming` describing chunk order
-    and finalization marker.
-- a2ui.actions -> UiArtifactViewOffer.actions
+- `a2ui.streamable` -> progressive complete artifact revisions
+  - If the source supports progressive hydration, publish successive complete
+    immutable artifact revisions. V1 does not standardize fragment/CID or JSONL
+    patch transport.
+- `a2ui.actions` -> local action descriptors
   - Convert a2ui-defined interactive handlers to typed action descriptors:
     `{id,label,kind,schema,authRequired}`. Do not embed executable callbacks.
-- a2ui.templateUri -> UiArtifactViewOffer.templateUri
+- `a2ui.templateUri` -> `UiArtifactViewOffer.templateUri`
   - Normalize a2ui template references to `ui://a2ui/<name>@<version>` and
     require exact match in host native registry for native rendering.
-- a2ui.deferred -> UiArtifactViewOffer.availability = "deferred"
+- `a2ui.deferred` -> `UiArtifactViewOffer.availability = "deferred"`
   - When the a2ui payload requires server-side materialization, expose it as
     `deferred` and require `materializeView` to fetch validated payload.
-- a2ui.sizeHints -> UiArtifactViewOffer.preferredLayout / uiDetails.minWidth
+- `a2ui.sizeHints` -> presentation hints
   - Map size and layout hints into `preferredLayout`, `minWidth`, `minHeight`.
-- a2ui.privacyFlags -> UiArtifact.privacy
+- `a2ui.privacyFlags` -> `UiArtifact.privacy`
   - Translate visibility/scrub flags into `privacy` with `visibility` and
     `scrubbed` fields; servers must honor these when filtering offers.
 
@@ -393,12 +394,78 @@ Security and runtime notes
 - Prefer deferred materialization for large or sensitive views so Gateway
   re-enters auth and policy checks at materialization time.
 
-Examples and next steps
+Example mapping:
 
-- Append a short example mapping (a2ui JSON -> UiArtifact view) to this
-  appendix. Add a small fixture to the RFC's `required conformance evidence`
-  showing a2ui view enumeration, deferred materialization, and an action
-  invocation roundtrip.
+```json
+{
+  "a2ui": {
+    "templateUri": "ui://a2ui/table@1",
+    "components": [
+      {
+        "type": "table",
+        "columns": ["name", "status"],
+        "rows": [["Northwind", "Ready"]]
+      }
+    ],
+    "actions": [
+      {
+        "id": "refresh",
+        "schema": { "type": "object", "additionalProperties": false }
+      }
+    ],
+    "deferred": false,
+    "privacyFlags": { "visibility": "caller", "scrubbed": false }
+  }
+}
+```
+
+becomes:
+
+```json
+{
+  "version": 1,
+  "id": "artifact-table-1",
+  "revision": 0,
+  "structuredContent": {
+    "columns": ["name", "status"],
+    "rows": [["Northwind", "Ready"]]
+  },
+  "views": [
+    {
+      "id": "table",
+      "templateUri": "ui://a2ui/table@1",
+      "dataVersion": 1,
+      "availability": "inline",
+      "data": {
+        "components": [
+          {
+            "type": "table",
+            "columns": ["name", "status"],
+            "rows": [["Northwind", "Ready"]]
+          }
+        ],
+        "actions": [
+          {
+            "id": "refresh",
+            "schema": { "type": "object", "additionalProperties": false }
+          }
+        ]
+      }
+    }
+  ],
+  "state": "ready",
+  "source": {
+    "sessionKey": "session-1",
+    "toolCallId": "tool-1",
+    "toolName": "example.table"
+  }
+}
+```
+
+The host may render this natively only when its reviewed local registry accepts
+`ui://a2ui/table@1` and data version 1. The `refresh` action is still just a
+named local action; the host must map it to a supported Control Model command
+or product-owned operation and the Gateway must authorize any protected effect.
 
 ## Required conformance evidence
 

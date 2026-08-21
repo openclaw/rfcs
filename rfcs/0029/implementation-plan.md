@@ -354,6 +354,14 @@ The exact incumbent UI-local paths identified by CU1-CU5 adoption.
 
 ## Adjacent surfaces
 
+- **Hosted Control UI and policy:** keep the hosted `/openclaw` route,
+  bootstrap policy, rollout gates, and server-side method enforcement as the
+  immediate deployment and lockdown path for hosts that can use OpenClaw's
+  version-matched application. This path is additive to Control Model. It
+  proves host-owned auth/routing/rollout and policy enforcement, while Control
+  Model proves framework-neutral conversation state, commands, and artifacts
+  for native product shells. A stale or bypassed UI affordance is never
+  authoritative; Gateway/runtime policy remains the enforcement point.
 - **Dashboards and widgets:** host OpenClaw's existing dashboard routes first.
   The first fork-only Board Model proof now extracts selected-session board
   reconciliation into `@openclaw/gateway-client/model/board` and keeps Control
