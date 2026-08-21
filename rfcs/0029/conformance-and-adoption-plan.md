@@ -22,13 +22,13 @@ proof, and deletion agree.
 
 | Layer | Review surface | Required proof | Deletion unlocked |
 | --- | --- | --- | --- |
-| M1 Gateway Client model boundary | OpenClaw PR 1 | Browser-safe module graph, lifecycle, immutable store contract | Consumer scaffolding for connection/session snapshots |
-| M2 conversation projection | OpenClaw PR 2 | Shared history/live/reconnect/tool/approval corpus | Per-consumer chat reducers and event folding |
-| A1 UI artifacts | OpenClaw PR 3 | Native, structured-only, MCP fallback, malformed, stale, history cases | Tool-specific presentation interpretation |
-| O1 Control UI adoption | OC4 plus CU4-CU6 | Existing Control UI behavior unchanged as runtime, catalog, selected conversation, ordinary commands, interactions, and artifacts move through the model in bounded slices | Only the UI-local capability/reducer/request code replaced by each observed slice |
+| M1 Gateway Client model boundary | [CM1 #127670](https://github.com/openclaw/openclaw/pull/127670) | Browser-safe module graph, lifecycle, immutable store contract | Consumer scaffolding for connection/session snapshots |
+| M2 conversation projection | [CM2 #127671](https://github.com/openclaw/openclaw/pull/127671) | Shared history/live/reconnect/tool/approval corpus | Per-consumer chat reducers and event folding |
+| A1 UI artifacts | [CM3 #127672](https://github.com/openclaw/openclaw/pull/127672) | Native, structured-only, MCP fallback, malformed, stale, history cases | Tool-specific presentation interpretation |
+| O1 Control UI adoption | [CM4 #127674](https://github.com/openclaw/openclaw/pull/127674), [CM5 #127675](https://github.com/openclaw/openclaw/pull/127675), and later CU6 | Existing Control UI behavior unchanged as runtime, catalog, selected conversation, ordinary commands, interactions, and artifacts move through the model in bounded slices | Only the UI-local capability/reducer/request code replaced by each observed slice |
 | H1 independent host | Lobster/M PR 1 | Real hosted Gateway projected into existing host view model | Host-owned Gateway reconciliation for adopted slice |
 | H2 native artifact | Lobster/M PR 2 | One allowlisted component plus denied action and fallback | One bespoke tool-output rendering path |
-| C1 shared conformance | OpenClaw PR 5 | Shared fixtures, finite defaults, browser/Node package acceptance, compatibility canaries, performance bounds, and security review | Publication uncertainty |
+| C1 shared conformance | [CM4 #127674](https://github.com/openclaw/openclaw/pull/127674) | Shared fixtures, finite defaults, browser/Node package acceptance, compatibility canaries, performance bounds, and security review | Publication uncertainty |
 | R1 publication | OpenClaw PR 6/release | Accepted conformance, two consumers, compatibility window, migration policy, release and support ownership, and clean install/import proof from the packed release artifact | Fork-only distribution |
 | D1 incumbent cleanup | OpenClaw PR 7 | Observation window, rollback proof, and exact deletion ledger | Superseded Control UI reconciliation |
 
@@ -55,7 +55,7 @@ Fork-only evidence now covers the full bounded V1 thesis:
 | OC2 | Lazy conversations, deterministic history/live reconciliation, bounded messages/runs/tools/interactions, typed commands, reconnect, and retention. |
 | OC3 | Sanitized renderer-neutral artifacts, history/reconnect revisions, selected-only deferred materialization, MCP App/Canvas fallback, and provenance/identity hardening. |
 | OC4 | Initial Control UI adoption: lazy runtime binding, canonical active-session catalog, and selected-chat history/subscription state without visual or startup-budget regression. Ordinary commands, interactions, artifacts, and operational callers remain outside this draft. |
-| OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; repair of a package-only browser export failure; asserted steady-state projection and retained-memory bounds; an asserted candidate/predecessor/main wire-compatibility matrix; asserted initial projection, selected-view materialization, inactive eviction, and reconnect/resync lifecycle bounds; and an independent security review with authority-epoch cache remediation. The latest slice is fork [OpenClaw PR #248](https://github.com/giodl73-repo/openclaw/pull/248), stacked on lifecycle PR #247. |
+| OC5 current slices | Centralized finite defaults; reusable catalog, history/live overlap, reconnect, approval authorization, run, tool, question, artifact, and retained-bounds fixtures; packed protocol/client installation; every Gateway Client export imported from the tarball; declaration consumption; browser bundling; repair of a package-only browser export failure; asserted steady-state projection and retained-memory bounds; an asserted candidate/predecessor/main wire-compatibility matrix; asserted initial projection, selected-view materialization, inactive eviction, and reconnect/resync lifecycle bounds; and an independent security review with authority-epoch cache remediation. Filed upstream in [CM4 #127674](https://github.com/openclaw/openclaw/pull/127674); the latest fork slice is [OpenClaw PR #248](https://github.com/giodl73-repo/openclaw/pull/248), stacked on lifecycle PR #247. |
 | Whole-series review | Independent GPT-5.6 Terra, Claude Opus 5, and Gemini 3.1 Pro Preview reviews covered OC1-OC5 and CU4-CU5, followed by a clean Codex branch review. Accepted findings were fixed at core head `a158436f085` in PR #248 and Control UI head `0a8ad4188a6` in PR #243. Final focused proof passed 59 Gateway lifecycle/model tests, 61 integrated Control UI tests, 6 prompt tests, and packed-package acceptance. |
 | CU4 | Fork-only Control UI ordinary-command adoption: selected composer sends and connected exact-run aborts route through the existing conversation handle while reconnect-resume, steer/inject, background/non-selected, realtime, replay, and session-wide abort paths remain raw. Session identity, attachments, reply/fencing inputs, retry metadata, and active-leaf recovery details are preserved. |
 | CU5 | Fork-only selected-session interaction and artifact adoption: exact pending question answer/cancel commands route through the cached conversation identity while Control UI retains prompt lifecycle and raw fallback. Validated ready Canvas/MCP artifact snapshots feed only existing sandboxed adapters, with canonical-first provenance and occurrence-aware compatibility dedupe. Global/operator approval queues remain raw. |
@@ -71,7 +71,9 @@ dependency through PR 6. The bounded steady-state projection and
 retained-memory threshold slice is measured in PR #245, the wire-compatibility
 canary is measured in PR #246, and the lifecycle performance scenarios are
 measured in PR #247. The security gate is reviewed and remediated in PR #248.
-Control UI CU5 remains fork-only adopter evidence in
+Control UI CU5 is filed upstream in
+[CM5 #127675](https://github.com/openclaw/openclaw/pull/127675), with fork
+adopter evidence in
 [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243).
 The whole-series review closes the technical review gate but does not satisfy
 the explicit acceptance records required by the

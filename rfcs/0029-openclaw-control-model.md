@@ -161,10 +161,18 @@ contracts. That lets maintainers review the complete architecture without
 making Control Model v1 responsible for every UI, dashboard, settings, or
 policy feature.
 
-### Fork-only implementation evidence
+### Upstream implementation drafts
 
-The proposed boundary has twelve fork-only implementation and reference-adopter
-drafts:
+The proposed boundary is now filed upstream as five condensed draft PRs:
+
+1. [CM1: Control Model session foundation](https://github.com/openclaw/openclaw/pull/127670)
+2. [CM2: Control Model conversations](https://github.com/openclaw/openclaw/pull/127671)
+3. [CM3: renderer-neutral UI artifacts](https://github.com/openclaw/openclaw/pull/127672)
+4. [CM4: conformance, package, performance, compatibility, lifecycle, and security hardening](https://github.com/openclaw/openclaw/pull/127674)
+5. [CM5: Control UI command, interaction, and artifact adoption](https://github.com/openclaw/openclaw/pull/127675)
+
+These are draft review surfaces, not accepted roadmap or merge approval. They
+condense the original fork-only evidence stack:
 
 1. [OC1: Gateway Client model foundation](https://github.com/giodl73-repo/openclaw/pull/230)
 2. [OC2: conversation model and commands](https://github.com/giodl73-repo/openclaw/pull/231)
@@ -179,19 +187,20 @@ drafts:
 11. [CU4: Control UI ordinary command adoption](https://github.com/giodl73-repo/openclaw/pull/242)
 12. [CU5: Control UI interaction and artifact adoption](https://github.com/giodl73-repo/openclaw/pull/243)
 
-These drafts are evidence for review, not an upstream submission or accepted
-roadmap. OC5 now proves finite defaults, the representative fixture families,
-clean packed-package Node/declaration/browser consumption, measured
-steady-state and lifecycle performance, candidate/predecessor/main wire
-compatibility, and full-stack security review with the confirmed finding
-remediated. A final whole-series review then covered OC1-OC5 and CU4-CU5 with
-independent GPT-5.6 Terra, Claude Opus 5, and Gemini 3.1 Pro Preview passes,
-followed by a clean Codex branch review. Accepted lifecycle, observer
-ownership, canonical-session alias, metadata-bound, history, roster, routing,
-and question-state findings were fixed at core head `a158436f085` in PR #248
-and Control UI head `0a8ad4188a6` in PR #243. Final focused proof passed 59
-Gateway lifecycle/model tests, 61 integrated Control UI tests, 6 prompt tests,
-and packed-package acceptance. Owner acceptance remains open under the
+The upstream PRs currently use the already-published fork heads and are draft
+until the RFC and owner acceptance settle. OC5 proves finite defaults,
+representative fixture families, clean packed-package Node/declaration/browser
+consumption, measured steady-state and lifecycle performance,
+candidate/predecessor/main wire compatibility, and full-stack security review
+with the confirmed finding remediated. A final whole-series review then covered
+OC1-OC5 and CU4-CU5 with independent GPT-5.6 Terra, Claude Opus 5, and Gemini
+3.1 Pro Preview passes, followed by a clean Codex branch review. Accepted
+lifecycle, observer ownership, canonical-session alias, metadata-bound,
+history, roster, routing, and question-state findings were fixed at core head
+`a158436f085` in PR #248 / upstream CM4 and Control UI head `0a8ad4188a6` in
+PR #243 / upstream CM5. Final focused proof passed 59 Gateway lifecycle/model
+tests, 61 integrated Control UI tests, 6 prompt tests, and packed-package
+acceptance. Owner acceptance remains open under the
 [ownership and support plan](0029/ownership-and-support-plan.md).
 
 The independent Lobster evidence started as a temporary carry plus six bounded
@@ -254,12 +263,13 @@ Two adjacent owner-first projections now have separate fork-only evidence:
   real Electron Gateway fixture now proves the populated native page, authored
   value boundary, and restart guidance.
 
-### Proposed future OpenClaw PR sequence
+### Proposed OpenClaw PR sequence
 
-No additional upstream PRs or branches are opened by this RFC update. The
-remaining work is proposed here so maintainers can review the intended shape
-before any implementation is prepared, and any drafts should remain fork-only
-until RFC intake and owner approval.
+The first implementation review sequence is now visible as draft upstream PRs
+CM1-CM5. The drafts remain review aids until RFC intake, owner approval, and
+publication gates are explicit. Clean same-repository stacked branches may
+replace the current fork-head drafts before merge if maintainers prefer a
+non-cumulative diff shape.
 
 Control UI adoption is also intentionally incremental. OC4 already proves the
 first three slices; it does not yet make every Control UI command, interaction,
@@ -270,8 +280,8 @@ or artifact path model-backed.
 | CU1: runtime binding | Create one lazy Control Model runtime over the existing Control UI Gateway client and forward connection/event invalidations without changing Lit presentation. | Complete in OC4. |
 | CU2: catalog and selection | Drive the active session roster and selected-session lookup from immutable catalog snapshots while retaining unsupported archived/all roster behavior. | Complete in OC4. |
 | CU3: selected conversation projection | Drive selected-chat history, live subscription, reconnect, and retryable fallback from the lazy conversation handle. | Complete in OC4; the representative overlap/gap/retired-epoch fixtures are now shared in OC5. |
-| CU4: ordinary conversation commands | Route the normal composer send and foreground active-run abort through typed conversation commands. Keep steer/inject, realtime talk, background tasks, no-run abort-all, and other operational callers raw until separately classified. | Complete in fork-only [OpenClaw PR #242](https://github.com/giodl73-repo/openclaw/pull/242), stacked on OC5. The adapter preserves session identity, attachment/reply/fencing inputs, reconnect-resume fallback, and structured command errors used by incumbent recovery. |
-| CU5: interactions and artifacts | Project selected-session questions and current Canvas/MCP/structured fallbacks through conversation snapshots plus the existing Control UI adapters. Preserve global/operator approval lanes and sandbox ownership where they are not equivalent. | Complete in fork-only [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243), stacked on CU4. |
+| CU4: ordinary conversation commands | Route the normal composer send and foreground active-run abort through typed conversation commands. Keep steer/inject, realtime talk, background tasks, no-run abort-all, and other operational callers raw until separately classified. | Filed upstream in [CM5](https://github.com/openclaw/openclaw/pull/127675); fork evidence is [OpenClaw PR #242](https://github.com/giodl73-repo/openclaw/pull/242), stacked on OC5. The adapter preserves session identity, attachment/reply/fencing inputs, reconnect-resume fallback, and structured command errors used by incumbent recovery. |
+| CU5: interactions and artifacts | Project selected-session questions and current Canvas/MCP/structured fallbacks through conversation snapshots plus the existing Control UI adapters. Preserve global/operator approval lanes and sandbox ownership where they are not equivalent. | Filed upstream in [CM5](https://github.com/openclaw/openclaw/pull/127675); fork evidence is [OpenClaw PR #243](https://github.com/giodl73-repo/openclaw/pull/243), stacked on CU4. |
 | CU6: observation and deletion | Run the model-backed path through an observation window, retain rollback, then delete only the superseded UI-local reducers, requests, and compatibility adapters named by the earlier slices. | Maps to OC7 and cannot precede OC6 publication, rollback proof, and an exact deletion ledger. |
 
 Board and configuration adoption are not hidden CU slices. They remain the
@@ -280,7 +290,7 @@ persistence, and release contracts differ from conversation state.
 
 | Candidate | Scope | Gate |
 | --- | --- | --- |
-| [OC5: shared conformance and package hardening](https://github.com/giodl73-repo/openclaw/pull/241) | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, and prove package acceptance, steady-state and lifecycle performance, wire compatibility, and security through the stacked PRs #244-#248. | Fork-only technical evidence complete; OC6 remains blocked on explicit owner acceptance and a chosen support window. |
+| [CM4: shared conformance and package hardening](https://github.com/openclaw/openclaw/pull/127674) | Promote the proven fixture families into shared Gateway Client/Control UI conformance, finalize finite defaults, and prove package acceptance, steady-state and lifecycle performance, wire compatibility, and security through the fork evidence stack #241 and #244-#248. | Draft upstream review surface filed; OC6 remains blocked on explicit owner acceptance and a chosen support window. |
 | OC6: supported model subpaths | Publish the optional model subpaths with compatibility window, migration policy, framework-neutral quickstart, release notes, support ownership, and install/import proof from the packed release artifact rather than a workspace checkout. Replace fork-only consumption only after a released package exists. | OC5 passes on the supported release, predecessor where promised, and `main`; the packed artifact passes clean browser and Node consumer checks; independent-host evidence remains valid. |
 | OC7: incumbent-path cleanup | After an observation window and rollback proof, remove only the superseded Control UI reconciliation, standard command, interaction, artifact-adapter, and compatibility paths actually replaced by CU1-CU5. | OC6 is released, Control UI is stable on the model, and deletion evidence identifies each exact old path. |
 
