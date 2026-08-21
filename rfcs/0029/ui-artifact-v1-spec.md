@@ -353,6 +353,53 @@ The following fail artifact rendering without failing the surrounding message:
 Failures are observable and safe to log after redaction. They must not contain
 raw credentials, capability URLs, hidden model context, or unbounded tool data.
 
+### Appendix: mapping a2ui → uiDetails
+
+This appendix shows a pragmatic mapping from common a2ui payload fields into the
+Control Model's uiDetails/view offer shape. Use this as an implementation guide
+when adapting an a2ui-producing tool or a2ui-capable Canvas to the Control Model.
+
+- a2ui.root -> UiArtifact.structuredContent or UiArtifactViewOffer.data
+  - When a2ui produces a single root HTML/DOM fragment, place a sanitized
+    structured representation under `structuredContent` and supply a `view` that
+    declares `templateUri: "ui://a2ui/<component>"`.
+- a2ui.components[] -> view.data component array
+  - Map named a2ui components to an array in `view.data.components` with the
+    minimal typed props; include `dataVersion` for component schema validation.
+- a2ui.streamable -> view.streamable or UiArtifactViewOffer.meta.streamable
+  - If the a2ui renderer supports progressive hydration, set `streamable:true`
+    and provide a fragment/CID plan in `meta.streaming` describing chunk order
+    and finalization marker.
+- a2ui.actions -> UiArtifactViewOffer.actions
+  - Convert a2ui-defined interactive handlers to typed action descriptors:
+    `{id,label,kind,schema,authRequired}`. Do not embed executable callbacks.
+- a2ui.templateUri -> UiArtifactViewOffer.templateUri
+  - Normalize a2ui template references to `ui://a2ui/<name>@<version>` and
+    require exact match in host native registry for native rendering.
+- a2ui.deferred -> UiArtifactViewOffer.availability = "deferred"
+  - When the a2ui payload requires server-side materialization, expose it as
+    `deferred` and require `materializeView` to fetch validated payload.
+- a2ui.sizeHints -> UiArtifactViewOffer.preferredLayout / uiDetails.minWidth
+  - Map size and layout hints into `preferredLayout`, `minWidth`, `minHeight`.
+- a2ui.privacyFlags -> UiArtifact.privacy
+  - Translate visibility/scrub flags into `privacy` with `visibility` and
+    `scrubbed` fields; servers must honor these when filtering offers.
+
+Security and runtime notes
+
+- Never copy executable code: a2ui payloads must not carry active JS callbacks
+  or module URIs. Use action descriptors that map to server-side commands.
+- Require schema validation for any `view.data` consumed by a native renderer.
+- Prefer deferred materialization for large or sensitive views so Gateway
+  re-enters auth and policy checks at materialization time.
+
+Examples and next steps
+
+- Append a short example mapping (a2ui JSON -> UiArtifact view) to this
+  appendix. Add a small fixture to the RFC's `required conformance evidence`
+  showing a2ui view enumeration, deferred materialization, and an action
+  invocation roundtrip.
+
 ## Required conformance evidence
 
 Fixtures must cover:
