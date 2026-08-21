@@ -32,6 +32,19 @@ proof, and deletion agree.
 | R1 publication | OpenClaw PR 6/release | Accepted conformance, two consumers, compatibility window, migration policy, release and support ownership, and clean install/import proof from the packed release artifact | Fork-only distribution |
 | D1 incumbent cleanup | OpenClaw PR 7 | Observation window, rollback proof, and exact deletion ledger | Superseded Control UI reconciliation |
 
+## Additive adoption map
+
+Control Model conformance is not the only path for OpenClaw UI in a host. The
+supported architecture is additive:
+
+| Surface | Authority retained | Control Model relationship |
+| --- | --- | --- |
+| Hosted Control UI | OpenClaw owns the version-matched app; host runtime owns auth, route selection, rollout, and server-side policy enforcement. | Independent deployment/fallback path. It can use the same Gateway, but Control Model v1 does not gate or replace hosted policy enforcement. |
+| Native conversation UX | OpenClaw owns conversation semantics; host owns React/native composition. | Primary v1 target: immutable snapshots, typed commands, and renderer-neutral artifacts. |
+| Native board/dashboard UX | OpenClaw owns board identity, widgets, grants, tickets, layout, persistence, and sandbox semantics. | Sibling Board Model proposal. Dashboard-shaped conversation artifacts do not replace the board model. |
+| Native settings UX | OpenClaw owns schema meaning and config read/write semantics; Managed Configuration owns governed writes and activation. | Sibling Config Model proposal. V1 may show safe command-denial details, but it does not define settings writes. |
+| Policy and lockdown | Policy/Gateway/runtime enforcement owns allowed operations, read-only state, disabled state, and denial reasons. | Model consumers may project presentation-safe state and errors; they must not treat UI affordances as authorization. |
+
 ## Evidence to date
 
 Fork-only evidence now covers the full bounded V1 thesis:
