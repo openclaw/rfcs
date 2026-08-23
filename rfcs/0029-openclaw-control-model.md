@@ -197,18 +197,22 @@ condense the original fork-only evidence stack:
 8. [OC5: wire-compatibility canary](https://github.com/giodl73-repo/openclaw/pull/246)
 9. [OC5: lifecycle performance](https://github.com/giodl73-repo/openclaw/pull/247)
 10. [OC5: security review and authority-epoch hardening](https://github.com/giodl73-repo/openclaw/pull/248)
-11. [CU4: Control UI ordinary command adoption](https://github.com/giodl73-repo/openclaw/pull/242)
-12. [CU5: Control UI interaction and artifact adoption](https://github.com/giodl73-repo/openclaw/pull/243)
+11. [Session-list projection follow-up](https://github.com/giodl73-repo/openclaw/pull/249)
+12. [CU4: Control UI ordinary command adoption](https://github.com/giodl73-repo/openclaw/pull/242)
+13. [CU5: Control UI interaction and artifact adoption](https://github.com/giodl73-repo/openclaw/pull/243)
 
 The upstream PRs currently use the already-published fork heads and are draft
 until the RFC and owner acceptance settle. OC5 proves finite defaults,
 representative fixture families, clean packed-package Node/declaration/browser
 consumption, measured steady-state and lifecycle performance,
 candidate/predecessor/main wire compatibility, and full-stack security review
-with the confirmed finding remediated. A final whole-series review then covered
-OC1-OC5 and CU4-CU5 with independent GPT-5.6 Terra, Claude Opus 5, and Gemini
-3.1 Pro Preview passes, followed by a clean Codex branch review. Accepted
-lifecycle, observer ownership, canonical-session alias, metadata-bound,
+with the confirmed finding remediated. The session-list follow-up is additive
+evidence that product shells can consume a smaller read-only roster projection
+derived from the existing session catalog without adding Gateway methods,
+session mutations, chat send, or history behavior. A final whole-series review
+then covered OC1-OC5 and CU4-CU5 with independent GPT-5.6 Terra, Claude Opus
+5, and Gemini 3.1 Pro Preview passes, followed by a clean Codex branch review.
+Accepted lifecycle, observer ownership, canonical-session alias, metadata-bound,
 history, roster, routing, and question-state findings were fixed at core head
 `a158436f085` in PR #248 / upstream CM4 and Control UI head `0a8ad4188a6` in
 PR #243 / upstream CM5. Final focused proof passed 59 Gateway lifecycle/model
