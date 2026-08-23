@@ -424,11 +424,12 @@ Each deferred surface requires a separate owner-first slice and deletion case.
 
 ## Fork-only proposal policy
 
-This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 now has
-fork-only hardening drafts for package/shared-fixture evidence and bounded
+This plan names OC5-OC7, BM2, CFG1, and CFG2 for maintainer review. OC5 has
+fork-linked hardening drafts for package/shared-fixture evidence and bounded
 projection/retained-memory thresholds, candidate/predecessor/main wire
-compatibility, lifecycle performance bounds, and reviewed security hardening;
-the complete OC1-OC5 and CU4-CU5 stack is now review-clean. No upstream branch
-or PR was opened. OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any
-further implementation drafts should remain in the author's forks until RFC
-intake and the relevant OpenClaw owners approve the surface.
+compatibility, lifecycle performance bounds, and reviewed security hardening.
+The complete OC1-OC5 and CU4-CU5 stack is review-clean and the condensed
+Control Model evidence is now visible upstream through draft PRs CM1-CM5.
+OC6, OC7, BM2, CFG1, and CFG2 remain proposals only. Any further implementation
+drafts should remain in the author's forks until RFC intake and the relevant
+OpenClaw owners approve the surface.

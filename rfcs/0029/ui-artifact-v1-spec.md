@@ -5,7 +5,8 @@ This document defines a renderer-neutral UI artifact projected by
 first-party presentation while preserving structured output and sandboxed
 third-party fallback.
 
-Status: draft. This is a fork-only preview.
+Status: submitted draft sidecar for RFC 0029. It has not been accepted or
+released upstream; implementation evidence remains draft and review-gated.
 
 ## Principles
 

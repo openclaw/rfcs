@@ -21,8 +21,9 @@ React, routes, or product presentation. OpenClaw's Control UI and independently
 owned product shells could consume the same behavior while retaining their own
 components, navigation, theming, authentication, and rollout.
 
-This document is a fork-only design preview. It does not request RFC intake,
-open an upstream pull request, or claim maintainer acceptance.
+This document is the submitted draft for RFC 0029. It requests design review
+of the proposed Control Model family, but does not claim maintainer acceptance,
+implementation approval, release support, or product adoption.
 
 ## Motivation
 
