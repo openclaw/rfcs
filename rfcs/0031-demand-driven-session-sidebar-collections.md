@@ -7,7 +7,7 @@ created: 2026-08-23
 last_updated: 2026-08-23
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/64
 ---
 
 # Proposal: Demand-driven session sidebar collections
