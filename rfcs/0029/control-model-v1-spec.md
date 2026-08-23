@@ -5,8 +5,8 @@ This document defines the candidate behavioral contract for
 commands above the Gateway Client browser transport. It does not define
 presentation, product authentication, or another wire protocol.
 
-Status: draft. This is a fork-only preview and has not been submitted or
-accepted upstream.
+Status: submitted draft sidecar for RFC 0029. It has not been accepted or
+released upstream; implementation evidence remains draft and review-gated.
 
 ## Scope
 
