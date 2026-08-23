@@ -245,8 +245,9 @@ evidence into reviewable product slices:
   focused desktop tests, Loki schema tests, static checks, Vite build, branch
   review, all six Rust E2E shards, all three Playwright runtime shards, both
   Git-workspace hard gates, and the multiplayer hard gate.
-- [Lobster PR #9605](https://microsoft.ghe.com/bic/lobster/pull/9605) is the
-  separate native table follow-up. It keeps raw `chat.final` as the visual
+- [Lobster PR #9605](https://microsoft.ghe.com/bic/lobster/pull/9605) merged
+  the separate native table follow-up as `476282420292` after required
+  PullRequest and POP gates passed. It keeps raw `chat.final` as the visual
   commit owner while adding renderer-neutral artifact projection, exact
   allowlisted native table rendering, artifact-only history hydration,
   fallback coverage, live flight rollback, and Gateway/Electron proof. Its
