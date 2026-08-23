@@ -8,7 +8,7 @@ The implementation evidence is now filed upstream as five draft review PRs:
 
 | Upstream draft | Condensed scope | Fork evidence |
 | --- | --- | --- |
-| [CM1 #127670](https://github.com/openclaw/openclaw/pull/127670) | Gateway Client model foundation, immutable connection/session snapshots, host binding, lifecycle, and shared event-refresh policy. | OC1 [#230](https://github.com/giodl73-repo/openclaw/pull/230) |
+| [CM1 #127670](https://github.com/openclaw/openclaw/pull/127670) | Gateway Client model foundation, immutable connection/session snapshots, host binding, lifecycle, and shared event-refresh policy. | OC1 [#230](https://github.com/giodl73-repo/openclaw/pull/230), session-list follow-up [#249](https://github.com/giodl73-repo/openclaw/pull/249) |
 | [CM2 #127671](https://github.com/openclaw/openclaw/pull/127671) | Lazy conversation models, bounded history/live state, runs, tools, approvals, questions, and typed commands. | OC2 [#231](https://github.com/giodl73-repo/openclaw/pull/231) |
 | [CM3 #127672](https://github.com/openclaw/openclaw/pull/127672) | Renderer-neutral UI artifacts, view offers, revisions, deferred materialization, and MCP/Canvas fallback. | OC3 [#232](https://github.com/giodl73-repo/openclaw/pull/232) |
 | [CM4 #127674](https://github.com/openclaw/openclaw/pull/127674) | Initial Control UI reference adoption plus conformance, package, performance, compatibility, lifecycle, and security hardening. | OC4 [#238](https://github.com/giodl73-repo/openclaw/pull/238), OC5 [#241](https://github.com/giodl73-repo/openclaw/pull/241), [#244](https://github.com/giodl73-repo/openclaw/pull/244)-[#248](https://github.com/giodl73-repo/openclaw/pull/248) |
@@ -17,6 +17,11 @@ The implementation evidence is now filed upstream as five draft review PRs:
 These PRs are drafts until RFC intake, owner acceptance, and publication gates
 settle. They currently use the published fork heads; clean same-repository
 stacked branches may replace them before merge.
+
+The session-list follow-up is additive evidence over CM1's catalog boundary. It
+derives a smaller read-only roster projection from `sessionCatalog` for product
+shells and deliberately adds no Gateway request, session mutation, chat send, or
+history behavior.
 
 ## Source extraction rules
 
