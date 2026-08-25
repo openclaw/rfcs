@@ -4,7 +4,7 @@ authors:
   - osolmaz
   - vincentkoc
 created: 2026-06-17
-last_updated: 2026-06-25
+last_updated: 2026-08-25
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/18
@@ -21,9 +21,9 @@ harness-specific behavior to use for a resolved model: tool exposure, Tool
 Search defaults, system prompt sources, and supported thinking levels. It is
 separate from model identity, provider drivers, and managed-local serving
 presets. Phase one preserves four requested model-size classes as metadata,
-ships `openclaw/base` plus size-derived child profiles, migrates existing
-Lean/GPT-5/Claude model-specific behavior onto profiles, and leaves KV cache
-and engine tuning outside profiles.
+ships `openclaw/base` plus size-derived child profiles, migrates existing Lean,
+GPT-5 system-prompt, and portable thinking-default behavior onto profiles, and
+leaves KV cache and engine tuning outside profiles.
 
 ## Motivation
 
@@ -32,8 +32,8 @@ wrong long-term abstraction:
 
 - It makes locality stand in for agent-harness capability.
 - It is binary where current behavior already needs model-family rules.
-- GPT-5 response-style prompt overlays and Claude/Opus thinking defaults live
-  in separate model-specific paths rather than one inspectable behavior system.
+- GPT-5 system-prompt overlays and portable model thinking defaults live in
+  separate model-specific paths rather than one inspectable behavior system.
 - It cannot cleanly distinguish portable harness behavior from local server
   configuration.
 - It encourages a future where a change intended to help local models can
@@ -56,7 +56,7 @@ hosted providers a consistent way to opt into portable model-family behavior.
 
 - Replace `experimental.localModelLean` with named, testable Agent Profiles.
 - Preserve current Lean behavior exactly during migration.
-- Centralize existing GPT-5 response-style and Claude/Opus thinking-default
+- Centralize existing GPT-5 system-prompt and portable model thinking-default
   behavior under the profile resolution system.
 - Keep four model size classes available as model metadata and diagnostics.
 - Ship `openclaw/base` plus size-derived OpenClaw child profiles, with Lean
@@ -65,8 +65,6 @@ hosted providers a consistent way to opt into portable model-family behavior.
   configuration separate ownership layers.
 - Provide deterministic selection, clear precedence, and explainable
   diagnostics.
-- Allow narrow, validated per-profile settings without adding a generic
-  provider parameter bag.
 - Preserve hosted provider payload and cache behavior unless a driver-owned
   change explicitly changes it.
 - Establish a registry format that can later support reviewed model-family and
@@ -192,7 +190,6 @@ type AgentProfile = {
 type AgentProfileSpec = {
   common: AgentProfileCommon;
   "openclaw.ai"?: OpenClawAgentProfileSpec;
-  settings?: AgentProfileSettingsSchema;
 };
 
 type AgentProfileCommon = {
@@ -209,14 +206,11 @@ type AgentProfileSystemPromptSource =
   | {
       file: {
         path: string;
-        digest?: string;
       };
     };
 
 type OpenClawAgentProfileSpec = {
   toolProfile?: "lean";
-  contextPosture?: "constrained";
-  thinkingLevel?: "adaptive" | "max";
 };
 
 type AgentProfileBinding = {
@@ -270,11 +264,6 @@ harness-agnostic part. Domain-named sections such as `openclaw.ai` are owned
 by the corresponding harness or project and can grow independently without
 changing the common schema.
 
-The resource `spec` may also include `settings` with the same closed settings
-schema used by the materialized profile. For example, a GPT-5 profile artifact
-can declare the supported response-style setting without adding a generic
-config bag.
-
 Referenced files must stay inside the profile folder. A path such as
 `./prompts/system.md` is valid; a path such as `../shared/system.md` is invalid.
 
@@ -290,14 +279,14 @@ development or build validation rather than falling back at request time.
 Future installed packs may be hosted by ClawHub, a public artifact registry, a
 private enterprise registry, or an intranet mirror. They require explicit
 owner-controlled installation, schema validation, version/provenance
-attribution, digest pinning or equivalent immutable identity, and restart or
-explicit reload. They must never be fetched during a model request.
+attribution, whole-pack digest pinning or equivalent immutable identity, and
+restart or explicit reload. They must never be fetched during a model request.
 
 Profile inheritance is resolved before runtime selection. The registry rejects
 cycles, unknown parents, bindings that reference unknown profiles, ambiguous
-bindings, prompt paths that escape the profile folder, invalid system prompt
-sources, and invalid settings. Arrays and maps must use field-specific
-replacement/merge semantics; generic deep merge is not allowed.
+bindings, prompt paths that escape the profile folder, and invalid system
+prompt sources. Arrays and maps must use field-specific replacement/merge
+semantics; generic deep merge is not allowed.
 
 ### Selection order
 
@@ -333,8 +322,8 @@ artifact binding always wins over model, family, and model size. Family
 bindings are provider scoped whenever native capabilities differ across routes.
 
 Agent Profile behavior remains subject to driver capabilities. A profile can
-request an adaptive thinking mode, for example, but the driver remains
-authoritative on whether the selected model/route supports it. Unsupported
+request a portable thinking level, for example, but the driver remains
+authoritative on whether the selected model and route support it. Unsupported
 requested behavior uses a named, testable fallback and emits bounded
 diagnostics; it does not invent a provider payload.
 
@@ -349,10 +338,9 @@ base profile plus size-derived child profiles:
 | `openclaw/small` | `openclaw/base` | trusted Tiny/Small; legacy config | exact Lean migration |
 | `openclaw/medium` | `openclaw/base` | trusted Medium | stable medium-size layer |
 | `openclaw/large` | `openclaw/base` | trusted Large | stable large-size layer |
-| `openclaw/gpt-5` | `openclaw/base` | current GPT-5 family behavior | system prompt source and response-style setting |
+| `openclaw/gpt-5` | `openclaw/base` | current GPT-5 family behavior | system prompt source |
 | `openclaw/claude` | `openclaw/base` | shared Claude behavior | base profile for Claude-family overrides |
-| `openclaw/claude-opus-4-7` | `openclaw/claude` | current exact Opus 4.7/4.8 behavior | preserves thinking default |
-| `openclaw/claude-4-6` | `openclaw/claude` | current direct Claude 4.6 behavior | preserves adaptive thinking default |
+| `openclaw/claude-opus-4-7` | `openclaw/claude` | current exact Opus 4.7/4.8 behavior | preserves portable thinking default |
 
 The exact model aliases and family identities remain in canonical model/provider
 catalogs. Registry bindings refer to normalized identity; profiles are not a
@@ -387,8 +375,7 @@ second model catalog.
   "spec": {
     "common": {},
     "openclaw.ai": {
-      "toolProfile": "lean",
-      "contextPosture": "constrained"
+      "toolProfile": "lean"
     }
   }
 }
@@ -422,8 +409,8 @@ type OpenClawToolProfilePolicy = {
 It does not change phase-one Lean semantics without an explicit product
 decision.
 
-The GPT-5 profile owns the migrated response-style setting and a system prompt
-source:
+The GPT-5 profile owns the stable system prompt source. Existing response-style
+configuration remains in its current owner:
 
 ```json
 {
@@ -436,12 +423,6 @@ source:
         "file": {
           "path": "./prompts/gpt-5.md"
         }
-      }
-    },
-    "settings": {
-      "responseStyle": {
-        "allowedValues": ["friendly", "off"],
-        "default": "friendly"
       }
     }
   }
@@ -463,23 +444,11 @@ The Claude/Opus profiles migrate only existing thinking-default selection:
 }
 ```
 
-```json
-{
-  "schemaVersion": 1,
-  "id": "openclaw/claude-4-6",
-  "extends": "openclaw/claude",
-  "spec": {
-    "common": {},
-    "openclaw.ai": {
-      "thinkingLevel": "adaptive"
-    }
-  }
-}
-```
-
-The profile selects a default; the driver continues to own allowed thinking
-levels, native parameter names, and final request validation. There is no
-current Claude prompt overlay to migrate, and this RFC does not create one.
+The profile selects a portable default; the driver continues to own allowed
+thinking levels, native parameter names, adaptive policy, and final request
+validation. Existing Claude 4.6 adaptive behavior remains driver-owned. There
+is no current Claude prompt overlay to migrate, and this RFC does not create
+one.
 
 ### Agent Profile surface
 
@@ -492,7 +461,6 @@ that project.
 type AgentProfileSpec = {
   common: AgentProfileCommon;
   "openclaw.ai"?: OpenClawAgentProfileSpec;
-  settings?: AgentProfileSettingsSchema;
 };
 
 type AgentProfileCommon = {
@@ -509,14 +477,11 @@ type AgentProfileSystemPromptSource =
   | {
       file: {
         path: string;
-        digest?: string;
       };
     };
 
 type OpenClawAgentProfileSpec = {
   toolProfile?: "lean";
-  contextPosture?: "constrained";
-  thinkingLevel?: "adaptive" | "max";
 };
 ```
 
@@ -525,11 +490,6 @@ type OpenClawAgentProfileSpec = {
 | `systemPrompt` | `spec.common` | prompt composition | system-prompt builder | loads inline text or a profile-pack file |
 | `thinkingLevel` | `spec.common` | agent harness | current thinking-default callers | selects a portable default thinking level |
 | `toolProfile` | `spec.openclaw.ai` | OpenClaw agent harness | tool preparation and Tool Search | applies current Lean behavior |
-| `contextPosture` | `spec.openclaw.ai` | OpenClaw diagnostics/future behavior | no hidden automatic rewrite | records compact intent |
-| `thinkingLevel` | `spec.openclaw.ai` | OpenClaw agent harness | provider capability gate | OpenClaw-only `adaptive` or `max` thinking |
-
-`contextPosture` is not a context-window override. It remains diagnostic until
-a concrete behavior has benchmark and compatibility evidence.
 
 The schema must not add arbitrary user tool allow/deny lists, endpoint data,
 transport headers, provider request fragments, server launch arguments, cache
@@ -549,7 +509,6 @@ type AgentProfileSystemPromptSource =
   | {
       file: {
         path: string;
-        digest?: string;
       };
     };
 ```
@@ -559,9 +518,11 @@ The resolver enforces these rules:
 - exactly one source type is set;
 - `file.path` is relative to the `AgentProfile` resource file;
 - file paths cannot escape the profile pack root;
-- if `file.digest` is present, the resolved file content must match it;
 - child profiles replace `systemPrompt` as a whole unless a later RFC defines
   explicit merge behavior.
+
+Per-file digests are not part of phase one. A future package digest or signature
+can cover the complete profile pack, including referenced prompt files.
 
 OpenClaw's built-in profiles can keep prompt text in source-controlled prompt
 files. Installed profile packs can carry their own prompt files, but they are
@@ -696,34 +657,13 @@ Phase one adds one narrow selector at defaults and agent scope:
 is an explicit operator choice. It is useful for a local model whose metadata
 is unknown but whose behavior has been evaluated.
 
-Settings are namespaced to the selected profile's closed settings schema:
-
-```json
-{
-  "agents": {
-    "defaults": {
-      "agentProfileId": "openclaw/gpt-5",
-      "settings": {
-        "responseStyle": "off"
-      }
-    }
-  }
-}
-```
-
-The final field names should match existing agent-default conventions, but the
-surface remains one selector plus settings for that selected profile. Do not
-add equivalent settings at provider, driver, and agent scope.
+The final field names should match existing agent-default conventions. The
+surface remains one profile selector at defaults and agent scope.
 
 Validation rules:
 
 - `"auto"` and registered ids are accepted selectors.
 - Unknown profile ids fail validation.
-- Profile settings require an explicit non-`"auto"` profile at the same scope.
-  An inherited explicit profile is valid when its ownership is unambiguous.
-- Settings fail validation when the selected profile does not own them.
-- Prompt text is accepted only through `spec.common.systemPrompt`, not as a
-  setting.
 - Agent scope wins over defaults, which wins over registry binding.
 - Explicit selection still passes through driver capability gates.
 
@@ -740,12 +680,9 @@ shapes.
 | default `experimental.localModelLean: true` | default `agentProfileId: "openclaw/small"` | preserves explicit Lean intent |
 | agent `experimental.localModelLean: true` | agent `agentProfileId: "openclaw/small"` | preserves stronger scope |
 | legacy Lean `false` | remove legacy field | no explicit base profile needed |
-| GPT-5 overlay personality | GPT response-style setting | preserves `friendly`/`off` |
-| OpenAI plugin personality fallback | GPT response-style setting when no more-specific canonical value exists | preserves current precedence |
 
-Doctor must validate rewritten config, be idempotent, avoid duplicating
-settings across scopes, remove legacy fields after success, and report
-same-precedence conflicts rather than guessing.
+Doctor must validate rewritten config, be idempotent, remove legacy fields
+after success, and report same-precedence conflicts rather than guessing.
 
 The following current code moves to the profile system:
 
@@ -754,7 +691,7 @@ The following current code moves to the profile system:
 | `src/agents/local-model-lean.ts` | boolean resolution and compact tool behavior | profile behavior implementation; delete boolean resolver |
 | `src/agents/agent-tools.ts` | normal-tool filtering | consume resolved OpenClaw `toolProfile` |
 | `src/agents/embedded-agent-runner/run/attempt.ts` | Tool Search default and pre/post-search filtering | consume resolved profile at both boundaries |
-| `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | `gpt-5-v1` system prompt source plus response-style setting |
+| `src/agents/gpt5-prompt-overlay.ts` | GPT detection, personality precedence, contribution | consume the `gpt-5-v1` system prompt source while preserving current response-style configuration |
 | `src/plugins/provider-runtime.ts` | direct GPT helper call | resolve profile system prompt source before generic provider contribution |
 | `extensions/openai/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
 | `extensions/codex/prompt-overlay.ts` | GPT helper facade/re-export | remove after caller migration |
@@ -814,10 +751,10 @@ serving boundary before any ClawHub or community registry is trusted.
 7. Thread the resolved profile through run planning, tools, and prompt
    composition.
 8. Move Lean logic and doctor-migrate legacy Lean config.
-9. Add `openclaw/gpt-5`, migrate response-style config, and replace direct
-   prompt overlay resolution.
-10. Add `openclaw/claude` plus exact Claude/Opus derived profiles, and move
-    only existing thinking-default selection branches.
+9. Add `openclaw/gpt-5`, preserve current response-style config, and replace
+   direct prompt source resolution.
+10. Add `openclaw/claude` plus the exact Opus derived profile, move portable
+    thinking-default selection, and keep adaptive policy driver-owned.
 11. Add profile inspection and documentation.
 12. Remove retired runtime config reads and helper/re-export paths.
 13. Add reviewed artifact/family bindings only with canonical identity,
@@ -894,8 +831,7 @@ boundaries.
 Registry and resolver:
 
 - reject duplicate ids, unknown parents, cycles, bindings that reference
-  unknown profiles, ambiguous bindings, invalid system prompt sources, and
-  invalid settings;
+  unknown profiles, ambiguous bindings, and invalid system prompt sources;
 - load profile folders into stable registry snapshots;
 - reject missing `profile.yaml` files, prompt paths that escape the profile
   folder, request-time remote fetches, and ambiguous inherited outputs;
@@ -916,15 +852,15 @@ Lean:
 GPT:
 
 - preserve current prompt snapshots for `friendly`, `off`, and heartbeat cases;
-- preserve contribution order before generic provider contributions;
-- prove non-GPT profiles receive no GPT contribution;
-- prove legacy overlay/plugin settings migrate and invalid settings fail.
+- preserve existing response-style configuration and contribution order before
+  generic provider contributions;
+- prove non-GPT profiles receive no GPT contribution.
 
 Claude/Opus:
 
-- preserve exact current Opus 4.7/4.8 off defaults;
-- preserve direct Anthropic Claude 4.6 adaptive behavior only where driver
-  capabilities support it;
+- preserve exact current Opus 4.7/4.8 off defaults through its profile;
+- keep direct Anthropic Claude 4.6 adaptive behavior in its current driver
+  owner;
 - retain existing provider tests as the source of truth for payload behavior.
 
 Hosted provider regression:
