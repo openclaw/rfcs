@@ -3,7 +3,7 @@ title: Channel-Agnostic Sender Authentication Strength
 authors:
   - Omar Shahine
 created: 2026-07-27
-last_updated: 2026-08-15
+last_updated: 2026-08-27
 status: accepted
 issue: https://github.com/openclaw/openclaw/issues/124218
 rfc_pr: https://github.com/openclaw/rfcs/pull/51
@@ -248,10 +248,19 @@ authentication.
 
 Resolved once, during entry and subject normalization:
 
-1. If the subject supplies `authentication` for this field key, use it (subjects only).
+1. If the subject supplies a per-message `authentication` map, use the map's value
+   for this field key; a field key **omitted from a supplied map resolves to
+   `unverified`** (subjects only). A subject that supplies no map at all falls
+   through to the static rules below.
 2. Else if the field declares `authentication`, use it.
 3. Else if `dangerous` resolves to `true`, use `"mutable"`.
 4. Else use `"asserted"`.
+
+Step 1's floor is deliberate: a partial map is a bug, not a claim. Without it, a
+per-message channel that declares a strong static ceiling and then forgets the map
+on one code path would silently score a spoofed message at the ceiling — the exact
+incident class this RFC exists to close. The floor makes the forgotten path fail
+closed instead.
 
 Step 4 is the load-bearing default and it is deliberately conservative. A channel that has
 not thought about this question does not get to claim `verified`. Because the default
@@ -393,6 +402,18 @@ risk from asserted-but-unauthenticated risk, which it does not currently do.
 ### Proposed PR stack
 
 Sequential, each independently landable and testable, smallest first.
+
+*Implementation status (2026-08-27).* Stages 2 through 5 are landed on `main`:
+the kernel as openclaw/openclaw#123782 (`d5614697454`), the SDK contract plus the
+six bundled-channel migrations as openclaw/openclaw#123793 (`ea552dff2c2`), and the
+audit/doctor findings as openclaw/openclaw#131129 (`a509254b16ea`). Landing review
+added exact-field compatibility repairs for five bundled channels whose entries
+previously matched across same-kind identity fields (Twitch, Discord, Slack, IRC,
+Feishu), and settled two semantics this text now reflects: a supplied per-message
+map floors omitted fields to `unverified`, and admission-receipt aggregation
+reports `affected` when any contribution's outcome was changed. Stage 1's threat
+model atlas update and the downstream email consumer are tracked in the main
+repository.
 
 *August 2026 refresh.* The original PR 2/3 implementations were closed unmerged while
 `main` gained the execution-identity architecture (admission evidence, decision
@@ -656,6 +677,7 @@ Static shape, declared once, exactly like every other channel:
 const mailIngressIdentity = defineStableChannelIngressIdentity({
   key: "sender-address",
   kind: "email",
+  authentication: "verified", // ceiling: per-message claims decide the actual strength
   normalizeEntry: normalizeMailAddressEntry,
   normalizeSubject: normalizeMailAddress,
   sensitivity: "pii",
@@ -665,6 +687,7 @@ const mailIngressIdentity = defineStableChannelIngressIdentity({
       kind: "email",
       normalizeEntry: normalizeMailDomainEntry,
       normalizeSubject: normalizeMailDomain,
+      authentication: "verified", // ceiling: the strongest claim a message can prove
     },
     {
       key: "sender-display-name",
@@ -677,8 +700,14 @@ const mailIngressIdentity = defineStableChannelIngressIdentity({
 });
 ```
 
-Note what is absent. `sender-address` and `sender-domain` declare no static strength,
-because theirs is per message.
+Note the pattern. `sender-address` and `sender-domain` declare `verified` as a
+static **ceiling** — the strongest claim this channel can ever substantiate — and
+every message supplies the per-message actual through the subject map below. The
+gate takes `min(entry, subject)`, so the ceiling never inflates a weak message,
+and the supplied-map floor (Normalization precedence, step 1) means a code path
+that forgets a field's claim scores `unverified`, never the ceiling. Declaring no
+static strength instead would cap entries at the `asserted` default and make a
+`verified` minimum unreachable for this channel.
 
 ### Building the subject
 
@@ -700,7 +729,8 @@ const subject = createIdentitySubject(mailIngressIdentity, {
   authentication: {
     "sender-address": strengths.address,
     "sender-domain": strengths.domain,
-    // "sender-display-name" omitted: the static field declaration already says mutable
+    // "sender-display-name" omitted: a supplied map floors it to unverified; the
+    // mutable entry-side declaration keeps the effective pair at mutable either way
   },
 });
 ```
@@ -857,19 +887,27 @@ cleanup at the end.
 - **Does `verified` need splitting later?** This RFC says not in v1. Maintainers should
   confirm they would rather add a level above `verified` on evidence than ship it now and
   discover it is decorative.
-- **Should core refuse a channel whose gated identifier can never reach the minimum?** A
+- **Should core refuse a channel whose gated identifier can never reach the
+  minimum?** *Resolved for v1 by observability rather than refusal: the security
+  audit warns on allowFrom entries that are silently inert under the effective
+  minimum and previews the lockout cost of disabling mutable matching
+  (openclaw/openclaw#131129).* A
   channel that emits only `asserted` for its primary identifier under an `asserted` default
   has a gate that cannot fire. That is statically detectable from a channel's declared
   reachable strengths, and catching it at registration would turn the class of bug this RFC
   was amended for into a startup error rather than a silent bypass.
-- **What is the proof standard for declaring `verified`?** This RFC requires a channel to
+- **What is the proof standard for declaring `verified`?** *Resolved in practice:
+  reviewer judgment at PR time, with every bundled declaration documenting its
+  authoritative transport fact in the channel-ingress SDK docs.* This RFC requires a channel to
   document the transport fact behind the claim. It does not propose a mechanical
   conformance test, and there may not be one. If the answer is "reviewer judgment at PR
   time," that should be stated rather than implied.
 - **Should the operator-facing minimum ever become public config?** v1 defers it. The
   trigger condition should be named: presumably the first public channel that can declare
   `verified` for some identifiers and `asserted` for others.
-- **Does the per-message subject strength map belong in v1?** No *bundled* channel needs it
+- **Does the per-message subject strength map belong in v1?** *Resolved: shipped
+  in the kernel; the first in-tree consumer is Discord's PluralKit provenance
+  downgrade, and the supplied-map floor above governs partial maps.* No *bundled* channel needs it
   today; every current channel's strength is static. By this RFC's own standard that makes
   it speculative surface. The counter-argument is that the primitive is provably
   insufficient without it for the transport that motivated the RFC. One external email
