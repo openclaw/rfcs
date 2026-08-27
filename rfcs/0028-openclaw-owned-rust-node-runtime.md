@@ -1,0 +1,477 @@
+---
+title: OpenClaw-owned Rust node runtime
+authors:
+  - Gio Della-Libera
+created: 2026-07-29
+last_updated: 2026-07-31
+status: draft
+issue:
+rfc_pr: https://github.com/openclaw/rfcs/pull/54
+---
+
+# Proposal: OpenClaw-owned Rust node runtime
+
+## Summary
+
+OpenClaw should own a reusable, headless Rust node runtime in the OpenClaw
+repository. Its first proposed product adopter is the new Copilot app system
+tray in Microsoft's Edge/Chromium repository. Separately, Windows Companion
+and `openclaw-windows-node` can align on the same crates to simplify their
+native stack. Each product embeds or launches the runtime through a narrow
+adapter while retaining ownership of its user experience, native tools,
+packaging, and deployment.
+
+This RFC records the requested technical ownership split. Microsoft product
+stakeholders want the Windows shell to remain with the Edge/Chromium product
+while the reusable, product-neutral runtime lives in OpenClaw. That is a
+proposal for OpenClaw maintainer agreement, not a claim that the architectural
+decision has already been accepted.
+
+The acceptance discussion and decision record for that proposal is
+[RFC PR #54](https://github.com/openclaw/rfcs/pull/54). Acceptance of this RFC
+means accepting the bounded, unpublished monorepo foundation described below;
+it does not by itself publish crates, ship the proof binary, promise platform
+support, or accept broader TypeScript node-host parity. A maintainer approval on
+the RFC PR records that bounded technical decision. It does not assign
+individual maintainers or require a staffing decision as a condition of
+acceptance. Normal OpenClaw maintainership, review, and CODEOWNERS processes can
+evolve with the implementation. Later release or scope expansion requires the
+separate gates in this RFC and its companion specifications.
+
+## Motivation
+
+OpenClaw already has a TypeScript node host, and its Tauri application has Rust
+code that connects to the Gateway. Neither is the right reusable boundary for a
+Windows-native product that intends to run without a Node.js or Tauri runtime:
+
+- `src/node-host` combines the canonical node behavior with a TypeScript/Node.js
+  implementation and process assumptions.
+- Tauri is an application shell and consumer of Gateway connectivity, not a
+  complete headless node runtime.
+- A Rust-to-TypeScript wrapper would retain the Node.js dependency and split
+  lifecycle, cancellation, and security ownership across two runtimes.
+- Implementing the node directly in Edge/Chromium would make protocol and policy
+  drift likely and would not give Scout Cloud or other native hosts a reusable
+  OpenClaw implementation.
+
+The desired architecture is materially simpler when a product shell delegates
+the portable node execution plane while all remote management remains behind
+Gateway authentication and authorization:
+
+![Proposed OpenClaw Rust node runtime topology](0028/rust-node-runtime-topology.svg)
+
+The Copilot app system tray is the first proposed host. Windows Companion is a
+separate adopter: it can reuse the same crates for its native node work and can
+also act as an authorized Gateway controller for the tray node. Scout Cloud and
+other authorized OpenClaw controllers use the same Gateway-mediated path; none
+connect directly to the local runtime.
+
+One implementation and conformance suite can then serve native desktop shells,
+headless deployments, and managed-node scenarios without transferring ownership
+of those products into OpenClaw.
+
+## Goals
+
+- Establish OpenClaw as the owner of the portable Rust node runtime, its Gateway
+  contract, security invariants, conformance tests, and release compatibility.
+- Keep Microsoft-specific tray, settings, Windows UX, native-tool adapters,
+  signing, packaging, and deployment in Microsoft-owned repositories.
+- Provide a headless runtime that can be embedded in-process or launched as a
+  sidecar without requiring Tauri or Node.js.
+- Allow Windows Companion and Scout Cloud to manage the same node identity and
+  lifecycle through canonical Gateway APIs.
+- Reuse OpenClaw's command, approval, cancellation, and policy semantics rather
+  than defining a Microsoft-specific wire profile.
+- Preserve incremental value: the Gateway client can be used independently of
+  the complete node host.
+- Let OpenClaw maintainers accept the Rust commitment incrementally—from the
+  shared client, through the bounded node-role subset, up to broader native
+  node-mode parity—without making later layers prerequisites for earlier ones.
+- Keep every accepted runtime and capability API customer-neutral so native,
+  embedded, appliance, and headless adopters can reuse it without Microsoft
+  product dependencies or a product-specific protocol profile.
+
+## Non-Goals
+
+- Moving Windows Companion, the system tray, or Edge/Chromium product code into
+  the OpenClaw repository.
+- Replacing Tauri or requiring native consumers to use Tauri.
+- Making OpenClaw responsible for Microsoft product UX, native tool
+  implementations, IPC, signing, packaging, deployment, or support policy.
+- Sandboxing product-native handlers. Product adapters are trusted components
+  inside the embedding product's security boundary; untrusted capability code
+  must not be registered with this runtime.
+- Adding a second protocol or Microsoft-specific node role.
+- Shipping unrestricted `system.run`, PTY, or process execution without the
+  canonical OpenClaw approval and policy boundary.
+- Reimplementing the model-facing agent loop inside the node runtime. This RFC
+  covers the node invocation loop; any broader agent-loop ownership requires a
+  separate decision.
+- Stabilizing or publishing the Rust crate APIs before conformance and adoption
+  evidence are sufficient.
+
+## Proposal
+
+The normative candidate contracts and evidence are split into companion
+documents so this RFC can stay focused on ownership and architectural choice:
+
+- [Rust Gateway client v1 specification](0028/gateway-client-v1-spec.md)
+- [Rust node runtime v1 specification](0028/node-runtime-v1-spec.md)
+- [Rust node sidecar hosting v1 specification](0028/sidecar-hosting-v1-spec.md)
+- [Rust node sidecar Gateway connection v1 specification](0028/sidecar-gateway-connection-v1-spec.md)
+- [Conformance and adoption plan](0028/conformance-and-adoption-plan.md)
+- [Implementation and evidence inventory](0028/implementation-and-evidence-inventory.md)
+
+The first two describe the reusable OpenClaw layers. The hosting specification
+defines product-neutral process and IPC invariants. The connection specification
+defines how a sidecar reacquires endpoint/auth material, requests external
+signatures, returns issued tokens, and retires authority without selecting a
+product IPC transport or secure-store API. The plan and inventory distinguish
+implemented evidence from future adoption and release gates.
+
+### Repository and crate boundary
+
+The runtime lives in `openclaw/openclaw` as two workspace crates:
+
+1. `openclaw-gateway-client` owns transport, authentication, request/response
+   correlation, event delivery, reconnect classification/backoff primitives,
+   and trust policy. Reconnect supervision, per-attempt material, and final
+   retry decisions remain with `NodeLifecycle` or the embedding. The client is
+   useful to applications—including Tauri applications—that need Gateway
+   connectivity but do not host a node.
+2. `openclaw-node-host` builds on the client and owns node identity, pairing,
+   capability declaration, lifecycle, invocation dispatch, duplex input and
+   progress, cancellation, and a bounded adapter boundary for commands/tools.
+
+The split is deliberate: it prevents every Gateway consumer from inheriting an
+execution runtime, while ensuring node hosts do not invent transport or
+authentication behavior.
+
+The crates remain in the OpenClaw monorepo while the contract is evolving. This
+keeps TypeScript and Rust conformance changes reviewable together and avoids
+repository, version, and release skew. A later RFC or maintainer decision may
+publish them once the public API and support policy are stable.
+
+During incubation, `pub` means available to reviewed workspace consumers, not
+a stable or supported public Rust API. The crate names, module layout, Rust
+types, configuration, and proof-binary interface may change through ordinary
+OpenClaw review without SemVer compatibility. In-tree consumers must change in
+the same commit or stacked series, and the shared wire fixtures and canonical
+Gateway behavior—not the current Rust API shape—remain the compatibility
+authority. The supported-release gate must define an API/versioning policy
+before publication or compatibility claims. This RFC does not select or commit
+to a cross-repository distribution mechanism.
+
+### Ownership boundary
+
+OpenClaw maintainers own:
+
+- the Gateway Rust client and node-host implementation;
+- protocol compatibility and role-safe session behavior;
+- identity, pairing, reconnect, cancellation, input, and progress semantics;
+- bounded invocation supervision and the generic tool adapter contract;
+- integration with canonical OpenClaw approval and command/tool policy;
+- cross-language fixtures, conformance tests, compatibility, and releases.
+
+Microsoft product teams own:
+
+- the Copilot app system-tray shell in Edge/Chromium;
+- the Windows Companion and `openclaw-windows-node` product integration;
+- settings and Windows-native user experiences;
+- Windows-native tools and their runtime adapters;
+- the IPC shape between the product shell and an out-of-process runtime, when
+  that deployment mode is selected;
+- product policy selection, signing, packaging, deployment, and servicing.
+
+Scout Cloud owns its management and orchestration experience. It discovers and
+manages the node through supported Gateway surfaces; it does not fork the Rust
+runtime or introduce a separate node protocol.
+
+Microsoft is prepared to act as the anchor adopter and contribute implementation,
+conformance, and maintenance for the Rust capability layers, including broader
+node-mode parity if OpenClaw accepts that scope. That sponsorship does
+not make the runtime Microsoft-specific: accepted APIs, fixtures, and policy
+integration must serve other OpenClaw customers and contributors equally.
+OpenClaw maintainers retain authority over the canonical contract, security and
+policy boundaries, repository acceptance, and release requirements. The
+maintainer group can therefore choose the product scope that is right for
+OpenClaw and its broader customer base without making individual staffing part
+of this architecture decision.
+
+Product-specific shells and adapters remain outside the generic runtime. Other
+customers can embed the crates, supervise the headless host, and contribute
+portable capability layers under the same conformance and ownership rules.
+
+### Embedding contract
+
+The runtime must support both of these topologies without changing its semantic
+contract:
+
+- **In-process:** a native shell links the crates and supplies platform adapters.
+- **Sidecar:** a shell supervises an OpenClaw-owned executable over a narrow,
+  authenticated local IPC adapter.
+
+The selection is a product and deployment concern. Runtime APIs must not expose
+Tauri types, Chromium types, Windows handles, or Scout-specific management
+objects. Platform tools are registered through bounded adapters and execute only
+after canonical admission and approval decisions.
+
+The adapter is trusted product code, not a sandbox boundary. The Rust runtime
+authenticates, authorizes, bounds, correlates, and cancels dispatch, but it does
+not isolate a handler from the product account or operating system. The product
+owns least privilege, OS permissions, containment, and any stronger isolation
+required for native capability execution.
+
+### Hosting and management are separate relationships
+
+A product may have either or both of these relationships with a Rust node:
+
+1. **Local hosting and supervision:** the product shell embeds the runtime or
+   starts it as a sidecar, supplies credentials and native-tool adapters, and
+   owns local start, stop, health, and recovery behavior. The first proposed
+   host is the Copilot app system tray in Edge/Chromium.
+2. **Gateway-mediated management:** Windows Companion, Scout Cloud, or another
+   authorized OpenClaw controller observes and manages a node through canonical
+   Gateway APIs.
+
+The first relationship is local process composition. The second is a control-
+plane relationship and does not require another runtime or a product-specific
+management implementation inside `openclaw-node-host`. The Copilot system-tray
+node can be locally hosted by its product shell while authorized controllers
+manage it through the Gateway.
+
+Gateway remains authoritative for controller authentication, node session
+state, authorization, conflict behavior, audit attribution, and revocation.
+The Rust runtime receives canonical authorized events, executes or cancels the
+corresponding work, preserves attribution, and reports status and results. It
+must not contain separate Windows Companion and Scout Cloud control planes.
+These authority rules must be complete before the multi-manager topology is
+considered production-ready.
+
+Sidecar deployments also require an explicit operational contract: local-only
+authenticated IPC, bounded startup and memory, truthful readiness, supervised
+crash recovery, idempotent reconnect, and graceful shutdown of active work.
+These are release gates for sidecar mode, not details delegated implicitly to
+each shell.
+
+### Conformance and security
+
+Until the Rust implementation reaches parity, `src/node-host` is the executable
+behavioral reference. Shared fixtures should replace implementation-by-
+implementation interpretation for:
+
+- connect metadata, identity, authentication, and pairing;
+- command declaration and invocation envelopes;
+- input/progress ordering and byte limits;
+- cancellation, deadlines, saturation, shutdown, and reconnect behavior;
+- structured failures and redaction;
+- approval and command/tool policy decisions.
+
+The runtime fails closed when policy, approval, identity, or controller authority
+is unknown. A native tool adapter cannot broaden permissions granted by the
+Gateway or product policy. Every admission, approval, denial, cancellation,
+controller action, and approved-but-failed execution must retain distinct,
+exportable audit attribution. Revocation must stop new work promptly and cancel
+affected in-flight work; a disconnected management surface cannot silently
+retain authority.
+
+### Delivery plan
+
+The proposed review shape is three logically stacked OpenClaw implementation
+PRs plus one initial Windows adopter PR:
+
+1. **OpenClaw foundation:** add the two crates, a role-safe Gateway session, a
+   minimal bounded node host, and a Tauri consumer that proves the client is
+   reusable ([openclaw/openclaw#116050](https://github.com/openclaw/openclaw/pull/116050)).
+2. **OpenClaw embeddable runtime:** add external credential/signing hooks,
+   issued-token delivery, the supervised lifecycle, bounded duplex invocation,
+   local fail-closed admission, connection-scoped command manifests, and the
+   shared TypeScript/Rust lifecycle corpus. Draft
+   [openclaw/openclaw#116450](https://github.com/openclaw/openclaw/pull/116450)
+   is the second upstream PR, explicitly dependent on the foundation landing
+   first.
+3. **OpenClaw authenticated sidecar bridge:** add transport-neutral framing,
+   negotiation, immutable configuration, an ordinary-command runtime bridge,
+   exact cross-language corpora, and a real child-process authenticated IPC test
+   ([openclaw/openclaw#116863](https://github.com/openclaw/openclaw/pull/116863)).
+   This draft is logically stacked on #116450. It defines the shared primitive
+   and proves it across a real process/transport boundary, but deliberately
+   stops before choosing product IPC, protected credential bootstrap, process
+   supervision, or rollout policy.
+4. **Windows adopter:** keep the existing C# runtime as the production default
+   while adding one replaceable runtime boundary and one Windows-owned shared
+   capability dispatcher, plus an independent non-selectable C# consumer of
+   the sidecar contracts
+   ([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
+
+Fork-only follow-up evidence now launches the real Rust test child over
+anonymous pipes, verifies an exact SHA-256 artifact pin while locking the
+artifact path against substitution through launch, delivers the fresh
+session key through a bounded inherited private pipe, and requires the
+authenticated runtime offer to match that verified identity
+([Rust #12](https://github.com/giodl73-repo/openclaw-rust-node/pull/12),
+[Windows #4](https://github.com/giodl73-repo/openclaw-windows-node/pull/4)).
+It remains non-selectable source evidence rather than another upstream
+implementation PR or a packaged production runtime.
+
+The next proposed OpenClaw slice implements the product-neutral sidecar Gateway
+connection-control contract defined here: per-attempt material acquisition,
+external signing, issued-token acknowledgement, and authoritative retirement.
+It does not move secure storage, endpoint authorization, process supervision,
+or product policy into Rust. A matching adopter slice can then replace the
+current environment-based live-Gateway proof with the protected sidecar path.
+
+The earlier fork drafts #186-#191 remain detailed evidence history for #116450,
+and closed fork drafts #193-#195 remain detailed evidence history for #116863.
+Their commits remain intact in the consolidated branches, so the review shape
+does not hide the native-signing, lifecycle, duplex, authority, manifest,
+sidecar-protocol, negotiation, or runtime-bridge boundaries.
+
+After those reviews, adoption proof must demonstrate the authenticated,
+versioned Windows adapter and a Scout Cloud management flow against a real
+Gateway, including cancellation, revocation, reconnect, crash recovery,
+readiness, rollback, and audit evidence. Sidecar proof also measures startup
+and steady-state resource cost. API stability, artifacts, SBOM/signing,
+compatibility windows, servicing, and support ownership remain explicit release
+decisions before the crates are declared generally supported.
+
+The existing official C# Windows node now has one consolidated draft adopter
+([openclaw-windows-node#1068](https://github.com/openclaw/openclaw-windows-node/pull/1068)).
+It introduces an injectable node-runtime contract and extracts a single
+Windows-owned capability dispatcher shared by the current C# transport and the
+new non-selectable sidecar adapter, while keeping the C# client as the
+production default. The public OpenClaw draft now proves authenticated framing
+across a real child process. Fork evidence extends that proof with a verified,
+privately bootstrapped process over authenticated, versioned
+anonymous pipes. A future product adoption slice can wire that launcher into
+an opt-in runtime and add signing, packaging, supervision, and rollback:
+Rust owns Gateway transport, registration, invocation, cancellation, reconnect,
+and runtime lifecycle, while the Windows app retains WinUI, the operator role,
+MCP, approvals, and native capability handlers. This proves adoption can be
+incremental without duplicating Windows command routing, replacing the product
+shell, or introducing a Tauri dependency.
+
+Each earlier layer remains useful if maintainers defer a later layer. In
+particular, adopting only the Gateway client still removes duplicated transport,
+authentication, and reconnect logic from Rust consumers.
+
+## Rationale
+
+### Existing multi-language node precedent
+
+OpenClaw node mode already has several language- and platform-specific
+implementations: the generic TypeScript headless host, shared Swift sessions
+used by Apple nodes, the Kotlin Android node, the official C# Windows node, and
+the official C ESP-IDF component. They do not expose identical tools. Each
+advertises the capabilities and commands its platform can currently serve.
+
+These are not competing protocols. They implement one node role: protocol
+admission, signed device identity and pairing, a connection-scoped capability
+manifest, invocation/result behavior, bounded lifecycle, and Gateway plus local
+policy enforcement. Transport adapters, credential storage, native capability
+handlers, and application lifecycle remain implementation-specific.
+
+The Rust work is therefore not a new architectural exception. It fills the
+reusable native/headless Rust slot and prevents every Rust adopter from
+implementing that common machinery independently. Its additional commitment is
+to strengthen the shared cross-language fixtures and conformance corpus where
+input, progress, cancellation, lifecycle, and error behavior are currently
+distributed across schemas and implementation tests.
+
+### Why OpenClaw owns the runtime
+
+The runtime implements an OpenClaw protocol role and security boundary. Keeping
+it beside the canonical TypeScript implementation makes behavior changes,
+fixtures, and review atomic. It also makes the implementation available to
+non-Microsoft native consumers.
+
+### Why the product shell stays with Microsoft
+
+Tray behavior, settings, Windows UX, native tools, packaging, and deployment are
+product concerns with different release and platform constraints. Moving them
+into OpenClaw would blur responsibility and make the portable runtime less
+reusable.
+
+### Why this is not a Tauri decision
+
+Tauri and the Rust runtime occupy different layers. A Tauri app can consume the
+Gateway client or node host, but a headless service, Chromium component, or
+Windows-native shell should not need an application framework to reuse protocol
+and lifecycle behavior.
+
+### Why this is not two competing OpenClaw runtimes
+
+Node mode is a protocol role, not a requirement that every node run in the same
+language or application framework. OpenClaw keeps one canonical node contract,
+policy boundary, and conformance corpus. The TypeScript `src/node-host` remains
+the executable behavioral reference while the Rust implementation reaches the
+approved native/headless subset.
+
+The minimum Rust commitment is the proper node-role subset needed by native and
+headless hosts; it does not absorb the Gateway's model-facing agent loop.
+Additional node-mode capabilities—including MCP, skills, plugins, and richer
+tool execution where they truly belong to the node role—can be added when
+OpenClaw accepts the scope and the change carries implementation, conformance,
+and a credible maintenance path. Microsoft is willing to seed that work, but
+the resulting surface must remain useful to non-Microsoft adopters. Shared
+fixtures must prove equivalent behavior for every capability implemented in
+both languages, and Rust must reuse the canonical policy rather than create a
+parallel one.
+
+This lets OpenClaw maintainers choose among a shared Gateway client, a bounded
+native node host, or broader native node-mode parity. In every
+case it eliminates product-owned Rust node forks. Whether a future native or
+headless deployment replaces its TypeScript bridge is an adoption decision made
+only after conformance is proven; this RFC does not require removing the
+TypeScript host from Node.js deployments.
+
+### Why not keep a separate Rust repository
+
+A separate repository would make protocol changes, security fixes, tests, and
+releases easier to skew while the implementation is young. The monorepo provides
+the strongest path to conformance. Extraction remains possible after the API and
+release contract stabilize.
+
+### Why not wrap the TypeScript node host
+
+A wrapper is the shortest path for products already carrying Node.js. It does
+not meet the all-Rust runtime goal, does not simplify the Windows process model,
+and preserves two runtimes across lifecycle and security-sensitive paths.
+
+## Acceptance record and follow-on decisions
+
+One technical decision is required to accept this RFC:
+
+- Should the bounded, unpublished Rust Gateway-client and node-runtime
+  foundation be an OpenClaw core surface in the monorepo, with Gateway/security
+  authority and cross-language conformance maintained beside the TypeScript
+  reference?
+
+The recommended bounded answer is **yes**. It permits the two `publish = false`
+workspace crates and the Tauri reuse slice to incubate in `openclaw/openclaw`.
+It does not make the foreground proof host an official binary, promise a public
+crate API, select supported platforms, or authorize broader tool execution.
+Public Rust visibility during incubation is an internal workspace seam, carries
+no SemVer promise, and may change with its reviewed in-tree consumers.
+It also does not assign individual maintainers; that is an implementation and
+project-maintenance concern rather than an architectural prerequisite.
+
+The following are explicit follow-on adoption or release decisions, not hidden
+prerequisites for reviewing the bounded foundation:
+
+- Select the canonical command/tool and approval adapters before enabling each
+  native capability beyond the bounded custom-handler surface.
+- Choose in-process embedding or an authenticated signed sidecar per adopter;
+  both must satisfy the same runtime contract.
+- Define controller authority, conflicts, revocation, and audit attribution
+  before Windows Companion and Scout Cloud jointly manage one node.
+- Name release owners, platforms, artifact identities, compatibility windows,
+  and servicing policy before publishing crates or shipping an official binary.
+- Which identity and token material is stored by the runtime versus a
+  Windows-secure-storage adapter?
+- What is explicitly in scope for the node invocation loop, and what remains in
+  the Gateway's model-facing agent loop?
+- When should the crates be published, and who owns artifact signing, SBOMs,
+  compatibility windows, servicing, and security response?
+- What end-to-end evidence is required before the TypeScript node host is no
+  longer the behavioral reference for a capability?
