@@ -1,0 +1,600 @@
+# Readiness v1 Specification
+
+This document is the implementer-facing specification for RFC 0018, Readiness
+Conditions and Providers. The RFC explains the motivation, compatibility
+strategy, and rollout plan. This file defines the v1 condition model, provider
+lifecycle, operator selection, bounded evaluation, aggregation, and projection
+contract that OpenClaw runtimes, plugins, and hosts can build against. The
+focused subject identity and reconciliation contract is defined in
+[`readiness-subjects-v1-spec.md`](readiness-subjects-v1-spec.md).
+
+Status: draft, tied to RFC 0018.
+
+## Scope
+
+This specification defines:
+
+- the canonical readiness condition and result shapes;
+- stable condition, subject identity, and reason requirements;
+- required and advisory aggregation;
+- the core condition namespace and baseline lifecycle conditions;
+- plugin readiness-provider registration and activation lifecycle;
+- operator selection of additional required or advisory criteria;
+- deadlines, cancellation, coalescing, caching, and error conversion;
+- HTTP, health, status, and CLI projections; and
+- compatibility and conformance requirements.
+
+This specification does not define:
+
+- standard or custom hosting profiles;
+- checkpoint durability, safe shutdown, or restore compatibility;
+- arbitrary shell, network, or script probes configured by operators;
+- orchestration retry intervals or restart policy; or
+- telemetry sinks, dashboards, alerting, or retention.
+
+## Terminology
+
+- **Condition**: one bounded observation about the current runtime activation.
+- **Criterion**: an enumerable condition definition that can be selected for
+  evaluation.
+- **Provider**: activated plugin code that implements one plugin-owned
+  criterion.
+- **Requirement**: whether a non-true condition blocks readiness.
+- **Universal condition**: a core lifecycle condition that always participates
+  once canonical readiness is activated and cannot be removed by operator
+  configuration.
+- **Canonical result**: the single aggregated result consumed by all readiness
+  projections.
+- **Subject**: one core- or plugin-owned runtime object observed by conditions.
+- **Producer**: the subject that assembled and owns one readiness decision.
+- **Projection**: an HTTP, health, status, or CLI representation of the
+  canonical result; a projection is not a second evaluator.
+
+## Compatibility And Evolution
+
+Readiness v1 uses these compatibility rules:
+
+- absence of both `gateway.readiness` and another separately accepted
+  activation contract preserves the legacy Gateway readiness decision path and
+  does not execute the canonical runtime evaluator;
+- presence of `gateway.readiness`, including an empty object, activates v1;
+- a separately accepted Standard Hosting Profile may activate v1 through its
+  profile-selection contract;
+- condition `type` and `reason` values are stable machine contracts;
+- `message` is redacted operator guidance and is not stable machine identity;
+- adding an advisory criterion is backward compatible;
+- making a criterion required, or adding a new universal required condition,
+  is compatibility-sensitive because it can change `200` to `503`;
+- unknown optional result fields must be ignored by v1 consumers;
+- legacy readiness fields remain projections during migration; and
+- implementing or registering a criterion does not select it or make it
+  required.
+
+## Canonical Data Model
+
+The canonical v1 shapes are:
+
+```ts
+type ReadinessConditionStatus = "True" | "False" | "Unknown";
+type ReadinessRequirement = "required" | "advisory";
+
+type ReadinessCondition = {
+  type: string;
+  subjectRef: string;
+  relatedSubjectRefs?: string[];
+  observedAtMs?: number;
+  status: ReadinessConditionStatus;
+  requirement: ReadinessRequirement;
+  reason: string;
+  message: string;
+};
+
+type ReadinessResult = {
+  contractVersion: 1;
+  evaluatedAtMs: number;
+  identity: ReadinessIdentity;
+  ready: boolean;
+  conditions: ReadinessCondition[];
+  failures: string[];
+  advisories: string[];
+};
+```
+
+`ReadinessIdentity` and subject reconciliation are normative in the focused
+subject sidecar. Implementations may add optional metadata, but the fields above
+retain their v1 meaning.
+
+### Identity
+
+The pair `(subjectRef, type)` must be stable and unique within one result. Core uses
+the public condition types defined below, such as `WorkspaceWritable`. A plugin
+condition uses this namespace:
+
+- `plugin.<plugin-id>.<criterion-id>` for plugin criteria.
+
+Configuration selects enumerable criterion IDs. Selectable public core
+criteria use `openclaw.<criterion-id>` and map to a core condition type. Not
+every universal or built-in advisory condition is operator-selectable. Plugin
+selectors are the same namespaced ID used by their emitted condition. Core and
+plugin criterion IDs must not collide after normalization. A plugin-local ID is
+trimmed, converted to lowercase, and must match
+`^[a-z0-9][a-z0-9._-]*$`. Core prefixes the canonical activated plugin ID and
+must reject an invalid or duplicate resulting ID. Configured selectors use the
+canonical stored ID; consumers must not perform a second case-folding rule.
+
+`reason` must describe the observed state, not repeat the criterion identity.
+Provider reasons must match `^[A-Za-z][A-Za-z0-9._-]{0,127}$`. Provider messages
+must be valid text of at most 512 UTF-8 bytes after redaction. Reason and message
+values must not contain secrets, paths with credentials, raw exception text, or
+tenant content. Core validates these bounds before caching or projection;
+invalid output becomes `CriterionInvalidResult`.
+
+Every primary, related, parent, and producer reference must resolve in the
+result identity package. Subjects are declared once and deterministically
+ordered. Core owns the `openclaw/*` namespace; plugins receive
+`plugin.<plugin-id>/*`. Identity declarations, conflict behavior, bounds,
+Gateway serving-incarnation lifetime, and diff semantics are defined by
+[`readiness-subjects-v1-spec.md`](readiness-subjects-v1-spec.md).
+
+### Status
+
+- `True` means the criterion was observed and satisfied.
+- `False` means the criterion was observed and not satisfied.
+- `Unknown` means the criterion was selected but could not be established
+  within the contract, including timeout, unavailable source state, or an
+  evaluator failure.
+
+An absent observation must never be inferred as `True`. A selected required
+criterion that cannot be evaluated must be emitted as `Unknown`.
+
+### Aggregation
+
+Aggregation is deterministic:
+
+| Requirement | `True` | `False` or `Unknown` |
+| --- | --- | --- |
+| `required` | No failure. | `ready=false`; append the stable reason to `failures`. |
+| `advisory` | No advisory. | Preserve readiness; append the stable reason to `advisories`. |
+
+The condition array must use this v1 order when present:
+
+1. `ReadinessEvaluationComplete` when the normal evaluation cannot complete;
+2. `GatewayStartupComplete`, `GatewayAcceptingWork`, `ChannelRuntimeReady`,
+   `ChannelRuntimeSuppressed`, and `EventLoopHealthy`;
+3. `ConfigLoaded` and `WorkspaceWritable`;
+4. `GatewayResponding` and `PluginsLoaded`; and
+5. remaining selected core, profile-contributed, and plugin conditions sorted
+   by condition type and then `subjectRef`.
+
+`failures` and `advisories` follow condition order and contain no duplicates.
+
+Malformed evaluator output must become a stable `Unknown` result or cause
+registration/config validation to fail. It must not disappear from aggregation.
+
+### Selected-Condition Health
+
+A diagnostic projection may derive this summary from one canonical result:
+
+```ts
+type ConditionHealthStatus = "passing" | "degraded" | "failing" | "unknown";
+
+type ConditionHealthSummary = {
+  contractVersion: 1;
+  evaluatedAtMs: number;
+  scope: "selected-readiness-conditions";
+  status: ConditionHealthStatus;
+  ready: boolean;
+};
+```
+
+The projection must use this precedence:
+
+1. `failing` if any required condition is `False`;
+2. `unknown` if no required condition is `False` and any required condition is
+   `Unknown`;
+3. `degraded` if all required conditions are `True` and any advisory condition
+   is `False` or `Unknown`; and
+4. `passing` otherwise.
+
+`evaluatedAtMs` and `ready` must equal the source canonical result. The scope
+value is fixed because the summary covers only conditions selected into that
+result. Implementations must not invoke unselected providers to expand health
+coverage.
+
+Detailed output may include canonical non-`True` conditions without rewriting
+them. `reason` remains the stable machine-readable code, `message` remains the
+bounded redacted operator explanation, and `subjectRef` plus
+`relatedSubjectRefs` identify affected objects. Unauthenticated remote output
+must omit those details.
+
+This summary is not part of `CanonicalReadinessResult` and does not change its
+contract version. It is computed only by projection owners from an already
+evaluated result.
+
+## Core Criteria
+
+The initial public core criteria are:
+
+| Selector ID | Condition type | Default requirement | Stable non-true reasons |
+| --- | --- | --- | --- |
+| Not selectable | `GatewayStartupComplete` | Universal required | `GatewayStartupPending`, `GatewayStartupNotChecked` |
+| Not selectable | `GatewayAcceptingWork` | Universal required | `GatewayDraining`, `GatewayAdmissionNotChecked` |
+| Not selectable | `ChannelRuntimeReady` | Universal required | `ChannelRuntimeUnavailable`, `ChannelRuntimeNotChecked` |
+| Not selectable | `ChannelRuntimeSuppressed` | Advisory when present | `ChannelRuntimeSuppressed` |
+| `openclaw.event-loop-healthy` | `EventLoopHealthy` | Advisory unless selected as required | `EventLoopDegraded`, `EventLoopStatusUnavailable`, `CriterionEvaluationUnavailable` |
+| Not selectable | `ConfigLoaded` | Universal required | `ConfigNotLoaded`, `ConfigInvalid`, `EffectiveConfigUnavailable` |
+| `openclaw.workspace-writable` | `WorkspaceWritable` | Selectable | `WorkspaceMissing`, `WorkspaceStorageFull`, `WorkspaceNotWritable`, `WorkspaceProbeFailed`, `WorkspaceProbeTimedOut`, `WorkspaceNotChecked` |
+| `openclaw.config-current` | `ConfigCurrent` | Selectable | `ConfigRestartRequired` |
+| `openclaw.model-route-ready` | `ModelRouteReady` | Selectable | `ModelRouteUnavailable`, `ModelAuthUnavailable` |
+| `openclaw.secrets-ready` | `SecretsReady` | Selectable | `SecretOwnersUnavailable` |
+| `openclaw.session-storage-ready` | `SessionStorageReady` | Selectable | `SessionStorageMissing`, `SessionStorageFull`, `SessionStorageNotWritable`, `SessionStorageProbeFailed`, `SessionStorageProbeTimedOut`, `SessionStorageNotChecked` |
+| `openclaw.context-engine-ready` | `ContextEngineReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.tool-catalog-ready` | `ToolCatalogReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.mcp-runtime-ready` | `McpRuntimeReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.sandbox-ready` | `SandboxReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.harness-ready` | `HarnessReady` | Selectable | Owner-defined bounded activation reasons. |
+| `openclaw.state-ready` | `StateReady` | Selectable | Owner-defined bounded state reasons. |
+| `openclaw.delivery-runtime-ready` | `DeliveryRuntimeReady` | Selectable | Owner-defined bounded delivery reasons. |
+| `openclaw.scheduler-ready` | `SchedulerReady` | Selectable | Owner-defined bounded scheduler reasons. |
+| `openclaw.plugins-loaded` | `PluginsLoaded` | Advisory unless selected as required | `PluginLoadFailures`, `PluginStatusUnavailable`, `CriterionEvaluationUnavailable` |
+
+Each condition is `True` only when the runtime observes the corresponding
+startup, admission, channel, event-loop, config, activation, workspace,
+execution-capability, state, background-service, or plugin predicate described
+by RFC 0018. A successful condition uses a stable success reason that normally
+matches its condition type. Selectable owner criteria must observe existing
+snapshots and must not initiate the subsystem work they report.
+
+The evaluator may emit these failure-only guard conditions:
+
+| Condition type | Requirement | Predicate |
+| --- | --- | --- |
+| `ReadinessEvaluationComplete` | Required | The bounded canonical evaluation completed; otherwise `ReadinessEvaluationTimedOut` or `ReadinessEvaluationFailed`. |
+| `GatewayResponding` | Required when the operation is remote | The caller reached the live Gateway; otherwise `GatewayUnavailable` or `GatewayNotChecked`. |
+
+Implementations must preserve existing unconfigured Gateway readiness behavior
+while these observations are normalized. `workspace-writable` remains
+unselected unless an operator or a separately accepted profile selects it.
+
+## Plugin Readiness Providers
+
+Only activated OpenClaw plugins may register executable provider code. Runtime
+configuration may select a provider ID but must not contain callbacks, scripts,
+commands, or arbitrary probe definitions.
+
+The v1 plugin SDK contract is:
+
+```ts
+type PluginReadinessResult = {
+  subjectRef?: string;
+  relatedSubjectRefs?: string[];
+  observedAtMs?: number;
+  status: "True" | "False" | "Unknown";
+  reason: string;
+  message: string;
+};
+
+type PluginReadinessProvider = {
+  id: string;
+  description: string;
+  check(context: {
+    config: OpenClawConfig;
+    pluginConfig: unknown;
+    signal: AbortSignal;
+    subjects: PluginReadinessSubjectCollector;
+  }): Promise<PluginReadinessResult> | PluginReadinessResult;
+};
+
+type RegisterReadinessCriterion = (
+  provider: PluginReadinessProvider,
+) => void;
+```
+
+Registration through `api.registerReadinessCriterion` is scoped to the current
+plugin activation. Core publishes the resulting ID as
+`plugin.<plugin-id>.<provider-id>`.
+
+Each provider invocation emits exactly one condition. A plugin registers
+separate criteria for independently selectable resources or states; an
+unbounded collection is summarized by one aggregate subject and a bounded,
+deterministic set of related subjects.
+
+The bundled Policy plugin is an optional demonstration of this contract; core
+readiness does not depend on Policy being installed or enabled. When activated,
+it registers `plugin.policy.conformant`. It reuses the plugin's existing policy
+evaluation,
+returns only bounded summary text, and is not evaluated until selected through
+`gateway.readiness`. Advisory selection does not affect the overall readiness
+decision; required selection fails closed for findings, disabled evaluation,
+provider failure, or timeout.
+
+### Provider Requirements
+
+A provider must be:
+
+- observational and read-only;
+- idempotent under repeated invocation;
+- cancellation-aware;
+- safe under concurrent invocation or core coalescing;
+- free of blocking synchronous I/O; and
+- redacted by construction.
+
+A provider must not mutate config, reload plugins, acquire or rotate secrets,
+send model requests, change admission state, invoke tools, or alter another
+condition.
+
+Provider `reason` must match `^[A-Za-z][A-Za-z0-9._-]{0,127}$`. Provider
+`message` must be non-empty after trimming, contain no NUL bytes, and be at
+most 512 UTF-8 bytes after core redaction. Output that violates these rules
+becomes `CriterionInvalidResult=Unknown`; no raw provider exception or
+unvalidated message is projected.
+
+### Activation Lifecycle
+
+The registered provider set is bound to one activation-pinned plugin registry
+and effective config snapshot. Plugin or config reload atomically publishes one
+replacement config-and-registry snapshot identity. Publication aborts in-flight callbacks from the prior
+generation, invalidates their cached results, and prevents late settlement from
+entering the active result. Core must keep retained state bounded when a
+callback ignores cancellation; an abandoned callback must not retain an active
+registry or become selectable after replacement.
+
+Provider descriptors must be enumerable without invoking callbacks. At minimum
+the active registry entry contains the namespaced ID, description, owning
+plugin, and source. The registry snapshot identity is the activation-generation
+boundary.
+
+### Optional Criterion Catalog Projection
+
+An implementation may expose an authenticated read-only projection that
+enumerates configurable criteria from one activation-pinned config and registry
+snapshot. When implemented, the v1 catalog has this shape:
+
+```ts
+type ReadinessCriterionCatalog = {
+  catalogVersion: 1;
+  criteria: Array<{
+    id: string;
+    description?: string;
+    owner:
+      | { kind: "core" }
+      | { kind: "plugin"; pluginId: string; pluginName?: string }
+      | { kind: "unresolved" };
+    registered: boolean;
+    selection: "required" | "advisory" | "unselected";
+  }>;
+};
+```
+
+The projection lists selectable core criteria and all descriptors in the active
+plugin registry. A selected ID absent from that registry remains visible with
+`registered: false` and unresolved ownership. Results are sorted by criterion
+ID. Registration source paths, plugin configuration, callback references, and
+provider results are not projected.
+
+Catalog enumeration is deterministic for one config/registry snapshot and must
+not invoke readiness evaluation, provider callbacks, probes, reload, repair, or
+network I/O. It remains available when canonical readiness is not selected so
+an operator can discover criteria before changing configuration.
+
+## Operator Selection
+
+Universal conditions always apply. Operators may select additional registered
+core or plugin criteria without selecting a hosting profile:
+
+```json5
+{
+  gateway: {
+    readiness: {
+      requiredCriteria: [
+        "openclaw.workspace-writable",
+        "plugin.storage.backend",
+      ],
+      advisoryCriteria: ["plugin.metrics.exporter"],
+    },
+  },
+}
+```
+
+Selection uses namespaced criterion IDs. The same ID must not appear in both
+lists. Configuration validates selector syntax. A syntactically valid selected
+ID absent from the active registry produces `CriterionNotRegistered=Unknown`
+with the requirement of its containing list. Unknown IDs must never be silently
+ignored.
+
+Registration alone does not activate a plugin criterion. Only explicitly
+selected criteria participate: `advisoryCriteria` selects them as advisory and
+`requiredCriteria` selects them as required. Operator selection may strengthen
+a selectable criterion from advisory to required but must not weaken universal
+required conditions.
+
+## Bounded Evaluation
+
+Readiness is a hot operational path and must complete within code-owned bounds.
+The initial v1 limits are:
+
+- one second per plugin provider;
+- one second for the workspace observation;
+- concurrent evaluation of independent observations; and
+- an independent two-second outer deadline for the complete result.
+
+Core owns deadlines, cancellation, coalescing, caching, error conversion, and
+subject reconciliation, and result ordering. A timed-out criterion becomes `Unknown` with a stable timeout
+reason. Unexpected exceptions become `Unknown`; raw exception text is not
+copied into public output.
+
+Universal core observations consume already-owned runtime snapshots and must
+not perform request-time network I/O. Plugin providers should report from
+asynchronously refreshed local state when an observation can exceed the normal
+probe path. Blocking synchronous work is invalid even though the outer watchdog
+bounds cooperative asynchronous work.
+
+Plugin-provider failures use these core-owned reasons:
+
+- `CriterionNotRegistered` when a selected provider is unavailable;
+- `CriterionInvalidResult` when output violates the provider result shape;
+- `CriterionTimedOut` when the provider exceeds its deadline; and
+- `CriterionCheckFailed` when invocation throws or rejects.
+
+If the outer deadline expires, the evaluator must return a required
+`ReadinessEvaluationComplete=Unknown` condition with reason
+`ReadinessEvaluationTimedOut`. The HTTP request must not hang or reject.
+
+Core retains ownership of an invocation after its deadline. If a provider
+ignores cancellation and remains pending, later polls reuse the stable timeout
+result and must not start another invocation, including after config or plugin
+registry replacement. The callback is quarantined by canonical criterion ID
+until it settles. A new invocation may start only after settlement and the
+applicable cache or replacement-generation rules permit it.
+
+Successful and failed provider or workspace observations may be cached for at
+most five seconds. Replacement effective-config or plugin-registry snapshots,
+effective workspace identity, or selected-criterion changes invalidate affected
+entries immediately. Admission, drain, startup, channel, and event-loop
+snapshots are not made stale by this cache. A late result from an invalidated
+generation is discarded.
+
+A changed workspace identity may start one replacement probe while a retired
+probe remains blocked. No more than two workspace probes may remain in flight;
+additional generations fail closed with `WorkspaceProbeTimedOut` until probe
+capacity returns.
+
+## Projections
+
+Once v1 is activated, all projections consume the same canonical result. When
+neither direct readiness configuration nor another separately accepted
+activation contract is present, `/ready` and `/readyz` retain the legacy Gateway
+decision path and must not invoke providers or the canonical runtime evaluator.
+
+### HTTP
+
+- `/ready` and `/readyz` are authoritative readiness probes.
+- A ready result returns `200`; a non-ready result returns `503`.
+- `HEAD` compatibility remains unchanged.
+- Authenticated or local callers may receive the structured result.
+- Unauthenticated remote callers receive only a compact redacted response.
+- `/health` and `/healthz` remain shallow liveness probes and do not acquire
+  readiness semantics.
+- An implementation may expose `/statusz` for selected-condition health.
+  Successful evaluation returns `200` for every health status; `/statusz` is
+  diagnostic and must not duplicate `/readyz` traffic-admission status codes.
+  A request may trigger canonical readiness evaluation, including bounded
+  checks for selected providers. The health projection must not invoke
+  additional or unselected providers, and `/statusz` must not invoke active
+  channel probes used only by deeper health diagnostics.
+- Local or authenticated `/statusz` callers may receive canonical non-`True`
+  condition details. Unauthenticated remote callers receive only `status` and
+  `ready`.
+
+### Health And Status
+
+Gateway health and status project the canonical result or a bounded summary of
+it. A surface that did not observe a required live fact reports `Unknown`; it
+must not synthesize success. Descriptor enumeration must not execute providers.
+When a surface exposes selected-condition health, it uses the normative
+derivation above and does not evaluate conditions independently.
+
+### CLI
+
+An `openclaw ready` command, when implemented, is a client of the live Gateway
+result:
+
+- human output lists all conditions with pass, fail, or warning classification;
+- when identity is available, human output may identify the affected subject;
+- `--json` preserves the canonical result; and
+- exit status is nonzero for required failure, required unknown, transport
+  failure, or absence of a supported readiness contract.
+
+The CLI must not implement condition evaluation independently.
+
+### Optional CLI Facilities
+
+The following facilities are compatible extensions over the same live result.
+They are not required for core readiness v1 conformance. When implemented, they
+must follow the contracts below.
+
+Human output for non-`True` conditions may identify the existing kind, ID,
+generation, and parent reference of each affected primary and related subject.
+It must derive that explanation only from the canonical identity package.
+
+Criterion list and inspect commands are clients of the live catalog projection.
+They may filter descriptors for presentation but must not execute a criterion
+or infer registration from a readiness result.
+
+A bounded CLI wait mode is a client of repeated live Gateway results. It must:
+
+- use one explicit total deadline that covers config, credential, TLS,
+  connection, and RPC setup;
+- run attempts sequentially and cap each per-call timeout by the remaining
+  total budget;
+- retry both unavailable and not-ready observations without overlapping calls;
+- emit only the final observation;
+- preserve the canonical result unchanged for successful JSON output and for a
+  final observed not-ready result; and
+- exit nonzero at timeout or transport failure.
+
+The wait facility must not evaluate conditions locally. Launcher-specific
+commands may delegate to it, but they must not define another readiness or
+deadline model.
+
+## Legacy Projection
+
+Existing `ready`, `failing`, `suppressed`, `eventLoop`, and `uptimeMs` fields
+remain compatibility projections during migration. Implementations preserve the
+legacy path before activation, emit canonical conditions beside legacy fields
+after activation, then move every activated surface to the canonical evaluator.
+Legacy removal requires a separate compatibility review.
+
+## Conformance Checklist
+
+An implementation conforms to readiness v1 when it proves:
+
+- existing unconfigured readiness behavior is unchanged;
+- unconfigured probes do not execute providers or the canonical runtime
+  evaluator;
+- an explicit empty `gateway.readiness` object activates canonical evaluation
+  without selecting additional criteria;
+- implementations that support Standard Hosting Profiles prove that profile
+  selection activates canonical evaluation without requiring a separate
+  `gateway.readiness` section;
+- universal startup, admission, and selected-channel failures return `503`;
+- additional criteria do not become required without explicit selection;
+- required `False` and `Unknown` return `503`;
+- advisory `False` and `Unknown` remain visible while returning `200` when all
+  required conditions are true;
+- provider timeout, exception, malformed output, and ignored cancellation all
+  return within the outer deadline;
+- cache entries expire within five seconds and invalidate on relevant config,
+  workspace, selection, and plugin-generation changes;
+- reload atomically replaces provider descriptors and callbacks, discards late
+  results, and remains bounded across repeated never-settling providers;
+- unknown selected criteria fail closed;
+- every condition and relationship resolves to one reconciled subject;
+- every canonical result has `contractVersion: 1` and satisfies the wire
+  cardinality and string bounds;
+- plugin subject declarations are namespaced, bounded, deterministic, and
+  conflict-safe;
+- one live Gateway serving lifecycle retains one producer identity across
+  repeated evaluations and receives a new identity after restart;
+- process and optional host-workload parents renew independently at their own
+  lifecycle boundaries;
+- `/ready`, `/readyz`, health, status, and CLI do not disagree about the same
+  observed activation; and
+- public output contains no raw exceptions, secrets, credentials, or tenant
+  content.
+
+### Optional Facility Conformance
+
+An implementation that adds the optional operator facilities must also prove:
+
+- catalog enumeration reflects one active config/registry snapshot, reports
+  selected missing IDs, and never invokes provider callbacks;
+- bounded CLI waiting aborts slow pre-request setup at its total deadline,
+  never overlaps evaluations, and emits only its final observation; and
+- CLI subject-lifetime explanation is derived only from the canonical identity
+  package and does not alter canonical JSON or evaluate conditions locally;
+- selected-condition health follows the required-false, required-unknown,
+  advisory-non-true, all-true precedence exactly;
+- `/statusz`, when implemented, preserves `/healthz` liveness and `/readyz`
+  admission behavior and redacts condition details for unauthenticated remote
+  callers.
