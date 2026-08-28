@@ -6,7 +6,7 @@ created: 2026-08-27
 last_updated: 2026-08-27
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/65
 ---
 
 # Proposal: Code Mode Effect Receipts and Scoped Mutation Recovery
