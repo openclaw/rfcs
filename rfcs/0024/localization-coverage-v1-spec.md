@@ -3,7 +3,26 @@
 This document defines the product-level inventory, maturity, validation, and
 release-reporting contract for RFC 0024.
 
-Status: draft, tied to RFC 0024.
+Status: accepted as part of RFC 0024; implementation lands progressively.
+
+## Contract At A Glance
+
+Use this specification to decide whether OpenClaw may claim a surface or the
+product is localized. The v1 release portfolio has 15 rows and 21 non-English
+targets, producing 315 target cells. Every required row is present even when
+its maturity is `unsupported`; only `complete` counts toward the unqualified
+product claim.
+
+Owner declarations may be more granular than release rows. Message families,
+packages, and channel adapters publish their own evidence, then the product
+aggregator derives the applicable release-row state. Adding a delivery slice
+or owner declaration does not silently change the 315-cell denominator;
+changing the required release-row set is an explicit product-policy decision.
+
+Runtime rendering rules live in the
+[runtime specification](localization-runtime-v1-spec.md). Locale-aware command,
+skill, and capability fields live in the
+[metadata specification](localized-metadata-v1-spec.md).
 
 ## Coverage Manifest
 
@@ -103,11 +122,11 @@ or declared locale support without a corresponding artifact. The generated
 manifest does not persist the declaration order field; order only makes the
 checked report deterministic.
 
-The current RFC 0024 release portfolio contains 15 owner-declared product
-surfaces. That portfolio and its 315 target cells are product release policy,
-not a closed type restriction in localization core. A future owner can publish
-a valid new surface without modifying generic core validation, while changing
-the required release portfolio remains an explicit product-policy change.
+The current RFC 0024 release portfolio contains 15 required release rows. That
+portfolio and its 315 target cells are product release policy, not a closed type
+restriction in localization core. A future owner can publish a valid granular
+declaration without modifying generic core validation, while changing the
+required release-row set remains an explicit product-policy change.
 
 `manifestRevision` is computed from the canonical checked-in manifest bytes and
 is not stored inside that manifest. Release reports and packaged status expose
@@ -162,29 +181,31 @@ string.
 
 ## Surface Set
 
-The initial product report covers:
+The initial product report uses these exact 15 release rows:
 
-- Control UI;
-- CLI onboarding;
-- channel and plugin setup flows;
-- remaining CLI commands and help;
-- TUI human-readable output;
-- core runtime messages, approvals, authentication, validation, and recovery
-  guidance;
-- Gateway errors;
-- server-rendered channel messages and notifications;
-- core and bundled command metadata;
-- bundled channel command-menu projections, tracked separately for each
-  adapter such as Telegram and Discord;
-- core and bundled skill metadata;
-- Android;
-- Apple platforms;
-- documentation.
+| Surface ID | Includes |
+| --- | --- |
+| `control-ui` | Browser UI copy and client-rendered known Gateway failures |
+| `cli-onboarding` | CLI onboarding wizard |
+| `channel-plugin-setup` | Channel and bundled-plugin setup flows |
+| `cli` | Remaining CLI commands, help, validation, and recovery copy |
+| `tui` | Human-readable terminal UI output |
+| `runtime` | Core runtime, approval, authentication, validation, and recovery copy |
+| `gateway-errors` | Protocol-owned known Gateway error descriptors |
+| `server-rendered-channels` | Channel messages, notifications, and approval presentation |
+| `command-metadata` | Core and bundled command display metadata |
+| `telegram-command-menu` | Telegram-native command-menu projection |
+| `discord-command-menu` | Discord-native command-menu projection |
+| `skill-metadata` | Core and bundled skill display metadata |
+| `android` | Android product catalogs |
+| `apple` | Apple-platform product catalogs |
+| `docs` | Published documentation |
 
-Surfaces can have different catalogs and supported locale sets. A shared
-metadata catalog and each product-owned platform projection are separate
-coverage surfaces because platform limits, locale support, and reconcile
-behavior can independently reject or drop localized text.
+Rows can have different catalogs and supported locale sets. More granular
+owner declarations feed these rows. For example, Telegram and Discord retain
+separate projection rows because their locale limits and reconcile behavior
+can fail independently; other adapter-specific message evidence contributes to
+`server-rendered-channels` until product policy adds another required row.
 Generated-content language is post-v1 and is not part of this initial coverage
 report or the product-localization completeness claim.
 
@@ -224,11 +245,10 @@ locale additions can be prioritized by OpenClaw users and maintainers.
 The initial release-policy snapshot contains 15 English source rows plus 15
 product surfaces across 21 translation targets. Release completion is
 calculated over those 315 translation-target cells. This is not an
-RFC-acceptance gate. The product completion target is all 313 OpenClaw-controlled
-target cells at `complete`. `docs/fa` and `docs/th` must
-either gain an approved publishing path or remain the only disclosed
-`platform-constrained` cells. An unqualified `fully-localized` claim requires
-all 315 target cells to be complete.
+RFC-acceptance gate. The product-completion target and the unqualified
+`fully-localized` claim both require all 315 target cells to be `complete`.
+`docs/fa` and `docs/th` need an approved publishing path to reach that target;
+a `platform-constrained` row explains a blocker but does not count as complete.
 
 Pseudo-locales and bounded script fixtures are declared under
 `testFixtures`, not the release locale registry. They support expansion,
@@ -364,15 +384,27 @@ The maintenance workflow follows a dependency-guard-style state machine:
 
 | Phase | Trigger | Behavior |
 | --- | --- | --- |
-| `detect` | Pull request | Runs without provider credentials. Reports changed English source, missing targets, stale revisions, fallback, and review drift. |
-| `refresh` | Trusted `main`, schedule, or manual dispatch | Generates candidate translations per locale, validates isolated artifacts, and opens or updates a generated pull request. Failed generation or validation aborts publication. |
+| `detect` | Ready English source pull request | Runs without provider credentials. For a same-repository PR targeting the default branch, fails with the exact missing or stale targets until refresh output is present. Non-default bases and branches the repository cannot update remain advisory. Drafts do not run this lane. It never publishes translations from pull-request code. |
+| `refresh` | Maintainer dispatch for a ready same-repository, default-base PR, or trusted `main` push after a fork/cross-repository source merge | Runs protected-base tooling against an exact source revision, generates and validates all affected locale candidates as one batch, then either commits them to the unchanged source branch under an exact-head lease or opens/updates one generated fallback PR. Failed generation or validation aborts publication. |
 | `enforce` | Pull request and release | Blocks invalid catalogs and any `complete` claim whose source, artifacts, or required review are stale. |
 
-The refresh workflow must check out a trusted exact source revision reachable
-from a protected base-repository ref, keep provider credentials unavailable to
-untrusted pull-request code, and publish through a scoped generated-PR
-application identity. Generated changes retain source, glossary, workflow,
-provider/model, and catalog-revision provenance.
+The refresh workflow must execute workflow and generator code from a protected
+base-repository revision. A source PR's registry and English catalogs are read
+only as validated data; its scripts, actions, dependencies, and hooks are never
+executed with provider or publisher credentials. Before an in-place push the
+workflow rechecks that the PR is open, ready, same-repository, targets the
+default branch, and is still at the
+resolved source SHA, then uses a scoped application identity and an exact-head
+lease. Generated changes retain source, glossary, workflow, provider/model,
+and catalog-revision provenance.
+
+The normal same-repository path keeps one review unit: a ready source PR fails
+the scoped gate, tells the author to request the maintainer-authorized refresh,
+receives one bot commit containing every affected target, and reruns to green.
+The original author and reviewers remain responsible for the now-complete PR;
+automation never approves or merges it. Fork and cross-repository paths merge
+reviewed English first, then use one generated follow-up PR. A trusted `main`
+refresh also reconciles residual drift as a recovery path.
 
 Detection and enforcement fail closed on malformed manifests, tool failure, or
 unreadable required evidence. A failed refresh leaves the prior catalogs and
@@ -381,7 +413,8 @@ maturity state unchanged while reporting the unresolved drift.
 The projected delivery registry proves this contract with three explicit slices.
 `G45` adds deterministic, credential-free detect/enforce checks for one
 owner-declared routine message family. `G46` adds the trusted exact-source
-refresh, validation, evidence, and generated-PR path for the same fixture. They
+refresh, validation, evidence, in-place update, and generated-PR fallback for
+the same fixture. They
 may land together in one bounded core/tooling exemplar PR, after which each
 surface adopts the checks only for its own declared families, namespaces, or
 directories. `G47` adds a build-time disposition gate for newly enumerated
@@ -393,12 +426,12 @@ informative; the state-machine contract above remains normative.
 
 After the exemplar exists, a migrated string-bearing area does not satisfy the
 maintenance contract until both phases are wired for its declared scope:
-credential-free detect/enforce on pull requests and trusted refresh through a
-generated pull request. Existing owner workflows may provide this evidence;
+credential-free detect/enforce on pull requests and trusted in-place refresh
+with a generated-PR fallback. Existing owner workflows may provide this evidence;
 the RFC does not require replacing a conforming pipeline.
 
-The gate may automatically repair missing low-risk catalog entries in a
-generated pull request. It must not:
+The trusted refresh may repair missing low-risk catalog entries in the source
+PR or a generated fallback PR. It must not:
 
 - push generated translations directly to a protected branch;
 - promote its own output to `complete`;

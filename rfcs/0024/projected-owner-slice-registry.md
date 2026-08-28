@@ -29,24 +29,77 @@ Each entry tracks:
 - accepted, fallback/failure, compatibility, and privacy evidence;
 - the hardcoded, duplicated, or parsed-prose authority it deletes; and
 - a live state such as `projected`, `audited`, `owner-approved`, `draft`,
-  `landed`, `generated-follow-up`, `blocked`, `deferred`, or `deleted`.
+  `ready-for-review`, `source-enrolled`, `candidate-ready`, `landed`,
+  `blocked`, `deferred`, or `deleted`.
+
+The implementation tracker
+[openclaw#113105](https://github.com/openclaw/openclaw/issues/113105) is the
+live delivery ledger. State values in this planning document are a reviewed
+snapshot and should not be treated as a substitute for live PR and generated
+artifact state.
 
 The registry lives in RFC and project planning. Runtime lookup remains in
 surface-owned catalogs and protocol-owned descriptor registries. Coverage
 aggregation reads landed owner declarations; it does not make this planning
 file executable.
 
+Owner registries below are delivery boundaries, not necessarily release-report
+rows. Updater and Doctor slices, for example, contribute to the `cli` release
+row; approval slices may contribute to `runtime`, `gateway-errors`, and
+`server-rendered-channels`. The exact 15-row product denominator is defined by
+the [coverage specification](localization-coverage-v1-spec.md#surface-set).
+
 After `G45` and `G46` land, every slice that adds or migrates deterministic
 product strings must also onboard its area to both halves of the maintenance
 contract before that area is complete: its declared scope runs the blocking,
 credential-free authoring/drift gate, and its owner workflow runs trusted
-asynchronous generation, validation, and generated-PR publication. An owner
+asynchronous generation and validation with an in-place update for an unchanged
+same-repository, default-base PR or a generated-PR fallback. An owner
 with an existing pipeline may prove that pipeline satisfies the contract rather
 than replace it. Schema-only, English-only, or deferred slices record why no
 translated catalog is being enrolled. `G47` separately ensures that newly
 enumerated product-string surfaces receive one of those dispositions at
 introduction time; platform-constrained dispositions also identify their owner
 and reason.
+
+Adoption is documented progressively. Each slice updates its checked-in
+inventory disposition, the public contributor workflow index, and nearest
+owner-internal guidance, plus additional public documentation when it changes
+a public authoring or compatibility contract. These are part of that slice's
+done bar. `G47`/`PK0` registers its PK0 entries that predate the inventory,
+indexes their workflows publicly, and backfills their nearest owner-internal
+guidance rather than expanding their already-reviewed runtime scopes. `F02`,
+`F04`, `F05`, and later slices carry those artifacts in their own packages. The
+later `P41`-`P42` documentation package localizes documentation as a user-facing
+product surface;
+it does not defer documentation of earlier owner obligations.
+
+## Slice Lifecycle
+
+The normal delivery path is:
+
+```text
+projected -> audited -> owner-approved -> ready-for-review
+  -> source-enrolled -> candidate-ready -> landed
+```
+
+- `ready-for-review` means the bounded source or contract PR is prepared; it
+  does not advance product coverage.
+- `source-enrolled` means the source/runtime change plus its inventory, shared
+  gate configuration, workflow index, and owner guidance have landed, while a
+  required generated artifact or review is still outstanding.
+- `candidate-ready` means the trusted owner workflow has updated the source PR
+  in place or opened/updated the required fallback PR. Passing structure checks
+  or an open generated PR is not done without required review.
+- `landed` means every source, generated-artifact, compatibility, deletion, and
+  named review requirement in that registry entry's exit bar is present in
+  accepted history.
+- `blocked`, `deferred`, `platform-constrained`, and `deleted` are explicit
+  exits with the owner and evidence required elsewhere in this registry.
+
+Source and generated changes may use separate PRs when the source branch cannot
+be updated, without becoming separate planning slices. The slice remains
+incomplete until its full exit bar is met.
 
 ## Owner Registries
 
@@ -65,17 +118,17 @@ and reason.
 
 ## A. Current Foundation Evidence
 
-These five drafts are the first registry entries. `F02` through `F05` branch
-independently from `F01`, so each review contains the shared foundation plus
-only its own owner-bounded delta.
+These five implementation PRs are the first registry entries. `F02` through
+`F05` branch independently from `F01`, so each review contains the shared
+foundation plus only its own owner-bounded delta.
 
 | ID | Owner registry | Slice and edge | State | Exit and deletion proof |
 | --- | --- | --- | --- | --- |
-| `F01` | `core-locale` + `wizard` | Minimal kernel and onboarding consumer ([#111541](https://github.com/openclaw/openclaw/pull/111541)) | `draft` | Kernel/catalog tests, unchanged English wizard behavior, missing-key fallback, no runtime I/O; replaces wizard-local resolution duplication where adopted. |
-| `F02` | `updater` | Human `update --dry-run` preview ([#111542](https://github.com/openclaw/openclaw/pull/111542)) | `draft` | JSON equality, literal command/path/version preservation, English and non-English proof; deletes updater-owned hardcoded preview labels. |
-| `F03` | contributor/docs owners | Ownership and contribution guide ([#111543](https://github.com/openclaw/openclaw/pull/111543)) | `draft` | Docs map, glossary, source-safe validation, and working links; replaces undocumented cross-surface guesswork, not owner workflows. |
-| `F04` | `tui` | TUI status summary and relative ages ([#111544](https://github.com/openclaw/openclaw/pull/111544)) | `draft` | Formatter and PTY proof, documented `OPENCLAW_LOCALE`/host-locale/English precedence, literal IDs/paths/models/events, exact English compatibility; deletes status-owned English assembly. |
-| `F05` | `gateway-error` + `control-ui` + `approval` | `APPROVAL_NOT_FOUND` descriptor and approval-page edge ([#111545](https://github.com/openclaw/openclaw/pull/111545)) | `draft` | Stable tuple, bounded metadata, legacy English, unknown-key denial, protocol/UI tests; deletes the two Gateway emitter variants as independent descriptor authorities. |
+| `F01` | `core-locale` + `wizard` | Minimal kernel and onboarding consumer ([#111541](https://github.com/openclaw/openclaw/pull/111541)) | `ready-for-review` | Kernel/catalog tests, unchanged English wizard behavior, missing-key fallback, no runtime I/O; replaces wizard-local resolution duplication where adopted. |
+| `F02` | `updater` | Human `update --dry-run` preview ([#111542](https://github.com/openclaw/openclaw/pull/111542)) | `ready-for-review` | JSON equality, literal command/path/version preservation, English and non-English proof; deletes updater-owned hardcoded preview labels. |
+| `F03` | contributor/docs owners | Ownership and contribution guide ([#111543](https://github.com/openclaw/openclaw/pull/111543)) | `ready-for-review` | Docs map, glossary, source-safe validation, and working links; replaces undocumented cross-surface guesswork, not owner workflows. |
+| `F04` | `tui` | TUI status summary and relative ages ([#111544](https://github.com/openclaw/openclaw/pull/111544)) | `ready-for-review` | Formatter and PTY proof, documented `OPENCLAW_LOCALE`/host-locale/English precedence, literal IDs/paths/models/events, exact English compatibility; deletes status-owned English assembly. |
+| `F05` | `gateway-error` + `control-ui` + `approval` | `APPROVAL_NOT_FOUND` descriptor and approval-page edge ([#111545](https://github.com/openclaw/openclaw/pull/111545)) | `ready-for-review` | Stable tuple, bounded metadata, legacy English, unknown-key denial, protocol/UI tests; deletes the two Gateway emitter variants as independent descriptor authorities. |
 
 ## B. Operator Surface Follow-Ups
 
@@ -147,7 +200,7 @@ PRs remain separate where the repository policy requires it.
 | `P39` | `native.android` | Android catalog completeness and blocking quality advisories | Native workflow owner | Generated inventory/artifact parity, platform UI tests, named review; platform-native resources remain authoritative. |
 | `P40` | `native.apple` | Apple catalog completeness and blocking quality advisories | Native workflow owner | Generated inventory/artifact parity, platform UI tests, named review; platform-native resources remain authoritative. |
 | `P41` | `docs` | Swedish documentation source/navigation and generated publication | Docs owner and `openclaw/docs` workflow | Exact source/tool revision, glossary, links/anchors, published artifact evidence; no second docs translator. |
-| `P42` | `docs` | Persian and Thai publishing-path decision and implementation | Docs platform owner decision | Either verified artifacts or explicit `platform-constrained` rows with fallback and platform evidence. |
+| `P42` | `docs` | Persian and Thai publishing-path decision and implementation | Docs platform owner decision | Verified published artifacts; any interim `platform-constrained` row must carry fallback and platform evidence and remains a product-completion blocker. |
 
 ## F. Authoring Gates And Translation Automation
 
@@ -156,16 +209,16 @@ together in one bounded core exemplar PR because they share tooling ownership
 and one test fixture, but adopted surfaces opt in independently and retain their
 own source, catalog, generation, review, and publication policy.
 
-Draft OpenClaw PR
+OpenClaw PR
 [#112784](https://github.com/openclaw/openclaw/pull/112784) is the reference
 implementation for both slices, using the wizard completion family as the first
-adopted area. Its draft status is implementation evidence, not a claim that the
+adopted area. Its open status is implementation evidence, not a claim that the
 slices have landed.
 
 | ID | Owner registry | Projected slice | Gate | Required proof and deletion target |
 | --- | --- | --- | --- | --- |
-| `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until it is registered; invalid ICU, placeholder mismatch, protected-literal drift, stale catalog evidence, and hand-edited generated paths fail without provider credentials. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
-| `G46` | `catalog-automation` + first adopting owner | Trusted async catalog refresh and generated-PR reference lane | `G45`; approved provider secret on trusted `main`, schedule, or manual dispatch | One English fixture change produces an isolated locale candidate, validates it, records source-pinned generation evidence, and opens or updates a generated PR through the existing publisher. Stale input or validation failure publishes nothing and leaves coverage partial. No direct protected-branch push, AI self-review, or automatic safety-copy promotion. Replaces hand-copied translation updates for the adopted fixture. |
+| `G45` | `catalog-automation` + first adopting owner | Deterministic authoring and drift gate for explicitly migrated families, namespaces, or directories | `F01` and `F03`; one routine core/wizard fixture | A changed English product string fails until its source area is registered. Invalid source ICU, placeholder or protected-literal rules fail without provider credentials. Drafts do not run the lane. Once ready, a same-repository PR targeting the default branch fails with the exact stale targets until refreshed; non-default bases and branches the repository cannot update remain advisory. Any PR that changes generated paths runs the strict catalog check. Unmigrated legacy scopes remain advisory. Replaces ad hoc or manual adopted-scope checks. |
+| `G46` | `catalog-automation` + first adopting owner | Trusted async catalog refresh with in-place and generated-PR publication | `G45`; approved provider secret on protected-`main` workflow code | A maintainer dispatch resolves a ready same-repository, default-base PR head, runs only trusted generator code, produces and validates all affected locale candidates, and commits one batch to that unchanged branch under an exact-head lease. Fork/cross-repository merges and recovery runs open or update one generated follow-up PR. Stale input or validation failure publishes nothing. No protected-branch push, AI self-review, or automatic safety-copy promotion. Replaces hand-copied translation updates for the adopted fixture. |
 | `G47` | `catalog-automation` + surface-registry owners | [New product-string surface disposition gate](https://github.com/openclaw/openclaw/pull/112801) | `G45` and `G46`; one owner adapter that enumerates real surface registrations or declared product-facing source roots | Adding an enumerated surface or expanding a declared product-facing scope fails until it is adopted, mapped to a conforming owner pipeline, or explicitly English-only, platform-constrained, or deferred with a named owner and rationale. Existing unclassified scopes are baselined as legacy debt. No repository-wide literal heuristic, runtime registry, or classification requirement for tests, logs, developer diagnostics, or model-authored text. Replaces review-only discovery of newly introduced localization debt. |
 
 The exemplar is deliberately routine product copy. Safety catalogs may reuse
@@ -193,7 +246,7 @@ F01 kernel
 
 F01 kernel + F03 contributor contract
   -> G45 scoped authoring gate
-  -> G46 trusted async refresh exemplar
+  -> G46 trusted in-place refresh + generated-PR fallback exemplar
   -> G47 new-surface disposition gate
 
 F05 Gateway approval descriptor
@@ -217,6 +270,8 @@ artifacts or adapter projections. Once the core exemplar lands, every later
 string-bearing area slice includes its scoped `G45` gate and `G46` refresh
 adoption (or evidence that its existing owner workflow already conforms), while
 `G47` prevents newly enumerated surfaces from remaining outside that decision.
+The slice's inventory and applicable public/internal guidance land alongside
+that adoption rather than in the final evidence or documentation packages.
 
 ## September 1, 2026 Delivery Packages
 
@@ -233,13 +288,13 @@ discovered in the scheduled implementation week.
 
 | Window | Delivery packages | Registry entries | Required outcome |
 | --- | --- | --- | --- |
-| July 22-24 | `PK0` architecture, foundation, and automation | `F01`, `F03`, `G45`, `G46`, `G47` | Accept RFC direction; land the kernel, contributor contract, shared per-repo gates, trusted refresh exemplar, and new-surface disposition gate; supervise the first credentialed generated-PR run. |
-| July 27-31 | `PK1` initial operator consumers; `PK2` first Gateway edge; `PK3` wizard/setup | `F02`, `F04`, `O07`, `O15`; `F05`, `O06`; `O08`, `O09` | Finish updater and TUI families, approval-not-found plus its generated UI catalog, and remaining owner-bounded wizard/setup families. |
+| July 22-24 | `PK0` architecture, foundation, and automation | `F01`, `F03`, `G45`, `G46`, `G47` | Accept RFC direction; land the kernel, contributor contract, shared per-repo gates, trusted refresh exemplar, and new-surface disposition gate; backfill foundation inventory, public workflow indexing, and nearest owner guidance; supervise the first credentialed in-place run and generated-PR fallback. |
+| July 27-31 | `PK1` initial operator consumers; `PK2` first Gateway edge; `PK3` wizard/setup | `F02`, `F04`, `O07`, `O15`; `F05`, `O06`; `O08`, `O09` | Finish updater and TUI families, approval-not-found plus its generated UI catalog, and remaining owner-bounded wizard/setup families; land each slice's inventory, public workflow index, and nearest owner guidance. |
 | August 3-7 | `PK4` CLI shell/agent; `PK5` sessions/tasks/Doctor; `PK6` Gateway families | `O10`, `O11`; `O12`, `O13`, `O14`; `R16`, `R17`, `R18`, `R19` | Land reusable CLI adapters and bounded consumers, then expand only reviewed Gateway discriminator tuples. |
 | August 10-14 | `PK7` runtime safety; `PK8` command metadata; `PK9` skill/plugin metadata | `R20`, `R21`, `R22`, `R23`, `R24`; `M25`, `M26`, `M27`, `M28`; `M29`, `M30`, `M31`, `M32` | Complete approval/runtime safety boundaries and land public metadata contracts before their projections. |
 | August 17-21 | `PK10` channel notices; `PK11` Control UI; `PK12` native apps | `M33`, `M34`, `M35`, `M36`; `P37`, `P38`; `P39`, `P40` | Finish adapter-owned channel dispositions and extend existing UI/native owner pipelines without replacing them. |
-| August 24-28 | `PK13` documentation; `PK14` coverage aggregation and catch-up | `P41`, `P42`; `E43` | Land or prove the docs publishing paths, close any slipped package, and publish coverage from landed owner declarations. |
-| August 31-September 1 | `PK15` evidence promotion | `E44` | Ingest current named-review evidence and generated artifacts, disclose accepted platform constraints, and make the qualified or full product claim. |
+| August 24-28 | `PK13` documentation product surface; `PK14` coverage aggregation and catch-up | `P41`, `P42`; `E43` | Land or prove the localized docs publishing paths, close any slipped package, and publish coverage from landed owner declarations; earlier slice guidance is already required at each slice's merge. |
+| August 31-September 1 | `PK15` evidence promotion | `E44` | Ingest current named-review evidence and generated artifacts; make the full claim only at 315/315, otherwise publish the qualified blocker report and keep product completion open. |
 
 The packages cover all 47 current entries exactly once. The target operating
 cadence is roughly three completed packages per full week with no more than
