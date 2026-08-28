@@ -124,6 +124,8 @@ identifier.
 The URI:
 
 - does not identify a JavaScript module to import;
+- is always an opaque registry key and is never dereferenced, including when it
+  uses the `ui://` scheme;
 - does not grant network, tool, command, credential, or DOM authority;
 - does not select native rendering unless the host registry contains an exact
   compatible registration; and
@@ -196,6 +198,30 @@ component marketplace.
 
 The Control Model does not import or execute registry components. A framework
 adapter reads artifacts and invokes the host registry.
+
+## Native catalogs, MCP Apps, and renderer dialects
+
+These are complementary presentation paths, not competing artifact lifecycles:
+
+- A host-native view names one exact, versioned registration in the client's
+  reviewed component catalog. Web and mobile may advertise and register
+  different sets.
+- An MCP App view uses OpenClaw's existing MCP `ui://` resource
+  materialization, sandbox, CSP, bridge, expiry, and authorization contracts.
+  The iframe is the security boundary for third-party executable UI; it is not
+  required for trusted native views.
+- A compositional renderer such as A2UI may be registered as one exact,
+  versioned dialect view. Its payload may describe a tree of components from a
+  reviewed vocabulary rather than one component-specific schema. V1 does not
+  define dynamic vocabulary negotiation; an exact dialect registration must pin
+  the supported catalog or validate and decline unsupported components locally.
+
+The artifact envelope remains responsible for stable identity, revisions,
+source provenance, view selection, action fencing, history/reconnect behavior,
+and fallback. A renderer dialect remains responsible for its component
+vocabulary, layout semantics, incremental message format, and renderer-local
+validation. This separation allows A2UI or another dialect to be added without
+making it the mandatory format for native components or changing MCP Apps.
 
 ## Capability discovery
 
@@ -304,6 +330,10 @@ bridge, expiry, and authorization contracts. Canvas fallback uses existing
 host URL and sandbox policy. Structured/text output remains available when no
 executable fallback is accepted.
 
+An MCP App's materializable resource URI appears only as
+`fallback.uiResourceUri`; it is never inferred from or dereferenced through
+`templateUri`.
+
 ## Streaming
 
 V1 exposes complete immutable artifact revisions. A source may update an
@@ -354,101 +384,79 @@ The following fail artifact rendering without failing the surrounding message:
 Failures are observable and safe to log after redaction. They must not contain
 raw credentials, capability URLs, hidden model context, or unbounded tool data.
 
-### Appendix: mapping a2ui to uiDetails
+### Appendix: carrying an A2UI dialect
 
-This appendix shows a pragmatic mapping from common a2ui payload fields into the
-Control Model's uiDetails/view offer shape. Use this as an implementation guide
-when adapting an a2ui-producing tool or a2ui-capable Canvas to the Control Model.
+This appendix shows how a future A2UI view can be carried without redefining
+the artifact envelope. It is non-normative for v1.
 
-- `a2ui.root` -> `UiArtifact.structuredContent` or
-  `UiArtifactViewOffer.data`
-  - When a2ui produces a single root HTML/DOM fragment, place a sanitized
-    structured representation under `structuredContent` and supply a `view` that
-    declares `templateUri: "ui://a2ui/<component>"`.
-- `a2ui.components[]` -> `view.data` component array
-  - Map named a2ui components to an array in `view.data.components` with the
-    minimal typed props; include `dataVersion` for component schema validation.
-- `a2ui.streamable` -> progressive complete artifact revisions
-  - If the source supports progressive hydration, publish successive complete
-    immutable artifact revisions. V1 does not standardize fragment/CID or JSONL
-    patch transport.
-- `a2ui.actions` -> local action descriptors
-  - Convert a2ui-defined interactive handlers to typed action descriptors:
-    `{id,label,kind,schema,authRequired}`. Do not embed executable callbacks.
-- `a2ui.templateUri` -> `UiArtifactViewOffer.templateUri`
-  - Normalize a2ui template references to `ui://a2ui/<name>@<version>` and
-    require exact match in host native registry for native rendering.
-- `a2ui.deferred` -> `UiArtifactViewOffer.availability = "deferred"`
-  - When the a2ui payload requires server-side materialization, expose it as
-    `deferred` and require `materializeView` to fetch validated payload.
-- `a2ui.sizeHints` -> presentation hints
-  - Map size and layout hints into `preferredLayout`, `minWidth`, `minHeight`.
-- `a2ui.privacyFlags` -> `UiArtifact.privacy`
-  - Translate visibility/scrub flags into `privacy` with `visibility` and
-    `scrubbed` fields; servers must honor these when filtering offers.
+OpenClaw today hosts A2UI v0.8 JSONL inside the sandboxed Canvas web surface. It
+accepts messages such as `surfaceUpdate`, `dataModelUpdate`, `beginRendering`,
+and `deleteSurface`, and rejects v0.9. That is evidence for the sandboxed
+fallback path only. No shipped client currently renders A2UI through a reviewed
+native component catalog.
 
-Security and runtime notes
-
-- Never copy executable code: a2ui payloads must not carry active JS callbacks
-  or module URIs. Use action descriptors that map to server-side commands.
-- Require schema validation for any `view.data` consumed by a native renderer.
-- Prefer deferred materialization for large or sensitive views so Gateway
-  re-enters auth and policy checks at materialization time.
-
-Example mapping:
-
-```json
-{
-  "a2ui": {
-    "templateUri": "ui://a2ui/table@1",
-    "components": [
-      {
-        "type": "table",
-        "columns": ["name", "status"],
-        "rows": [["Northwind", "Ready"]]
-      }
-    ],
-    "actions": [
-      {
-        "id": "refresh",
-        "schema": { "type": "object", "additionalProperties": false }
-      }
-    ],
-    "deferred": false,
-    "privacyFlags": { "visibility": "caller", "scrubbed": false }
-  }
-}
-```
-
-becomes:
+One possible future native adopter advertises an exact registration that pins
+the dialect and reviewed catalog, for example
+`openclaw-renderer://a2ui/v0.8/core-v1`, plus the artifact and data versions it
+accepts. The selected view carries bounded A2UI messages as data. For a dialect
+view, `dataVersion` versions this carrier envelope independently from the A2UI
+dialect and catalog version in `templateUri`.
 
 ```json
 {
   "version": 1,
-  "id": "artifact-table-1",
+  "id": "artifact-summary-1",
   "revision": 0,
   "structuredContent": {
-    "columns": ["name", "status"],
-    "rows": [["Northwind", "Ready"]]
+    "title": "Deployment status",
+    "status": "Ready"
   },
   "views": [
     {
-      "id": "table",
-      "templateUri": "ui://a2ui/table@1",
+      "id": "a2ui",
+      "templateUri": "openclaw-renderer://a2ui/v0.8/core-v1",
       "dataVersion": 1,
       "availability": "inline",
       "data": {
-        "components": [
+        "messages": [
           {
-            "type": "table",
-            "columns": ["name", "status"],
-            "rows": [["Northwind", "Ready"]]
-          }
-        ],
-        "actions": [
+            "surfaceUpdate": {
+              "surfaceId": "main",
+              "components": [
+                {
+                  "id": "root",
+                  "component": {
+                    "Column": {
+                      "children": {
+                        "explicitList": ["title", "status"]
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "title",
+                  "component": {
+                    "Text": {
+                      "text": { "literalString": "Deployment status" }
+                    }
+                  }
+                },
+                {
+                  "id": "status",
+                  "component": {
+                    "Text": {
+                      "text": { "literalString": "Ready" }
+                    }
+                  }
+                }
+              ]
+            }
+          },
           {
-            "id": "refresh",
-            "schema": { "type": "object", "additionalProperties": false }
+            "beginRendering": {
+              "surfaceId": "main",
+              "root": "root"
+            }
           }
         ]
       }
@@ -463,10 +471,38 @@ becomes:
 }
 ```
 
-The host may render this natively only when its reviewed local registry accepts
-`ui://a2ui/table@1` and data version 1. The `refresh` action is still just a
-named local action; the host must map it to a supported Control Model command
-or product-owned operation and the Gateway must authorize any protected effect.
+The host may render this view only when its reviewed local registry accepts
+`openclaw-renderer://a2ui/v0.8/core-v1` and data version 1. Otherwise it renders
+`structuredContent` or an accepted explicit fallback.
+
+The dialect payload must not carry executable callbacks or module URIs.
+Interactive components resolve only to named, schema-validated host actions.
+
+A2UI incremental messages and Control Model artifact revisions solve different
+problems. A2UI messages update one renderer surface efficiently. The artifact
+revision is the authoritative, reconnectable conversation projection. A future
+normative dialect must define:
+
+- the base artifact revision and ordered A2UI message sequence;
+- a finite message count, byte budget, component depth, and catalog;
+- surface identifiers scoped to the artifact and view instance so one
+  artifact's messages cannot modify another artifact's surface;
+- atomic validation before a message affects the visible surface;
+- the checkpoint persisted into sanitized history;
+- behavior for duplicate, missing, reordered, or unsupported messages;
+- reconnect resynchronization from an authoritative checkpoint; and
+- how A2UI user actions map to named, schema-validated host actions that
+  re-enter Gateway authorization.
+
+Until those rules and cross-client conformance exist, an implementation may
+carry a complete bounded A2UI message set inside one immutable artifact revision
+but must not claim patch-stream compatibility.
+
+The runnable
+[`a2ui-artifact-envelope.mjs`](./prototypes/a2ui-artifact-envelope.mjs)
+prototype illustrates exact dialect/catalog selection, composed component
+messages, explicit MCP App fallback, structured fallback, and fail-closed
+version validation. It is protocol-shape evidence, not renderer conformance.
 
 ## Required conformance evidence
 
