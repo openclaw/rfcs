@@ -93,6 +93,13 @@ Server guidance:
 5. Treat capability advertisement as potentially stale or incomplete; the
    client may still decline or ignore offers at render time.
 
+V1 does not define a renderer dialect or component-vocabulary negotiation
+carrier. A future dialect registration may use an exact `templateUri` that pins
+both its protocol and reviewed component catalog. Until richer bounded
+negotiation is specified, a dialect mismatch is detected by the client registry
+at render time and must fail to structured/text or an explicit sandboxed
+fallback.
+
 Privacy guidance:
 
 - advertise exact supported template/version pairs, not unrelated installed
