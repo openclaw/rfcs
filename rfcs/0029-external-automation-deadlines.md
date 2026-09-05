@@ -3,7 +3,7 @@ title: External Automation Deadlines and Schedule-Only Occurrences
 authors:
   - Omar Shahine
 created: 2026-08-04
-last_updated: 2026-08-04
+last_updated: 2026-09-05
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/59
@@ -41,10 +41,14 @@ The current plugin hooks already establish most of the right boundary:
   attempting to apply lossy deltas.
 - An abort signal invalidates work from an older scheduler lifecycle.
 
-This is enough to build an external deadline projection. It is not enough to
-define how that projection is accepted durably, how stale writers lose, what a
-host does with an already-due deadline, or when restored compute is ready to
-admit the occurrence.
+The documented [safe external cron projection pattern](https://github.com/openclaw/openclaw/blob/bdd75d44c56154a24123be1a4218647b5f6712f3/docs/plugins/hooks.md#safe-external-cron-projection)
+already requires atomic, idempotent, durable `replaceAll` acceptance and abort
+handling. It also shows full rereads, stale-attempt cancellation, disabled-state
+clearing, retries, and shutdown join. This RFC builds on that supported pattern.
+The remaining proposal defines typed acceptance outcomes and receipts,
+cross-process revision arbitration, already-due host policy, and composition
+with restored-state admission. Those contracts are not supplied by the example's
+`Promise<void>` adapter.
 
 The proposed `payload.kind = "wake"` takes a different path. When its occurrence
 is due, OpenClaw performs no payload work, records a successful run, and advances
@@ -157,6 +161,28 @@ ownership contract.
 
 ## Proposal
 
+### Current implementation status
+
+**Accuracy note, 2026-09-05:** This draft is for Automations, Plugin SDK, and
+managed-host maintainers deciding whether to standardize the remaining registrar
+and host contracts. It is not a proposal to reintroduce projection hooks.
+The audit below uses OpenClaw main at
+[`bdd75d44c561`](https://github.com/openclaw/openclaw/commit/bdd75d44c56154a24123be1a4218647b5f6712f3).
+
+| Contract | Current main | Remaining proposal |
+| --- | --- | --- |
+| Reconciled baseline and change hints | `cron_reconciled`, `cron_changed`, exact `getCron`, and scheduler lifecycle abort are available. | Reuse these hooks; verify registrar conformance. |
+| Safe replace-all projection | Documentation requires atomic, idempotent, durable acceptance and cancellation; the example handles rereads, retries, clearing, and shutdown. | Standardize bounded SDK types and explicit results instead of a deployment-local `Promise<void>` adapter. |
+| Durable registration outcomes | No generic deadline registrar with the result union in section 3 is exported. | Define receipts, revisions, replay, supersession, due, unarmable, and rejected outcomes. |
+| Host lifecycle | Host transport and durable storage remain adapter responsibilities. | Prove cross-process arbitration, restart, already-due handling, and recovery/readiness composition. |
+| Externally completed occurrences | No `wake` or `scheduleOnly` payload is in the cron payload union. | Keep `scheduleOnly` deferred; converge any future execution contract with RFC #5. |
+
+The existing hooks and safe projection pattern are landed prerequisites, not
+completion of this RFC. The RFC remains `draft`; no maintainer acceptance or
+implementation issue is claimed. PR #119040 remains an experimental `wake`
+implementation. Refreshing its branch does not approve its public payload or
+change the proposal to keep it paused pending this decision.
+
 ### 1. OpenClaw remains authoritative
 
 OpenClaw owns:
@@ -185,7 +211,13 @@ a successful run, or infer completion from process activation.
 
 The deadline registrar is plugin-owned. It consumes the existing
 `cron_reconciled` baseline and `cron_changed` hint, then reads the full current
-inventory through `cron.list(includeDisabled: true)`.
+inventory through `cron.list({ includeDisabled: true })` on the exact scheduler
+captured by `ctx.getCron?.()` at reconciliation. A late `cron_changed` hint must
+not replace that captured scheduler.
+
+The current hook is not replayed by plugin-only hot reload. A newly enabled
+consumer waits for the next scheduler replacement or Gateway start to receive
+its baseline; enabling the plugin alone does not authorize a projection.
 
 The registrar follows these rules:
 
@@ -441,7 +473,7 @@ Existing Automation stores require no migration.
 
 The plugin contract can be introduced additively:
 
-- Document the existing reconciled-projection pattern as the supported basis.
+- Reuse the already documented reconciled-projection pattern as the supported basis.
 - Add an opaque scheduler-generation field to plugin hook context only if
   current lifecycle identity cannot be carried safely by the existing abort
   signal and plugin instance.
@@ -477,11 +509,15 @@ schema discriminator alone is not a compatibility plan.
 
 Each slice remains independently reviewable.
 
-### Slice 1: document and test the projection contract
+### Slice 1: verify the existing projection contract
 
-- Document `cron_reconciled` as the baseline and `cron_changed` as a hint.
-- Add contract tests for full reread, authoritative empty state, abort on
-  lifecycle replacement, and shutdown join.
+The hook infrastructure and safe projection documentation have landed. This
+slice verifies the proposed registrar against them and adds only missing proof.
+
+- Retain `cron_reconciled` as the baseline and `cron_changed` as a hint.
+- Audit existing tests and add registrar conformance coverage where missing for
+  full reread, authoritative empty state, abort on lifecycle replacement, and
+  shutdown join. Include plugin-only reload's lack of a new baseline.
 - Confirm the plugin can derive a scheduler generation without a new public
   Gateway field. Add an opaque plugin-hook generation only if needed.
 
@@ -594,26 +630,33 @@ or one-shot behavior.
 Supported as an operator choice. It is not a substitute when OpenClaw owns the
 Automation schedule.
 
-### Alternative E: replace OpenClaw's scheduler with a pluggable scheduler
+### Alternative E: delegate execution through a dispatch backend
 
-[RFC PR #5](https://github.com/openclaw/rfcs/pull/5) proposes a broader seam in
-which an external scheduler can become canonical. That may serve deployments
-that want external ownership of all scheduled work. A host that only needs the
-next deadline should not take over job storage, recurrence, or execution.
+**Accuracy note, 2026-09-05:** [RFC PR #5](https://github.com/openclaw/rfcs/pull/5)
+was narrowed after this draft was written. Its
+[current proposal](https://github.com/openclaw/rfcs/blob/dc1519a51b4e6221af6c40e48ca7013ec45ac5a0/rfcs/0014-pluggable-scheduler.md)
+keeps shared SQLite authoritative for public jobs, admission, identifiers, and
+history. It proposes explicit per-job external dispatch for compatible
+shell/command `cron` and `at` work, with durable fencing and receipt ingestion.
+It no longer proposes an external canonical catalog.
 
-Not selected for this problem. The two proposals can coexist if their owner
-modes are mutually exclusive and explicit.
+Phase-one deadline projection remains distinct: a host arranges compute while
+OpenClaw executes the payload. External dispatch performs the action itself.
+If `scheduleOnly` advances, it must converge with RFC #5 on one owner,
+authorization, admission, fencing, receipt, and history contract. The two drafts
+must not create parallel plugin APIs for the same externally executed
+occurrence. Neither draft's acceptance is implied by this alignment.
 
 ## Relationship to current work
 
 - [Issue #114145](https://github.com/openclaw/openclaw/issues/114145) describes
   nullable external deadlines derived from reconciled cron projection hooks.
-  This RFC supplies the missing durable ownership and lifecycle contract.
+  This RFC proposes the remaining registrar outcomes and host lifecycle contract.
 - [Issue #103205](https://github.com/openclaw/openclaw/issues/103205) and
   [PR #103647](https://github.com/openclaw/openclaw/pull/103647) introduced the
-  projection hooks.
+  projection hooks; #103647 merged on 2026-07-10.
 - [PR #104368](https://github.com/openclaw/openclaw/pull/104368) added exact
-  lifecycle cancellation for reconciled hooks.
+  lifecycle cancellation for reconciled hooks and merged on 2026-07-11.
 - [PR #103618](https://github.com/openclaw/openclaw/pull/103618) and
   [PR #103925](https://github.com/openclaw/openclaw/pull/103925) define current
   suspension behavior. Suspension pauses automatic cron dispatch but does not
@@ -641,7 +684,8 @@ The following decisions require named maintainer approval:
 
 1. **Cron and Automations owners:** Is OpenClaw permanently authoritative for
    occurrences in the host-activation use case?
-2. **Plugin SDK owners:** Should scheduler generation become an explicit hook
+2. **Plugin SDK owners:** Is a generic typed registrar justified beyond the
+   documented host adapter? Should scheduler generation become an explicit hook
    field, or is hook-instance identity plus the abort signal sufficient?
 3. **Gateway protocol owners:** If schedule-only occurrences proceed, what is
    the additive compatibility policy for older exhaustive clients?
@@ -658,3 +702,10 @@ The following decisions require named maintainer approval:
    the second phase proceeds?
 9. **RFC maintainer:** Should #119040 be closed after phase 1 is accepted, or
    retained as an implementation branch for a later schedule-only protocol?
+10. **Automations and RFC #5 owners:** If external actions proceed, which single
+    dispatch-and-receipt contract covers both proposals? No independent
+    `scheduleOnly` API should ship before that boundary is agreed.
+
+The required `maintainer-discussion` thread is not linked in this draft or its
+PR. Maintainer acceptance and the implementation issue remain outstanding; the
+landed projection prerequisites do not satisfy those RFC lifecycle gates.
