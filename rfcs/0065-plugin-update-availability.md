@@ -6,7 +6,7 @@ created: 2026-08-28
 last_updated: 2026-09-06
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/66
 ---
 
 # Proposal: Surface plugin update availability
