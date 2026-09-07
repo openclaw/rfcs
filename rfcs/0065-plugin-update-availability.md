@@ -3,7 +3,7 @@ title: Surface plugin update availability
 authors:
   - Erick Kinnee (@ekinnee)
 created: 2026-08-28
-last_updated: 2026-09-06
+last_updated: 2026-09-07
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/66
@@ -64,15 +64,34 @@ existing pin.
 
 ### Shared availability view
 
-Use the existing plugin update resolution owner to obtain metadata for installed
-plugins with a recorded, resolvable install source. Separate metadata resolution
+Use ClawHub as the primary plugin update metadata path, through the existing
+plugin update resolution owner. Resolve installed plugins from their recorded
+source: ClawHub installations use their recorded ClawHub registry and package
+identity; npm installations retain npm metadata resolution. Do not substitute a
+ClawHub package for an npm installation based on name similarity. Separate metadata resolution
 from installation so checking availability performs no package installation or
 configuration mutation.
 
-Each result should identify the plugin, recorded source and selector, installed
-version, eligible target when known, and newer published release when known.
-Include the check outcome and observation time. Exact field names and the public
-JSON contract remain subject to review.
+Propose a shared `pluginAvailability` object for JSON consumers, with
+`checkedAt`, `complete`, and `plugins` sorted by plugin ID. Each entry contains
+`pluginId`, a credential-free source identity, `selector`, `installedVersion`,
+`eligibleVersion`, `publishedVersion`, `outcome`, `reason`, and `observedAt`.
+Unknown versions and absent observation times are `null`, never inferred values.
+
+`outcome` is `ok`, `unknown`, or `unsupported`. A successful observation also
+contains `eligibleUpdate` and `newerOutsideSelector` booleans; both can be true
+for a range allowing an update but excluding a still newer release. Unknown
+comparisons are `null`. Published releases follow the existing source/channel
+policy; this field does not mean the highest version across every channel.
+`freshness` is `fresh`, `stale`, or `missing`. Failed refreshes expose their
+current reason separately from `lastSuccess`, an optional stale observation.
+Only fresh successful observations contribute to the eligible-update count.
+
+`complete` is true only when every installed plugin has a fresh successful
+observation. Unsupported, unattempted, and failed entries remain in the result.
+Reasons include `not-checked`, `unsupported-source`, `lookup-failed`, `timeout`,
+`budget-exhausted`, and `install-changed`. Human output maps each reason to an
+explicit refresh, retry, or source-specific manual inspection action.
 
 A pinned plugin can have a newer published release while its eligible target
 remains unchanged. Present that as a newer release outside the recorded selector,
@@ -83,8 +102,12 @@ unsupported local sources must not appear as up to date.
 
 `openclaw plugins list --verbose` should display an availability hint alongside
 the installed version when a result is available. Ordinary inventory listing
-should remain local. The precise explicit refresh entry point is an unresolved
-question; verbose formatting alone should not silently introduce registry calls.
+must remain local, including verbose output. Propose
+`openclaw update status --refresh-plugins` as the explicit metadata refresh
+entry point; `--json` returns the same results. These flags describe the proposed
+interface, not a command available today. Without refresh, the plugin section
+reads retained observations and shows their age or a not-checked hint. Existing
+core network checks in `update status` keep their current behavior.
 
 `openclaw update status` should add a separate plugin availability section and an
 equivalent JSON representation. Retain the core update section's meaning. Plugin
@@ -93,12 +116,16 @@ a candidate-core compatibility assessment.
 
 Keep `openclaw plugins update --all --dry-run` as the actionable check path named
 by the original RFC. The availability view should reuse its resolution semantics,
-with an implementation-time check that metadata-only inspection causes no install
-or state changes.
+but must not call the installer dry-run as its implementation. Current dry-run
+enters installer paths. Extract or reuse metadata primitives at the update owner;
+checks must not download package artifacts, execute plugin code, install packages,
+or change authored configuration. Persisting the observation is the only proposed
+new durable side effect.
 
 ### Control UI presentation
 
-Extend the update surface with a plugin summary and a details view identifying
+Add a neighboring plugin section to the core update card, linking to installed-plugin
+details identifying
 the installed version, eligible update, and any newer release excluded by a pin.
 Count eligible updates separately from pinned newer releases and unknown checks.
 Provide explicit refresh and the appropriate CLI next action; displaying a notice
@@ -110,10 +137,43 @@ state rather than representing it as a successful current check.
 
 ### Refresh and storage
 
-Propose on-demand checks with bounded completion and explicit partial results.
-Do not add scheduled polling. The cache lifetime, invalidation owner, and need
-for persistence must be settled before implementation; this draft does not
-prescribe a new store, configuration option, or environment variable.
+The following values are proposed defaults for acceptance, not measured limits
+or existing runtime behavior:
+
+- The existing plugin update owner owns refresh, retained observations, and
+  invalidation. CLI and Gateway are callers; neither owns a second cache or
+  selection policy. Refresh uses the caller's existing management authorization.
+- Retain the latest attempt and at most one successful observation per installed
+  plugin in the existing global SQLite control-plane database. Do not add a
+  sidecar file, standalone database, history log, config option, or environment
+  variable. The exact schema and migration require storage-owner review before
+  implementation; RFC acceptance must explicitly include these persistence
+  semantics.
+- Observations are fresh for 24 hours. Expiry marks them stale without a network
+  request. The cache key includes installation identity, installed version,
+  recorded source/selector, OpenClaw host version and plugin API compatibility
+  context, and resolution-relevant channel and registry context. A core upgrade
+  invalidates prior eligibility observations.
+  Local reads reject mismatched keys. Refresh rechecks installation identity
+  before publishing results; changed entries become `install-changed`.
+- Concurrent refreshes must not let an older attempt overwrite a newer result.
+  The same update owner serializes publication, revalidating the current attempt
+  and install identity after network work. Uninstalled entries are pruned during
+  the next authorized refresh; ordinary reads do not perform maintenance writes.
+- Allow at most four concurrent metadata lookups and a 15-second total network
+  budget per refresh, including queue time. Bound each lookup by the remaining
+  budget, cancel outstanding requests at expiry, and schedule no automatic
+  retries. Unstarted entries report `budget-exhausted`; unfinished entries report
+  `timeout`. Return partial results instead of silently dropping plugins.
+- V1 prioritizes ClawHub metadata and also resolves recorded npm installations. Other sources, including Git and
+  marketplace installations, remain visible as `unsupported` until their owner
+  provides equivalent metadata-only resolution. Existing update support for
+  those sources is unchanged.
+
+Opening the UI, listing plugins, and reading retained plugin status never trigger
+plugin metadata requests. Offline operators omit the refresh action. Failed
+refreshes retain last-success evidence only with an explicit stale label; cache
+write failures are reported and must not claim cross-command persistence.
 
 ### Acceptance criteria
 
@@ -139,6 +199,9 @@ Leaving discovery only in explicit update commands preserves simplicity but
 does not address the original RFC's visibility problem. Resolving on every list
 would make ordinary inventory inspection depend on network availability.
 On-demand refresh provides a deliberate check without adding background work.
+Process-local caching would lose observations between CLI invocations and leave
+ordinary verbose listings without useful availability. Shared SQLite observations
+preserve that goal at the cost of explicitly reviewed persistence semantics.
 
 A single `Latest` column is compact but ambiguous for pinned installations.
 Separating published releases from eligible targets makes the operator's choice
@@ -151,17 +214,18 @@ assessment and admission policy.
 
 ## Unresolved questions
 
-1. What explicit CLI action refreshes availability, and how should verbose list
-   and update status consume the result without hidden network work?
-2. Should results be cached across commands, and if so, which existing owner
-   controls storage, expiry, and invalidation?
-3. What precise JSON fields and outcome names distinguish eligible updates,
-   releases excluded by pins, unknown checks, and unsupported sources?
-4. Should the Control UI summary appear in the core update card or a neighboring
-   plugin section, and where should per-plugin details live?
-5. How should offline operators invoke or suppress an explicit check without
-   adding another configuration flag?
-6. What bounds apply to concurrent lookups and total check duration?
+Maintainers are asked to accept or amend the proposed refresh command, 24-hour
+freshness window, four-lookup concurrency, 15-second budget, JSON semantics, and
+shared persistence ownership as one v1 contract. These choices are not approved
+by publication of this draft.
+
+Before implementation, the storage owner must approve the exact schema,
+migration, and publication fencing. Source-specific metadata adapters must prove
+that cancellation bounds actual work. These are implementation review gates,
+not permission to substitute installer dry-run or introduce another state owner.
+
+Later work may extend metadata-only support to additional install sources.
+Background refresh and upgrade-preflight policy remain outside this proposal.
 
 The original issue remains the proposal's provenance. Per the RFC repository's
 lifecycle, the frontmatter implementation issue remains blank until acceptance.
