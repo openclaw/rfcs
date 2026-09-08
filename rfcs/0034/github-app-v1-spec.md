@@ -6,7 +6,11 @@ Provider-specific contract for [RFC 0034](../0034-github-app-credentials.md), us
 
 V1 targets organization-managed GitHub.com App installations, one repository per credential, HTTPS Git, and a bounded Git/`gh` workflow. Personal credentials, GitHub Enterprise hosts, SSH, LFS, submodules, arbitrary uploads, and unlisted operations are excluded.
 
-The current Crawl proposal uses native Git/`gh`; GitHub credential substitution is optional within Crawl. The required external model-credential proxy is a separate capability and does not implement Git smart HTTP, REST, or GraphQL. Upstream must decide whether production requires GitHub mediation or accepts the native-token exception to [RFC 0027](../0027-openclaw-enterprise.md#secret-access). Until that decision and mode qualification, neither is a supported production profile.
+The proposed production profile requires GitHub mediation, consistent with [RFC 0027's credential boundary](../0027-openclaw-enterprise.md#secret-access). Native delivery is limited to development/testing and is never a production fallback. The first release targets the pinned ordinary Git/`gh` subset below, including its required REST and GraphQL requests. Broader CLI/API compatibility requires separately specified and qualified operations. The model-credential proxy is a separate capability and does not establish GitHub mediation. Publication of this proposal qualifies neither mode.
+
+## Client versions
+
+Git 2.55.0 and `gh` 2.93.0 are the proposed qualification pins for both modes. Pin binaries, image digests, configuration, and exact command variants in implementation evidence. Supporting another version requires its own compatibility evidence; a system binary with a different version does not qualify these pins. [Git credential helper interface](https://git-scm.com/docs/gitcredentials), [gh environment](https://cli.github.com/manual/gh_help_environment)
 
 ## Enrollment and configuration
 
@@ -65,13 +69,32 @@ GitHub visibility checks and writes are separate operations. For the full guaran
 | `views` | `contents:read`, `issues:read`, `pull_requests:read` | Repository, issue, and PR reads. |
 | `coding` | `contents:write`, `issues:read`, `pull_requests:write` | Prepared-branch push and same-repository draft PR creation, plus reads. |
 
-All profiles include GitHub's required `metadata:read`. Do not request workflow, administration, or secrets permissions. A coding token is not inherently restricted to draft PRs or particular branches: native use can exercise all operations GitHub grants those permissions. GitHub repository rules that the App cannot bypass must enforce branch/merge restrictions. [Merge permissions](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request)
+All profiles include GitHub's required `metadata:read`. Do not request workflow, administration, or secrets permissions. A coding token is not inherently restricted to draft PRs or particular branches: `contents:write` is sufficient for the documented PR-merge permission check. Removing `pull_requests:write` does not create a no-merge token. GitHub repository rules that the App cannot bypass must enforce branch/merge restrictions. [Merge permissions](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request)
 
 The issuer signs an App JWT outside execution and calls `POST /app/installations/{id}/access_tokens` with exactly one explicit `repository_ids` entry and the exact permissions of the lease's effective profile, validated as a supported subset of its admitted grant. A `coding` grant narrowed to `views` must mint `views` permissions. It never relies on installation-wide defaults. Validate the returned repository selection and permissions against that effective scope, and verify actual expiry before eligibility; incomplete scope evidence or unexpected scope retains the token for cleanup only. Extra unavoidable metadata read is the sole implicit baseline. [Installation token creation](https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app)
 
 App JWTs have a maximum documented expiry of ten minutes. Installation tokens expire after one hour; the documented API has no custom TTL parameter. Treat tokens as opaque variable-length strings. A shorter OCE lease does not shorten provider validity, and App key rotation does not itself revoke previously issued tokens. [App JWT](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app), [installation token lifetime](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 
 Declare the profile as new-token issuance, provider-fixed lifetime, individual revocation using protected token material, and no assumed mint-idempotency or lost-token lookup. Revoke each known token using `DELETE /installation/token`; `204` confirms revocation. A token hash alone cannot call this endpoint. Retain protected material through cleanup. Installation suspension/uninstall is a separately authorized operator action, never an automatic broad fallback. [Revocation](https://docs.github.com/en/rest/apps/installations#revoke-an-installation-access-token)
+
+## Policy enforcement
+
+Enforce scope at minting and on every mediated request, using the [same effective grant](credential-broker-v1-spec.md#one-effective-grant-two-enforcement-points). GitHub's installation-token API accepts repository selection and permission categories. It has no documented general fields for a branch, arbitrary path, individual mutation, current repository visibility, OCE work item, or originating container. These restrictions cannot be represented by naming a token profile. [Token parameters](https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app)
+
+| Constraint | Enforcement |
+| --- | --- |
+| Repository and permission category | Explicit mint scope and validation of each request against the effective grant. |
+| Supported operation and parameters | Mediator validates actual Git/REST/GraphQL semantics, including same-repository targets and draft PR state. |
+| Branch and merge restrictions | GitHub repository rules with no App bypass. V1 adds no proxy-side branch policy. |
+| Approved non-public destination | Current ownership/visibility checks plus the organization controls required by the publication policy. |
+| Work purpose, horizon, withdrawal | Current OCC/IAM decision and broker lease enforcement at dispatch. |
+| Execution origin | Trusted runtime/host mapping and enforced routing; no workload-visible proof is sufficient by possession. |
+
+The selected permission profile is a ceiling; use a supported narrower profile when the admitted work only needs reads. V1 does not mint arbitrary permission combinations per request. Adding finer operation classes requires a versioned profile and compatible lease/cache accounting. Never reuse or refresh a broader token for narrower work. GitHub documents endpoint-specific requirements and calls for testing the permissions of actual GraphQL queries and mutations. [Permission guidance](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
+
+Broader API/CLI support means extending the reviewed operation catalog. Each addition must identify actual targets, required provider permissions, request constraints, and outcome handling. No generic authenticated passthrough is implied. If a required restriction cannot be enforced, deny that operation or offer a narrower supported profile through authorized admission; never silently broaden access after a permission error.
+
+Ordinary Contents permissions do not provide general per-token arbitrary path scope. GitHub has a specialized App-registration `single_file` permission with configured paths; it is outside this profile and does not establish ordinary Git compatibility. Supported GitHub push rules may add path restrictions, but require separate qualification. [App registration](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-using-url-parameters), [repository rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets)
 
 ## Refresh and overlap
 
@@ -85,7 +108,7 @@ An unknown GitHub mint creates a hold on the stable provider target: OCE Install
 
 The hold remains until definite no-issuance evidence, an evidenced expiry that has elapsed, or verified sufficient administrative revocation resolves it. Neither a new request ID nor time elapsed since a client timeout resolves the hold. A broader remedy must identify its affected scope and receive the corresponding operator authorization. Other provider targets are independent, but the broker must not automatically switch accounts to bypass a hold.
 
-New Git helper invocations and `gh` children receive an eligible token. Existing child environments do not rotate. Running commands may fail on expiry or revocation; renewal does not automatically rerun an ambiguous push, PR mutation, or other write.
+In mediation, each new authorized dispatch can use an eligible replacement token without restarting the requesting process. An already-dispatched operation may fail on expiry or revocation. In development/testing native mode, new Git helper invocations and `gh` children receive an eligible token; existing child environments do not rotate. Neither mode automatically reruns an ambiguous push, PR mutation, or other write.
 
 ## Native client contract
 
@@ -96,13 +119,11 @@ The Git helper and `gh` launcher consume the broker's native delivery port with 
 - Helper store/erase handling must not persist material; diagnostics and failures use safe reason codes. Native code can read its token and write it anywhere, so these handling rules do not promise that an adversarial workload will keep tokens out of its own logs or artifacts.
 - A denied, closed, expired, unsupported, or unavailable result fails the command's credential acquisition. There is no fallback to a personal credential, App key, alternate installation, or mediated-to-native downgrade.
 
-Git 2.55.0 and `gh` 2.93.0 are the proposed qualification pins. Pin binaries, image digests, configuration, and exact command variants in implementation evidence. Supporting another version requires its own compatibility evidence; a system binary with a different version does not qualify these pins. [Git credential helper interface](https://git-scm.com/docs/gitcredentials), [gh environment](https://cli.github.com/manual/gh_help_environment)
-
 ## Mediated origin and routing
 
 The proposed transport uses a trusted host connector whose SPIFFE mTLS key remains outside Agent execution. It authenticates an exclusive runtime-owned local channel, resolves the actual container incarnation and original invocation through a protected mapping, and makes the broker request itself. The broker verifies the connector's service identity and exact mapping; it does not trust container-supplied identity headers.
 
-A shared host identity, socket pathname, Pod UID alone, same-Pod sidecar, or self-reported turn ID is insufficient. The mapping must change on container restart and distinguish sibling containers and successive invocations. An old process must not obtain or use a successor's channel. This is a required runtime capability and a release blocker until demonstrated, not a property provided by naming SPIFFE. The SPIFFE Workload API gives private key material to its authorized consumer; therefore an SVID key delivered inside execution cannot establish the required copy resistance. [SPIFFE Workload API](https://spiffe.io/docs/latest/spiffe-specs/spiffe_workload_api/)
+A shared host identity, socket pathname, Pod UID alone, same-Pod sidecar, or self-reported turn ID is insufficient. The mapping must change on container restart and distinguish sibling containers and the original work behind each request. Persistent workers may serve later work only through the [protected work-binding contract](credential-broker-v1-spec.md#persistent-processes-and-background-work); an old queued request cannot inherit the successor's authority. The concrete dispatcher/channel is a release blocker until demonstrated. SPIFFE identifies its authorized consumer and supplies private key material; an SVID key delivered inside execution cannot establish the required copy resistance. [SPIFFE Workload API](https://spiffe.io/docs/latest/spiffe-specs/spiffe_workload_api/)
 
 The SandboxDriver enforces the route and denies bypass to token endpoints, alternate brokers, direct credentialed GitHub routes, and general tunnels. Client proxy settings establish compatibility only. The workload receives neither GitHub material nor reusable origin proofs minted by the connector. A native delivery endpoint must be unreachable or refuse all mediated leases, including requests with copied handles.
 
@@ -135,4 +156,4 @@ Preserve the active workspace and uncommitted user changes. Compute owns an expl
 
 ## Acceptance
 
-Both modes require the shared broker contract, real provider scope/revocation evidence, safe preparation, and original-invocation lifecycle evidence. Mediation additionally requires origin replay negatives and semantic protocol compatibility. See the [acceptance matrix](lifecycle.md#acceptance-matrix); presence of an issuer or helper is not a production acceptance result.
+Production requires the shared broker, real provider scope/revocation evidence, safe preparation, persistent-work attribution, mediated origin replay negatives, and the selected semantic protocol compatibility. Native helper evidence is development/testing evidence only. See the [acceptance matrix](lifecycle.md#acceptance-matrix); presence of an issuer or helper is not a production acceptance result.

@@ -47,7 +47,26 @@ The Agent uses its own explicitly granted `WorkloadIdentity` authority. Original
 
 A session may contain multiple invocations. Effective access is the intersection of current workload authority, admitted revision grants, the authorized session selection, and the original invocation selection and restrictions. OCC records both selections before execution; missing or ambiguous selection denies. Each invocation binds fresh leases to the exact selected accesses it uses. Every `beginAccess` checks its retained original selection and current narrowing, including when no lease exists yet for the requested grant. Broadening a session requires authorized re-admission within current Agent authority and takes effect only in a new invocation with fresh leases. Existing invocations cannot gain authority through that change; renewal cannot add a resource or permission. Closing a session or invocation closes all its affected leases. Preparation uses its separate admitted selection.
 
-A handle, unexpired identity certificate, caller-supplied turn ID, or cached allow decision does not establish current authority. Container identity also does not prove invocation identity: processes from successive turns may share a container. The runtime must establish a protected per-invocation execution/channel binding, or isolate and stop prior execution before admitting the successor. If old code can borrow a later invocation's binding, that runtime/profile is unsupported. The issuer cannot supply this missing proof.
+A handle, unexpired identity certificate, caller-supplied turn ID, or cached allow decision does not establish current authority. Container identity also does not prove invocation identity: processes from successive turns may share a container. The runtime must establish protected correspondence between each credentialed effect and its original admitted work. A reusable process may serve later work, but an old request cannot borrow that later work's authority. The issuer cannot supply missing origin proof.
+
+### One effective grant, two enforcement points
+
+The existing authority owns the effective grant. The issuer's provider-permission selection and the mediator's request checks must derive from the same versioned grant, original selection, and current narrowing. The trusted protocol adapter validates the actual request and supplies canonical resource identities, operation, policy-relevant arguments, and an immutable request digest. Existing OCC/IAM evaluates those facts; the broker consumes the resulting permit for that exact effect at dispatch. Caller labels and parsed data alone confer no authority.
+
+Each supported provider operation must declare its required permissions, applicable constraints, read/write behavior, and uncertain-outcome handling. This catalog interprets provider protocols; it is not another policy authority. Unsupported constraints deny admission or the affected operation. Permission failures cannot trigger broader credentials, another account, or a less restrictive access mode. A wider grant requires authorized admission and new work; it cannot change the original selection of existing work.
+
+### Persistent processes and background work
+
+Persistent execution is a first-class requirement. A process may remain alive after its lease closes; closure denies new credentialed effects and starts cleanup. Process liveness, an open connection, or later work cannot renew closed authority. Workspace replacement still requires Compute to observe previous writers stopped.
+
+Two cases need distinct admission and lifecycle behavior:
+
+- **Reusable worker:** each request belongs to an explicitly admitted invocation, with its own immutable selection and current authority. The worker can serve successive invocations without carrying their permissions forward.
+- **Background job:** continuing GitHub work after the initiating interactive invocation ends requires separately admitted work. The proposed representation is an existing OCC invocation/work record with an explicit noninteractive purpose, original attribution, exact grants and restrictions, finite horizon, renewal limits, and lifecycle/cancellation owner. Session-linked work closes with its session. Session-independent work needs separate explicit authority; a surviving process cannot create it.
+
+The concrete background-admission producer, supported session relationship, and protected dispatch mechanism remain open design work. Until specified and qualified, they cannot authorize access. The broker must not invent an invocation or silently detach work when a turn ends.
+
+A mutable current-turn pointer or workload-selected handle cannot protect work attribution. A trusted dispatcher must own the authorized request boundary, or differently authorized work needs execution isolation. A shared untrusted process cannot isolate mutually untrusted computations merely by labeling their requests. If the runtime cannot establish the boundary, restrict the process to one immutable authority context and deny after closure; do not claim support for mixed-authority reuse. Qualification must cover concurrency, queued requests, cancellation, reconnects, and restart.
 
 ## Broker operations
 
@@ -128,7 +147,7 @@ Keep these status dimensions independent:
 | Issuance | `reserved`, `dispatched`, `issued`, `not-issued`, `unknown`. |
 | Delivery/use | `not-started`, `admitted`, `completed`, `unknown`, or `denied`. |
 | Cleanup | `not-required`, `pending`, `confirmed-revoked`, `confirmed-expired`, `unknown`, or `action-required`. |
-| Execution | Supplied independently by Compute: stopping, observed stopped, or unresolved. |
+| Execution | Supplied independently by Compute: running, stopping, observed stopped, or unresolved. A closed lease does not imply a stopped process. |
 
 Expiry is either evidenced with a timestamp and provenance or unproven. A future expiry is not a terminal outcome. Expiry completion requires the evidenced time to have elapsed with the selected clock uncertainty allowance. A guessed issue time plus nominal TTL is insufficient.
 

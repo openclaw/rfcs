@@ -13,7 +13,7 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/68
 
 ## Summary
 
-Give OpenClaw Enterprise a shared credential lifecycle behind `SecretBroker`, with GitHub Apps as the first issuer. The OpenClaw Controller (OCC) authorizes access; the broker manages credentials and cleanup; issuers perform provider operations. Reviewers are asked to approve this boundary and the GitHub profile. Whether production permits native tokens or requires mediation remains open.
+Give OpenClaw Enterprise a shared credential lifecycle behind `SecretBroker`, with GitHub Apps as the first issuer. The OpenClaw Controller (OCC) authorizes access; the broker manages credentials and cleanup; issuers perform provider operations. Production requires mediation, keeping GitHub tokens outside Agent execution. Reviewers are asked to approve this boundary and a bounded Git/`gh` profile.
 
 ## Motivation
 
@@ -24,9 +24,9 @@ An external attacker can reuse a leaked token. Narrow scope limits the damage. G
 ## Goals
 
 - Define ownership of credential authorization, protected custody, and durable cleanup.
-- Support ordinary Git and `gh` workflows within an explicit repository grant.
+- Support a pinned subset of ordinary Git/`gh` workflows and persistent processes within explicit grants.
 - Prevent Agents from publishing private workspace content to public GitHub repositories.
-- Provide mediated access where copying container-visible integration credentials grants no access elsewhere.
+- Ensure copied container-visible integration credentials grant no access elsewhere in production.
 
 ## Non-Goals
 
@@ -47,7 +47,7 @@ Extend [RFC 0027's SecretBroker](0027-openclaw-enterprise.md#secret-access) with
 | Issuer implementation | Issue/revoke within the grant; report scope, expiry, and uncertainty. |
 | Compute and Sandbox drivers | Compute owns execution and checkout; SandboxDriver establishes and verifies containment. |
 
-The issuer cannot grant permission. A lease identifies one original invocation or preparation operation; it grants nothing by possession. Workloads retain their own authority, with invocation checks only narrowing it. Issuer process shutdown, authorization closure, container termination, and provider revocation remain separate events.
+The issuer cannot grant permission. A lease identifies one original invocation or preparation operation; possession grants nothing. Invocation checks only narrow workload authority. Issuer shutdown, authorization closure, process termination, and provider revocation remain separate events.
 
 The [broker specification](0034/credential-broker-v1-spec.md) defines the shared contract. It begins as a trusted local interface; it does not require a new microservice.
 
@@ -63,24 +63,26 @@ OCC records a session's selection from those grants; current Agent authority and
 | Issue and PR views | `contents:read`, `issues:read`, `pull_requests:read` |
 | Coding | `contents:write`, `issues:read`, `pull_requests:write` |
 
-All include required `metadata:read`. Every mint specifies the repository and permissions. Workflow, administration, and secrets permissions are excluded; repository rules must enforce branch and merge restrictions. The [GitHub specification](0034/github-app-v1-spec.md) defines enrollment, clients, and provider behavior.
+All include required `metadata:read`. Every mint specifies the effective repository and permissions. Workflow, administration, and secrets permissions are excluded. The proxy separately checks each operation against the same grant; GitHub repository rules enforce branch and merge restrictions. Broader client support cannot broaden authority. [Policy enforcement](0034/github-app-v1-spec.md#policy-enforcement)
 
-Writes must target approved, non-public repositories, including Git pushes and PR/API mutations. Public or unverified destinations deny. Native scope checks provide partial protection; the [publication policy](0034/github-app-v1-spec.md#preventing-public-publication) requires enforced mediation and visibility controls for the full guarantee.
+Git pushes and PR/API writes must target approved, non-public repositories. Public or unverified destinations deny. The [publication policy](0034/github-app-v1-spec.md#preventing-public-publication) also requires controls over visibility changes.
 
-### Select an access mode
+### Require mediation in production
 
 | Mode | Behavior and protection |
 | --- | --- |
-| Native | A Git helper and each new `gh` child receive scoped tokens. Escaped tokens remain reusable until revoked or expired. This proposes a narrow exception to RFC 0027. |
-| Mediated | A trusted host connector authenticates the exact execution and original invocation. The proxy inserts GitHub credentials outside the container. Copied container-visible credentials alone cannot authorize access. |
+| Mediated — production | A trusted host connector authenticates execution and original work. The proxy inserts GitHub credentials outside the container. Copied container-visible credentials alone cannot authorize access. |
+| Native — development/testing only | A Git helper and each new `gh` child receive scoped tokens. Escaped tokens remain reusable until revoked or expired. |
 
-The current Crawl (initial rollout) proposal uses native repository access, with GitHub mediation optional. Its required model-credential proxy does not implement GitHub mediation. Production selection and acceptance of any native exception remain open; unsupported mediation never falls back to native.
+The initial profile targets clone/fetch, prepared-branch push, repository/issue/PR views, and explicit draft PR creation. Each supported command variant requires qualification. The model-credential proxy does not implement GitHub mediation; unsupported operations deny without native fallback.
 
 ### Manage normal operation
 
 1. **Prepare.** OCC authorizes a separate read-only checkout. SandboxDriver verifies containment; Compute verifies the commit and storage handoff. OCC gates candidate Harness startup on both. Failure preserves the serving revision and workspace.
-2. **Run and renew.** The broker checks current authority before issuing or delivering credentials and before each mediated operation. Long sessions receive replacement tokens while the original invocation remains authorized. Each successor is tracked alongside its predecessor. Existing commands may fail on expiry; ambiguous writes are not automatically replayed.
-3. **Close and clean up.** Turn completion, replacement, expiry, or access withdrawal closes affected leases. Compute stops affected execution; the broker independently revokes outstanding credentials. Cleanup survives deletion and restart. An old process cannot adopt a later turn's authority.
+2. **Run and renew.** The broker checks current authority before issuing credentials and each mediated operation. Long-running authorized work receives replacement tokens; each successor is tracked alongside its predecessor. Existing commands may fail on expiry; ambiguous writes are not automatically replayed.
+3. **Close and clean up.** Completion, replacement, expiry, or withdrawal closes affected leases and starts durable credential cleanup. A reusable process may remain alive, but old work cannot inherit later work's authority. Workspace replacement still requires observed writer termination.
+
+Persistent processes are a requirement. Their requests need protected work attribution; staying alive cannot extend access. Background work beyond an interactive turn needs explicit admission and a cancellation owner. The [persistent-work design](0034/credential-broker-v1-spec.md#persistent-processes-and-background-work) remains an implementation gate.
 
 [Recovery and qualification](0034/lifecycle.md) distinguish local denial, observed termination, and upstream cleanup. Already accepted provider operations may finish.
 
@@ -88,10 +90,9 @@ The current Crawl (initial rollout) proposal uses native repository access, with
 
 A shared broker avoids duplicate lifecycle implementations while each issuer retains its provider's scope and API rules.
 
-Native clients offer simpler compatibility with explicit bearer exposure. Mediation addresses copied credentials but requires trusted origin enforcement and separate Git/API compatibility work. Its guarantee assumes trusted host and broker infrastructure; use of the original authorized container as a relay is outside that guarantee.
+Mediation requires trusted origin enforcement and Git/API compatibility work. Its guarantee assumes trusted host and broker infrastructure; use of the original authorized container as a relay is outside that guarantee.
 
 ## Unresolved questions
 
-- Should production require mediation, or accept the bounded native exception?
-- Which protected local transport can prove both execution and original-invocation origin on the selected runtime?
-- Can the initial mediated profile qualify the selected ordinary `gh` GraphQL commands, or must its first supported workflow be smaller?
+- Which protected transport and dispatcher can attribute persistent-worker requests to their original work on the selected runtime?
+- Which background-work lifetimes should initial admission support, and who owns their renewal and cancellation?
