@@ -13,7 +13,7 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/68
 
 ## Summary
 
-Give Enterprise Agents access to approved repositories through an organization-managed GitHub App. An external credential service issues scoped tokens for ordinary Git and `gh` commands. The first release delivers tokens into the container; a later mediated mode keeps them in a trusted proxy and binds access to the originating container.
+Give Enterprise Agents access to approved repositories through an organization-managed GitHub App. Crawl requires an external proxy for model credentials and a GitHub token service. Native Git/`gh` is the baseline repository mode. GitHub credential substitution at the proxy is optional within Crawl, subject to separate origin-authentication and client-compatibility checks.
 
 ## Motivation
 
@@ -58,12 +58,12 @@ Each revision selects an access mode. The Agent cannot change it or expand its g
 
 | Mode | How it works | Security property |
 | --- | --- | --- |
-| **Native: first release** | A Git credential helper and a launcher for each new `gh` process obtain scoped tokens. Commands use GitHub directly. | Container code can read and reuse the token. Client-managed handling keeps it out of URLs, arguments, persistent configuration, logs, and artifacts. |
-| **Mediated: follow-on** | A trusted proxy checks the originating container and current grant, then inserts the installation token into approved GitHub requests. | GitHub tokens stay external. Copying container-visible integration credentials elsewhere grants no GitHub or proxy access. |
+| **Native: Crawl baseline** | A Git credential helper and a launcher for each new `gh` process obtain scoped tokens. Commands use GitHub directly. | Container code can read and reuse the token. Client-managed handling keeps it out of URLs, arguments, persistent configuration, logs, and artifacts. |
+| **Mediated: optional in Crawl** | A trusted proxy checks the originating container and current grant, then inserts the installation token into approved GitHub requests. | GitHub tokens stay external. Copying container-visible integration credentials elsewhere grants no GitHub or proxy access. |
 
 Native mode proposes a narrow exception to [RFC 0027's credential boundary](0027-openclaw-enterprise.md#secret-access) for scoped GitHub installation tokens. App keys and other long-lived platform credentials remain outside execution.
 
-Mediated access requires origin authentication that the container cannot copy or impersonate. A reusable proxy bearer is insufficient. The `SandboxDriver` enforces the proxy route; unsupported operations fail without falling back to native access.
+For mediation, propose a trusted host connector that holds its SPIFFE mTLS key outside Agent execution and verifies a protected connection from the exact container. The runtime network boundary enforces routing. A copied token or container-readable key is insufficient proof of origin; unsupported operations fail without native fallback.
 
 ### Manage the lifecycle
 
@@ -75,11 +75,12 @@ Durable issuance and token records let cleanup survive workload deletion and ser
 
 ## Rationale
 
-GitHub Apps provide scoped service access. Native clients preserve familiar tools and avoid requiring a complete Git/API proxy for the first release, accepting bearer-token exposure inside the container.
+GitHub Apps provide scoped service access. Native clients preserve familiar tools without making GitHub proxy compatibility a prerequisite, accepting bearer-token exposure inside the container.
 
 Mediation adds protection against credential leaks, at the cost of trusted origin enforcement and separate Git/`gh` compatibility work. It assumes trusted host and proxy infrastructure; an attacker using the original authorized container as a relay is outside the copied-credential guarantee.
 
 ## Unresolved questions
 
-- Which trusted transport will bind mediated requests to an exact container, and which Git/`gh` operations will that mode support initially?
-- What revocation latency and outage behavior should operators be able to rely on?
+- Which local connection can the selected runtime securely bind to one container? The [proposed transport, command set, and timing targets](0034/lifecycle.md#crawl-scope-and-proposed-mediated-profile) narrow the implementation choices.
+- Should the first mediated profile preserve the selected `gh repo/issue/pr` commands, including GraphQL, or use a smaller REST workflow?
+- Should GitHub mediation be required for Crawl release or remain optional?
