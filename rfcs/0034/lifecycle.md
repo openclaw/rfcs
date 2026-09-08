@@ -1,119 +1,110 @@
-# GitHub access lifecycle and implementation detail
+# Credential Lifecycle: Recovery and Qualification
 
-Supporting detail for [Scoped GitHub App access for Enterprise Agents](../0034-github-app-credentials.md), updated September 8, 2026. The main RFC is the concise decision document. Shared lifecycle rules apply to both modes; the origin/proxy requirements below apply only to mediated mode. Native is the Crawl baseline and exposes a reusable scoped bearer. GitHub mediation is optional within Crawl, independently of the required model-credential proxy. These proposed contracts do not establish production integration or container binding.
+Implementation and review companion to [RFC 0034](../0034-github-app-credentials.md). Status: draft. The [broker specification](credential-broker-v1-spec.md) owns shared normative rules; the [GitHub specification](github-app-v1-spec.md) owns provider and client rules. This appendix maps those requirements to recovery, delivery milestones, and acceptance evidence. It does not report production qualification.
 
 ## Crawl scope and proposed mediated profile
 
-Crawl already requires external model-credential proxying and an external GitHub App token service. GitHub credential substitution is additional work that may ship in Crawl; it is not currently a dependency of native repository support. Reuse the identity, current-authorization and credential-lifecycle interfaces, while qualifying separate GitHub request handling. Model JSON/stream handling does not implement Git smart HTTP, REST or GraphQL.
-
-The proposed mediated command set preserves the selected normal-client workflow:
-
-| Surface | Initial target |
-| --- | --- |
-| HTTPS Git | Clone/fetch an approved repository and commit; push a prepared branch under a coding grant. |
-| GraphQL through `gh` | Repository view, bounded issue list/view, PR view, and explicit same-repository draft PR creation. |
-| REST through `gh api` | Selected repository/commit metadata and bounded issue/PR lists. |
-| Local Git | Status, diff, log, branch and commit operate on fetched objects; they are outside network mediation. |
-
-This is a proposed compatibility target, not a passing command matrix. The selected ordinary `gh` repository, issue and PR commands use GraphQL; the actual queries and mutations need permission and scope checks. A smaller REST-only adapter could expose managed issue/PR actions, but would not support those ordinary commands. [GitHub installation authentication](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation), [pinned gh repository query](https://github.com/cli/cli/blob/f96972ce1c11fdb8eaa556257fde962a363dffde/api/queries_repo.go)
-
-Client routing remains a concrete implementation choice: an explicit GitHub-compatible service endpoint, or managed TLS termination for the ordinary GitHub destinations. A plain CONNECT tunnel cannot substitute credentials inside encrypted requests. `GH_HOST` is a GitHub host setting, not a generic proxy base URL. Both choices require actual Git/gh routing, certificate and identity tests. Initially exclude SSH, LFS, submodules, extra hosts, implicit fork/push and unsupported API operations. [Git HTTP protocol](https://git-scm.com/docs/http-protocol), [HTTP CONNECT](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.6), [gh environment](https://cli.github.com/manual/gh_help_environment)
+The current proposal has native repository access as the Crawl baseline, with GitHub mediation optional and independently qualified. Model proxying remains separate. The production native-exception/mediation decision is open in the RFC. See [GitHub release selection](github-app-v1-spec.md#scope-and-proposed-release-selection) and the [mediated command profile](github-app-v1-spec.md#mediated-operation-profile).
 
 ## Authority and identity
 
-| Object | Meaning |
-| --- | --- |
-| Agent | Stable OCC resource and workload identity, potentially serving many conversations. |
-| AgentRevision | Immutable installation identity, repository IDs, exact permissions, and checkout intent. Current policy may narrow or revoke this grant. |
-| Workload incarnation | One concrete container execution, including Pod UID and an execution generation that changes on container restart. |
-| Credential lease | One original invocation or separate preparation identity, incarnation, purpose, repository/profile grant, deadline, and authorization generation. Preparation and runtime use separate leases. |
-| Original invocation | Exact original actor, attempt, grant, audience, purpose and deadline. A later turn cannot authorize an earlier process. |
-| GitHub installation token | Upstream bearer held by the credential service and also delivered into native execution. In mediated mode it stays external. GitHub expiry is independent of lease expiry. |
-
-Resolve installation bindings from authorized Namespace configuration. Snapshot the GitHub host, App, organization installation identity, repository IDs, and exact permission values. Binding edits, profile changes, and key rotation cannot silently retarget or expand an admitted revision. Validate repository identity again on rename or transfer. Deny missing repositories, wildcards, unknown profiles, and unsupported hosts.
-
-Start with one repository per token and separate tokens for independently revocable leases. Key caches by host/App/installation, Namespace, Agent, revision, incarnation, exact lease and original invocation (or separate preparation identity), purpose, repository, permissions, and generation. Never satisfy a narrow grant with a broader cached token. GitHub's required read-only metadata permission is the only implicit baseline.
-
-The coding profile is not inherently “draft PRs only”: `contents:write` also permits the [merge endpoint](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request). Use repository rules the App cannot bypass for branch/merge restrictions. These scope controls govern permitted operations; the separate transport binding prevents credential replay.
+The four lifetimes are the issuer service instance, original-invocation access lease, individual provider credential, and execution process. Their owners and closure semantics are defined in the [shared specification](credential-broker-v1-spec.md). Ending any one is not evidence that the others ended.
 
 ## What binds mediated access to the container
 
-In mediated mode, the workload may hold a lease handle or audience-bound identity token, but neither authenticates the request's physical origin. Kubernetes validates the referenced Pod and ServiceAccount; a copied bearer can still be presented elsewhere while that Pod remains live. See [ServiceAccount authentication](https://kubernetes.io/docs/concepts/security/service-accounts/).
-
-The proposed GitHub-mediated transport uses a trusted host connector with a SPIFFE mTLS key outside Agent execution. It obtains the connection's exact sandbox identity from a protected runtime mapping and performs the authenticated request itself. It does not export reusable signed proofs to the container. The broker checks the authenticated origin against the lease. The worker must be unable to extract the key, forge the mapping, select another sandbox's identity, or reach an alternate credential endpoint. A shared host identity, same-Pod sidecar, or self-reported container ID is insufficient by itself.
-
-A sandbox-local model relay holding its own SVID key does not establish this stronger property: the SPIFFE Workload API delivers private key material to its authorized consumer. The host connector must instead keep that key outside execution and authenticate the final local hop. Select an exclusive local channel only after proving its mapping to the actual execution instance, including same-Pod restarts, replacement, cross-Agent denial and original-turn binding. Neither a socket path nor a host identity proves that mapping by itself. [SPIFFE Workload API](https://spiffe.io/docs/latest/spiffe-specs/spiffe_workload_api/)
-
-The required guarantee is protection against copying container-visible credentials to an external host or another container. It assumes trusted host/control-plane/broker infrastructure and intact sandbox isolation; continued use of the original authorized container as a relay is a different attack from credential replay.
-
-The broker authorizes the canonical host, repository, method, and supported operation before selecting an upstream token. Construct destinations from trusted enrollment data; strip caller authorization, cookies, and proxy headers. Reject redirects, ambiguous paths, host/target disagreement, and unsupported body semantics. Never return upstream tokens in APIs, errors, logs, or response headers. No workload-reachable raw-token route or arbitrary CONNECT fallback is allowed.
-
-The proposed initial set includes HTTPS Git, selected REST routes and the GraphQL operations needed by the named gh commands. GraphQL requires reviewed operations or semantic validation; an endpoint allowlist cannot restrict its repository selection. LFS, submodules, uploads, and other origins remain unsupported until separately tested. Client proxy settings provide compatibility; enforced routing and independently verified workload origin provide the security boundary.
+The [origin and routing contract](github-app-v1-spec.md#mediated-origin-and-routing) requires a protected host-to-execution mapping and original-invocation correspondence. It explicitly excludes relying on a copied bearer, a container-readable key, or a claimed turn ID. The transport choice remains a qualification dependency.
 
 ## Minting, refresh, and revocation
 
-The credential service calls `POST /app/installations/{id}/access_tokens` with explicit repository and permission fields, using an App JWT signed outside workloads. GitHub limits App JWT expiry to no more than ten minutes into the future; installation tokens expire after one hour, with no custom TTL in the documented mint API. Validate returned permissions and expiry; unexpected scope fails closed and enters cleanup. Treat tokens as opaque, variable-length strings. See [JWT authentication](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app) and [installation-token creation](https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app).
+Use the [durable issuance protocol](credential-broker-v1-spec.md#durable-issuance-and-dispatch) and [GitHub renewal policy](github-app-v1-spec.md#refresh-and-overlap). Replacement creates another tracked token. Local closure prevents new authorized use; provider revoke or evidenced expiry determines when an escaped native token stops working.
 
-Every issuance, refresh, and mediated proxy operation requires the current lease generation and current authorization for its exact original actor, attempt, common Agent/repository grant, audience, purpose and deadline. An A-owned process never adopts B authority. Preparation uses its separate lifecycle authority rather than a fabricated conversation turn. A cached token does not override these service checks. Fencing closes further service access; in native mode it cannot invalidate bearer bytes already delivered. Later authorization creates a fresh lease rather than reopening the old attempt.
+## Recovery cases
 
-Refresh creates another token. Track all outstanding tokens, limit overlap, and revoke superseded tokens when no longer needed. Serialize minting per lease and recheck its generation after mint completes, before using the result. If cancellation won the race, retain the returned token only for revocation.
-
-Use `DELETE /installation/token` authenticated with each token to revoke it; `204` confirms success. Consequently, crash recovery needs protected token material until revocation or expiry. Store secret values in the selected protected backend, with opaque references, ownership, expiry, and cleanup state in ordinary OCC records. Hashes alone cannot perform this revocation. See [GitHub's revoke endpoint](https://docs.github.com/en/rest/apps/installations#revoke-an-installation-access-token).
-
-Persist an issuance intent before sending the mint request, including original authority, installation, exact scope and operation. Store known token material and actual provider expiry durably before delivery/use. If the response or persistence outcome is lost, retain an `issuance-unknown` record with `expiry-unproven`; do not deliver, automatically remint or discard it after a guessed deadline. Client timeout plus one hour does not prove actual mint time or expiry. Keep the affected issuance scope blocked until provider-derived expiry, an evidenced mint-time bound, definitive no-issuance evidence or verified operator revocation resolves it. A future expiry is not terminal until it has elapsed. Unknown tokens may lack recoverable bytes for individual revocation. Retry known-token cleanup until confirmed or evidenced expiry; network failures are not success.
-
-Operators own App enrollment, key rotation, and installation-wide suspension/uninstall. Key removal, local cache deletion, and container teardown do not establish that previously issued tokens were revoked.
-
-## Timing targets and outages
-
-Use three separate measurements. These are implementation and qualification targets, not measured service guarantees:
-
-| Measurement | Target and outcome |
+| Event | Required recovery and truthful result |
 | --- | --- |
-| Local access denial | Within 60 seconds of accepting an authenticated disable request. Record durable commit separately; once committed it grants no grace period for further authorized work. |
-| Workload termination | Require observed termination of affected writers before replacement. Report it independently; local denial does not prove a process has stopped. |
-| GitHub revocation | Observe the initial cleanup episode for up to 120 seconds. Report confirmed revocation, evidenced expiry or pending/unknown; timeout is not success. |
+| Broker fails before a committed provider claim | Reconcile the original reservation and claim. Dispatch only when authoritative evidence proves no earlier attempt could have crossed the boundary. |
+| Mint response is lost or a timeout follows possible dispatch | Keep the original attempt `unknown`, with expiry unproven unless evidence establishes it. Do not remint under a fresh request/lease to evade the hold. |
+| Provider succeeds but custody/inventory acknowledgement is lost | Read back the exact protected operation. No delivery while persistence is uncertain; retain available material for cleanup. A missing read result alone does not authorize minting again. |
+| Cancellation/rotation occurs during issuance | Close old authority. Record late results against their original binding and revoke them; never attach them to the successor. |
+| Refresh fails | An eligible recorded token may still be used under fresh original authority until expiry. Unknown minting or exhausted overlap blocks further issuance as required by the profile. |
+| Delivery response is lost | Track possible exposure; reconcile the same delivery record. Do not report that the workload received nothing or discard the token's cleanup obligation. |
+| Issuer process restarts | Reconstruct state from durable records, obtain fresh service authority, and resume exact cleanup/readback. Do not revive cached allow decisions. |
+| User access is revoked or Agent/Namespace is deleted | Deny new access; retain tombstones and protected cleanup references. Independent platform cleanup authority continues after user/resource removal. |
+| Revocation times out or a worker claim expires | Record pending/unknown state and reconcile that attempt. Worker timeout is neither provider failure nor provider success. |
+| Protected token material is unavailable | Report action-required; recover custody or perform separately authorized broader mitigation. Do not claim a hash can revoke the token. |
 
-Record request receipt, authenticated acceptance, durable commit, and each boundary's last allowed and first denied request separately. Report request-to-denial and commit-to-denial durations. A failed or unknown commit is not a successful sample.
-
-If current authorization or assignment cannot be established, deny new issuance and mediated operations; do not reuse an old permission decision. Cancel affected mediated requests on authority loss. Native token copies remain governed by actual GitHub revocation or expiry.
-
-During GitHub outages or throttling, retain protected cleanup records and retry with bounded backoff, respecting `Retry-After` and rate-limit reset responses. The interactive observation window may end while durable cleanup continues. Do not release unknown-mint records on a guessed expiry or automatically replay an ambiguous push/PR creation. [GitHub rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately)
+Apply the [GitHub issuance hold](github-app-v1-spec.md#refresh-and-overlap) across replacement leases and broker restarts. A recovered connection or a new local request ID does not resolve an uncertain provider attempt.
 
 ## Lifecycle
 
-| Event | Required behavior |
+| Event | Coordination |
 | --- | --- |
-| Admit | Authorize the Agent and each installation/repository binding; snapshot the grant. Admission or gateway readiness alone does not mint tokens. |
-| Prepare candidate | Verify containment; create a separate preparation incarnation with a bounded read-only lease. The candidate Harness remains inactive. |
-| Finish/cancel preparation | Fence its lease, stop preparation, and revoke its tokens. Failure leaves the previous active revision intact. |
-| Activate | Serialize activation; fence old runtime leases, stop and confirm old Harness termination, then activate the candidate and enable its route when ready. |
-| End/start conversation turns | Close the ended attempt's issuance/forward authority even if the container remains active. Each new attempt receives fresh authorization; old processes cannot inherit it. Track native token copies until actual revoke/expiry. |
-| Restart or replace container | Fence the old incarnation and revoke its tokens. Admit a fresh incarnation and lease; never inherit old authority through a reused Pod or volume. |
-| Expire lease or deny renewal | Fence terminally, deny forwards, and queue all associated tokens for revocation. OCC reconciles or stops the workload. |
-| Stop/delete Agent, retire revision, or remove access | Fence affected leases immediately; stop affected routing/workloads independently of upstream cleanup. Rollback uses fresh authorization and leases. |
-| Installation or permission changes | Reconcile verified provider changes with current OCC policy and fence affected grants. A revision snapshot cannot override revocation. |
-
-Compute cleanup and credential cleanup retry independently. Preserve a cleanup tombstone after workload deletion. Report “workload stopped; upstream revocation pending until recorded expiry” when appropriate. Fencing prevents new proxy operations; it cannot undo requests already accepted by GitHub.
+| Admit and verify enrollment | OCC authorizes exact references; issuer verifies provider identity/scope; readiness alone does not mint. |
+| Prepare candidate | Compute provides execution and staging; SandboxDriver verifies containment; OCC gates checkout on their observations and a separate read-only preparation lease. |
+| Finish/cancel preparation | Close preparation access, observe preparation stopped, and retain cleanup. Failure leaves the serving workspace intact. |
+| Activate or replace | Close old runtime authority, observe previous writers stopped, and promote verified staging through Compute's handoff. Candidate requests use fresh execution and invocation bindings. |
+| End/start turns in a persistent container | Close the ended invocation. Prove old execution cannot use a successor's protected channel; a mutable current-turn pointer is insufficient. |
+| Restart within a Pod | Change the execution generation, close old leases, and reestablish origin. Reusing a Pod UID or volume does not preserve authority. |
+| Disable/retire/delete | Stop new access and affected execution independently of provider cleanup. Keep outstanding records until terminal evidence. |
 
 ## Repository preparation
 
-Preparation is an OCC-owned provisioning operation for an admitted candidate, with its own identity and read-only grant. It does not activate that candidate or borrow the previous revision's runtime lease. This extends RFC 0027's candidate preparation sequence without introducing another user-facing execution resource.
+The [GitHub preparation contract](github-app-v1-spec.md#repository-preparation) owns checkout constraints. The runtime implementation must document its concrete preparation workload, staging/promotion mechanism, cancellation behavior, previous-writer proof, and rollback behavior. No generic “prepared” flag substitutes for those observations.
 
-Use a separate contained preparation Job. `ComputeDriver` supplies its exact incarnation and candidate-owned staging volume; the selected runtime's containment boundary is verified before checkout. Native preparation receives an inventoried read-only ephemeral token; mediated preparation uses enforced broker routing and origin binding without receiving a GitHub token.
+## Timing targets and outages
 
-Clone/fetch the admitted repository and resolved commit into an empty staging directory. Preserve the active workspace and uncommitted user work. Persistent-volume handoff must be explicit; a backend without safe staging/promotion cannot claim rollout support. Run no repository hooks, setup scripts, submodules, or LFS during preparation.
+These are proposed qualification targets, not measured guarantees:
 
-Use fixed Git configuration, argument arrays, canonical HTTPS remotes, validated destination paths, and no inherited credential helpers. Reject traversal, symlink escapes, and redirects. Verify the resulting commit and repository identity, stop preparation, and fence its lease before starting the Harness. No integration-supplied credentials are written into the checkout; repository code and instructions remain untrusted input.
+| Measurement | Target and interpretation |
+| --- | --- |
+| Local access denial | Within 60 seconds of accepting an authenticated disable request. Record durable closure and last admitted operation separately; closure permits no new operation-permit consumption. Earlier admitted in-flight requests may finish. |
+| Workload termination | Observe affected writers stopped before replacement. A timeout reports unresolved termination and blocks unsafe promotion. |
+| Upstream cleanup | Observe the initial cleanup episode for up to 120 seconds, then report confirmed revoke, evidenced expiry, pending/unknown, or action-required. The observation window does not terminate durable cleanup. |
+
+Record authenticated request acceptance, durable state commit, operation admission, provider dispatch, last success, first denial, and observed process termination with clock uncertainty. Report request-to-denial separately from commit-to-denial. A lost or failed commit is not a successful sample.
+
+Unknown current authorization, assignment, inventory commit, or invalidation-channel state denies new effects. Cancel affected mediated requests on authority loss; report already accepted provider operations honestly. Native copies remain usable until actual provider revoke/expiry even when OCE is unavailable.
+
+Rate limiting and outages preserve cleanup obligations and use bounded backoff where the provider profile permits retry. Respect `Retry-After` and reset responses. Do not replay an ambiguous business write or treat a recovered network connection as permission to remint. [GitHub rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately)
+
+## Implementation sequence
+
+| Milestone | Deliverable and exit evidence |
+| --- | --- |
+| A. Authority and composition | Map existing OCC/IAM, invocation, runtime, SecretBroker and protected-storage owners to the new ports. Demonstrate real current decisions and protected original-invocation correspondence; record unsupported runtime/profile combinations. |
+| B. Durable broker | Implement reservations, claimed attempts, protected custody, delivery gates, closure, and deletion-safe cleanup. Exercise failures at every commit/provider/delivery boundary across replicas and restart. |
+| C. GitHub issuer | Verify enrollment, explicit scope, returned scope/expiry, replacement overlap and individual revoke against a disposable App installation. |
+| D. Preparation and execution | Qualify staging, containment, commit verification, old-writer termination, restart generations, and safe activation/rollback. |
+| E. Access modes | Qualify pinned native helpers/children under the approved exposure policy. Separately qualify mediated origin binding, TLS/routing, and the exact Git/REST/GraphQL request manifests. |
+| F. Operator release | Select permitted production mode; qualify the complete production composition against live GitHub; demonstrate denial/cleanup targets and outage reporting; supply enrollment/rotation/disable/recovery guidance and exact artifact-linked evidence. |
+
+API definitions and synthetic fixtures can be developed before their dependencies are deployed. They cannot satisfy the later authority, provider, or runtime gates. Native and mediated modes may share milestones A–D, but each needs its own E/F evidence. The production mode decision determines which delivery milestone is required for release.
+
+## Acceptance matrix
+
+C1–C4 and O1 cover shared behavior; substitute the selected provider's supported expiry/cleanup semantics. G1 is GitHub provider evidence, G2 is native-client evidence, R1 applies to repository preparation, and M1–M3 apply only to mediation. E1 is required for every mode proposed for production; separately passing layers do not replace that combined proof.
+
+| ID | Scope | Required evidence and outcome |
+| --- | --- | --- |
+| C1 | Authority | Forged/cross-Namespace references, stale revision/incarnation, closed leases, wrong original invocation and unavailable policy all deny. The legitimate current invocation succeeds as a positive control. |
+| C2 | Issuance | Concurrent/repeated requests and crash injection establish one original claimed attempt. Lost provider/commit acknowledgements reconcile without untracked remint or premature delivery. For GitHub, profile/permission edits, rotation, rebinding, and replacement leases cannot bypass an unresolved provider-target hold. |
+| C3 | Renewal | A session crosses provider credential expiry (one hour for GitHub); successors retain original authority, predecessors remain inventoried, overlap is bounded, and ended turns cannot renew through later turns. |
+| C4 | Cleanup | Cancel during mint/delivery; verify successful and failed key rotation plus new-generation admission; revoke user access, delete resources, lose a cleanup claim, and restart the broker. Every known/uncertain token remains accounted for; local closure and provider outcome stay separate. |
+| G1 | Live provider | Disposable private repositories: selected reads succeed, outside-grant repositories and disallowed writes fail, actual returned scope matches, and revoke-then-deny is observed. Coding also verifies branch/merge rules with no App bypass. |
+| G2 | Pinned native clients | Actual Git 2.55.0 and gh 2.93.0 processes against controlled endpoints with synthetic ephemeral tokens: helper/per-child delivery, denied/expired outcomes, refresh overlap, original-attempt retention, and no automatic replay of ambiguous writes. |
+| R1 | Preparation/runtime | Safe checkout before Harness startup, commit verification, preserved user work, cancellation, same-Pod restart, replacement, previous-writer termination, and deletion. Tie all evidence to pinned runtime/image artifacts. |
+| M1 | Copy resistance | While A is live and succeeds, replay every integration-issued container-visible credential from an external host and B, including B on A's host/Pod where supported. GitHub and broker deny the copies. An old A invocation cannot borrow its successor's channel. |
+| M2 | Boundary enforcement | Demonstrate no upstream credential reaches execution, no raw-token endpoint or direct/tunnel fallback works, and forged origin/turn assertions fail. Verify key custody and the runtime-owned local mapping. |
+| M3 | Protocol scope | Real pinned clients exercise approved Git/REST/GraphQL requests. Redirects, ambiguous targets, cross-repository node IDs, extra GraphQL operations, malformed framing and unlisted operations deny. |
+| O1 | Operations | Measured local-denial and separate termination/cleanup outcomes; lost authority, provider throttling, unavailable custody/storage, restart, and operator recovery remain truthful and fail closed. Authorized management can discover unresolved tombstoned obligations after deletion/restart and identify the evidence/action needed to resolve them. |
+| E1 | Complete supported mode | Using one pinned implementation/configuration/runtime/client manifest and a disposable live App/repository, enroll and admit an Agent through the actual authority, broker, issuer and inventory. Prepare/activate, run the selected Git/gh reads and coding workflow, cross a token-replacement boundary under the original invocation, close/stop, and observe subsequent denial with separate provider cleanup. Restart and recover an outstanding obligation. Repeat for each proposed production mode. |
+
+Each evidence bundle records implementation commit, configuration/profile version, tool and image pins, fixture or real-provider environment, command/request manifest, positive/negative outcomes, and unresolved results. Publish only redacted evidence with synthetic identifiers; retain secrets and private infrastructure details outside the RFC repository.
 
 ## Acceptance evidence and current implementation limits
 
-1. **Provider behavior:** with a configured test App and disposable repositories, verify selected reads, denied unselected repositories/writes, refresh, and revoke-then-deny. Coding grants also require verified branch/merge rules. Simulated transport tests do not establish live GitHub behavior.
-2. **Mediated copy resistance:** while workload A remains live, capture every integration-issued container-visible credential and replay it from an external host and container B, including B on A's host or in its Pod where supported. Require denial by GitHub and the broker while A's authorized request succeeds. Include copied ServiceAccount tokens, handles, and any client keys.
-3. **Mediated boundary enforcement:** prove no upstream token reaches the workload, direct routes and tunnel fallbacks fail, alternate broker endpoints cannot return tokens, and forged identities, redirects, and ambiguous requests cannot escape the grant.
-4. **Lifecycle:** verify preparation before Harness startup, safe workspace handoff, cancellation during mint/request execution, restart within a Pod, replacement, and deletion. Expire a lease while its container remains alive; require denied forwards, queued cleanup, and no reuse of the expired generation.
-5. **Recovery:** restart the broker with outstanding tokens; recover cleanup, revoke refresh-overlap tokens, and distinguish unavailable GitHub cleanup from successful local fencing.
+This RFC submission runs documentation checks only. It claims no native-client, provider, recovery, or selected-runtime qualification. Future implementation submissions must identify their actual code, configuration, and mode, and publish appropriate redacted evidence for the applicable rows. Existing issuer caches, helpers, or component results may be reused only where their behavior matches this contract; they do not establish the shared lifecycle or mediated origin guarantee by themselves.
 
-As of September 8, the inactive native client contribution implements helper/per-new-child delivery mechanics, explicit command/permission plans including `issues:read`, and immutable original-attempt handling. Its dependency-injected delivery port does not provide production authority or an issuer. The retained component run records 16 passed, zero failed and 15 native skips; all selected Git 2.55.0 / gh 2.93.0 cases remain unrun. The current harness needs an import guard, request-attempt accounting, setup cancellation/partial cleanup, overlapping-child and in-flight-expiry coverage, and documentation/formatting corrections.
+## Upstream decision and implementation handoff
 
-Native acceptance still requires actual authority, protected inventory/revocation, private outside-grant negatives, upstream branch controls, preparation and selected-runtime evidence. The credential-facing preparation boundary is defined; concrete Job applicability, genuine producers and runtime qualification remain incomplete. Mediated acceptance adds items 2–3 above. Neither source presence nor a component test pass establishes a supported production mode. Native credential readability and fetched history remain explicit residual exposure.
+Reviewers can approve the platform boundary and GitHub profile independently of claiming a production implementation. Record the native-exception/required-mediation decision and any remaining transport/command-profile decisions explicitly. Follow the RFC repository's discussion and acceptance process; after acceptance, create the implementation issue and attach milestone/evidence ownership there. Keep draft status until the maintainers accept the proposal.
