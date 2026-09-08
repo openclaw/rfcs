@@ -69,10 +69,26 @@ Git pushes and PR/API writes must target approved, non-public repositories. Publ
 
 ### Require mediation in production
 
-| Mode | Behavior and protection |
-| --- | --- |
-| Mediated — production | A trusted host connector authenticates execution and original work. The proxy inserts GitHub credentials outside the container. Copied container-visible credentials alone cannot authorize access. |
-| Native — development/testing only | A Git helper and each new `gh` child receive scoped tokens. Escaped tokens remain reusable until revoked or expired. |
+```mermaid
+flowchart LR
+    AGENT["Agent execution<br/>Git / gh<br/>Persistent processes"]
+
+    subgraph TRUSTED["Outside Agent execution"]
+        CONNECTOR["Trusted host connector<br/>Establish execution<br/>and original-work identity"]
+        PROXY["Broker + GitHub mediator<br/>Check current authority<br/>Validate operation<br/>Insert token"]
+
+        CONNECTOR --> PROXY
+    end
+
+    GITHUB["GitHub<br/>Enforce token permissions<br/>and repository rules"]
+
+    AGENT -->|"Request without a GitHub token"| CONNECTOR
+    PROXY -->|"Authorized request + scoped token"| GITHUB
+```
+
+Proposed request path: GitHub tokens stay outside Agent execution. SandboxDriver must enforce this route and prevent bypass; client proxy settings alone are insufficient. [Origin and routing](0034/github-app-v1-spec.md#mediated-origin-and-routing)
+
+Native delivery remains development/testing only: a Git helper and each new `gh` child receive scoped tokens. Escaped tokens remain reusable until revoked or expired.
 
 The initial profile targets clone/fetch, prepared-branch push, repository/issue/PR views, and explicit draft PR creation. Each supported command variant requires qualification. The model-credential proxy does not implement GitHub mediation; unsupported operations deny without native fallback.
 
