@@ -13,52 +13,61 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/68
 
 ## Summary
 
-Use an external credential service to give Enterprise Agents repository-scoped GitHub App access. Ship native Git/`gh` first, with short-lived installation tokens delivered into the container. Add a separately qualified mediated mode that inserts credentials at the trusted proxy, keeping them outside Agent execution. **The mediated guarantee is that copying all integration-issued container-visible credentials elsewhere grants no GitHub or broker access. Native mode does not provide that guarantee.**
+Give Enterprise Agents access to approved repositories through an organization-managed GitHub App. An external credential service issues scoped tokens for ordinary Git and `gh` commands. The first release delivers tokens into the container; a later mediated mode keeps them in a trusted proxy and binds access to the originating container.
 
 ## Motivation
 
-The key risk is a leaked token being used by an external attacker. Scope limits what a stolen token can do; it does not bind the token to its container. GitHub installation tokens are bearer credentials with a one-hour lifetime. A shorter local lease does not shorten their upstream validity. [GitHub token contract](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
+Agents need to check out repositories, push changes, and work with issues and pull requests. Operators choose the repositories, permissions, and duration of access. A shared Agent should use organization-managed access rather than a participant's personal credential.
+
+The main security concern is a leaked token being used by an external attacker. Scope limits the damage but does not prevent reuse. GitHub installation tokens expire after one hour; ending a local session does not revoke them. [GitHub token contract](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 
 ## Goals
 
-Support ordinary repository workflows, explicit least-privilege grants, recoverable credential cleanup, and a stronger mode that prevents off-container credential replay.
+- Support normal Git and `gh` workflows within an explicit repository grant.
+- Keep App keys outside Agent execution and centralize issuance and revocation.
+- Offer mediated access where copied container-visible integration credentials confer no access elsewhere.
 
 ## Non-Goals
 
-Preventing permitted Agent operations, hiding fetched repository history, impersonating a GitHub user, or supporting every host/protocol/CLI command.
+- Preventing an Agent from exercising its permitted operations or exposing repository data it can read.
+- Hiding fetched Git history or supporting every GitHub host, protocol, and CLI command.
 
 ## Proposal
 
-### Authority and ownership
+### Grant repository access
 
-Operators enroll an organization installation. OpenClaw Controller (OCC) admits an immutable `AgentRevision` containing the installation binding, repository IDs, permission profile, access mode and checkout intent. Tools and repository content cannot expand that grant or downgrade the mode.
+An operator makes an enrolled GitHub App installation available to a Namespace. OpenClaw Controller (OCC) authorizes its use and records the installation, repository IDs, permissions, access mode, and checkout commit in the immutable `AgentRevision`.
 
-The credential service owns App keys, minting, refresh and revocation. OCC owns authorization and lifecycle; `ComputeDriver` owns preparation, containers and termination; `SandboxDriver` owns containment and trusted origin enforcement. Long-lived platform credentials remain outside Agent execution.
+The credential service holds the App key and owns issuance, refresh, and revocation. Every token request specifies repository IDs and permissions. Read-only checkout needs `contents:read`; issue and PR views add `issues:read` and `pull_requests:read`. Coding grants use `contents:write`, `issues:read`, and `pull_requests:write`, with required read-only metadata. Workflow, administration, and secrets permissions are excluded. GitHub repository rules must enforce any branch or merge restrictions.
 
-Always supply explicit, nonempty repository IDs and permissions. Read-only checkout uses `contents:read`; collaboration adds `issues:read` and `pull_requests:read`; approved coding uses `contents:write`, `issues:read` and `pull_requests:write`. Retain required read-only metadata; exclude workflow, administration and secrets permissions. These are shared Agent grants, not a participant's personal GitHub authority. Branch/merge restrictions must be enforced upstream; a wrapper is not an authorization boundary.
+### Use Git and gh
 
-### Delivery modes
+Each revision selects an access mode. The Agent cannot change it or expand its grant.
 
-| Mode | Contract |
-| --- | --- |
-| **Native — first release** | A Git credential helper and per-new-child `gh` launcher obtain scoped tokens. Client-managed handling avoids tokens in arguments, URLs, persistent configuration, logs and artifacts. Runtime code can still read and copy them. Direct GitHub access is intentional. |
-| **Mediated — follow-on** | Trusted host egress authenticates the exact container incarnation to an application-aware proxy. The proxy validates current authority, destination, repository and operation, strips caller authentication and inserts the upstream token. Direct/token-return routes and unsupported fallbacks are denied. |
+| Mode | How it works | Security property |
+| --- | --- | --- |
+| **Native: first release** | A Git credential helper and a launcher for each new `gh` process obtain scoped tokens. Commands use GitHub directly. | Container code can read and reuse the token. Client-managed handling keeps it out of URLs, arguments, persistent configuration, logs, and artifacts. |
+| **Mediated: follow-on** | A trusted proxy checks the originating container and current grant, then inserts the installation token into approved GitHub requests. | GitHub tokens stay external. Copying container-visible integration credentials elsewhere grants no GitHub or proxy access. |
 
-Mediated origin authentication must depend on infrastructure the container cannot copy or impersonate. A reusable broker bearer, container-readable private key, or self-reported container ID is insufficient. The selected gVisor/SPIRE integration still needs proof of this property. HTTPS credential substitution requires application-level handling; an opaque CONNECT tunnel cannot do it.
+Native mode proposes a narrow exception to [RFC 0027's credential boundary](0027-openclaw-enterprise.md#secret-access) for scoped GitHub installation tokens. App keys and other long-lived platform credentials remain outside execution.
 
-### Lifecycle
+Mediated access requires origin authentication that the container cannot copy or impersonate. A reusable proxy bearer is insufficient. The `SandboxDriver` enforces the proxy route; unsupported operations fail without falling back to native access.
 
-1. **Prepare:** authorize a separate, contained, read-only preparation workload for the candidate revision and exact commit. It cannot borrow a serving turn's authority. Verify checkout and storage handoff before Harness startup; failure preserves the serving revision.
-2. **Execute:** bind each managed invocation to its original actor, attempt, grant, purpose, incarnation and deadline. Every acquisition/refresh, and every mediated forward, rechecks that authority. A container may outlive a turn; an old process cannot borrow a newer turn's authority. Native tokens already delivered remain reusable until revoked or expired.
-3. **Mint and refresh:** persist issuance intent before contacting GitHub, then protected token material and provider expiry before delivery/use. Track every token, including refresh overlap. Lost mint responses remain unresolved; do not automatically remint or infer expiry from a client timeout. Preserve original-attempt attribution and never blindly replay a push or PR creation after an ambiguous result.
-4. **Stop or revoke:** turn completion, replacement, disable or grant narrowing closes affected authority. Deny new issuance/forwards, stop affected execution, and revoke every outstanding affected token independently of compute cleanup. Preserve cleanup records across restarts/deletion. Report local denial, confirmed provider revocation, evidenced expiry and unknown outcomes separately. Already accepted GitHub requests may finish. [GitHub revocation](https://docs.github.com/en/rest/apps/installations#revoke-an-installation-access-token)
+### Manage the lifecycle
+
+1. **Prepare.** OCC authorizes a separate read-only checkout for the candidate revision. `ComputeDriver` verifies the checkout and storage handoff before starting the Harness. Preparation failure preserves the serving revision.
+2. **Run and refresh.** The service checks current authority before supplying a token; the mediated proxy checks every request. Managed client requests retain their original invocation. An ended turn cannot renew its access under a later turn's authority, even if the container survives.
+3. **Stop.** Turn completion, container replacement, or grant withdrawal closes the affected authorization. Compute stops the affected execution; the credential service revokes all associated tokens, including those replaced during refresh. Already accepted GitHub requests may finish.
+
+Durable issuance and token records let cleanup survive workload deletion and service restarts. Local denial and confirmed GitHub revocation are separate outcomes; copied native tokens may remain usable while revocation is pending. [Detailed lifecycle and recovery rules](0034/lifecycle.md)
 
 ## Rationale
 
-Native mode provides compatibility sooner with explicit bearer-token exposure. Mediation adds leak resistance and requires its own transport and client qualification; it must never silently fall back to native. Its acceptance must demonstrate that an authorized container succeeds while copies of its integration credentials fail from an external host and another container. This assumes trusted host/control-plane/broker infrastructure; use of the original container as a relay is a separate risk.
+GitHub Apps provide scoped service access. Native clients preserve familiar tools and avoid requiring a complete Git/API proxy for the first release, accepting bearer-token exposure inside the container.
+
+Mediation adds protection against credential leaks, at the cost of trusted origin enforcement and separate Git/`gh` compatibility work. It assumes trusted host and proxy infrastructure; an attacker using the original authorized container as a relay is outside the copied-credential guarantee.
 
 ## Unresolved questions
 
-**Implementation status, September 8:** inactive helper/launcher mechanics preserve original attempts and have 16 passing component tests. All 15 selected Git 2.55.0 / `gh` 2.93.0 cases remain unrun; their harness requires corrections. Production authority, durable inventory/revocation, preparation and selected-runtime integration remain incomplete.
-
-Release evidence must establish actual client compatibility, private-repository scope denials, upstream branch controls and lifecycle recovery. Mediated mode additionally needs proven origin binding and its supported Git/API surface. [Supporting lifecycle and acceptance detail](0034/lifecycle.md)
+- Which trusted transport will bind mediated requests to an exact container, and which Git/`gh` operations will that mode support initially?
+- What revocation latency and outage behavior should operators be able to rely on?
