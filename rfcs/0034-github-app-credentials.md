@@ -38,7 +38,19 @@ The main security concern is a leaked token being used by an external attacker. 
 
 An operator makes an enrolled GitHub App installation available to a Namespace. OpenClaw Controller (OCC) authorizes its use and records the installation, repository IDs, permissions, access mode, and checkout commit in the immutable `AgentRevision`.
 
-The credential service holds the App key and owns issuance, refresh, and revocation. Every token request specifies repository IDs and permissions. Read-only checkout needs `contents:read`; issue and PR views add `issues:read` and `pull_requests:read`. Coding grants use `contents:write`, `issues:read`, and `pull_requests:write`, with required read-only metadata. Workflow, administration, and secrets permissions are excluded. GitHub repository rules must enforce any branch or merge restrictions.
+- **Ownership:** the credential service holds the App key and issues, refreshes, and revokes tokens.
+- **Scope:** every token request specifies repository IDs and one of these permission profiles:
+
+| Profile | Permissions |
+| --- | --- |
+| Read-only checkout | `contents:read` |
+| Issue and PR views | `contents:read`, `issues:read`, `pull_requests:read` |
+| Coding | `contents:write`, `issues:read`, `pull_requests:write` |
+
+All profiles include the required `metadata:read` permission.
+
+- Workflow, administration, and secrets permissions are excluded.
+- GitHub repository rules must enforce any branch or merge restrictions.
 
 ### Use Git and gh
 
