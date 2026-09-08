@@ -68,7 +68,7 @@ Mediated access requires origin authentication that the container cannot copy or
 ### Manage the lifecycle
 
 1. **Prepare.** OCC authorizes a separate read-only checkout for the candidate revision. `ComputeDriver` verifies the checkout and storage handoff before starting the Harness. Preparation failure preserves the serving revision.
-2. **Run and refresh.** The service checks current authority before supplying a token; the mediated proxy checks every request. Managed client requests retain their original invocation. An ended turn cannot renew its access under a later turn's authority, even if the container survives.
+2. **Run and refresh.** Token expiry does not end a session. The service supplies replacement tokens as needed while the original invocation remains authorized; the mediated proxy checks every request. An ended turn cannot renew under a later turn's authority. Running commands may fail on expiry; ambiguous writes are not automatically replayed.
 3. **Stop.** Turn completion, container replacement, or grant withdrawal closes the affected authorization. Compute stops the affected execution; the credential service revokes all associated tokens, including those replaced during refresh. Already accepted GitHub requests may finish.
 
 Durable issuance and token records let cleanup survive workload deletion and service restarts. Local denial and confirmed GitHub revocation are separate outcomes; copied native tokens may remain usable while revocation is pending. [Detailed lifecycle and recovery rules](0034/lifecycle.md)
