@@ -25,13 +25,14 @@ An external attacker can reuse a leaked token. Narrow scope limits the damage. G
 
 - Define ownership of credential authorization, protected custody, and durable cleanup.
 - Support ordinary Git and `gh` workflows within an explicit repository grant.
+- Prevent Agents from publishing private workspace content to public GitHub repositories.
 - Provide mediated access where copying container-visible integration credentials grants no access elsewhere.
 
 ## Non-Goals
 
 - Introducing another IAM system or a user-facing resource for every token.
 - Migrating all existing credentials, supporting every provider/protocol, or hiding fetched repository history.
-- Preventing an Agent from exercising permitted operations or exposing data it can read.
+- Preventing disclosure through every output channel; public GitHub writes are explicitly in scope.
 
 ## Proposal
 
@@ -54,6 +55,8 @@ The [broker specification](0034/credential-broker-v1-spec.md) defines the shared
 
 An operator enrolls a GitHub App installation through a Namespace's broker. OCC admits its repository grant, permission profile, mode, and checkout commit into an immutable revision. The signing key stays outside Agent execution.
 
+OCC records a session's selection from those grants; current Agent authority and invocation restrictions may only narrow it. Each repository has a separate invocation lease and token. Changes to two independent repositories produce two PRs. [Session scope](0034/github-app-v1-spec.md#session-scope-and-multiple-repositories)
+
 | Profile | GitHub permissions |
 | --- | --- |
 | Read-only checkout | `contents:read` |
@@ -61,6 +64,8 @@ An operator enrolls a GitHub App installation through a Namespace's broker. OCC 
 | Coding | `contents:write`, `issues:read`, `pull_requests:write` |
 
 All include required `metadata:read`. Every mint specifies the repository and permissions. Workflow, administration, and secrets permissions are excluded; repository rules must enforce branch and merge restrictions. The [GitHub specification](0034/github-app-v1-spec.md) defines enrollment, clients, and provider behavior.
+
+Writes must target approved, non-public repositories, including Git pushes and PR/API mutations. Public or unverified destinations deny. Native scope checks provide partial protection; the [publication policy](0034/github-app-v1-spec.md#preventing-public-publication) requires enforced mediation and visibility controls for the full guarantee.
 
 ### Select an access mode
 
