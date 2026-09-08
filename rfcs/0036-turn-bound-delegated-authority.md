@@ -6,7 +6,7 @@ created: 2026-09-08
 last_updated: 2026-09-08
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/70
 ---
 
 # Proposal: Turn-bound delegated authority for Enterprise Agents
