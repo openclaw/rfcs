@@ -3,7 +3,7 @@ title: Turn-bound delegated authority for Enterprise Agents
 authors:
   - Free Wortley
 created: 2026-09-08
-last_updated: 2026-09-08
+last_updated: 2026-09-09
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/70
@@ -13,149 +13,92 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/70
 
 ## Summary
 
-Add an online, turn-bound authority contract for Enterprise Agents. A trusted
-boundary records the original request and a fixed resource/action ceiling; each
-subsequent operation must also satisfy the workload's own current permissions,
-current initiating-principal policy, and platform Restrictions. Enforcement and
-provider credentials remain outside the Agent. This extends the operation
-boundary in [RFC 0027](0027-openclaw-enterprise.md#iam-and-authority) without
-letting a workload inherit a human's credentials or permissions.
+Add online, turn-bound authority for Enterprise Agents. A trusted boundary records the original request and immutable resource/action ceiling. Every operation also requires current workload permissions, initiating-principal policy and platform Restrictions. Enforcement and provider credentials stay outside the Agent. This extends [RFC 0027](0027-openclaw-enterprise.md#iam-and-authority) without transferring human credentials or permissions.
 
 ## Motivation
 
-A shared Agent may handle Alice's request to inspect repository A and then
-Bob's request to edit repository B. Neither the Agent's ambient access nor the
-most recently active user identifies which request permits a particular tool
-call. A delayed child process or retry must remain associated with its original
-turn.
+A shared Agent may inspect repository A for Alice, then edit B for Bob. Its ambient access or latest user cannot identify which request authorizes a delayed child process or retry.
 
-An identity certificate answers who is calling. It does not establish the
-allowed repository, action, initiating request, or whether permission still
-exists. A recorded approval also cannot survive policy withdrawal indefinitely.
-We need a small contract that makes these distinctions enforceable at the
-actual external-operation boundary.
+Certificates authenticate callers; they do not establish original requests, permitted actions or current policy. Recorded approval must not survive withdrawal indefinitely. Enforce these distinctions where external operations are dispatched.
 
 ## Goals
 
-- Bind every covered operation to its original admitted turn and exact workload.
-- Enforce finite resource/action ceilings that later policy changes cannot widen.
-- Recheck current authority, support revocation, and retain truthful effect outcomes.
-- Reuse OCC, existing IAM adapters, Restrictions, and broker boundaries.
+- Bind operations to their original admitted turn and exact workload.
+- Keep finite resource/action ceilings immutable despite later policy growth.
+- Recheck authority, support revocation and retain truthful effect outcomes.
+- Reuse OCC, IAM adapters, Restrictions and broker boundaries.
 
 ## Non-Goals
 
-- Human impersonation, cross-Namespace access, or a new IAM system.
-- General policy languages, offline delegation, or automatic multi-Agent orchestration.
-- Claiming that logical subagents sharing a process are isolated security principals.
+- Human impersonation, cross-Namespace access or a new IAM system.
+- General policy languages, offline delegation or automatic multi-Agent orchestration.
+- Treating logical subagents in one process as isolated security principals.
 
 ## Proposal
 
 ### Preserve independent workload authority
 
-RFC 0027 gives each Agent an OCC-owned `WorkloadIdentity`; only its active
-revision's exact workload may act. Preserve that rule. For an operation, the
-workload must independently possess the required current permission. The
-original-turn grant is an additional restriction, never a substitute binding.
-The initiating principal must remain authorized for the requested use, and
-applicable collaboration policy, revision limits, Restrictions, and provider
-policy must also allow it.
+Only RFC 0027's active revision and exact workload may act through the Agent's OCC-owned `WorkloadIdentity`. The workload independently needs current permission. The turn grant only narrows it; initiating-principal, collaboration, revision, Restriction and provider policy must also allow the operation.
 
-For example, Alice's read-only grant cannot let a read-only workload write, even
-if Alice can write. A workload's broader repository access cannot expand her
-grant beyond A. Policy shrink takes effect on subsequent checks; policy growth
-can restore access only within the original ceiling while the grant remains open;
-it cannot reopen a closed grant. No amendment to RFC 0027's
-no-inheritance rule is proposed.
+Alice's permission cannot let a read-only workload write. Broader workload access cannot expand her grant beyond A. Policy shrink applies on subsequent checks; recovery permits access only within the unchanged ceiling of an open grant. Closed grants cannot reopen.
 
 ### Record a turn and its operations
 
-Use internal durable records attached to existing Agent and request identities;
-these are not additional user-facing deployment resources. Conversation
-association supplies attribution, not permission to read another user's memory;
-the [memory ACL proposal](https://github.com/openclaw/rfcs/pull/30) remains separate.
-Illustrative fields:
+Use internal durable records attached to existing Agent/request identities. Conversation attribution grants no access to another user's memory; the [memory ACL proposal](https://github.com/openclaw/rfcs/pull/30) remains separate.
 
 | Record | Contents |
 | --- | --- |
-| Turn grant | Original request/turn reference, verified initiating principal, Installation and Namespace, Agent, revision, WorkloadIdentity and incarnation, intended receiver, immutable resources/actions, expiry, and closure state. |
-| Operation receipt | Grant reference, idempotency key, canonical request fingerprint, current authorization observations, reserved allowance where applicable, dispatch state, and external outcome reference. |
+| Turn grant | Original request/turn, verified principal, Installation/Namespace, Agent/revision, WorkloadIdentity/incarnation, intended receiver, immutable resources/actions, expiry and closure. |
+| Operation receipt | Grant, idempotency key, canonical request fingerprint, current authorization observations, reserved allowance, dispatch state and external outcome reference. |
 
-Conceptual trusted interfaces are `admitTurn`, `authorizeOperation`, and
-`closeTurn`. Wire formats remain open. Admission resolves identity and scope
-from verified ingress and server-owned mappings, not model text or caller-chosen
-identity labels. It durably records the grant before acknowledging acceptance.
-A duplicate key returns the same admission; a conflicting request is rejected.
-Admission alone neither dispatches a tool nor proves an external effect.
+Session-based admission retains the verified original session reference; a caller cannot omit or change it to avoid closure. Session closure terminally closes interactive grants and dependent permits/leases across all connectors. Separately admitted session-independent work remains unavailable until specified and qualified below.
 
-Return an opaque reference bound to the intended authenticated presenter and
-original turn. Possession alone grants nothing. Expiry, closure, or workload
-replacement invalidates further use. Scheduling overlap remains a separate
-policy; admitting authority does not create an implicit execution queue.
+Use OCC's canonical assignment/generation from the [identity contract](https://github.com/openclaw/rfcs/pull/69) under the selected authentication profile; this does not require SPIFFE. For [broker access](https://github.com/openclaw/rfcs/pull/68), the authoritative turn grant retains session selection, selected `admittedAccessRef` values, scopes and horizon. Broker invocation selection references its immutable digest; repository leases only narrow it.
+
+The receipt owns business-request identity and outcome. Credential issuance and lifecycle operations retain separate identities. Correlate their references: replacing a token, process or connection cannot turn a retry into a new business effect.
+
+Trusted interfaces are `admitTurn`, `authorizeOperation` and `closeTurn`; wire formats remain open. Verified ingress and server-owned mappings resolve identity/scope. Durably record admission before acknowledging it. Duplicate keys return the same admission; conflicts deny. Admission neither dispatches a tool nor proves its effect.
+
+Return an opaque reference bound to the authenticated presenter and original turn. Possession grants nothing. Expiry, closure or workload replacement invalidates use. Admission creates no implicit execution queue; scheduling overlap needs separate policy.
 
 ### Enforce at dispatch
 
-1. The trusted connector authenticates the actual workload incarnation and
-   original-turn origin through a protected path. An untrusted header is
-   insufficient.
-2. It derives the exact action and resource from the operation it will send,
-   including relevant request-body and redirect behavior.
-3. OCC and selected authorities check the immutable ceiling, current policies,
-   active revision, purpose, expiry, and closure. Missing or unavailable evidence
-   denies the operation; no alternate adapter supplies a fallback allow.
-4. The operation owner durably reserves any allowance and records dispatch
-   responsibility under the original idempotency key before submission. It
-   rechecks current authority at the actual dispatch boundary.
-5. The connector sends the bounded request and records the observed result.
-   Duplicate admission does not cause another submission.
+1. Authenticate the workload incarnation and original-turn origin through a protected connector path, not an untrusted header.
+2. Derive action and resource from the actual operation, including relevant body and redirect behavior.
+3. OCC and selected authorities check the ceiling, current policies, active revision, purpose, expiry and closure. Missing evidence denies; no alternate adapter supplies permission.
+4. Before submission, durably reserve applicable allowances and dispatch responsibility under the original key. Recheck authority at dispatch.
+5. Submit the bounded request and record its observed result. Duplicate admission cannot trigger another submission.
 
-A positive decision cannot be carried across arbitrary asynchronous work as
-permanent authority. Streams need bounded rechecks and terminal invalidation;
-late positive responses cannot reopen a closed stream. Exact recheck and
-revocation-latency requirements must be selected and qualified per connector.
+Streams require bounded rechecks and terminal invalidation; asynchronous work cannot retain permanent authority. Late success cannot reopen a closed stream. Each connector must specify and qualify recheck and revocation latency.
+
+Policy recovery cannot expand session selection, mutate a lease scope ceiling or reopen closed work. Delegated operations retain current initiating-principal checks. Preparation and retained cleanup have separate admission and purposes; they cannot impersonate the user or depend on reviving revoked user permission.
 
 ### Keep credential modes explicit
 
-Model access uses a trusted mediator that retains upstream credentials. Model
-credentials, GitHub installation tokens, and opaque grant references are
-separate mechanisms; one cannot stand in for another.
+Model access retains upstream credentials in a trusted mediator. Model credentials, GitHub tokens and grant references are not interchangeable. [RFC 0034](https://github.com/openclaw/rfcs/pull/68) requires production GitHub mediation; native delivery is development/testing only. Each mediated profile must qualify origin and credential insertion. A model proxy provides neither GitHub mediation nor permission for native fallback.
 
-The public [GitHub credential proposal](https://github.com/openclaw/rfcs/pull/68)
-distinguishes native Git/`gh` tokens from mediated repository access. Native
-mode deliberately exposes scoped bearer tokens to workload processes and
-proposes a separate, narrow exception to RFC 0027. This RFC does not approve
-that exception or claim a model proxy mediates GitHub. A strict mediated profile
-must qualify its own protected origin and credential insertion path; unsupported
-mediation never falls back to token delivery.
+### Persistent workers and background admission
+
+Workers may serve successive turns, but operations retain original grants and protected work bindings. Surviving code, queued requests and recovered context cannot acquire later authority.
+
+Work beyond a turn needs a separately admitted noninteractive grant. This RFC owns the unresolved producer, initiating-principal policy, resource/action ceiling, finite horizon, renewal/cancellation owner and session relationship. This paragraph authorizes no background access. RFC 0037 owns execution/recovery; RFC 0034 may consume a qualified grant but cannot invent or detach one.
 
 ### Close honestly and qualify the boundary
 
-Closing a turn denies new authorizations. It does not retract an accepted
-provider operation, prove process termination, or revoke an escaped native
-token. Those outcomes require their own observations. A timeout after possible
-submission remains outcome-unknown until reconciled by exact operation identity;
-neither a new grant nor a retry silently replays it. Audit records retain
-attribution and safe outcome references, excluding credentials and message bodies.
+Closing a turn denies new authorization. It does not retract accepted effects, prove termination or revoke native tokens. Possible submission with no confirmed outcome requires exact reconciliation; a new grant or retry cannot replay it. Audit retains attribution and safe outcome references, excluding credentials and message bodies.
 
-The public platform interfaces are building blocks, not proof that this complete
-integration works. Qualification must exercise the selected real Harness,
-identity verifier, connector, and authority store: allow/deny, policy shrink,
-expiry, workload replacement, duplicate submission, crash ambiguity, and
-cross-turn misuse. Surviving code in a shared process may steal a later handle;
-a strict original-turn isolation claim requires a protected origin boundary
-that actually prevents this, not merely narrower handles.
+[RFC 0037 stop](https://github.com/openclaw/rfcs/pull/71) closes new work immediately. Eligible existing work may finish only under its unchanged grant, current policy and recorded deadline. Turn closure, deadline, disable or retirement denies further dispatch even on an open connection. Cleanup retains independent authority.
+
+Qualification requires the real Harness, verifier, connector and authority store: allow/deny, shrink, expiry, replacement, duplicates, crash uncertainty and cross-turn misuse. Session-closure tests must deny further model and GitHub operations while connections and credentials remain valid. Shared-process code may steal later handles; original-turn isolation needs a protected boundary that prevents this. Interfaces or narrower handles alone do not qualify it.
 
 ## Rationale
 
-A single online authority can reuse existing durable state and current IAM
-checks. Independent long-lived bearer grants would require separate revocation
-and accounting mechanisms. Offline capabilities and token exchange may become
-useful adapters, but serialization or signature verification alone cannot
-establish current policy or shared allowance state. Explicit operation receipts
-also make uncertainty reviewable without promising exactly-once provider effects.
+Online authority reuses durable state and current IAM. Independent bearer grants add revocation/accounting machinery. Signatures alone cannot establish current policy or shared allowance state. Receipts expose uncertainty without promising exactly-once provider effects.
 
 ## Unresolved questions
 
-- Which protected transport proves original-turn origin for each supported Harness?
-- What bounded freshness and outage behavior must each connector demonstrate?
-- Which actions need shared allowance reservations or human approval before dispatch?
-- When should separately authenticated child Agents and bounded grant ancestry be added?
+- Which protected transport proves original-turn origin for each Harness?
+- What freshness and outage behavior must connectors demonstrate?
+- Which actions need shared allowance reservations or human approval?
+- When should authenticated child Agents and bounded grant ancestry be added?
+- Which noninteractive grants may outlive turns/sessions, with what admission, renewal and cancellation policy?
