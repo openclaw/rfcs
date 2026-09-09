@@ -50,6 +50,8 @@ Add an internal issuer capability to [RFC 0027's SecretBroker](0027-openclaw-ent
 
 The broker tracks access in a **lease** tied to one invocation or preparation operation. A lease ID grants no permission; invocation checks can only narrow workload authority. The [broker interface](0034/credential-broker-v1-spec.md) runs within trusted platform services and requires no new microservice.
 
+This proposal consumes the [identity/execution contract](https://github.com/openclaw/rfcs/pull/69), [original-work authority](https://github.com/openclaw/rfcs/pull/70), and [stop/replacement rules](https://github.com/openclaw/rfcs/pull/71). The [series overview](0027/runtime-access-overview.md) maps their ownership and remaining decisions.
+
 ### Configure GitHub access
 
 An operator enrolls a GitHub App installation through a Namespace's broker. OCC records approved repositories, permissions, mode, and checkout commit in an immutable Agent revision. The signing key stays outside Agent execution.

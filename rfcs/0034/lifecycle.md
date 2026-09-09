@@ -10,6 +10,8 @@ Production requires the [mediated Git/`gh` profile](github-app-v1-spec.md#mediat
 
 The [broker contract](credential-broker-v1-spec.md) separates four lifetimes: issuer service, invocation lease, provider token, and execution process. Tests must distinguish their endings.
 
+The [RFC series](../0027/runtime-access-overview.md) assigns execution identity to 0035, original-work authority to 0036, runtime lifecycle to 0037, and credential obligations to 0034. Their acceptance is separate from qualification of the combined production path.
+
 ## What binds mediated access to the container
 
 Test the [trusted mapping from each request to its container and original invocation](github-app-v1-spec.md#mediated-origin-and-routing). A copied bearer, container-readable key, or claimed turn ID must not substitute for that mapping.
@@ -46,6 +48,7 @@ The [GitHub issuance hold](github-app-v1-spec.md#refresh-and-overlap) survives r
 | End/start work in a persistent process | Close the ended invocation. A surviving worker's later requests need newly admitted work; queued requests cannot borrow it through a mutable current-turn pointer. |
 | Admit background work | Require a trusted admission producer, original selection, horizon, and cancellation owner before work may outlive its turn or session. |
 | Restart within a Pod | Change execution generation, close old leases, and reestablish origin. The same Pod UID or volume preserves no authority. |
+| Stop with bounded drain | Close new work admission; retain only eligible original work until the recorded finite deadline. Recheck authority on each effect. Completion/deadline closes access; disable or retirement overrides draining. A restart cannot extend the deadline. |
 | Disable/retire/delete | Stop new access and affected execution independently of cleanup. Retain outstanding records until terminal evidence. |
 
 ## Repository preparation
@@ -83,7 +86,7 @@ Interfaces and synthetic fixtures may precede deployed dependencies. Native chec
 
 ## Acceptance matrix
 
-C1–C4, P1, and O1 apply across providers using their expiry/cleanup rules. G2 is development/testing only. Production requires M1–M3 and the combined E1 test as well as the applicable shared, provider, publication, and preparation tests.
+C1–C5, S1, P1, and O1 apply across providers using their expiry/cleanup rules. G2 is development/testing only. Production requires M1–M3 and the combined E1 test as well as the applicable shared, provider, publication, and preparation tests.
 
 | ID | Scope | Required evidence and outcome |
 | --- | --- | --- |
@@ -91,10 +94,12 @@ C1–C4, P1, and O1 apply across providers using their expiry/cleanup rules. G2 
 | C2 | Issuance | Concurrent/repeated requests and crashes retain one original claimed attempt. Lost provider/commit acknowledgements reconcile without untracked remint or premature delivery. GitHub profile/permission edits, rotation, rebinding, and replacement leases cannot bypass an unresolved target hold. |
 | C3 | Renewal | Cross provider expiry (one hour for GitHub). Successors retain original authority, predecessors remain inventoried, overlap stays bounded, and ended turns cannot renew through later turns. |
 | C4 | Cleanup | Cancel during mint/delivery; test successful/failed key rotation and new-generation admission; revoke user access, delete resources, lose a cleanup claim, and restart. Account for every known/uncertain token. Report local closure separately from provider outcomes. |
+| C5 | Scope narrowing | Narrow a live coding lease to views without changing its recorded ceiling. Deny writes and broader-token reuse; allow a supported narrower issuance/read only when current authority, capacity and holds permit. Retain the broader token's identity and cleanup obligation. All scopes count toward the same overlap budget until evidenced revoke/expiry. Policy recovery cannot revive cleanup-only credentials, closed work, or a larger session selection. |
+| S1 | Series integration | Verify connector identity, represented execution assignment, and original-work grant independently. Deny an allowed connector's claim for an unassigned execution and deny delegated work after initiating-principal withdrawal. During stop, deny new work and allow only eligible original operations before the recorded deadline; deny after closure despite live connections or renewed identities/tokens. Disable overrides drain. Restart preserves the cutoff and independent cleanup. Correlate business receipts, credential attempts, and lifecycle operations without replaying uncertain effects. |
 | P1 | Persistent work | Keep a worker alive across A's closure and B's admission. Deny A's queued/retried requests; allow B's independently authorized requests without importing A's authority. Test concurrency, narrowing, cancellation, reconnect, and restart. Each background mode needs explicit admission, finite horizon, renewal/cancellation ownership, and a defined session relationship; session-linked work closes with its session. Unsupported attribution or admission denies. |
 | G1 | Live provider | Disposable private repositories: selected reads succeed, outside-grant repositories and disallowed writes fail, actual returned scope matches, and revoke-then-deny is observed. Coding also verifies branch/merge rules with no App bypass. |
 | G2 | Pinned native clients | Actual Git 2.55.0 and gh 2.93.0 processes against controlled endpoints with synthetic ephemeral tokens: helper/per-child delivery, denied/expired outcomes, refresh overlap, original-attempt retention, and no automatic replay of ambiguous writes. |
-| G3 | Public publication | Allow an approved non-public write; deny public write grants even where the App has access. Deny wrong remotes, public mirror pushes, and public PR/API mutations. Visibility/ownership changes and unavailable checks close access and retain cleanup. Use synthetic content. The full guarantee also requires M2/M3 and visibility-change controls; native scope checks provide partial protection. |
+| G3 | Public publication | Allow an approved non-public write; deny public write grants even where the App has access. Deny wrong remotes, public mirror pushes, and public PR/API mutations. Actual visibility/ownership changes close affected access and retain cleanup. Unavailable visibility checks deny the affected write; recovery requires fresh verification and still-open original authority, never reopening a closed lease. Use synthetic content. The full guarantee also requires M2/M3 and visibility-change controls; native scope checks provide partial protection. |
 | R1 | Preparation/runtime | Verify checkout before Harness startup, commit, preserved user work, cancellation, same-Pod restart, replacement, stopped previous writers, and deletion. Pin runtime/image artifacts. |
 | M1 | Copy resistance | While A succeeds, replay every integration-issued container-visible credential from an external host and B, including B on A's host/Pod where supported. GitHub and broker deny copies. A's old invocation cannot borrow its successor's channel. |
 | M2 | Boundary enforcement | Keep upstream credentials outside execution. Deny raw-token endpoints, direct/tunnel fallback, and forged origin/turn assertions. Verify key custody and the runtime-owned local mapping. |
