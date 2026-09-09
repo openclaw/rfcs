@@ -3,7 +3,7 @@ title: SQLite Snapshot Backup Artifacts
 authors:
   - giodl
 created: 2026-06-18
-last_updated: 2026-07-21
+last_updated: 2026-08-13
 status: completed
 issue: https://github.com/openclaw/openclaw/pull/105718
 rfc_pr: https://github.com/openclaw/rfcs/pull/20
@@ -55,6 +55,7 @@ The first landed implementation uses SQLite `VACUUM INTO` to capture committed W
 - This RFC does not require OpenClaw to own upload, tenant routing, retention, or encryption policy.
 - This RFC does not require hot writes over a network filesystem.
 - This RFC does not define WAL bundles, leases, promotion, fencing, or standby orchestration.
+- This RFC does not define another Gateway pause, drain, or suspension API.
 - This RFC does not change `openclaw backup create` archive behavior.
 
 ## Proposal
@@ -172,6 +173,437 @@ flowchart LR
 
 The diagram is a responsibility split. The default local runtime can ignore the host box entirely. Hosted deployments can use the snapshot directory as the sync boundary without copying live SQLite sidecars.
 
+### Optional Follow-On Composition
+
+RFC 0013 is the completed one-database artifact contract. It is also the
+owner-authored substrate for optional recovery workflows, but those workflows
+must compose the landed command rather than reinterpret live SQLite files or
+duplicate snapshot creation, verification, repository, or restore behavior.
+
+For scale-to-zero, the goal is simple: let an idle OpenClaw Gateway stop using
+compute, then wake a replacement when work arrives without losing state or
+sending work to it before it is ready.
+
+Most of the OpenClaw-side foundation already exists. Vincent's snapshot work
+provides durable state capture and restore. Peter's Gateway suspension and Cron
+work provides a cooperative way to stop and reconcile tracked work. The
+remaining need is a small handoff between OpenClaw and its host:
+
+1. the host remembers that work is waiting and wakes the replacement;
+2. OpenClaw restores the accepted state and reports when the Gateway is ready;
+3. the host waits for that readiness before sending the queued work.
+
+This follow-on does not add a host scheduler, Teams transport, compute
+placement service, or retained-payload store to OpenClaw. It defines the
+application-consistency facts a host needs to use its existing infrastructure
+safely. The detailed contracts below preserve generation fencing, replay, and
+failure handling for implementations.
+
+The scale-to-zero outcome and user evidence are tracked in
+[openclaw/openclaw#114145](https://github.com/openclaw/openclaw/issues/114145).
+This follow-on deliberately builds on, rather than replaces, work Vincent and
+Peter already added: Vincent's verified SQLite snapshots in
+[openclaw/openclaw#105718](https://github.com/openclaw/openclaw/pull/105718),
+Peter's cooperative host suspension in
+[openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
+and Vincent's suspension validation repair in
+[openclaw/openclaw#103925](https://github.com/openclaw/openclaw/pull/103925).
+It also composes with Josh Lehman's SQLite-backed session and transcript runtime
+in [openclaw/openclaw#98236](https://github.com/openclaw/openclaw/pull/98236)
+and restart-recovery admission behavior in
+[openclaw/openclaw#111869](https://github.com/openclaw/openclaw/pull/111869).
+
+The three implementation PRs linked below demonstrate one bounded composition;
+they are not a required decomposition. If maintainers prefer a smaller or
+different core seam that satisfies the same recovery and restored-admission
+outcomes, that is a valid resolution of the umbrella issue.
+
+#### What snapshots and suspension do not finish
+
+Per-user and event-driven hosts can stop paying for resident compute only when
+they can retire one Gateway generation and later admit work on a replacement
+without losing accepted state. A SQLite snapshot alone cannot prove that
+transaction. It does not identify the complete set of state owners, prove that
+the host durably accepted every required byte, authorize retirement of the
+source generation, or prove that the replacement restored the same recovery
+point before accepting work.
+
+Without those semantics, hosts must choose between keeping idle Gateways warm
+or maintaining private shutdown, copying, restore-ordering, and readiness
+inference paths. Managed-host experience has exposed the resulting failure
+classes: accepted ingress can outlive the compute that should process it,
+scheduled wake can race idle retirement, replacement can lose scheduler
+continuity, and a cold runtime can appear ready before its required owner state
+is restored.
+
+Existing reports ground those outcomes in OpenClaw operator needs:
+
+- [openclaw/openclaw#13616](https://github.com/openclaw/openclaw/issues/13616)
+  requests unified backup and restore for config, cron, and session state.
+- [openclaw/openclaw#63392](https://github.com/openclaw/openclaw/issues/63392)
+  requests per-agent backup and restore rather than whole-instance rollback.
+- [openclaw/openclaw#104412](https://github.com/openclaw/openclaw/issues/104412)
+  shows recurring cron work can be skipped silently while Gateway is stopped.
+- [openclaw/openclaw#101290](https://github.com/openclaw/openclaw/issues/101290)
+  shows why hosts need owner-safe snapshot boundaries instead of touching live
+  SQLite state from another process.
+- [openclaw/openclaw#107433](https://github.com/openclaw/openclaw/issues/107433)
+  requests explicit protected and reconstructable-state obligations.
+
+[openclaw/openclaw#113306](https://github.com/openclaw/openclaw/issues/113306)
+tracks adjacent crash-durability and identity hardening in the underlying
+SQLite snapshot implementation; the follow-on lifecycle does not claim to fix
+that separate issue.
+
+Infrastructure platforms already provide the compute lifecycle primitives:
+
+- [Fly Machines](https://fly.io/docs/launch/autostop-autostart/) can stop all
+  Machines and autostart them for traffic.
+- [E2B](https://e2b.dev/docs/sandbox/auto-resume) pauses and automatically
+  resumes persistent sandboxes.
+- [Daytona](https://www.daytona.io/docs/en/persistence/) preserves sandbox
+  files across stop/start and offers archive or VM pause/resume paths.
+- [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/scale-app)
+  scales to zero and wakes from configured event sources.
+- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)
+  hibernate while retaining wakeable WebSocket delivery.
+- [Modal](https://modal.com/docs/guide/scale) scales Functions to zero by
+  default and offers
+  [Sandbox snapshots](https://modal.com/docs/guide/sandbox-snapshots).
+
+Those platforms do not know OpenClaw's owner inventory, SQLite invariants,
+scheduler state, or readiness boundary. The follow-on contracts define that
+application-consistent layer. A host remains responsible for retained ingress,
+wake registration, compute placement, and external durability; OpenClaw and
+its state owners provide the exact recovery point and restored-admission proof
+that make those host primitives safe to use.
+
+The implementer-facing follow-on contracts are deliberately split by owner:
+
+- [Recovery Point Components v1](0013/recovery-point-components-v1-spec.md):
+  compose verified SQLite snapshots with explicit non-SQLite owner artifacts
+  and external or reconstruction obligations.
+- [Portable Handoff v1](0013/portable-handoff-v1-spec.md): combine the existing
+  cooperative Gateway suspension fence with final owner capture, durable host
+  acceptance, and generation-bound source-compute retirement authority.
+- [Restored Admission v1](0013/restored-admission-v1-spec.md): restore exact
+  accepted components into fresh paths and keep admission closed until
+  scheduler and required owner readiness complete.
+
+The split is mechanical rather than architectural:
+
+| Contract | Owner-side input | Durable output | Stops before |
+| --- | --- | --- | --- |
+| Recovery Point Components | Verified owner artifacts plus the closed selected-owner inventory | `recoveryPointId` and `acceptanceSetId` | Suspension, storage, or wake |
+| Portable Handoff | Suspension-ready source generation plus final owner capture | Host acceptance receipt and generation-scoped `sourceComputeRetirementAuthorized` | Restore or destination admission |
+| Restored Admission | Exact accepted recovery point plus destination generation | Restore receipt and `gateway.restore.status = ready` | Retained-work delivery |
+
+The IDs join the contracts; no sidecar owns another sidecar's work.
+
+These sidecars do not change `openclaw backup sqlite`. They do not make every
+ordinary snapshot a portable recovery point, add a continuity-specific storage
+provider, or make Lobster part of the core contract.
+
+OpenClaw implementation evidence is available for the three owner-side slices:
+
+- [openclaw/openclaw#112385](https://github.com/openclaw/openclaw/pull/112385)
+  composes verified global and owner-selected per-agent RFC 0013 snapshots into
+  one deterministic `host-protected` recovery point and exact acceptance byte
+  inventory.
+- [openclaw/openclaw#112865](https://github.com/openclaw/openclaw/pull/112865)
+  is stacked on #112385. It adds one hidden offline final
+  capture operation with operation-scoped SQLite intent, exact
+  committed-result replay, and fail-closed quarantine for conflicting or
+  incomplete attempts.
+- [openclaw/openclaw#112896](https://github.com/openclaw/openclaw/pull/112896)
+  is stacked on #112865. It restores one exact accepted aggregate to
+  fresh canonical paths, holds when required owner evidence is absent, and
+  keeps Gateway work admission closed through scheduler reconciliation and
+  owner readiness. Restore intent, results, startup descriptors, and ready
+  evidence share the dedicated SQLite recovery journal rather than JSON
+  runtime sidecars. It also implements the proposed read-only
+  `gateway.restore.status` projection as review evidence. The public Gateway
+  Protocol surface remains an explicit owner decision before merge or ship.
+
+These PRs are evidence for owner review, not normative dependencies. They do
+not move Gateway suspension, external ingress fencing, clean process shutdown,
+durable host acceptance, publication, host wake, or source-compute retirement
+into
+OpenClaw.
+
+#### What already exists and what remains
+
+OpenClaw has added useful owner-level foundations since this follow-on was
+first drafted:
+
+- [openclaw/openclaw#118393](https://github.com/openclaw/openclaw/pull/118393)
+  now binds Cron cancellation settlement to each active run and keeps
+  unresolved work visible to Gateway suspension through bounded shutdown.
+  This strengthens the source-work fence; it does not register or deliver a
+  wake after compute reaches zero.
+- [openclaw/openclaw#117705](https://github.com/openclaw/openclaw/pull/117705)
+  keeps Gateway-backed agent turns on a cold CLI path. This reduces replacement
+  startup overhead; it does not provide retained ingress, compute wake, or
+  restored-readiness gating.
+- Vincent's snapshot durability campaign in
+  [openclaw/openclaw#113306](https://github.com/openclaw/openclaw/issues/113306)
+  has landed durable parent publication and pending-snapshot recovery. The
+  generic helper's staging-cleanup ownership contract remains an explicit
+  maintainer decision.
+- Vincent's open
+  [openclaw/openclaw#117258](https://github.com/openclaw/openclaw/pull/117258)
+  isolates post-commit auth snapshot publication per runtime owner. It is
+  relevant evidence for owner-local reconciliation, but it is not a portable
+  recovery receipt or a restored-admission signal.
+
+The remaining gaps are narrower and sit at the host/OpenClaw boundary:
+
+1. agree who owns the selected-agent inventory, recovery journal, and public
+   `gateway.restore.status` method;
+2. let the host find the accepted recovery point and choose one fenced
+   replacement generation;
+3. remember and combine Teams, API, and Cron reasons to wake while compute is
+   absent; and
+4. send each queued item only after OpenClaw reports exact restored readiness,
+   with durable acknowledgement and crash replay.
+
+There is also an RFC-ownership decision before merge: repository review has
+asked whether this lifecycle belongs in a standalone draft RFC rather than as
+an optional follow-on to completed RFC 0013. Until maintainers settle that
+placement, RFC 0013 remains authoritative only for the completed SQLite
+artifact contract and these lifecycle sections remain review material.
+
+The intended observable outcome of the complete host composition is:
+
+- idle compute may reach zero without treating a raw live filesystem copy as a
+  recovery point;
+- accepted ingress remains retained until restored admission succeeds;
+- autonomous scheduled work does not require an unrelated user message to
+  recover from absent compute;
+- source compute is not retired before exact durable acceptance; and
+- replacement readiness names the accepted recovery point it restored.
+
+The three OpenClaw PRs prove only the owner-side recovery-point, final
+capture, and restored-admission slices. Host acceptance, retained ingress,
+wake, and source-compute retirement remain separate review and implementation
+work.
+
+#### Keep the host/OpenClaw handoff small
+
+The recommended V1 surface is one bidirectional protocol contract without an
+OpenClaw-owned lifecycle coordinator or abstract `Host` base class:
+
+- current-main `gateway.suspend.prepare|status|resume` supplies the live-source
+  fence;
+- the final-capture and accepted-restore operations supply the offline owner
+  work; and
+- a new read-only `gateway.restore.status` supplies the exact live-destination
+  admission fact.
+
+`gateway.restore.status` follows the design Peter established for
+`gateway.suspend.status`: a closed TypeBox request and result, one stable
+operation identity, `operator.read` scope, no mutation, and typed conflict
+behavior. The request names the expected `restoreOperationId`. An ordinary
+Gateway returns `not-restored`; the matching restored Gateway returns `held`
+or `ready`; a different active restore operation fails rather than returning a
+success-shaped result. The `ready` result names the destination generation,
+accepted recovery point and byte set, restore receipt, scheduler and owner
+readiness evidence, admission identity, and final readiness identity.
+
+The method projects the durable restored-admission record already required by
+this RFC. It does not add another journal or state machine. Offline restore and
+preflight failures remain offline failures; they are not represented as a
+live `restoring` phase. A quarantined start does not expose a live Gateway and
+therefore is not a success result. The detailed request, result, availability,
+and error contract is normative in
+[Restored Admission v1](0013/restored-admission-v1-spec.md#gateway-restore-status).
+
+There is deliberately no `gateway.restore.admit` method. OpenClaw computes
+readiness, durably records it, and opens its own admission. The host may only
+observe the result and compare it with the operation and generation it owns.
+Normal user-work methods remain unavailable while restored admission is held;
+the status method is allowed only through an authenticated pre-admission
+control path, following the existing suspension-control pattern. That path
+must admit only a bounded, non-enrolling control handshake, track it as active
+root work until authentication and connection completion, and lose to any
+restart fence. It must not admit nodes, device pairing or enrollment, remote
+clients, presence-bearing sessions, or any RPC other than the read-only status
+query while work admission is held.
+
+#### RFC 0018 readiness composition
+
+When the opt-in canonical readiness facility from
+[RFC 0018](https://github.com/openclaw/rfcs/pull/33) is available, restored
+admission composes with it rather than creating a second evaluator. A restored
+start publishes one required `RecoveryPointRestored` condition whose primary
+subject is the stable `openclaw/gateway` role. Related stable subject references
+identify the restore operation, accepted recovery point, destination runtime
+generation, scheduler reconciliation, and required state-owner roles; their
+current IDs and generations live in RFC 0018's identity package rather than in
+the references. The condition remains `Unknown` or `False` while the restore
+hold is active and becomes `True` only from the same durable record that opens
+admission.
+
+`gateway.restore.status` remains the stronger operation-fenced query: its
+caller supplies the expected restore operation and receives typed conflict
+behavior. `/readyz`, `openclaw ready`, Status, and Gateway readiness RPC expose
+the ordinary RFC 0018 projection for the active runtime. Both surfaces must
+project the same readiness generation and subject identities. Neither may
+infer restore completion from process health, database-open success, or a
+container probe. This composition is contingent on RFC 0018 acceptance and
+activation; `gateway.restore.status` remains independently useful and does not
+depend on RFC 0018.
+
+One host-owned coordinator may compose those contracts as
+`prepareHibernate`, `ensureRuntimeReady`, and `inspectLifecycle`. Those are
+host operations, not new OpenClaw Gateway methods. The resulting evidence
+chain is:
+
+```text
+GatewaySuspensionReady
+  -> SourceWritersClosed
+  -> RecoveryPointCaptured
+  -> RecoveryPointAccepted
+  -> generation-scoped SourceComputeRetirementAuthorized
+  -> retained wake cause
+  -> RecoveryPointRestored
+  -> AdmissionReady
+  -> owner delivery and acknowledgement
+```
+
+These are distinct facts, not aliases for one global `synced` state:
+
+- `GatewaySuspensionReady` proves OpenClaw's cooperative tracked-work fence for
+  one source generation.
+- `SourceWritersClosed` proves the host supervisor closed the Gateway process
+  and every other authoritative writer it owns for that generation.
+- `RecoveryPointCaptured` proves immutable owner artifacts and one closed
+  recovery-point identity.
+- `RecoveryPointAccepted` proves the host durability boundary accepted the
+  exact logical byte set.
+- `SourceComputeRetirementAuthorized` permits removal of only the named source
+  compute generation. It never authorizes persistent-state deletion.
+- `RecoveryPointRestored` proves exact fresh-target restore and owner
+  reconciliation for one destination generation.
+- `AdmissionReady` proves that same destination may accept ordinary work.
+
+Each authority contributes only its own fact.
+`SourceComputeRetirementAuthorized` is derived from durable acceptance rather
+than supplied by a caller. Wake callers cannot
+select a recovery point, destination generation, or readiness result. Teams,
+cron, and API owners retain their own payload, retry, deduplication, and
+acknowledgement state. Unknown outcomes retain work and hold or quarantine;
+timeouts do not imply success.
+
+The diagram shows the success path, not an irreversible linear workflow. A new
+retained-work cause may race any pre-retirement step. The host must atomically
+revoke or defeat `SourceComputeRetirementAuthorized` while source compute still
+exists; after retirement, the same cause joins the single destination wake and
+restore operation.
+
+Planned and forced transitions deliberately have different guarantees:
+
+| Transition | New recovery point | Source retirement | Recovery guarantee |
+| --- | --- | --- | --- |
+| Planned handoff | Requires Gateway suspension, closed source writers, final capture, and exact durable acceptance | Only after generation-scoped authorization | The newly accepted point |
+| Forced source loss | None may be inferred from process absence or partial files | Host policy handles already-lost compute; no clean-retirement claim is created | The last previously accepted point and its declared RPO |
+
+This contract simplifies the evidence implementation: reuse the existing
+suspension methods, scheduler reconciliation hooks, recovery operations,
+admission fence, and readiness journal; keep one host lifecycle state machine;
+and avoid a second pause API, generic host callback registry, duplicate
+Gateway admission state, or central retained-payload store. The Gateway
+Protocol package should own the new wire schemas beside `gateway-suspend`; a
+separate lifecycle SDK package is not required for V1.
+
+#### Wake and deliver work after compute reaches zero
+
+The current three-PR evidence stack intentionally stops at restored admission.
+A complete scale-to-zero host also needs to wake without relying on an
+unrelated user request and to retain accepted work while no Gateway process
+exists.
+
+OpenClaw already exposes the owner mechanism Peter added for this job:
+post-commit `cron_changed: scheduled` signals in
+[openclaw/openclaw#103647](https://github.com/openclaw/openclaw/pull/103647)
+and lifecycle-owned `cron_reconciled` snapshots in
+[openclaw/openclaw#104368](https://github.com/openclaw/openclaw/pull/104368).
+The documented safe external projection pattern uses `cron_reconciled` to adopt
+the exact scheduler, treats `cron_changed` only as a coalescible reread hint,
+and completes its `replaceAll` callback only after the host durably accepts the
+projection. Those callbacks remain tracked root work, so the existing
+`gateway.suspend.*` fence cannot report idle while a projection write is still
+in flight.
+
+The host should bind the durably accepted projection revision, accepted final
+recovery point, and revocable sleep authority in one transaction. That host
+wake registration contains a nullable `nextRequiredAt` and a bounded reason
+class, not cron expressions, job names, prompts, or payloads. The host may
+subtract a configured cold-start lead from that timestamp, but it must not
+decide whether a cron job is due, invent catch-up work, or suppress duplicates.
+No continuous callback beyond the shipped reconciliation hooks is required.
+
+A retained-ingress owner such as Teams must durably store its payload or opaque
+reference and deduplication identity before acknowledging upstream delivery.
+That accepted cause revokes an in-progress sleep authorization or joins an
+idempotent wake request. Teams messages, API work, semantic deadlines, and
+operator requests may coalesce one compute-provisioning attempt, but each owner
+retains its independent delivery, retry, and acknowledgement state.
+
+The host then selects an accepted recovery point, grants one destination
+generation, restores through the existing contract, and waits for the exact
+restored-admission readiness identity. Only then may retained-work owners use
+their existing generation-fenced delivery paths. After wake, OpenClaw remains
+authoritative for due and missed-run reconciliation, catch-up policy, duplicate
+suppression, and the next semantic deadline; a host alarm is only a provisioning
+trigger and must not invoke cron jobs directly.
+
+Wake callers cannot select a recovery point or destination generation and
+cannot supply readiness. Central lifecycle records contain bounded cause and
+generation identities only; retained payloads and credentials remain with
+their existing owners.
+
+Unknown provisioning, restore, readiness, or delivery outcomes retain the wake
+causes and hold or quarantine. A timeout is not permission to acknowledge work,
+start a second authoritative generation, or open admission.
+
+The bounded host follow-on has three independently reviewable responsibilities:
+
+1. **Project scheduler wake metadata:** consume `cron_reconciled`, use
+   `cron_changed` only as a reread hint, and durably bind the complete accepted
+   projection to the final recovery point and sleep authority. Fork-only
+   evidence is in Lobster PRs
+   [#38](https://microsoft.ghe.com/giodl/lobster/pull/38) through
+   [#45](https://microsoft.ghe.com/giodl/lobster/pull/45) (Microsoft access
+   required).
+2. **Retain and coalesce wake causes:** keep Teams/API payloads with their
+   owners, revoke sleep atomically, and grant one destination generation for
+   concurrent causes. Fork-only evidence is in Lobster PRs
+   [#46](https://microsoft.ghe.com/giodl/lobster/pull/46) and
+   [#47](https://microsoft.ghe.com/giodl/lobster/pull/47).
+3. **Deliver only after exact readiness:** match `gateway.restore.status`
+   against the host-owned restore operation and destination generation before
+   invoking each owner's existing delivery path. Fork-only replay evidence is
+   in Lobster PR [#51](https://microsoft.ghe.com/giodl/lobster/pull/51).
+
+These are review and evidence slices, not a required repository decomposition.
+The host slices may be combined if the same ownership, race, replay, and
+conformance boundaries remain independently reviewable. OpenClaw does not gain
+a Teams transport, compute scheduler, retained-payload store, or placement API.
+If end-to-end proof exposes an invariant the shipped hooks and suspension fence
+cannot express, the follow-up should be the smallest extension of those owner
+seams rather than a parallel continuity scheduler or wake API.
+
+OpenClaw `main` already provides the host-neutral
+`gateway.suspend.prepare|status|resume` contract from
+[openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
+with the validation and import-boundary repair from
+[openclaw/openclaw#103925](https://github.com/openclaw/openclaw/pull/103925).
+A follow-on handoff must reuse that cooperative tracked-work fence. It must not
+introduce another Gateway pause API. The existing contract intentionally leaves
+external ingress, third-party Channel transports, unregistered background work,
+and full process/filesystem consistency to the host.
+
 ### Snapshot Semantics
 
 The unit of snapshotting is one existing OpenClaw-owned SQLite database:
@@ -267,6 +699,16 @@ The original contributor prototype was [openclaw/openclaw#94805](https://github.
 
 The stress harness remains tracked separately in [openclaw/openclaw#94967](https://github.com/openclaw/openclaw/pull/94967). Broader state ownership and continuity work remains related to [openclaw/openclaw#101290](https://github.com/openclaw/openclaw/issues/101290).
 
+Adjacent shipped lifecycle foundations are:
+
+- [openclaw/openclaw#103618](https://github.com/openclaw/openclaw/pull/103618),
+  which added cooperative host suspension; and
+- [openclaw/openclaw#103925](https://github.com/openclaw/openclaw/pull/103925),
+  which restored its architecture and validation gates.
+
+The optional follow-on sidecars consume those contracts as implemented on
+current `main`.
+
 ## Rationale
 
 This approach solves the reliability problem at the correct boundary. SQLite remains local and authoritative while OpenClaw is running. Durability is handled by verified artifacts, manifests, and explicit restore procedures.
@@ -288,3 +730,6 @@ Deferring WAL bundles is intentional. Full snapshots provide the first correct r
 - restore-on-boot host integration
 - leases, promotion, fencing, and managed failover
 - dedicated snapshot targets for future owner stores
+
+The three RFC 0013 sidecars narrow the first portable follow-on without
+promoting those future items into this completed SQLite contract.
