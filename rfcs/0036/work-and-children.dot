@@ -1,0 +1,57 @@
+digraph WorkAndChildren {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad=0.18,
+    nodesep=0.42,
+    ranksep=0.56,
+    splines=polyline,
+    outputorder=edgesfirst,
+    fontname="DejaVu Sans"
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    color="#9CAAB1",
+    fillcolor="#F4F7F8",
+    fontcolor="#21343C",
+    fontname="DejaVu Sans",
+    fontsize=17,
+    margin="0.18,0.13",
+    penwidth=1.2
+  ];
+  edge [
+    color="#516A76",
+    fontcolor="#405762",
+    fontname="DejaVu Sans",
+    fontsize=12,
+    arrowsize=0.7,
+    penwidth=1.3
+  ];
+
+  requester [label="Requester", group="top"];
+  work [label="Service-owned\nreview work", color="#6493B0", fillcolor="#EAF3F8", group="bottom"];
+  child_a [label="Attached review A", color="#669E96", fillcolor="#EAF6F2", group="top"];
+  child_b [label="Attached review B", color="#669E96", fillcolor="#EAF6F2", group="bottom"];
+  result [label="Completed result", group="top"];
+  delivery [label="Finite delivery\nExact audience", color="#BA8191", fillcolor="#FAEEF2", group="bottom"];
+
+  { rank=same; requester; work; }
+  { rank=same; child_a; child_b; }
+  { rank=same; result; delivery; }
+  requester -> child_a [style=invis, weight=100];
+  child_b -> delivery [style=invis, weight=100];
+  requester -> work [xlabel="invoke"];
+  work -> child_a [label="admit"];
+  work -> child_b;
+  child_a -> result [weight=100];
+  child_b -> result;
+  result -> delivery [xlabel="bind content"];
+  work -> delivery [
+    label="cancel descendants and delivery",
+    style=dashed,
+    color="#AC566B",
+    fontcolor="#93475A",
+    constraint=false
+  ];
+}
