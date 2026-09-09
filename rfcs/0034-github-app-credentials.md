@@ -3,7 +3,7 @@ title: Credential lifecycle and GitHub App access for Enterprise Agents
 authors:
   - Free Wortley
 created: 2026-09-05
-last_updated: 2026-09-08
+last_updated: 2026-09-09
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/68
@@ -13,49 +13,48 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/68
 
 ## Summary
 
-Give OpenClaw Enterprise a shared credential lifecycle behind `SecretBroker`, with GitHub Apps as the first issuer. The OpenClaw Controller (OCC) authorizes access; the broker manages credentials and cleanup; issuers perform provider operations. Production requires mediation, keeping GitHub tokens outside Agent execution. Reviewers are asked to approve this boundary and a bounded Git/`gh` profile.
+Extend OpenClaw Enterprise's `SecretBroker` to manage issued credentials, with GitHub Apps as the first provider. The OpenClaw Controller (OCC) authorizes access; the broker owns issuance, renewal, and cleanup. In production, a trusted proxy checks each GitHub request and adds the token outside Agent execution.
 
 ## Motivation
 
-Agents need organization-managed access to repositories, issues, and pull requests. Secret storage and account provisioning need a shared contract for managing issued credentials throughout their lifetime. Separate implementations would duplicate authorization, renewal, and crash recovery.
+Agents need organization-managed access to repositories, issues, and pull requests. A shared credential lifecycle lets providers reuse authorization, renewal, and crash recovery.
 
-An external attacker can reuse a leaked token. Narrow scope limits the damage. GitHub installation tokens expire after one hour; ending a session or replacing a token does not revoke earlier copies. [GitHub token contract](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
+Scoped tokens limit damage, but an external attacker can still use a leaked copy. GitHub installation tokens [expire after one hour](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app); ending a session or replacing a token does not revoke it.
 
 ## Goals
 
-- Define ownership of credential authorization, protected custody, and durable cleanup.
-- Support a pinned subset of ordinary Git/`gh` workflows and persistent processes within explicit grants.
+- Define who authorizes access, protects credentials, and completes cleanup.
+- Support selected Git/`gh` workflows and persistent processes within explicit grants.
 - Prevent Agents from publishing private workspace content to public GitHub repositories.
-- Ensure copied container-visible integration credentials grant no access elsewhere in production.
+- Make integration credentials copied from a production container unusable elsewhere.
 
 ## Non-Goals
 
-- Introducing another IAM system or a user-facing resource for every token.
-- Migrating all existing credentials, supporting every provider/protocol, or hiding fetched repository history.
-- Preventing disclosure through every output channel; public GitHub writes are explicitly in scope.
+- A new IAM system or a user-facing resource for every token.
+- Migrating all credentials or supporting every provider and protocol.
+- Hiding fetched history or preventing disclosure through every output channel.
 
 ## Proposal
 
 ### Make the broker the lifecycle owner
 
-Extend [RFC 0027's SecretBroker](0027-openclaw-enterprise.md#secret-access) with an internal issuer capability. Installation configuration selects implementations. Existing `Secret` references name protected material; `SecretDriver` remains responsible for its backend operations. `ServiceAccountDriver` retains account provisioning.
+Add an internal issuer capability to [RFC 0027's SecretBroker](0027-openclaw-enterprise.md#secret-access), selected by Installation configuration. Existing `Secret` references and `SecretDriver` manage protected material; `ServiceAccountDriver` retains account provisioning.
 
 | Owner | Responsibility |
 | --- | --- |
-| OCC and existing IAM/runtime authorities | Admit the grant and mode; recheck workload and invocation authority. |
-| SecretBroker and protected storage | Record issuance before dispatch, retain tokens, control delivery/use, renew access, and recover cleanup. |
-| Issuer implementation | Issue/revoke within the grant; report scope, expiry, and uncertainty. |
-| Compute and Sandbox drivers | Compute owns execution and checkout; SandboxDriver establishes and verifies containment. |
+| OCC and existing IAM/runtime authorities | Authorize the grant and mode; check current workload and invocation authority. |
+| SecretBroker and protected storage | Record issuance before dispatch, protect tokens, control use, renew, and recover cleanup. |
+| Issuer implementation | Issue and revoke within the grant; report scope, expiry, and uncertain outcomes. |
+| Compute | Own execution and checkout. |
+| SandboxDriver | Establish and verify containment. |
 
-The issuer cannot grant permission. A lease identifies one original invocation or preparation operation; possession grants nothing. Invocation checks only narrow workload authority. Issuer shutdown, authorization closure, process termination, and provider revocation remain separate events.
-
-The [broker specification](0034/credential-broker-v1-spec.md) defines the shared contract. It begins as a trusted local interface; it does not require a new microservice.
+The broker tracks access in a **lease** tied to one invocation or preparation operation. A lease ID grants no permission; invocation checks can only narrow workload authority. The [broker interface](0034/credential-broker-v1-spec.md) runs within trusted platform services and requires no new microservice.
 
 ### Configure GitHub access
 
-An operator enrolls a GitHub App installation through a Namespace's broker. OCC admits its repository grant, permission profile, mode, and checkout commit into an immutable revision. The signing key stays outside Agent execution.
+An operator enrolls a GitHub App installation through a Namespace's broker. OCC records approved repositories, permissions, mode, and checkout commit in an immutable Agent revision. The signing key stays outside Agent execution.
 
-OCC records a session's selection from those grants; current Agent authority and invocation restrictions may only narrow it. Each repository has a separate invocation lease and token. Changes to two independent repositories produce two PRs. [Session scope](0034/github-app-v1-spec.md#session-scope-and-multiple-repositories)
+Each session selects from those grants. An invocation may narrow that selection and gets a separate lease and token per repository. Later session changes cannot expand an existing invocation's access. [Session scope](0034/github-app-v1-spec.md#session-scope-and-multiple-repositories)
 
 | Profile | GitHub permissions |
 | --- | --- |
@@ -63,9 +62,9 @@ OCC records a session's selection from those grants; current Agent authority and
 | Issue and PR views | `contents:read`, `issues:read`, `pull_requests:read` |
 | Coding | `contents:write`, `issues:read`, `pull_requests:write` |
 
-All include required `metadata:read`. Every mint specifies the effective repository and permissions. Workflow, administration, and secrets permissions are excluded. The proxy separately checks each operation against the same grant; GitHub repository rules enforce branch and merge restrictions. Broader client support cannot broaden authority. [Policy enforcement](0034/github-app-v1-spec.md#policy-enforcement)
+All include `metadata:read`; workflow, administration, and secrets permissions are excluded. Token issuance and proxy checks use the same grant. GitHub repository rules enforce branch and merge restrictions. [Policy enforcement](0034/github-app-v1-spec.md#policy-enforcement)
 
-Git pushes and PR/API writes must target approved, non-public repositories. Public or unverified destinations deny. The [publication policy](0034/github-app-v1-spec.md#preventing-public-publication) also requires controls over visibility changes.
+Pushes and PR/API writes require approved, verified non-public destinations, with [controls over visibility changes](0034/github-app-v1-spec.md#preventing-public-publication).
 
 ### Require mediation in production
 
@@ -86,27 +85,27 @@ flowchart LR
     PROXY -->|"Authorized request + scoped token"| GITHUB
 ```
 
-Proposed request path: GitHub tokens stay outside Agent execution. SandboxDriver must enforce this route and prevent bypass; client proxy settings alone are insufficient. [Origin and routing](0034/github-app-v1-spec.md#mediated-origin-and-routing)
+SandboxDriver must [enforce this route](0034/github-app-v1-spec.md#mediated-origin-and-routing) and prevent bypass. Client proxy settings alone are insufficient.
 
-Native delivery remains development/testing only: a Git helper and each new `gh` child receive scoped tokens. Escaped tokens remain reusable until revoked or expired.
+Native delivery is development/testing only: Git helpers and new `gh` processes receive scoped tokens, which remain reusable if leaked until revoked or expired.
 
-The initial profile targets clone/fetch, prepared-branch push, repository/issue/PR views, and explicit draft PR creation. Each supported command variant requires qualification. The model-credential proxy does not implement GitHub mediation; unsupported operations deny without native fallback.
+The initial profile covers clone/fetch, prepared-branch push, repository/issue/PR views, and explicit draft PR creation. Each command variant needs qualification; unsupported operations deny without native fallback. The model-credential proxy does not provide GitHub mediation.
 
 ### Manage normal operation
 
-1. **Prepare.** OCC authorizes a separate read-only checkout. SandboxDriver verifies containment; Compute verifies the commit and storage handoff. OCC gates candidate Harness startup on both. Failure preserves the serving revision and workspace.
-2. **Run and renew.** The broker checks current authority before issuing credentials and each mediated operation. Long-running authorized work receives replacement tokens; each successor is tracked alongside its predecessor. Existing commands may fail on expiry; ambiguous writes are not automatically replayed.
-3. **Close and clean up.** Completion, replacement, expiry, or withdrawal closes affected leases and starts durable credential cleanup. A reusable process may remain alive, but old work cannot inherit later work's authority. Workspace replacement still requires observed writer termination.
+1. **Prepare.** OCC authorizes a separate read-only checkout. SandboxDriver verifies containment; Compute verifies the commit and storage handoff before OCC starts the candidate Harness. Failure preserves the serving revision and workspace.
+2. **Run and renew.** Check current authority before issuance and every mediated operation. Token expiry does not end authorized work: the broker issues replacements and tracks every predecessor. Commands may fail on expiry; ambiguous writes are not automatically replayed.
+3. **Close and clean up.** Completion, replacement, expiry, or withdrawal closes affected leases and starts durable cleanup. Reusable processes may survive, but old requests cannot inherit later work's authority. Workspace replacement requires observed writer termination.
 
-Persistent processes are a requirement. Their requests need protected work attribution; staying alive cannot extend access. Background work beyond an interactive turn needs explicit admission and a cancellation owner. The [persistent-work design](0034/credential-broker-v1-spec.md#persistent-processes-and-background-work) remains an implementation gate.
+Persistent processes need trusted attribution of requests to their original work. Background work beyond a turn needs explicit admission and a cancellation owner. That [design remains a release gate](0034/credential-broker-v1-spec.md#persistent-processes-and-background-work).
 
-[Recovery and qualification](0034/lifecycle.md) distinguish local denial, observed termination, and upstream cleanup. Already accepted provider operations may finish.
+[Recovery requirements](0034/lifecycle.md) distinguish stopping access, stopping a process, and revoking tokens. Already accepted provider operations may finish.
 
 ## Rationale
 
-A shared broker avoids duplicate lifecycle implementations while each issuer retains its provider's scope and API rules.
+A shared broker gives providers common lifecycle behavior while issuers retain provider-specific APIs and scope rules.
 
-Mediation requires trusted origin enforcement and Git/API compatibility work. Its guarantee assumes trusted host and broker infrastructure; use of the original authorized container as a relay is outside that guarantee.
+Mediation requires trusted origin enforcement and Git/API compatibility work. Copy resistance assumes trusted host and broker infrastructure; it does not cover an attacker relaying through the original authorized container.
 
 ## Unresolved questions
 

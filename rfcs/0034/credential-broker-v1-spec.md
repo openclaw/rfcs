@@ -1,112 +1,116 @@
 # Credential Broker v1 Specification
 
-This is the shared implementation contract for [RFC 0034](../0034-github-app-credentials.md). The [GitHub profile](github-app-v1-spec.md) supplies provider-specific behavior; [recovery and qualification](lifecycle.md) supplies failure scenarios and evidence requirements.
+This shared contract supports [RFC 0034](../0034-github-app-credentials.md), the provider-specific [GitHub profile](github-app-v1-spec.md), and [recovery and qualification](lifecycle.md).
 
-Status: draft. These are proposed contracts, not a claim that upstream OCE implements them. In this document, **must** identifies a conformance requirement.
+Status: draft; upstream OCE implementation is not claimed. **Must** identifies a conformance requirement.
 
 ## Scope and ownership
 
-V1 manages credentials issued for admitted external access. It adds an internal issuer capability behind the existing Namespace-scoped `SecretBroker`; it adds no public Token, Lease, Issuer, or permission resource. Existing OCC identities, resource authorization, workload assignments, and invocation records remain authoritative.
+V1 manages credentials for admitted external access through an internal issuer behind the Namespace-scoped `SecretBroker`. It adds no public Token, Lease, Issuer, or permission resource. Existing OCC identities, resource authorization, workload assignments, and invocation records remain authoritative.
 
-OCC owns broker configuration and resource lifecycle. The broker coordinates authorization consumption, protected custody, inventory, delivery/use, and cleanup. The selected issuer performs provider operations. `SecretDriver` manages the selected secret backend; backend storage operations alone do not satisfy the custody and durable inventory requirements below. Account provisioning remains with `ServiceAccountDriver`.
+OCC owns configuration and resource lifecycle. The broker consumes authorization and coordinates protected custody, inventory, delivery/use, and cleanup. Issuers perform provider operations. `SecretDriver` manages backend storage; custody and durable inventory require the additional guarantees below. `ServiceAccountDriver` retains account provisioning.
 
-OCC's trusted platform service composition hosts the broker, issuer, and protected-material client outside Agent execution. An eligible existing service may host them; the Namespace gateway retains its routing role and gains no credential authority by forwarding requests. The host connector described by the GitHub profile is another trusted component outside execution.
+Trusted platform services host the broker, issuer, and protected-material client outside Agent execution. Existing services may host them; the Namespace gateway routes requests without gaining credential authority. The GitHub profile's host connector also runs outside execution.
 
-The issuer interface is local to that composition. Protected handles have no public constructor, serialization, or workload-facing byte accessor. A remote issuer requires a separately specified authenticated protocol; JSON versions of these handles are not authority. A logical broker resource does not imply one process per Agent or provider. Durable state survives process replacement and supports multiple service instances.
+The issuer interface is local. Protected handles have no public constructor, serialization, or workload-facing byte accessor. Remote issuers require a separately specified authenticated protocol; JSON handles confer no authority. Brokers need no dedicated process per Agent or provider. Durable state survives process replacement and supports multiple service instances.
 
-This contract does not force request signing or forwarding with existing credentials into a token-issuance API. Those capabilities may reuse authority and custody boundaries, but need their own operation contracts. V1 does not migrate existing model or ServiceAccount credentials.
+Signing or forwarding with existing credentials may reuse these authority and custody boundaries but needs separate operation contracts. V1 does not migrate model or ServiceAccount credentials.
 
 ## Configuration and admitted records
 
-These are internal, versioned records, not new API routes. Identifiers use existing OCC codecs. References are resolved in trusted storage, never dereferenced as caller-supplied URLs. Reject unknown versions, authority-affecting fields, unsupported modes, and unbounded inputs before effects.
+These internal, versioned records use existing OCC identifier codecs and add no API routes. Resolve references in trusted storage, never as caller-supplied URLs. Reject unknown versions, unknown authority-affecting fields, unsupported modes, and unbounded inputs before effects.
 
 | Record | Required contents and owner |
 | --- | --- |
 | Issuer binding | OCC: Installation and Namespace, exact broker and Secret references, selected issuer implementation/profile versions, protected provider-account binding, configuration generation, and enabled state. No key or token bytes. |
 | Admitted access | OCC: immutable internal `admittedAccessRef`, Agent/revision, binding/profile versions, provider-typed resource and permission grant, allowed mode, purpose, absolute access horizon, and limits. Its digest commits these fields. Current policy may narrow or revoke it. |
-| Session selection | Existing OCC session/admission record: selected admitted-access references, supported narrower permissions, and horizon. Existing IAM authorizes this selection within the Agent's grant; a participant's request alone confers no authority. |
-| Invocation selection | Existing OCC invocation record: immutable reference/version or digest of the original selected grants, effective scopes, and horizon. Later session expansion cannot enlarge this snapshot. |
-| Execution binding | Runtime authority: exact Agent/revision and concrete incarnation, including a generation that changes on restart. For runtime work, a protected correspondence to the original invocation and child/request channel is required. |
+| Session selection | Existing OCC session/admission record: selected admitted-access references, supported narrower permissions, and horizon. IAM authorizes selection within the Agent's grant. |
+| Invocation selection | Existing OCC invocation record: immutable reference/version or digest of the original selected grants, effective scopes, and horizon. |
+| Execution binding | Runtime authority: exact Agent/revision and incarnation, with a generation that changes on restart. Runtime work requires a protected link to its original invocation and child/request channel. |
 | Access lease | Broker: immutable original invocation or preparation identity, execution binding, exact admitted-access reference and digest, effective scope, current generation/version, deadline, and `open` or `closed` state. |
 | Issuance record | Inventory: stable operation and provider-attempt identities, intent digest, original lease/binding/generation, provider outcome, protected material references, actual expiry/scope evidence, delivery state, and cleanup state. |
 
-An issuer-binding change cannot silently retarget an active revision. For planned key rotation, stage protected replacement material and verify the same provider account before atomically selecting its new generation and closing affected leases. Failed verification leaves the current binding unchanged and reports failure; an independently authorized emergency disable can close access immediately. Subsequent use requires newly admitted revisions and leases pinned to the verified generation. Retain issued-token/revocation material and cleanup records until obligations finish; source-key retirement is a separate operation and proves nothing about token revocation.
+Binding changes cannot silently retarget active revisions. For planned key rotation, stage protected material and verify the same provider account before atomically selecting the new generation and closing affected leases. Report failed verification and leave the binding unchanged; independently authorized emergency disable can close access immediately. Further use requires newly admitted revisions and leases pinned to the verified generation. Retain issued-token/revocation material and cleanup records until obligations finish. Retiring a source key is separate from token revocation.
 
-Operator-visible enrollment states are `unverified`, `ready`, `disabled`, and `degraded`, with bounded reason codes. `ready` requires verified provider binding, protected custody and inventory availability, and a supported issuer profile. It does not grant an Agent access or mint a token. Workload readiness and mode qualification are separate.
+Enrollment reports `unverified`, `ready`, `disabled`, or `degraded`, with bounded reason codes. `ready` requires verified provider binding, available protected custody and inventory, and a supported issuer profile. It neither grants access nor mints tokens; workload readiness and mode qualification remain separate.
 
 ## Current authority and workload origin
 
-For each issuance, delivery, and mediated operation, the broker must authenticate the actual caller and obtain a current decision from existing OCC/IAM and runtime authorities for:
+For each issuance, delivery, and mediated operation, the broker must authenticate the caller and obtain current OCC/IAM and runtime decisions for:
 
 - the exact Installation, Namespace, Agent, revision, broker, Secret, and protected provider binding;
 - the current execution incarnation and original invocation, or separately admitted preparation purpose;
 - the permitted resource/operation intersection, binding/profile versions, lease generation, and deadline;
 - every applicable restriction and required audit decision.
 
-The Agent uses its own explicitly granted `WorkloadIdentity` authority. Original-actor attribution and any additional invocation-policy checks may only narrow that authority; they do not transfer human roles, sessions, provider credentials, or permissions to the Agent. Missing mappings and unavailable current decisions deny access. Preparation cannot fabricate a conversation turn or use a runtime lease.
+Agents use their explicitly granted `WorkloadIdentity` authority. Original-actor attribution and invocation policies may only narrow it; human roles, sessions, provider credentials, and permissions do not transfer to Agents. Missing mappings or unavailable current decisions deny. Preparation requires separate admission and cannot fabricate a turn or use a runtime lease.
 
-A session may contain multiple invocations. Effective access is the intersection of current workload authority, admitted revision grants, the authorized session selection, and the original invocation selection and restrictions. OCC records both selections before execution; missing or ambiguous selection denies. Each invocation binds fresh leases to the exact selected accesses it uses. Every `beginAccess` checks its retained original selection and current narrowing, including when no lease exists yet for the requested grant. Broadening a session requires authorized re-admission within current Agent authority and takes effect only in a new invocation with fresh leases. Existing invocations cannot gain authority through that change; renewal cannot add a resource or permission. Closing a session or invocation closes all its affected leases. Preparation uses its separate admitted selection.
+Effective access intersects current workload authority, admitted revision grants, authorized session selection, and original invocation selection and restrictions. OCC records both selections before execution; missing or ambiguous selections deny. Each invocation receives fresh leases for its exact selected accesses. Every `beginAccess`, including the first for a grant, checks the retained original selection and current narrowing.
 
-A handle, unexpired identity certificate, caller-supplied turn ID, or cached allow decision does not establish current authority. Container identity also does not prove invocation identity: processes from successive turns may share a container. The runtime must establish protected correspondence between each credentialed effect and its original admitted work. A reusable process may serve later work, but an old request cannot borrow that later work's authority. The issuer cannot supply missing origin proof.
+Session expansion requires authorized re-admission within current Agent authority and applies only to new invocations with fresh leases. Existing invocations and renewals cannot gain resources or permissions. Closing a session or invocation closes all affected leases. Preparation uses its separately admitted selection.
+
+Handles, unexpired identity certificates, caller-supplied turn IDs, and cached decisions do not establish current authority. Container identity cannot distinguish invocations sharing a container. The runtime must protect the link between each credentialed effect and its original admitted work; old requests cannot borrow later work's authority. Issuers cannot supply missing origin proof.
 
 ### One effective grant, two enforcement points
 
-The existing authority owns the effective grant. The issuer's provider-permission selection and the mediator's request checks must derive from the same versioned grant, original selection, and current narrowing. The trusted protocol adapter validates the actual request and supplies canonical resource identities, operation, policy-relevant arguments, and an immutable request digest. Existing OCC/IAM evaluates those facts; the broker consumes the resulting permit for that exact effect at dispatch. Caller labels and parsed data alone confer no authority.
+Issuer permission selection and mediator request checks must derive from the same versioned grant, original selection, and current narrowing. A trusted protocol adapter validates each request and supplies canonical resource identities, operation, policy-relevant arguments, and an immutable request digest. Existing OCC/IAM evaluates these facts; the broker consumes its permit for that exact effect at dispatch. Caller labels and parsed data confer no authority.
 
-Each supported provider operation must declare its required permissions, applicable constraints, read/write behavior, and uncertain-outcome handling. This catalog interprets provider protocols; it is not another policy authority. Unsupported constraints deny admission or the affected operation. Permission failures cannot trigger broader credentials, another account, or a less restrictive access mode. A wider grant requires authorized admission and new work; it cannot change the original selection of existing work.
+Each supported provider operation must declare required permissions, constraints, read/write behavior, and uncertain-outcome handling. This protocol catalog has no policy authority. Unsupported constraints deny admission or the affected operation. Permission failures cannot trigger broader credentials, another account, or a less restrictive mode. Wider grants require authorized admission and new work.
 
 ### Persistent processes and background work
 
-Persistent execution is a first-class requirement. A process may remain alive after its lease closes; closure denies new credentialed effects and starts cleanup. Process liveness, an open connection, or later work cannot renew closed authority. Workspace replacement still requires Compute to observe previous writers stopped.
+Persistent execution is required. Lease closure denies new credentialed effects and starts cleanup even if a process or connection survives. Neither survival nor later work renews closed authority. Workspace replacement requires Compute to observe previous writers stopped.
 
-Two cases need distinct admission and lifecycle behavior:
+Admission distinguishes:
 
-- **Reusable worker:** each request belongs to an explicitly admitted invocation, with its own immutable selection and current authority. The worker can serve successive invocations without carrying their permissions forward.
-- **Background job:** continuing GitHub work after the initiating interactive invocation ends requires separately admitted work. The proposed representation is an existing OCC invocation/work record with an explicit noninteractive purpose, original attribution, exact grants and restrictions, finite horizon, renewal limits, and lifecycle/cancellation owner. Session-linked work closes with its session. Session-independent work needs separate explicit authority; a surviving process cannot create it.
+- **Reusable worker:** each request belongs to an explicitly admitted invocation with its own immutable selection and current authority. Permissions do not carry forward.
+- **Background job:** GitHub work continuing beyond its initiating interactive invocation needs separate admission. The proposed representation uses an existing OCC invocation/work record with a noninteractive purpose, original attribution, exact grants and restrictions, finite horizon, renewal limits, and lifecycle/cancellation owner. Session-linked work closes with its session; session-independent work needs separate explicit authority.
 
-The concrete background-admission producer, supported session relationship, and protected dispatch mechanism remain open design work. Until specified and qualified, they cannot authorize access. The broker must not invent an invocation or silently detach work when a turn ends.
+The background-admission producer, supported session relationship, and protected dispatch mechanism cannot authorize access until specified and qualified. The broker must not invent invocations or silently detach work when a turn ends.
 
-A mutable current-turn pointer or workload-selected handle cannot protect work attribution. A trusted dispatcher must own the authorized request boundary, or differently authorized work needs execution isolation. A shared untrusted process cannot isolate mutually untrusted computations merely by labeling their requests. If the runtime cannot establish the boundary, restrict the process to one immutable authority context and deny after closure; do not claim support for mixed-authority reuse. Qualification must cover concurrency, queued requests, cancellation, reconnects, and restart.
+A mutable current-turn pointer or workload-selected handle cannot establish work attribution. A trusted dispatcher must own the authorized request boundary, or differently authorized work needs execution isolation. Request labels cannot isolate mutually untrusted computations in a shared process. Without this boundary, restrict the process to one immutable authority context and deny after closure; mixed-authority reuse is unsupported. Qualification must cover concurrency, queued requests, cancellation, reconnects, and restart.
 
 ## Broker operations
 
-The names below describe required local ports. Implementations may adapt existing methods without creating a parallel authority or inventory store.
+These required local ports may adapt existing methods without adding another authority or inventory store.
 
 | Operation | Required input | Result and behavior |
 | --- | --- | --- |
-| `beginAccess` | Authenticated admission context; original invocation/preparation reference; exact `admittedAccessRef`, effective scope and execution binding; stable request ID. | Resolve authoritative records, check current authority, commit a unique lease binding, return an opaque reference and deadline. Identical authorized repeats read the same record; conflicting intent denies. |
-| `renewAccess` | Same original binding, lease reference, expected version, stable request ID. | Recheck authority and conditionally advance version/deadline within the original absolute horizon. Never change principal, purpose, resources, mode, or incarnation. A closed lease cannot reopen. |
+| `beginAccess` | Authenticated admission context; original invocation/preparation reference; exact `admittedAccessRef`, effective scope and execution binding; stable request ID. | Resolve authoritative records, check current authority, commit a unique lease binding, and return an opaque reference and deadline. |
+| `renewAccess` | Same original binding, lease reference, expected version, stable request ID. | Recheck authority and conditionally advance version/deadline within the original absolute horizon. Preserve principal, purpose, resources, mode, and incarnation. Closed leases cannot reopen. |
 | `acquireCredential` | Current authorized operation, open lease/version, exact provider-typed grant. | Select an eligible recorded credential or run the durable issuance protocol. Return a protected reference to the trusted delivery/forwarding owner only. |
-| `deliverNative` | Current original authority, exact recorded credential and lease, immutable receiving child/channel, delivery ID. | Require admitted native mode; durably commit delivery intent before authorizing release on that exact channel. Return safe delivery status separately from provider issuance status. |
+| `deliverNative` | Current original authority, exact recorded credential and lease, immutable receiving child/channel, delivery ID. | Require admitted native mode and durably committed delivery intent before release on that exact channel. Return safe delivery status separately from issuance status. |
 | `authorizeUse` | Current original authority, lease/version, validated provider operation and request digest. | Authorize one mediated dispatch; the trusted protocol adapter uses protected credentials. It cannot expose an arbitrary signing or forwarding endpoint. |
-| `closeAccess` | Exact lease/version and authenticated lifecycle/cancel authority, cause, operation ID. | Commit terminal closure and cleanup obligations. Return local closure status; do not report provider revocation or execution termination by implication. |
+| `closeAccess` | Exact lease/version and authenticated lifecycle/cancel authority, cause, operation ID. | Commit terminal closure and cleanup obligations. Return local closure status separately from provider revocation and execution termination. |
 | `readStatus` | Authorized reader and exact operation/lease reference. | Return safe state and evidence metadata. Readback cannot authorize another provider attempt. |
 | `listOutstanding` | Existing management authority for the original ownership scope, binding/resource filter, bounded page size and snapshot cursor. | Enumerate unresolved records, including tombstones, without exposing protected material or requiring the deleted resource to exist. Read authority grants no cleanup effect. |
 
-Current-authorization context is created by the accepting authority, not by parsing caller fields or trusting a type brand. Management, workload-use, read, and cleanup capabilities are distinct. Management status includes original ownership, safe operation IDs, blocked scope, cause, evidenced/unproven expiry, last/next cleanup attempt, and the authority/evidence needed to resolve a hold. Resource deletion cannot remove this management path or the remaining custody responsibility.
+The accepting authority creates current-authorization context; caller fields or type brands cannot establish it. Management, workload-use, read, and cleanup capabilities are distinct. Management status includes original ownership, safe operation IDs, blocked scope, cause, evidenced/unproven expiry, last/next cleanup attempt, and authority/evidence needed to resolve a hold. This management path and custody responsibility survive resource deletion.
 
-Each mutating call has a stable request/operation ID and immutable intent digest; updates also name an expected record version. Results use this closed family:
+Every mutation and effect requires a stable request/operation ID and immutable intent digest; updates require expected record versions. Results use this closed family:
 
 | Result | Meaning |
 | --- | --- |
-| `ok` | Known committed operation, resulting record version and method-specific safe result. Protected references go only to the authorized local consumer. |
+| `ok` | Known committed operation, resulting version, and method-specific safe result. Protected references go only to the authorized local consumer. |
 | `denied` | Current authority or profile forbids this call; no new effect is admitted. Existing obligations from earlier calls remain. |
 | `conflict` | Request ID reused with different intent, or a new update names a stale version; no new effect is admitted. |
 | `unavailable` | A dependency is unavailable and evidence proves this call admitted no effect. |
-| `indeterminate` | An identified provider, commit, or delivery phase may have acted. Return the original operation reference and safe known state; reconcile it instead of replaying. |
+| `indeterminate` | An identified provider, commit, or delivery phase may have acted. Return its original operation reference and safe known state for reconciliation; do not replay. |
 
-The unique lease key is `(Namespace, original invocation or preparation operation, incarnation, broker binding, admittedAccessRef)`. The reference identifies an OCC-owned immutable grant, not a caller-chosen alias or a provider/permission profile name. Two repositories may use the same profile but must have distinct admitted-access references and leases. Look up an identical operation before applying a new expected-version comparison; a lost begin/renew response reads its known result under fresh authority. A changed immutable lease binding or effective scope conflicts even with a new request ID for the same key; renewal may change only the permitted deadline/version. Readback returns a known version/state, `unresolved`, or `not-found`; `not-found` alone is not proof of no earlier effect. Listing uses a stable snapshot and records late obligations separately so concurrent cleanup cannot silently omit entries.
+The unique lease key is `(Namespace, original invocation or preparation operation, incarnation, broker binding, admittedAccessRef)`. `admittedAccessRef` identifies an OCC-owned immutable grant, never a caller alias or profile name. Repositories sharing a profile still require distinct references and leases.
+
+Look up identical operations before comparing expected versions; lost begin/renew responses read known results under fresh authority. Changing an immutable binding or effective scope conflicts even with a new request ID for the same lease key. Renewal changes only the permitted deadline/version. Readback returns known version/state, `unresolved`, or `not-found`; `not-found` does not prove that no earlier effect occurred. Listing uses a stable snapshot and records late obligations separately to prevent omissions during concurrent cleanup.
 
 ## Issuer interface
 
-Each issuer exposes a fixed versioned profile and the following ports. The broker supplies already-authorized, bounded calls; the issuer never chooses a broader account or grant.
+Each issuer exposes a fixed versioned profile and these ports. Broker calls are authorized and bounded; issuers cannot broaden accounts or grants.
 
 | Port | Contract |
 | --- | --- |
 | `capabilities` | Declares the provider-typed scope schema, fixed or requested lifetime semantics, individual/broader/unsupported revocation, observation support, and any evidenced idempotency behavior. A declaration is not qualification. |
 | `issue` | Takes the recorded issuance/provider-attempt IDs and intent digest, exact binding/profile generation and admitted grant, protected material capability, current one-operation permit, deadline, and cancellation signal. |
 | `revoke` | Takes the exact issued record and protected revocation capability, recorded cleanup claim/provider-attempt IDs, independently authorized cleanup responsibility, deadline, and cancellation signal. |
-| `observe`, if supported | Reads the outcome of an exact earlier operation or credential under bounded read authority. It cannot repeat the original effect. |
+| `observe`, if supported | Reads an exact earlier operation or credential's outcome under bounded read authority, without repeating its effect. |
 
 `issue` returns one of:
 
@@ -115,29 +119,29 @@ Each issuer exposes a fixed versioned profile and the following ports. The broke
 - `rejected`: definitive evidence that the provider created no credential;
 - `unknown`: the provider may have created a credential; retain available protected material and evidence without enabling use.
 
-`revoke` returns `confirmed`, `pending`, `unknown`, or `failed`, with evidence and a safe reason. Unsupported revocation is declared before profile admission. `observe` returns evidence or an explicit unresolved result. Neither an abort nor an exception proves that the provider did nothing.
+`revoke` returns `confirmed`, `pending`, `unknown`, or `failed`, with evidence and a safe reason. Declare unsupported revocation before profile admission. `observe` returns evidence or explicit unresolved status. Aborts and exceptions do not prove that the provider did nothing.
 
-Successful provider output is not successful inventory persistence or successful delivery. The broker validates returned scope and expiry; unexpected output is retained for cleanup only. Providers that cannot meet the selected native exposure or mediated-use policy remain unavailable. Broader administrative revocation needs separately authorized scope; it is never an automatic fallback.
+Provider success does not establish inventory persistence or delivery. The broker validates returned scope and expiry, retaining unexpected output only for cleanup. Providers unable to meet the selected native-exposure or mediated-use policy remain unavailable. Broader administrative revocation requires separate scope authorization and cannot be an automatic fallback.
 
 ## Durable issuance and dispatch
 
-1. **Reserve.** Check current authority, limits, and audit readiness. Commit an issuance intent bound to the original lease, exact scope, generation, and operation. No provider call precedes this commit.
-2. **Claim.** Commit one provider-attempt claim under conditional version checks. Concurrent replicas and retries must resolve the same operation. An expired worker claim or missing acknowledgement does not prove no dispatch occurred.
-3. **Dispatch.** The existing authority owner supplies a bounded operation permit. The accepting broker consumes it for the exact request at the dispatch boundary, ordered against lease closure and configuration invalidation. A close that wins before consumption denies the operation. A permit consumed first identifies an in-flight operation that may finish; cancellation cannot promise distributed rollback. Lost authority or invalidation connectivity denies new consumption.
-4. **Record.** Retain accepted material in protected durable custody and commit its inventory record, actual scope and expiry before use/delivery. Late results after closure or rotation retain the original attempt and enter cleanup. Partial or uncertain persistence is reconciled by exact operation identity.
-5. **Use or release.** Validate the recorded credential against the still-current original grant. Delivery intent must have a known durable outer commit before exposing the first byte or invoking a release callback. Returning from an uncommitted transaction is insufficient; unknown commitment suppresses release until exact readback. Then consume fresh use/delivery authority at the actual boundary. Cancellation between mint and release must not make the credential available to a later invocation.
+1. **Reserve.** Check current authority, limits, and audit readiness. Before any provider call, commit issuance intent bound to the original lease, exact scope, generation, and operation.
+2. **Claim.** Commit one provider-attempt claim with conditional version checks. Replicas and retries must resolve the same operation. Expired worker claims and missing acknowledgements do not prove no dispatch occurred.
+3. **Dispatch.** The existing authority owner supplies a bounded operation permit. The broker consumes it for the exact request at dispatch, ordered against lease closure and configuration invalidation. Closure before consumption denies; consumption first means an in-flight operation may finish. Cancellation cannot promise distributed rollback. Lost authority or invalidation connectivity denies new consumption.
+4. **Record.** Before use/delivery, retain accepted material in protected durable custody and commit its inventory record, actual scope, and expiry. Late results after closure or rotation retain the original attempt and enter cleanup. Reconcile partial or uncertain persistence by exact operation identity.
+5. **Use or release.** Validate the credential against the still-current original grant. Delivery intent requires a known durable outer commit before the first byte or release callback; returning from an uncommitted transaction is insufficient. Unknown commitment suppresses release until exact readback. Consume fresh use/delivery authority at the actual boundary. Cancellation between mint and release must not expose credentials to a later invocation.
 
-Every effect has a stable operation ID and immutable intent digest. Identical retries return or reconcile that operation; a different digest conflicts. The provider profile defines any safe retry after definitive no-effect evidence. `unknown`, timeout, a new request ID, or an absent local read result never authorizes reminting. There is no generic exactly-once provider guarantee.
+Identical retries return or reconcile the original operation; different intent digests conflict. Provider profiles define safe retries after definitive no-effect evidence. `unknown`, timeout, new request IDs, or absent local read results never authorize reminting. Providers have no generic exactly-once guarantee.
 
-Inventory must retain outstanding and uncertain obligations across restart and deletion. Conditional claims, protected custody, and audit persistence must have defined commit/readback behavior. If capacity, audit, or storage availability is insufficient, deny new effects rather than evict obligations. No token values, keys, authorization headers, or handle secrets enter ordinary resource records, logs, metrics, or audit payloads.
+Inventory must retain outstanding and uncertain obligations across restart and deletion. Conditional claims, protected custody, and audit persistence must define commit/readback behavior. Insufficient capacity, audit, or storage availability denies new effects; obligations cannot be evicted. Token values, keys, authorization headers, and handle secrets cannot enter ordinary resource records, logs, metrics, or audit payloads.
 
 ## Replacement, closure, and cleanup
 
-Credential replacement is a new issuance under the same still-authorized lease. It does not renew that lease, revoke the predecessor, or replay a failed business operation. Track every predecessor and successor and bound overlap per profile. A cache may only reuse an exact permitted scope/binding/lease; it never caches authority.
+Replacement issues a new credential under the same still-authorized lease without renewing it, revoking predecessors, or replaying failed business operations. Track every predecessor and successor; bound overlap per profile. Caches may reuse only exact permitted scope/binding/lease matches and cannot cache authority.
 
-Lease closure, expiry, grant withdrawal, binding rotation, incarnation retirement, and explicit disable prevent new use/delivery and create cleanup work for every affected issued or uncertain credential. Commit invalidation and a complete inventory-scan obligation together so that racing/late results are included. Resource deletion retains a tombstone, protected references, and cleanup responsibility.
+Lease closure, expiry, grant withdrawal, binding rotation, incarnation retirement, and explicit disable prevent new use/delivery and require cleanup of every affected issued or uncertain credential. Commit invalidation and a complete inventory-scan obligation together, including racing/late results. Resource deletion retains a tombstone, protected references, and cleanup responsibility.
 
-Cleanup uses separately authenticated platform lifecycle authority, sufficient only to reduce the exact recorded access. It survives revocation of the initiating human and cannot issue replacement credentials or perform user work. Each cleanup attempt is durably claimed and recorded; takeover resolves or safely accounts for a previous uncertain attempt before new dispatch. Claim timeout alone is not success.
+Cleanup uses separately authenticated platform lifecycle authority limited to reducing the exact recorded access. It survives revocation of the initiating human and cannot issue replacements or perform user work. Durably claim and record each attempt; takeover must resolve or safely account for earlier uncertain attempts before dispatch. Claim timeout alone is not success.
 
 Keep these status dimensions independent:
 
@@ -149,16 +153,16 @@ Keep these status dimensions independent:
 | Cleanup | `not-required`, `pending`, `confirmed-revoked`, `confirmed-expired`, `unknown`, or `action-required`. |
 | Execution | Supplied independently by Compute: running, stopping, observed stopped, or unresolved. A closed lease does not imply a stopped process. |
 
-Expiry is either evidenced with a timestamp and provenance or unproven. A future expiry is not a terminal outcome. Expiry completion requires the evidenced time to have elapsed with the selected clock uncertainty allowance. A guessed issue time plus nominal TTL is insufficient.
+Expiry requires a timestamp and provenance; otherwise it is unproven. Completion requires that evidenced time to have elapsed, including the selected clock uncertainty allowance. Neither a future expiry nor guessed issue time plus nominal TTL proves completion.
 
 ## Issuer service lifecycle
 
-Trusted composition validates the fixed issuer profile and dependencies before serving. `quiesce` stops admitting local calls and cancels/drains bounded in-flight work while retaining their outcome records. `dispose` releases local clients and material handles; it does not mean provider tokens were revoked. Restart resumes from durable inventory under fresh service and cleanup authority, never by reviving in-memory permission decisions.
+Trusted services validate the fixed issuer profile and dependencies before serving. `quiesce` stops admitting local calls and cancels/drains bounded in-flight work while retaining outcome records. `dispose` releases local clients and material handles without implying token revocation. Restart resumes from durable inventory under fresh service and cleanup authority; cached permission decisions cannot revive.
 
-Shutdown reports local completion separately from retained cleanup obligations. An unavailable issuer or backend is an explicit degraded state; there is no fallback to another account, issuer, credential class, or access mode.
+Shutdown reports local completion separately from cleanup obligations. Unavailable issuers or backends report degradation without fallback to another account, issuer, credential class, or access mode.
 
 ## Versioning and conformance
 
-V1 profile identity includes the interface version and provider schema version. Reject unsupported authority-bearing fields and capability combinations. Backend, authority, and runtime replacements require conformance to the same lifecycle and evidence rules, not just compatible method signatures.
+V1 profile identity includes interface and provider schema versions. Reject unsupported authority-bearing fields and capability combinations. Backend, authority, and runtime replacements must satisfy the lifecycle and evidence rules as well as method signatures.
 
-The applicable rows in [the acceptance matrix](lifecycle.md#acceptance-matrix) are required alongside this contract. The selected provider and access mode determine which provider, client, preparation, and mediation checks apply. A parser, mock capability, or component pass cannot establish real current authority, durable transactions, provider revocation, or origin binding.
+The selected provider and mode determine required provider, client, preparation, and mediation checks in [the acceptance matrix](lifecycle.md#acceptance-matrix). Parser, mock, and component checks cannot establish real current authority, durable transactions, provider revocation, or origin binding.
