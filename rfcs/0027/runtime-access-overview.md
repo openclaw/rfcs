@@ -1,53 +1,31 @@
 # Enterprise runtime and access: RFC series
 
-This is an informational reading guide under accepted [RFC 0027](../0027-openclaw-enterprise.md). The linked drafts own their requirements; this guide adds no authority, resource, or acceptance decision. All four proposals remain drafts.
+This informational guide connects four **draft** proposals under accepted [RFC 0027](../0027-openclaw-enterprise.md). Each draft owns its requirements; this guide adds no authority, resource, or acceptance decision.
 
-## Decisions and owners
+## Four owners
 
-| Proposal | Owns | Other contracts consume |
-| --- | --- | --- |
-| [0035: identity and enforcement](https://github.com/openclaw/rfcs/pull/69) | Authenticated participant, canonical execution assignment, enforcement leases and withdrawal protocol. | Assignment reference/generation, verified peer, lease limits and effective withdrawal evidence. |
-| [0036: work authority](https://github.com/openclaw/rfcs/pull/70) | Service-owned work, immutable scope, attached children and finite delivery admission. | Work reference/digest, operation ceiling, lineage, closure and business receipts. |
-| [0037: runtime lifecycle](https://github.com/openclaw/rfcs/pull/71) | Stop/resume intent, bounded drain, writer exclusion and completed-state recovery. | Current purpose, drain deadline, retirement, observed termination and completed-delivery handling. |
-| [0034: credentials and GitHub](https://github.com/openclaw/rfcs/pull/68) | Provider credentials, protected custody, mediation and cleanup. | Credential eligibility and truthful issuance/use/cleanup outcomes. |
+| Proposal | Owns |
+| --- | --- |
+| [0036: work authority](https://github.com/openclaw/rfcs/pull/70) | Service-owned logical work, immutable scope, attached children, and delivery admission. |
+| [0035: identity and enforcement](https://github.com/openclaw/rfcs/pull/69) | Authenticated identity, execution assignment, bounded enforcement leases, and withdrawal. |
+| [0034: credentials and GitHub](https://github.com/openclaw/rfcs/pull/68) | Credential issuance, protected custody, mediated use, and cleanup. |
+| [0037: runtime and delivery](https://github.com/openclaw/rfcs/pull/71) | Stop/resume, bounded drain, writer exclusion, completed-state recovery, and completed-result delivery. |
 
-```mermaid
-flowchart TB
-    PLATFORM["0027 · Accepted platform architecture"]
-    ID["0035 · Identity and enforcement"]
-    WORK["0036 · Service-owned work authority"]
-    RUNTIME["0037 · Runtime lifecycle"]
-    ACCESS["0034 · Credentials and GitHub"]
-    PLATFORM --> ID
-    PLATFORM --> WORK
-    PLATFORM --> RUNTIME
-    ID -->|"Assignment and enforcement lease"| ACCESS
-    WORK -->|"Logical work and scope"| ACCESS
-    RUNTIME -->|"Stop and replacement semantics"| ACCESS
-```
+![An operation passes from work admission through execution binding and credential mediation to runtime transitions and delivery. Lease renewal stays within work limits; replacement needs a fresh assignment for still-open work.](runtime-access-overview.png)
 
-These arrows show contract reuse. Selecting SPIFFE for a trusted connector does not require changing every Agent's authentication profile. Credential mediation needs stop/replacement semantics, not the entire completed-context recovery feature.
+Arrows follow one operation, not service topology. Work, execution, enforcement leases, and provider tokens have separate lifetimes.
 
-## One operation through the series
+## One operation
 
-1. **Admit.** OCC checks the requester's permission to invoke the service and the service's own access. It records logical work with an immutable scope and horizon (0036), selects a qualified execution, and issues a bounded enforcement lease (0035).
-2. **Use.** A trusted connector proves its own identity and the represented execution/work binding. Writes need current authority. Only expressly qualified reads may use an existing unexpired lease during an authority outage, with all required local evidence intact. The broker obtains an eligible credential and the mediator inserts it outside Agent execution (0034).
-3. **Renew.** Current policy may renew an enforcement lease within the original work and ancestor limits. Attached children need no live parent process, but their logical ancestors must remain open and authorized. Identity and provider-credential rotation cannot extend work authority or a stop deadline.
-4. **Complete or cancel.** Completing a model turn does not complete the logical job. Work closure withdraws its computation authority. Delivery of an already completed result needs a separately admitted finite responsibility for its exact audience. Graceful stop can preserve that responsibility; cancellation and security revocation withdraw it (0036/0037).
-5. **Replace and recover.** Compute establishes predecessor termination before shared writable replacement. Recovery restores supported completed context and files. Continuing still-open work requires fresh authoritative assignment and enforcement leases; closed work, old grants and uncertain effects cannot be revived or replayed (0037).
-6. **Clean up.** Retained platform authority resolves credential obligations even after work closure or Agent deletion (0034). Business, credential, delivery and lifecycle outcomes remain distinct and correlated.
+1. **Admit.** OCC checks the requester's invocation permission and the service's own access separately. It records logical work with immutable scope and a finite horizon (0036), selects an eligible execution, and issues bounded enforcement authority (0035).
+2. **Dispatch and renew.** The trusted connector proves its identity and the represented execution/work binding. The mediator checks the operation and inserts an eligible provider credential outside Agent execution (0034). Authority renewal requires current policy within the original work and ancestor limits; rotating a certificate or token extends none of them.
+3. **Stop or complete.** A completed model turn does not close logical work. Graceful stop can drain eligible work within a finite deadline and preserve separately admitted delivery of an already completed result to its exact audience. Cancellation or security revocation withdraws affected work and delivery (0036/0037).
+4. **Replace and clean up.** Compute proves predecessor termination before shared writable replacement. Recovery restores supported completed state; continuing open work needs fresh assignment and enforcement authority. Closed work and uncertain effects cannot be revived or replayed (0037). Credential cleanup survives work closure and Agent deletion under retained platform authority (0034).
 
-These drafts extend the accepted platform contract. In particular, qualified read continuity under bounded leases is a proposed exception to online authorization for every operation; it must be explicitly selected and demonstrated. An HTTP read method, valid certificate or running process does not establish eligibility.
+## Acceptance boundary
 
-## Review and acceptance
+RFC 0027's accepted baseline denies operations when authorization is unavailable. These drafts propose an **explicit amendment** for selected, qualified reads under existing unexpired enforcement leases, with all required local evidence intact. Writes, authority renewal, admission, and new assignment still require current authority. The amendment remains unaccepted; a read method alone establishes no eligibility.
 
-Review the common assignment, work-grant, dispatch-withdrawal, and stop contracts together. Accept the RFCs separately once their dependencies agree: identity and work authority first, lifecycle alongside them, then the credential integration. Review credential interfaces concurrently; do not require completed implementations before accepting contracts. Each RFC follows the [repository lifecycle](../../README.md#rfc-lifecycle).
+Review shared contracts together and accept RFCs separately under the [repository lifecycle](../../README.md#rfc-lifecycle): identity and work authority first, lifecycle alongside them, then credential integration. Interfaces can be reviewed concurrently. Selecting SPIFFE for a connector does not select it for every Agent.
 
-## Remaining design and qualification gates
-
-- **0035:** attestation and protected execution evidence; current-purpose consistency and withdrawal under the selected authentication profile.
-- **0036:** admission and isolated/shared data policy, protected work attribution, attached-child joins, exact audiences, and measurable lease/withdrawal profiles.
-- **0037:** qualified drain policy, Harness/recovery compatibility, evidence of stopped writers, and delivery withdrawal after stop.
-- **0034:** qualified Git/REST/GraphQL operations, read-only credential maintenance where selected, token accounting/cleanup, publication controls and the complete mediated production test.
-
-The work, assignment, enforcement lease and provider token have separate lifetimes. None can supply missing authority for another. The concrete protected connector-to-broker representation remains a release gate. An accepted RFC or passing component test does not qualify the complete production composition.
+Acceptance does not qualify a production runtime. Each owner retains its mechanism and integration gates, including protected work attribution, measured withdrawal, recovery compatibility, and mediated provider access. Component tests cannot establish the complete composition's guarantees.

@@ -1,24 +1,59 @@
 # Credential Lifecycle: Recovery and Qualification
 
-Draft recovery and acceptance plan for [RFC 0034](../0034-github-app-credentials.md). The [broker specification](credential-broker-v1-spec.md) defines shared requirements; the [GitHub specification](github-app-v1-spec.md) defines provider and client behavior. This appendix describes how to test them.
+Draft recovery and acceptance plan for [RFC 0034](../0034-github-app-credentials.md).
+The [broker specification](credential-broker-v1-spec.md) defines shared
+requirements; the [GitHub specification](github-app-v1-spec.md) defines provider
+and client behavior. This appendix describes how to test them.
 
 ## Production scope
 
-Production requires the [mediated Git/`gh` profile](github-app-v1-spec.md#mediated-operation-profile), including persistent processes and service-owned logical work. Native delivery is development/testing only. The tests below cover trusted request attribution, attached children, and any qualified read-continuity profile.
+Production requires the
+[mediated Git/`gh` profile](github-app-v1-spec.md#mediated-operation-profile),
+including persistent processes and service-owned logical work. Native delivery
+is development/testing only.
+
+Qualification covers trusted request attribution, attached children, and any
+qualified read-continuity profile. The [acceptance matrix](#acceptance-matrix)
+identifies required tests; [release evidence](#acceptance-evidence-and-current-implementation-limits)
+records their results.
 
 ## Authority and identity
 
-The [broker contract](credential-broker-v1-spec.md) separates logical work, bounded enforcement authority, broker access, provider tokens, execution processes, and issuer services. Tests must distinguish their endings: a turn or token can end while work remains open, and a valid provider token cannot extend an enforcement deadline.
+The [broker contract](credential-broker-v1-spec.md) distinguishes these lifetimes:
 
-The [RFC series](../0027/runtime-access-overview.md) assigns execution identity to 0035, original-work authority to 0036, runtime lifecycle to 0037, and credential obligations to 0034. Their acceptance is separate from qualification of the combined production path.
+| Term | Distinction tests must preserve |
+| --- | --- |
+| Logical work | Service-owned work can remain open after a turn or provider token ends. |
+| Enforcement lease | Bounded authority has its own deadline; a valid provider token cannot extend it. |
+| Broker access lease | Closure denies further access and retains cleanup obligations. |
+| Provider token | Local denial is separate from confirmed provider revocation or evidenced expiry. |
+| Execution process | A process can survive access closure. Replacement requires observed writer termination. |
+| Issuer service | Restart requires durable recovery and fresh service authority. |
+
+The [RFC series](../0027/runtime-access-overview.md) assigns ownership as follows:
+
+| RFC | Responsibility |
+| --- | --- |
+| 0034 | Credential obligations |
+| 0035 | Execution identity |
+| 0036 | Original-work authority |
+| 0037 | Runtime lifecycle |
+
+Acceptance of those RFCs is separate from qualification of the combined
+production path.
 
 ## What binds mediated access to the container
 
-Test the [trusted mapping from each request to its container and original work](github-app-v1-spec.md#mediated-origin-and-routing). A copied bearer, container-readable key, or claimed work ID must not substitute for that mapping.
+Test the [trusted mapping from each request to its container and original work](github-app-v1-spec.md#mediated-origin-and-routing).
+A copied bearer, container-readable key, or claimed work ID must not substitute
+for that mapping.
 
 ## Minting, refresh, and revocation
 
-Exercise the [issuance protocol](credential-broker-v1-spec.md#durable-issuance-and-dispatch) and [renewal policy](github-app-v1-spec.md#refresh-and-overlap). Track predecessors after replacement and distinguish local access denial from provider revocation or evidenced expiry.
+Exercise the [issuance protocol](credential-broker-v1-spec.md#durable-issuance-and-dispatch)
+and [renewal policy](github-app-v1-spec.md#refresh-and-overlap). Track predecessor
+tokens after replacement and report local access denial, provider revocation,
+and evidenced expiry separately.
 
 ## Recovery cases
 
@@ -35,30 +70,56 @@ Exercise the [issuance protocol](credential-broker-v1-spec.md#durable-issuance-a
 | Revocation times out or a worker claim expires | Reconcile the pending/unknown attempt; timeout proves neither provider success nor failure. |
 | Protected token material is unavailable | Report action-required. Recover custody or perform separately authorized broader mitigation; a hash cannot revoke the token. |
 
-The [GitHub issuance hold](github-app-v1-spec.md#refresh-and-overlap) survives replacement leases and broker restarts. A new connection or request ID does not resolve uncertainty.
+The [GitHub issuance hold](github-app-v1-spec.md#refresh-and-overlap) survives
+replacement leases and broker restarts. A new connection or request ID does not
+resolve uncertainty.
 
 ## Lifecycle
+
+### Enrollment and preparation
 
 | Event | Coordination |
 | --- | --- |
 | Verify enrollment | OCC authorizes exact references; issuer verifies provider identity and scope. Readiness does not mint. |
 | Prepare candidate | Compute provides execution and staging; SandboxDriver verifies containment. OCC gates checkout on both and a separate read-only lease. |
 | Finish/cancel preparation | Close access, observe preparation stopped, and retain cleanup. Failure preserves the serving workspace. |
+
+### Active work and replacement
+
+| Event | Coordination |
+| --- | --- |
 | Activate or replace | Close old assignment authority, observe previous writers stopped, and promote verified staging through Compute. Continuing logical work requires fresh current assignment authorization and new access leases; original scope and effect receipts remain fixed. |
 | End a turn or logical work | A turn ending does not finish service-owned work. Logical-work closure closes its access leases; queued requests cannot borrow another work record through a mutable pointer. |
 | Admit long-lived work or children | Require trusted admission, original scope/horizon, and cancellation owner. An attached child renews under current authority while logical ancestors remain open and authorized, without requiring a live coordinator. |
 | Restart within a Pod | Change execution generation, close old leases, and reestablish origin. The same Pod UID or volume preserves no authority. |
+
+### Stopping and result delivery
+
+| Event | Coordination |
+| --- | --- |
 | Stop with bounded drain | Close new work admission; retain only eligible original work until the recorded finite deadline. Recheck authority on each effect. Completion/deadline closes access; disable or retirement overrides draining. A restart cannot extend the deadline. |
 | Disable/retire/delete | Stop new access and affected execution independently of cleanup. Retain outstanding records until terminal evidence. |
 | Deliver a completed result | Graceful stop preserves only separately admitted finite delivery to its exact audience. Posting still requires current authority. Cancellation/security revoke withdraws delivery even while already stopped; an uncertain submission is never blindly replayed. |
 
 ## Repository preparation
 
-For the [preparation contract](github-app-v1-spec.md#repository-preparation), document the actual workload, staging/promotion mechanism, cancellation, proof that previous writers stopped, and rollback. A “prepared” flag alone is insufficient.
+For the [preparation contract](github-app-v1-spec.md#repository-preparation),
+document:
+
+- The actual workload and staging/promotion mechanism.
+- Cancellation and proof that previous writers stopped.
+- Rollback.
+
+A "prepared" flag alone is insufficient.
 
 ## Timing targets and outages
 
-Each selected profile must publish numerical withdrawal bounds and their clock, observation, and enforcement assumptions. Ordinary eligible work may target minutes; sensitive profiles may target seconds with lower outage availability. These are tolerance scales, not fixed TTLs or measured guarantees:
+### Withdrawal and cleanup bounds
+
+Each selected profile must publish numerical withdrawal bounds and their clock,
+observation, and enforcement assumptions. Ordinary eligible work may target
+minutes; sensitive profiles may target seconds with lower outage availability.
+These are tolerance scales, not fixed TTLs or measured guarantees.
 
 | Measurement | Target and interpretation |
 | --- | --- |
@@ -66,11 +127,39 @@ Each selected profile must publish numerical withdrawal bounds and their clock, 
 | Workload termination | Observe affected writers stopped before replacement. A timeout blocks unsafe promotion and reports unresolved termination. |
 | Upstream cleanup | Observe for up to 120 seconds, then report confirmed revoke, evidenced expiry, pending/unknown, or action-required. Durable cleanup continues after this window. |
 
-Record authenticated request acceptance, authoritative observation, durable commit, holder observation, operation admission, provider dispatch, last success, first denial, and observed termination, including clock uncertainty. Separate request-to-denial from commit-to-denial; failed or lost commits are not successful samples. Tightening a profile cannot advertise its new bound until outstanding older leases are accounted for.
+### Timing evidence
 
-During an authority outage, deny writes, new admission, renewal, expansion, and reassignment. Only qualified existing reads may continue under an unexpired enforcement lease with protected origin, trustworthy local revocation/clock state, and all mandatory dependencies. Read-only credential maintenance needs explicit preauthorization under that same lease and available custody/inventory/provider evidence; it cannot reuse a write-capable token or move an authority deadline. Missing any required check denies. Report already accepted upstream operations separately. Native copies remain usable until provider revoke/expiry, including during OCE outages.
+Record each of the following, including clock uncertainty:
 
-Use bounded backoff only where retries are permitted, respecting [`Retry-After` and reset responses](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately). Outages retain cleanup obligations; network recovery authorizes neither reminting nor replay of ambiguous writes.
+- Authenticated request acceptance, authoritative observation, and durable commit.
+- Holder observation, operation admission, and provider dispatch.
+- Last success, first denial, and observed termination.
+
+Separate request-to-denial from commit-to-denial; failed or lost commits are not
+successful samples. Tightening a profile cannot advertise its new bound until
+outstanding older leases are accounted for.
+
+### Authority outages
+
+- Deny writes, new admission, renewal, expansion, and reassignment.
+- Allow only qualified existing reads under an unexpired enforcement lease,
+  with protected origin, trustworthy local revocation/clock state, and all
+  mandatory dependencies.
+- Allow read-only credential maintenance only with explicit preauthorization
+  under that same lease and available custody/inventory/provider evidence. It
+  cannot reuse a write-capable token or move an authority deadline.
+- Deny when any required check is missing. Report already accepted upstream
+  operations separately.
+
+Native copies remain usable until provider revoke/expiry, including during OCE
+outages.
+
+### Retries
+
+Use bounded backoff only where retries are permitted, respecting
+[`Retry-After` and reset responses](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately).
+Outages retain cleanup obligations; network recovery authorizes neither
+reminting nor replay of ambiguous writes.
 
 ## Implementation sequence
 
@@ -83,38 +172,234 @@ Use bounded backoff only where retries are permitted, respecting [`Retry-After` 
 | E. Mediated clients | Verify origin, TLS/routing, and exact pinned Git/REST/GraphQL requests, including persistent requesters. |
 | F. Operator release | Test the full mediated system against live GitHub. Measure denial/cleanup and outage reporting; provide artifact-linked evidence and enrollment, rotation, disable, and recovery guidance. |
 
-Interfaces and synthetic fixtures may precede deployed dependencies. Native checks remain development/testing evidence; neither replaces the authority, provider, runtime, or mediated E/F release tests.
+Interfaces and synthetic fixtures may precede deployed dependencies. Native
+checks remain development/testing evidence; neither replaces the authority,
+provider, runtime, or mediated E/F release tests.
 
 ## Acceptance matrix
 
-C1–C5, S1, P1, and O1 apply across providers using their expiry/cleanup rules. O2 applies to any enabled read-continuity or maintenance profile. G2 is development/testing only. Production requires M1–M3 and the combined E1 test as well as the applicable shared, provider, publication, and preparation tests.
+C1-C5, S1, P1, and O1 apply across providers using their expiry/cleanup rules.
+O2 applies to any enabled read-continuity or maintenance profile. G2 is
+development/testing only. Production requires M1-M3 and the combined E1 test,
+as well as the applicable shared, provider, publication, and preparation tests.
 
-| ID | Scope | Required evidence and outcome |
-| --- | --- | --- |
-| C1 | Authority | Deny forged/cross-Namespace references, stale revision/incarnation, closed leases, and wrong work; allow legitimate current work. Check requester invocation permission separately from service/workload permission. Give two grants with the same provider/profile distinct leases. Narrowing restricts issuance, delivery, and mediated use. Existing work cannot acquire a wider selection. Closing one grant preserves the other; closing logical work closes both. A turn ending alone does neither. |
-| C2 | Issuance | Concurrent/repeated requests and crashes retain one original claimed attempt. Lost provider/commit acknowledgements reconcile without untracked remint or premature delivery. GitHub profile/permission edits, rotation, rebinding, and replacement leases cannot bypass an unresolved target hold. |
-| C3 | Renewal | Cross provider expiry (one hour for GitHub) and model-turn boundaries while logical work remains open. Successors retain original authority, predecessors remain inventoried, and overlap stays bounded. Token replacement never extends enforcement/work deadlines; closed work cannot renew through later work. |
-| C4 | Cleanup | Cancel during mint/delivery; test successful/failed key rotation and new-generation admission; withdraw work/service authority, delete resources, lose a cleanup claim, and restart. Account for every known/uncertain token. Report local closure, effective distributed withdrawal, and provider outcomes separately. |
-| C5 | Scope narrowing | Narrow a live coding lease to views without changing its recorded ceiling. Deny writes and broader-token reuse; allow a supported narrower issuance/read only when authority, capacity and holds permit. Retain the broader token's identity and cleanup obligation. All scopes count toward the same overlap budget until evidenced revoke/expiry. Policy recovery cannot revive cleanup-only credentials, closed work, or a wider original work selection. |
-| S1 | Series integration | Verify connector identity, represented assignment, original-work grant, and enforcement lease independently. Deny an allowed connector's claim for an unassigned execution. During stop, deny new work and enforce the original drain deadline. Fresh reassignment requires current authority and predecessor stop evidence; old access leases remain closed. Graceful stop preserves only separately admitted completed-result delivery; cancellation/security revoke withdraws it while already stopped. Correlate business receipts, credential attempts, and lifecycle operations without replaying uncertain effects. |
-| P1 | Persistent work | Keep a worker alive across A's closure and B's admission. Deny A's queued/retried requests; allow B without importing A's authority. Test concurrency, narrowing, cancellation, reconnect, and restart. Continue admitted work across turn completion. Renew an attached child with a stopped coordinator and expired parent execution lease while logical ancestors remain open; deny after ancestor cancellation. Enforce eligible shared state and private/additional-authority isolation independently of equal repository scope. Unsupported attribution or admission denies. |
-| G1 | Live provider | Disposable private repositories: selected reads succeed, outside-grant repositories and disallowed writes fail, actual returned scope matches, and revoke-then-deny is observed. Coding also verifies branch/merge rules with no App bypass. |
-| G2 | Pinned native clients | Actual Git 2.55.0 and gh 2.93.0 processes against controlled endpoints with synthetic ephemeral tokens: helper/per-child delivery, denied/expired outcomes, refresh overlap, original-attempt retention, and no automatic replay of ambiguous writes. |
-| G3 | Public publication | Allow an approved non-public write; deny public write grants even where the App has access. Deny wrong remotes, public mirror pushes, and public PR/API mutations. Actual visibility/ownership changes close affected access and retain cleanup. Unavailable visibility checks deny the affected write; recovery requires fresh verification and still-open original authority, never reopening a closed lease. Use synthetic content. The full guarantee also requires M2/M3 and visibility-change controls; native scope checks provide partial protection. |
-| R1 | Preparation/runtime | Verify checkout before Harness startup, commit, preserved user work, cancellation, same-Pod restart, replacement, stopped previous writers, and deletion. Pin runtime/image artifacts. |
-| M1 | Copy resistance | While A succeeds, replay every integration-issued container-visible credential from an external host and B, including B on A's host/Pod where supported. GitHub and broker deny copies. A's closed work cannot borrow its successor's channel. |
-| M2 | Boundary enforcement | Keep upstream credentials outside execution. Deny raw-token endpoints, direct/tunnel fallback, and forged origin/turn assertions. Verify key custody and the runtime-owned local mapping. |
-| M3 | Protocol scope | Run approved Git/REST/GraphQL requests with real pinned clients. Deny redirects, ambiguous targets, cross-repository node IDs, extra GraphQL operations, malformed framing, and unlisted operations. Broader token permissions cannot authorize unlisted merges/mutations. Unsupported operations and provider denials cannot trigger wider tokens. |
-| O1 | Operations | Measure denial separately from termination/cleanup. Test lost authority, throttling, unavailable custody/storage, restart, and operator recovery; deny unsafe access and report actual outcomes. Authorized operators can find unresolved tombstones after deletion/restart and identify the evidence or action needed. |
-| O2 | Read continuity | During authority outage, allow only qualified reads within the existing deadline; deny writes, new admission, renewal, and reassignment. Exercise expressly preauthorized read-only token replacement, missing maintenance permission, broader-token rejection, unknown-mint hold, full overlap, and unavailable inventory. Deny at the original deadline despite a newly minted token. Missing live approval/freshness evidence denies. Restart with uncertain clock/revocation state requires synchronization. Measure each selected withdrawal bound, including disconnected holders and tighter-profile transitions. |
-| E1 | Complete mediated profile | Pin one implementation, configuration, runtime, and client manifest. With a disposable live App/repository, enroll/admit through the actual authority, broker, issuer, and inventory. Prepare/activate; run selected reads and coding; cross token replacement with a persistent requester under its original work. Close that work and observe denial while the process survives, plus separate provider cleanup. New work cannot revive old requests. Separately observe required execution termination; restart and recover an outstanding obligation. |
+| ID | Required test |
+| --- | --- |
+| C1 | [Authority](#c1-authority) |
+| C2 | [Issuance](#c2-issuance) |
+| C3 | [Renewal](#c3-renewal) |
+| C4 | [Cleanup](#c4-cleanup) |
+| C5 | [Scope narrowing](#c5-scope-narrowing) |
+| S1 | [Series integration](#s1-series-integration) |
+| P1 | [Persistent work](#p1-persistent-work) |
+| G1 | [Live provider](#g1-live-provider) |
+| G2 | [Pinned native clients](#g2-pinned-native-clients) |
+| G3 | [Public publication](#g3-public-publication) |
+| R1 | [Preparation/runtime](#r1-preparationruntime) |
+| M1 | [Copy resistance](#m1-copy-resistance) |
+| M2 | [Boundary enforcement](#m2-boundary-enforcement) |
+| M3 | [Protocol scope](#m3-protocol-scope) |
+| O1 | [Operations](#o1-operations) |
+| O2 | [Read continuity](#o2-read-continuity) |
+| E1 | [Complete mediated profile](#e1-complete-mediated-profile) |
 
-Record the implementation commit, configuration/profile version, tool/image pins, environment, command/request manifest, positive/negative outcomes, and unresolved results. Publish redacted evidence with synthetic identifiers; keep secrets and private infrastructure details outside this repository.
+Each test below states its required evidence and outcomes.
+
+### C1: Authority
+
+- Deny forged/cross-Namespace references, stale revision/incarnation, closed
+  leases, and wrong work; allow legitimate current work.
+- Check requester invocation permission separately from service/workload
+  permission.
+- Give two grants with the same provider/profile distinct leases. Closing one
+  grant preserves the other; closing logical work closes both. A turn ending
+  alone does neither.
+- Narrowing restricts issuance, delivery, and mediated use. Existing work cannot
+  acquire a wider selection.
+
+### C2: Issuance
+
+- Concurrent/repeated requests and crashes retain one original claimed attempt.
+- Lost provider/commit acknowledgements reconcile without untracked remint or
+  premature delivery.
+- GitHub profile/permission edits, rotation, rebinding, and replacement leases
+  cannot bypass an unresolved target hold.
+
+### C3: Renewal
+
+- Cross provider expiry (one hour for GitHub) and model-turn boundaries while
+  logical work remains open.
+- Successors retain original authority, predecessors remain inventoried, and
+  overlap stays bounded.
+- Token replacement never extends enforcement/work deadlines; closed work
+  cannot renew through later work.
+
+### C4: Cleanup
+
+- Cancel during mint/delivery. Test successful/failed key rotation and
+  new-generation admission.
+- Withdraw work/service authority, delete resources, lose a cleanup claim, and
+  restart. Account for every known/uncertain token.
+- Report local closure, effective distributed withdrawal, and provider outcomes
+  separately.
+
+### C5: Scope narrowing
+
+- Narrow a live coding lease to views without changing its recorded ceiling.
+- Deny writes and broader-token reuse; allow a supported narrower issuance/read
+  only when authority, capacity, and holds permit.
+- Retain the broader token's identity and cleanup obligation. All scopes count
+  toward the same overlap budget until evidenced revoke/expiry.
+- Policy recovery cannot revive cleanup-only credentials, closed work, or a
+  wider original work selection.
+
+### S1: Series integration
+
+- Verify connector identity, represented assignment, original-work grant, and
+  enforcement lease independently. Deny an allowed connector's claim for an
+  unassigned execution.
+- During stop, deny new work and enforce the original drain deadline.
+- Fresh reassignment requires current authority and predecessor stop evidence;
+  old access leases remain closed.
+- Graceful stop preserves only separately admitted completed-result delivery;
+  cancellation/security revoke withdraws it while already stopped.
+- Correlate business receipts, credential attempts, and lifecycle operations
+  without replaying uncertain effects.
+
+### P1: Persistent work
+
+- Keep a worker alive across A's closure and B's admission. Deny A's
+  queued/retried requests; allow B without importing A's authority.
+- Test concurrency, narrowing, cancellation, reconnect, and restart. Continue
+  admitted work across turn completion.
+- Renew an attached child with a stopped coordinator and expired parent
+  execution lease while logical ancestors remain open; deny after ancestor
+  cancellation.
+- Enforce eligible shared state and private/additional-authority isolation
+  independently of equal repository scope. Unsupported attribution or admission
+  denies.
+
+### G1: Live provider
+
+Use disposable private repositories to verify that:
+
+- Selected reads succeed; outside-grant repositories and disallowed writes fail.
+- Actual returned scope matches, and revoke-then-deny is observed.
+- Coding obeys branch/merge rules with no App bypass.
+
+### G2: Pinned native clients
+
+Run actual Git 2.55.0 and `gh` 2.93.0 processes against controlled endpoints with
+synthetic ephemeral tokens. Verify:
+
+- Helper/per-child delivery and denied/expired outcomes.
+- Refresh overlap and original-attempt retention.
+- No automatic replay of ambiguous writes.
+
+### G3: Public publication
+
+Use synthetic content for these checks:
+
+- Allow an approved non-public write; deny public write grants even where the
+  App has access.
+- Deny wrong remotes, public mirror pushes, and public PR/API mutations.
+- Actual visibility/ownership changes close affected access and retain cleanup.
+- Unavailable visibility checks deny the affected write. Recovery requires fresh
+  verification and still-open original authority, never reopening a closed
+  lease.
+
+The full guarantee also requires M2/M3 and visibility-change controls; native
+scope checks provide partial protection.
+
+### R1: Preparation/runtime
+
+- Verify checkout before Harness startup, the commit, and preserved user work.
+- Verify cancellation, same-Pod restart, replacement, stopped previous writers,
+  and deletion.
+- Pin runtime/image artifacts.
+
+### M1: Copy resistance
+
+- While A succeeds, replay every integration-issued container-visible
+  credential from an external host and B, including B on A's host/Pod where
+  supported. GitHub and broker deny copies.
+- A's closed work cannot borrow its successor's channel.
+
+### M2: Boundary enforcement
+
+- Keep upstream credentials outside execution.
+- Deny raw-token endpoints, direct/tunnel fallback, and forged origin/turn
+  assertions.
+- Verify key custody and the runtime-owned local mapping.
+
+### M3: Protocol scope
+
+- Run approved Git/REST/GraphQL requests with real pinned clients.
+- Deny redirects, ambiguous targets, cross-repository node IDs, extra GraphQL
+  operations, malformed framing, and unlisted operations.
+- Broader token permissions cannot authorize unlisted merges/mutations.
+- Unsupported operations and provider denials cannot trigger wider tokens.
+
+### O1: Operations
+
+- Measure denial separately from termination/cleanup.
+- Test lost authority, throttling, unavailable custody/storage, restart, and
+  operator recovery; deny unsafe access and report actual outcomes.
+- Authorized operators can find unresolved tombstones after deletion/restart
+  and identify the evidence or action needed.
+
+### O2: Read continuity
+
+- During authority outage, allow only qualified reads within the existing
+  deadline; deny writes, new admission, renewal, and reassignment.
+- Exercise expressly preauthorized read-only token replacement, missing
+  maintenance permission, broader-token rejection, unknown-mint hold, full
+  overlap, and unavailable inventory.
+- Deny at the original deadline despite a newly minted token. Missing live
+  approval/freshness evidence denies.
+- Restart with uncertain clock/revocation state requires synchronization.
+- Measure each selected withdrawal bound, including disconnected holders and
+  tighter-profile transitions.
+
+### E1: Complete mediated profile
+
+1. Pin one implementation, configuration, runtime, and client manifest.
+2. With a disposable live App/repository, enroll/admit through the actual
+   authority, broker, issuer, and inventory.
+3. Prepare/activate; run selected reads and coding; cross token replacement with
+   a persistent requester under its original work.
+4. Close that work and observe denial while the process survives, plus separate
+   provider cleanup. New work cannot revive old requests.
+5. Separately observe required execution termination; restart and recover an
+   outstanding obligation.
 
 ## Acceptance evidence and current implementation limits
 
-This submission runs documentation checks only. Implementation submissions must identify code, configuration, and mode and provide redacted evidence for applicable rows. Existing component results may be reused where behavior matches this contract; they do not establish the full lifecycle or mediated origin guarantee.
+This submission runs documentation checks only. Implementation submissions must
+identify code, configuration, and mode and provide redacted evidence for
+applicable tests. Record:
+
+- Implementation commit and configuration/profile version.
+- Tool/image pins and environment.
+- Command/request manifest.
+- Positive/negative outcomes and unresolved results.
+
+Publish redacted evidence with synthetic identifiers; keep secrets and private
+infrastructure details outside this repository.
+
+Existing component results may be reused where behavior matches this contract;
+they do not establish the full lifecycle or mediated origin guarantee.
 
 ## Upstream decision and implementation handoff
 
-RFC approval covers the platform boundary, service-owned work integration, bounded read continuity, production mediation, and the selected Git/`gh` profile. Record remaining transport, read/maintenance profile, and numerical withdrawal decisions. Follow the repository's acceptance process; keep draft status until acceptance, then create an implementation issue with milestone and evidence owners. RFC acceptance does not qualify an implementation for production.
+RFC approval covers the platform boundary, service-owned work integration,
+bounded read continuity, production mediation, and the selected Git/`gh` profile.
+Record the remaining decisions:
+
+- Protected transport.
+- Read/maintenance profiles.
+- Numerical withdrawal bounds.
+
+Follow the repository's acceptance process: keep draft status until acceptance,
+then create an implementation issue with milestone and evidence owners. RFC
+acceptance does not qualify an implementation for production.
