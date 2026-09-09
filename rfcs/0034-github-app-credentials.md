@@ -42,13 +42,13 @@ Add an internal issuer capability to [RFC 0027's SecretBroker](0027-openclaw-ent
 
 | Owner | Responsibility |
 | --- | --- |
-| OCC and existing IAM/runtime authorities | Authorize the grant and mode; check current workload and invocation authority. |
+| OCC and existing IAM/runtime authorities | Authorize invocation separately from service/workload access; issue and withdraw bounded enforcement authority. |
 | SecretBroker and protected storage | Record issuance before dispatch, protect tokens, control use, renew, and recover cleanup. |
 | Issuer implementation | Issue and revoke within the grant; report scope, expiry, and uncertain outcomes. |
 | Compute | Own execution and checkout. |
 | SandboxDriver | Establish and verify containment. |
 
-The broker tracks access in a **lease** tied to one invocation or preparation operation. A lease ID grants no permission; invocation checks can only narrow workload authority. The [broker interface](0034/credential-broker-v1-spec.md) runs within trusted platform services and requires no new microservice.
+The broker tracks access in an **access lease** tied to one logical work record and execution assignment, or a separately admitted preparation operation. This is distinct from the bounded **enforcement lease** issued by OCC's authority service. Requester invocation permission and service/workload permission are separate; neither a lease ID nor requester identity grants provider access. The [broker interface](0034/credential-broker-v1-spec.md) runs within trusted platform services and requires no new microservice.
 
 This proposal consumes the [identity/execution contract](https://github.com/openclaw/rfcs/pull/69), [original-work authority](https://github.com/openclaw/rfcs/pull/70), and [stop/replacement rules](https://github.com/openclaw/rfcs/pull/71). The [series overview](0027/runtime-access-overview.md) maps their ownership and remaining decisions.
 
@@ -56,7 +56,7 @@ This proposal consumes the [identity/execution contract](https://github.com/open
 
 An operator enrolls a GitHub App installation through a Namespace's broker. OCC records approved repositories, permissions, mode, and checkout commit in an immutable Agent revision. The signing key stays outside Agent execution.
 
-Each session selects from those grants. An invocation may narrow that selection and gets a separate lease and token per repository. Later session changes cannot expand an existing invocation's access. [Session scope](0034/github-app-v1-spec.md#session-scope-and-multiple-repositories)
+Each request selects from those grants at admission to service-owned logical work, with a separate access lease and token per repository and execution assignment. Logical work may outlive a message, model turn, or token. Later session changes cannot expand its original scope. [Session scope](0034/github-app-v1-spec.md#session-scope-and-multiple-repositories)
 
 | Profile | GitHub permissions |
 | --- | --- |
@@ -76,7 +76,7 @@ flowchart LR
 
     subgraph TRUSTED["Outside Agent execution"]
         CONNECTOR["Trusted host connector<br/>Establish execution<br/>and original-work identity"]
-        PROXY["Broker + GitHub mediator<br/>Check current authority<br/>Validate operation<br/>Insert token"]
+        PROXY["Broker + GitHub mediator<br/>Enforce work authority<br/>Validate operation<br/>Insert token"]
 
         CONNECTOR --> PROXY
     end
@@ -96,10 +96,10 @@ The initial profile covers clone/fetch, prepared-branch push, repository/issue/P
 ### Manage normal operation
 
 1. **Prepare.** OCC authorizes a separate read-only checkout. SandboxDriver verifies containment; Compute verifies the commit and storage handoff before OCC starts the candidate Harness. Failure preserves the serving revision and workspace.
-2. **Run and renew.** Check current authority before issuance and every mediated operation. Token expiry does not end authorized work: the broker issues replacements and tracks every predecessor. Commands may fail on expiry; ambiguous writes are not automatically replayed.
-3. **Close and clean up.** Completion, replacement, expiry, or withdrawal closes affected leases and starts durable cleanup. Reusable processes may survive, but old requests cannot inherit later work's authority. Workspace replacement requires observed writer termination.
+2. **Run and renew.** Enforce the admitted work and operation at every dispatch. Writes, authority renewal, and new assignments require current authority. Explicitly qualified reads may continue during an authority outage under an existing unexpired enforcement lease; narrowly preauthorized read-only credential maintenance may preserve that access. Token replacement tracks every predecessor and never renews work authority. Commands may fail on expiry; ambiguous writes are not automatically replayed.
+3. **Close and clean up.** Work completion, assignment retirement, access expiry, or withdrawal closes affected broker leases and starts durable cleanup. Logical work can move to a fresh authorized assignment after the required stop barrier; old assignment leases remain closed. Reusable processes cannot lend later work's authority to old requests. Workspace replacement requires observed writer termination.
 
-Persistent processes need trusted attribution of requests to their original work. Background work beyond a turn needs explicit admission and a cancellation owner. That [design remains a release gate](0034/credential-broker-v1-spec.md#persistent-processes-and-background-work).
+Persistent processes need trusted attribution of requests to their original work. Attached children have their own admission and immutable lineage; renewal depends on open, authorized logical ancestors, not a live coordinator process. The [protected dispatch mechanism remains a release gate](0034/credential-broker-v1-spec.md#persistent-processes-and-background-work).
 
 [Recovery requirements](0034/lifecycle.md) distinguish stopping access, stopping a process, and revoking tokens. Already accepted provider operations may finish.
 
@@ -112,4 +112,5 @@ Mediation requires trusted origin enforcement and Git/API compatibility work. Co
 ## Unresolved questions
 
 - Which protected transport and dispatcher can attribute persistent-worker requests to their original work on the selected runtime?
-- Which background-work lifetimes should initial admission support, and who owns their renewal and cancellation?
+- Which GitHub read operations and read-only credential-maintenance profile can qualify for bounded operation during an authority outage?
+- What numerical lease and withdrawal profiles meet the selected availability and security requirements?

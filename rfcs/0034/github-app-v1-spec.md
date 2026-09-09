@@ -42,13 +42,13 @@ Visibility changes, transfers, and enrollment changes require denial and revalid
 
 ## Session scope and multiple repositories
 
-At session admission, OCC records the selected immutable repository grants, supported narrower profiles, and deadline. Existing IAM/admission authority validates the selection; chat requests, local remotes, and personal GitHub access confer no authority. Every invocation derives a separate lease for each selected repository it uses under the [shared authority rules](credential-broker-v1-spec.md#current-authority-and-workload-origin).
+At logical-work admission, OCC records the selected immutable repository grants, supported narrower profiles, and original horizon. IAM authorizes the requester to invoke the service separately from the service/workload's repository access. Chat requests, local remotes, and personal GitHub access confer no provider authority. Each work/assignment derives a separate access lease for each selected repository under the [shared authority rules](credential-broker-v1-spec.md#current-authority-and-workload-origin). Session references retain provenance and any explicitly admitted cancellation relationship; ending a model turn does not close logical work.
 
 For example, `coding` on `org/service` and `views` on `org/library` allows pushes and PRs in `service`, and only reads in `library`. Changing both under `coding` grants creates two branches and two same-repository PRs. Each command selects one explicit grant and a token scoped to it; ambiguous selection denies. No session-wide token combines permissions. Report each PR's outcome independently and never blindly replay an uncertain write.
 
 Push the prepared branch first, then create a draft PR with explicit repository, base, and head in that same repository. Do not let `gh` implicitly fork or push. Fork-to-upstream PRs are unsupported; they require separate head/base identity, grant, visibility, and compatibility validation. [gh PR creation](https://cli.github.com/manual/gh_pr_create)
 
-Refresh and cleanup are independent per repository lease. Removing one grant preserves others unless shared authority changes; closing an invocation/session closes all its leases. The unknown-mint hold below applies across aliases for the same provider target. Native restrictions require enforcement by GitHub permissions and repository rules; narrower unsupported restrictions require mediation or denial. Delivered native tokens retain their scope until revoke or expiry.
+Refresh and cleanup are independent per repository access lease. Removing one grant preserves others unless shared authority changes; closing logical work closes its leases and applies its admitted child-cancellation rules. An authorized execution replacement creates fresh assignment-bound leases after the stop barrier; it cannot reopen old leases. The unknown-mint hold below applies across aliases for the same provider target. Native restrictions require enforcement by GitHub permissions and repository rules; narrower unsupported restrictions require mediation or denial. Delivered native tokens retain their scope until revoke or expiry.
 
 ## Preventing public publication
 
@@ -71,7 +71,7 @@ Visibility checks and writes are separate operations. Organization controls must
 
 All profiles include required `metadata:read`; workflow, administration, and secrets permissions are excluded. Coding tokens are not limited to drafts or particular branches: `contents:write` satisfies the PR-merge permission check even without `pull_requests:write`. GitHub repository rules with no App bypass must enforce branch/merge restrictions. [Merge permissions](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request)
 
-The issuer signs an App JWT outside execution and calls `POST /app/installations/{id}/access_tokens` with one explicit `repository_ids` entry and the issuance's exact effective permissions, validated as a supported subset of the immutable lease ceiling and current authority. A `coding` ceiling narrowed to `views` must mint `views` permissions without changing the ceiling. Never use installation-wide defaults; unavoidable metadata read is the sole implicit baseline. Validate returned repository scope, permissions, and actual expiry before eligibility. Incomplete scope evidence or unexpected scope retains the token for cleanup only. [Installation token creation](https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app)
+The issuer signs an App JWT outside execution and calls `POST /app/installations/{id}/access_tokens` with one explicit `repository_ids` entry and the issuance's exact effective permissions, validated as a supported subset of the immutable lease ceiling and applicable enforcement authority. A `coding` ceiling narrowed to `views` must mint `views` permissions without changing the ceiling. Never use installation-wide defaults; unavoidable metadata read is the sole implicit baseline. Validate returned repository scope, permissions, and actual expiry before eligibility. Incomplete scope evidence or unexpected scope retains the token for cleanup only. [Installation token creation](https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app)
 
 App JWTs expire within ten minutes; installation tokens expire after one hour, with no documented custom TTL parameter. Tokens are opaque variable-length strings. Shorter OCE leases do not shorten provider validity; App key rotation does not revoke issued tokens. [App JWT](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app), [installation token lifetime](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 
@@ -87,7 +87,7 @@ Enforce the [same effective grant](credential-broker-v1-spec.md#one-effective-gr
 | Supported operation and parameters | Mediator validates actual Git/REST/GraphQL semantics, including same-repository targets and draft PR state. |
 | Branch and merge restrictions | GitHub repository rules with no App bypass. V1 adds no proxy-side branch policy. |
 | Approved non-public destination | Current ownership/visibility checks plus the organization controls required by the publication policy. |
-| Work purpose, horizon, withdrawal | Current OCC/IAM decision and broker lease enforcement at dispatch. |
+| Work purpose, horizon, withdrawal | Current OCC/IAM decision or qualified existing read enforcement lease, plus broker access-lease enforcement at dispatch. |
 | Execution origin | Trusted runtime/host mapping and enforced routing; no workload-visible proof is sufficient by possession. |
 
 The profile is a ceiling: use supported narrower profiles for read-only work, never arbitrary per-request permission combinations. Never reuse or refresh broader tokens for narrower work. Finer operation classes require a versioned profile and compatible lease/cache accounting. GitHub specifies endpoint permissions and calls for testing actual GraphQL queries and mutations. [Permission guidance](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
@@ -98,7 +98,7 @@ Ordinary Contents permissions lack per-token arbitrary path scope. App-registrat
 
 ## Refresh and overlap
 
-Cache by exact binding/profile, Namespace/Agent/revision, incarnation, original lease/purpose, repository/effective permissions, and generation. Never substitute broader admitted scope or share tokens across independently revocable leases. Every use or delivery requires fresh authority.
+Cache by exact binding/profile, Namespace/Agent/revision, assignment/incarnation, original work and access lease/purpose, repository/effective permissions, and generation. Never substitute broader admitted scope or share tokens across independently revocable leases. Every use enforces its current decision or qualified read lease; native delivery requires current authority.
 
 Supported narrower issuances under the same open lease have distinct exact-scope
 cache entries. All scopes share that lease's mint claim and two-credential overlap
@@ -109,6 +109,8 @@ Begin replacement when the recorded token has less than five minutes remaining, 
 
 After failed refresh, the broker may serve a recorded unexpired token only while original authority, exact scope, and delivery/use checks pass. Do not run autonomous refresh after lease closure. Respect provider throttling on permitted retries and the shared no-remint rule for uncertain issuance.
 
+During an authority outage, existing qualified reads may use only their unexpired enforcement lease. Trusted token maintenance requires explicit preauthorization for the same work, assignment, access lease, repository, and a read-only `checkout` or `views` profile. It cannot renew an authority deadline, issue for new work, or reuse/replace a write-capable token offline. All provider verification, custody, inventory, overlap, and unknown-mint checks still apply; unavailable inventory denies maintenance. A new one-hour provider token does not extend the original enforcement deadline. Without a qualified maintenance profile, token expiry can interrupt otherwise authorized reads.
+
 An unknown mint holds the stable provider target: OCE Installation, canonical GitHub host, App identity, GitHub installation ID, and repository ID. It blocks issuance across binding aliases, Namespaces, profiles/permission changes, key or binding generations, revisions, incarnations, leases, and modes. Retain original ownership and permission evidence; configuration changes or renewed admission cannot bypass the hold. OCC's trusted inventory enforces it without disclosing another Namespace's records, prioritizing complete accounting over availability.
 
 Resolve the hold only with definite no-issuance evidence, evidence that expiry has elapsed, or verified sufficient administrative revocation. New request IDs and time since a timeout do not resolve it. Broader remedies require an identified scope and corresponding operator authorization. Other targets remain independent; never automatically switch accounts to bypass a hold.
@@ -117,7 +119,7 @@ Mediated dispatches can use eligible replacement tokens without restarting the r
 
 ## Native client contract
 
-The Git helper and `gh` launcher use the broker's native delivery port with a protected, immutable original-invocation binding. Reject broader permissions, alternate credentials, unsupported remotes, or invocation substitution. Preparation helpers use a separate read-only identity.
+The Git helper and `gh` launcher use the broker's native delivery port with a protected, immutable original-work and execution binding. Reject broader permissions, alternate credentials, unsupported remotes, or work substitution. Preparation helpers use a separate read-only identity.
 
 - Git authenticates only canonical HTTPS GitHub remotes through the selected helper. Keep credentials out of remote URLs, command arguments, persistent configuration, and credential stores. Disable inherited helpers and unmanaged credential fallback in the controlled client path.
 - Each new `gh` child receives `GH_TOKEN` in its environment only. Preserve arguments and exit/signal behavior; never update existing environments or a global current-turn token. Prevent inherited host/token configuration from selecting another credential or destination.
@@ -126,7 +128,7 @@ The Git helper and `gh` launcher use the broker's native delivery port with a pr
 
 ## Mediated origin and routing
 
-The proposed trusted host connector keeps its SPIFFE mTLS key outside Agent execution. It authenticates an exclusive runtime-owned local channel, resolves the actual container incarnation and original invocation through a protected mapping, and makes the broker request. The broker verifies its service identity and exact mapping; container-supplied identity headers are untrusted.
+The proposed trusted host connector keeps its SPIFFE mTLS key outside Agent execution. It authenticates an exclusive runtime-owned local channel, resolves the actual container incarnation and original logical work through a protected mapping, and makes the broker request. The broker verifies its service identity and exact mapping; container-supplied identity headers are untrusted.
 
 Use [RFC 0035's identity and assignment contract](https://github.com/openclaw/rfcs/pull/69) for three separately checked bindings: the connector's own service assignment, the represented Agent execution assignment/generation from protected runtime evidence, and [RFC 0036's original-work grant](https://github.com/openclaw/rfcs/pull/70). A connector may represent only executions allowed by its server-owned mapping; its SVID cannot substitute for Agent authority. Installation configuration pins trust roots and permitted peers. Registration/attestation ownership, peer acceptance, evidence lifetime, and invalidation must be specified and qualified for the selected runtime. SPIFFE service authentication does not itself select a different Agent-to-OCC authentication profile.
 
