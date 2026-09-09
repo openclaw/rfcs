@@ -1,0 +1,49 @@
+digraph StopAndDelivery {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    fontname="DejaVu Sans",
+    fontsize=13,
+    nodesep=0.34,
+    ranksep=0.62,
+    margin=0.08,
+    pad=0.10,
+    size="11,3.1",
+    dpi=100,
+    splines=polyline
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="DejaVu Sans",
+    fontsize=13,
+    color="#708791",
+    fillcolor="#EDF4F7",
+    fontcolor="#243A42",
+    penwidth=1.2,
+    margin="0.16,0.12"
+  ];
+  edge [
+    fontname="DejaVu Sans",
+    fontsize=11,
+    color="#426C7C",
+    fontcolor="#344F5C",
+    arrowsize=0.7,
+    penwidth=1.3
+  ];
+
+  stop [label="Graceful stop\nPersist stopped intent", fillcolor="#E4F3EE", color="#458878"];
+  drain [label="Finite drain\nEligible work; fixed deadline"];
+  termination [label="Worker termination\nExact workload confirmed stopped"];
+  delivery [label="Pre-admitted delivery\nCompleted result; exact audience\nOriginal finite horizon", fillcolor="#E4F3EE", color="#458878"];
+  revoke [label="Cancel / security revoke\nAlso when already stopped\nTermination remains required", fillcolor="#F9ECEF", color="#AE6D7D"];
+
+  { rank=same; stop; revoke; }
+  { rank=same; drain; delivery; }
+
+  stop -> drain [label="close admission"];
+  stop -> delivery [label="preserve"];
+  drain -> termination [label="drain ends; withdraw\nexecution authority"];
+  revoke -> drain [label="withdraw authority", color="#AD526C", fontcolor="#92465B", arrowhead=tee, constraint=false];
+  revoke -> delivery [label="withdraw delivery", color="#AD526C", fontcolor="#92465B", arrowhead=tee];
+}
