@@ -3,7 +3,7 @@ title: Workload identity and runtime authority with SPIFFE/SPIRE
 authors:
   - Free Wortley
 created: 2026-09-08
-last_updated: 2026-09-09
+last_updated: 2026-09-11
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/69
@@ -37,17 +37,19 @@ Under [execution registration](0035/enforcement-spec.md#execution-registration),
 
 [Request verification](0035/enforcement-spec.md#request-verification) requires qualified transport to establish required execution origin. Ordinary TLS proves key possession; copied identity fields cannot recreate connection-bound evidence. Missing origin proof denies affected operations. [RFC 0034 mediation](https://github.com/openclaw/rfcs/pull/68) binds connector, represented Agent and [RFC 0036 original work](https://github.com/openclaw/rfcs/pull/70); service identity cannot replace caller authority. [RFC 0037](https://github.com/openclaw/rfcs/pull/71) observes OCC's canonical assignment.
 
-Application writes, admission, renewal, expansion and reassignment require current authority. [Outage operation](0035/enforcement-spec.md#outage-operation) permits only qualified existing application reads under an existing, unexpired lease. Protected origin, trustworthy time, complete revocation state and all mandatory evidence remain required; missing evidence denies use. Read eligibility, freshness, protected content versions and preauthorized credential maintenance require explicit qualification; maintenance cannot expand access or extend deadlines.
+Application writes, admission, renewal, expansion and reassignment require current authority. The first GitHub mediation profile requires online OCC authority for every dispatch and selects no outage exception for reads or credential maintenance. An optional [outage profile](0035/enforcement-spec.md#outage-operation) would permit only qualified existing application reads under an existing, unexpired lease. Protected origin, trustworthy time, complete revocation state and all mandatory evidence remain required; missing evidence denies use. Read eligibility, freshness, protected content versions and preauthorized credential maintenance require explicit qualification; maintenance cannot expand access or extend deadlines.
 
-Logical work may survive a process; an enforcement lease binds an exact execution and cannot exceed the work horizon. Replacement requires current authority and new evidence.
+A stable Agent may persist across executions. Logical work and execution duration may be explicitly uncapped, but every enforcement lease remains finite and binds exact work and execution. Any finite work, ancestor, stop or purpose deadline still bounds authority. Replacement requires current authority and new evidence.
 
 ![Authority lifetimes](0035/authority-lifetimes.png)
 
-*Work may outlive execution; identity authenticates, while leases bound authority.*
+*Work may outlive execution and need not have a duration cap; leases always have finite expiry.*
 
 [Issuance and revocation](0035/enforcement-spec.md#lease-issuance-and-ordering) must be authoritatively ordered and stale issuers fenced. Late delivery retains original expiry. [Lease bounds](0035/enforcement-spec.md#lease-bounds-and-ancestry) respect ancestor horizons, purpose deadlines and withdrawal targets. Issuance and renewal recheck current policy and open logical ancestors; offline attenuation only narrows existing authority.
 
 Effective withdrawal requires complete holder acknowledgements or proven expiry, including descendants and clock/enforcement allowances. Leases cannot promise immediate withdrawal from unreachable holders. Lost continuity after restart, untrustworthy time, revocation gaps or rollback block affected use until trustworthy synchronization returns; [continuity contracts](0035/enforcement-spec.md#revocation-and-continuity) define the required evidence.
+
+In the selected Kubernetes/gVisor profile, permission increases and decreases require a fresh Pod/gVisor sandbox and execution identity. Withdraw old dispatch authority; old processes and retained state cannot acquire changed permissions in place. Unchanged-scope reuse remains a future qualified optimization.
 
 [Dispatch and lifecycle](0035/enforcement-spec.md#dispatch-and-lifecycle) recheck evidence at final submission and protected delivery. Queuing, reconnect and identity renewal cannot extend deadlines. Effective retirement requires established withdrawal; physical termination remains separate. Compute must observe predecessor termination before a writable successor; retained cleanup authority survives deletion.
 

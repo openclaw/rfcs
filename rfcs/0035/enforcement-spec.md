@@ -11,7 +11,9 @@ and attestation. Neither selects active revisions or grants OpenClaw permissions
 
 Each Agent retains its OCC-created `WorkloadIdentity`. An internal assignment
 binds it to an admitted revision and execution, without introducing a user-facing
-resource between AgentRevision and its workload. Gateways, registrars and cleanup
+resource between AgentRevision and its workload. The Agent resource may persist
+indefinitely; its stable identity is distinct from an execution assignment, its
+SVID and each finite authority lease. Gateways, registrars and cleanup
 services use their own narrowly authorized identities; they cannot assume Agent
 identity.
 
@@ -50,6 +52,21 @@ execution binding even with unchanged Agent, ServiceAccount or Pod UID.
 Compartment selection must satisfy
 [RFC 0036's shared-state or isolation requirements](https://github.com/openclaw/rfcs/pull/70);
 identity labels cannot prove that isolation.
+
+In the selected Kubernetes/gVisor profile, a permission increase or decrease
+requires a fresh Pod/gVisor sandbox, assignment and execution-bound SVID. Another
+container sharing the old Pod is insufficient. Withdraw old dispatch authority
+before admitting dispatch under the changed scope; do not change permissions in
+place while retaining old processes, memory, credentials or reusable state.
+Approved workspace or context handoff requires explicit scope and isolation
+checks; it cannot carry old authority or disallowed higher-authority data into
+the successor.
+
+An Agent may handle multiple messages and turns under one unchanged authorized
+context; a message alone does not require a new Pod. Reusing a context across
+assignments remains a future optimization requiring proof of unchanged effective
+authority and data scope, currentness, work attribution and retained-state
+isolation. Comparing one permission label cannot qualify reuse.
 
 The registered SPIFFE ID identifies one execution binding and must never be
 rebound to a successor. Attested selectors must distinguish that execution from
@@ -107,6 +124,12 @@ here. Connector and gateway identities cannot replace caller authority.
 
 ## Outage operation
 
+The first GitHub mediation profile requires online OCC authority for every
+protected dispatch. It selects no outage exception for reads or credential maintenance.
+The exception below is an optional profile proposal, requiring separate explicit
+selection and qualification; finite leases alone do not enable it. Provider tokens
+may be cached only while every use passes the selected current-authority checks.
+
 Long-lived connections and streams recheck purpose before privileged dispatch or
 protected delivery. Application writes, message posting, new admission, renewal,
 expansion and new execution assignment require current authority. Only explicitly
@@ -139,7 +162,7 @@ Each lease records:
 
 - Issuer and committed issuance version.
 - Installation and Namespace.
-- Work and immutable ceiling.
+- Work, immutable scope and the admitted finite-or-uncapped horizon selection.
 - Exact assignment and generation.
 - Intended accepting service and purpose.
 - Applicable policy and ancestor scopes.
@@ -160,10 +183,22 @@ guarantees or remain unavailable for this profile.
 
 ## Lease bounds and ancestry
 
-Lease expiry must fit all applicable bounds:
+Execution duration and logical-work horizons may be explicitly uncapped under
+the selected policy. An omitted or unknown policy is not evidence of uncapped
+authority. Each enforcement lease still has a finite absolute expiry.
+
+For issuance committed at `t`, expiry must satisfy:
+
+```text
+expiresAt <= min(t + maximumLeaseDuration, all applicable finite bounds)
+```
+
+`maximumLeaseDuration` is finite. An explicitly uncapped horizon contributes no
+duration bound; any finite ancestor, purpose or stop deadline still applies.
+Applicable bounds include:
 
 - The issuance-time maximum.
-- Original work and applicable ancestor horizons.
+- Any configured finite execution, original-work and ancestor horizons.
 - Purpose and stop deadlines.
 - Every applicable withdrawal target after clock and enforcement allowances.
 
@@ -172,7 +207,9 @@ tolerance scales, not chosen lifetimes or measured guarantees. A child cannot
 weaken an ancestor's withdrawal target.
 
 Fresh authoritative child renewal requires open, authorized logical ancestors,
-not a running parent or a valid parent execution lease. Offline attenuation can
+not a running parent or a valid parent execution lease. Renewal cannot expand
+scope, extend a configured cap or reopen terminal work. An uncapped horizon does
+not authorize offline writes or replay of uncertain effects. Offline attenuation can
 only narrow an existing lease and retains its expiry; it cannot admit children,
 renew authority or reassign execution.
 
@@ -227,6 +264,10 @@ original evidence lifetime; fresh authentication produces fresh evidence. Missin
 trust, expired evidence, untrustworthy revocation state or terminal invalidation
 blocks use; late success cannot reopen a closed stream.
 
+Permission changes use the fresh sandbox transition above. Withdrawal of old
+dispatch authority and physical termination are separate facts: denying the old
+assignment is not proof that its processes stopped or relinquished shared state.
+
 Retirement withdraws authority under the selected bound and preserves cleanup
 responsibility; report retirement as effective only after that withdrawal is
 established. Registration deletion and certificate expiry do not prove
@@ -249,7 +290,12 @@ Runtime qualification must demonstrate:
 - Distinct identities for co-located workloads and restarts.
 - Renewal, reconnect and warm-stream behavior.
 - Retired-execution denial while certificates remain valid.
-- Qualified reads stopping at existing lease deadlines during outages.
+- Permission increases and decreases using fresh Pod/gVisor sandboxes, with old
+  dispatch denied and retained-state handoff checked.
+- Finite lease expiry and current-authority renewal for explicitly uncapped work,
+  with any finite ancestor, stop and purpose deadlines preserved.
+- Online-only profiles denying affected dispatch when current authority is
+  unavailable; separately selected read exceptions stopping at lease deadlines.
 - Write, renewal and reassignment denial without current authority.
 - Registration timeouts, deletion cleanup and uncertain predecessor termination.
 
