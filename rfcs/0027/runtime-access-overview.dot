@@ -3,14 +3,10 @@ digraph RuntimeAccessOverview {
   node [shape=box, style="rounded,filled", fontname="Arial", fontsize=12, fontcolor="#24323B", color="#82949D", penwidth=1.1, margin="0.16,0.12"];
   edge [fontname="Arial", fontsize=10, fontcolor="#425963", color="#6B818A", penwidth=1.2, arrowsize=0.7];
 
-  work [label="0036: Work authority\nAdmit scope + duration policy", fillcolor="#E9F3F1", color="#578D82"];
-  identity [label="0035: Enforcement\nBind execution + lease", fillcolor="#EAF1F8", color="#6489B0"];
-  credentials [label="0034: Credentials\nMediate use + cleanup", fillcolor="#E9F3F1", color="#578D82"];
-  lifecycle [label="0037: Runtime + delivery\nStop, recover, deliver", fillcolor="#F7EDEE", color="#B7858B"];
+  reads [label="A: Managed reads\nMetadata, clone, fetch\nMinimal internal Work + operations", fillcolor="#E9F3F1", color="#578D82"];
+  publish [label="B: Coding + publication\nHuman Approve and publish\nExact candidate + separate effects", fillcolor="#EAF1F8", color="#6489B0"];
+  lifecycle [label="C: Broader durable Work + children\nStop task / Stop Agent / Start Agent\nQualify broader lifecycle behavior", fillcolor="#F7EDEE", color="#B7858B"];
 
-  work -> identity;
-  identity -> credentials;
-  credentials -> lifecycle;
-  identity:n -> identity:n [label="Renew within work limits", color="#6489B0"];
-  lifecycle:s -> identity:s [label="Fresh assignment for still-open work", constraint=false, color="#B7858B"];
+  reads -> publish;
+  publish -> lifecycle;
 }

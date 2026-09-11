@@ -7,16 +7,18 @@ and client behavior. This appendix describes how to test them.
 
 ## Production scope
 
-Production requires the
-[mediated Git/`gh` profile](github-app-v1-spec.md#mediated-operation-profile),
-including original-work attribution for persistent processes, online OCC
-authority for every dispatch, and trusted exact-candidate publication. Native
-delivery is development/testing only.
+Production requires the [mediated profile](github-app-v1-spec.md#mediated-operation-profile)
+and online OCC authority for every dispatch. Stage A qualifies repository
+metadata and clone/fetch; B adds the coding workflow and exact-candidate
+human-approved publication; C adds broader durable Work, separately admitted
+children, and Stop task / Stop Agent / Start Agent controls. Native delivery
+is development/testing only.
 
-Qualification covers trusted request attribution and the explicitly selected
-operation/runtime profile. Attached-child support remains a separate scope
-decision; active-session migration/replay is later work. Offline read continuity
-is a future optional broker profile, excluded from the first GitHub release.
+Genuine root Work, exact revision/assignment binding, current operation grants,
+cancellation/withdrawal, custody, and durable outcomes are required from A.
+Root-only execution may qualify first; subordinate helpers require the same
+qualified context, scope, and cancellation. Active-session migration/replay and
+offline read continuity remain later work, outside these initial GitHub gates.
 The [acceptance matrix](#acceptance-matrix)
 identifies required tests; [release evidence](#acceptance-evidence-and-current-implementation-limits)
 records their results.
@@ -92,12 +94,15 @@ resolve uncertainty.
 
 | Event | Coordination |
 | --- | --- |
-| Activate or replace | Close old assignment authority, observe previous writers stopped, and promote verified staging through Compute. Continuing logical work requires fresh current assignment authorization and new access leases; original scope and effect receipts remain fixed. |
+| Activate or replace | Close old assignment authority, observe previous writers stopped, and promote verified staging through Compute. Early stages admit fresh Work. Cross-assignment Work continuation is a later qualified profile requiring fresh current assignment authorization and new leases; original scope and effect receipts remain fixed. |
 | End a turn or logical work | A turn ending does not finish service-owned work. Logical-work closure closes its access leases; queued requests cannot borrow another work record through a mutable pointer. |
-| Admit long-lived work | Require trusted admission, original scope and explicit finite-or-uncapped duration selection, and cancellation owner. Every configured horizon remains immutable; leases and operation bounds remain finite. Child admission and renewal tests apply only to a separately selected supported child profile. |
+| Admit Work | From A, require genuine root admission, original scope, exact Agent/revision/assignment, current operation authority, duration selection, and cancellation owner. Leases and operations stay finite. Same-scope subordinate helpers require qualification; separately admitted durable children follow in C. |
 | Restart within a Pod | Change execution generation, close old leases, and reestablish origin. The same Pod UID or volume preserves no authority. Permission/context changes additionally require a fresh Pod/gVisor sandbox, eligible context, and observed old-writer termination. |
 
 ### Stopping and result delivery
+
+User-facing stop/start controls and completed-result delivery qualify in C.
+Cancellation, withdrawal, and safe retirement remain required from A.
 
 | Event | Coordination |
 | --- | --- |
@@ -165,28 +170,31 @@ reminting nor replay of ambiguous writes.
 
 ## Implementation sequence
 
-| Milestone | Required result |
+| Stage | Required result |
 | --- | --- |
-| A. Authority and composition | Map OCC/IAM, work, enforcement, runtime, broker, and storage owners to the ports. Implement the selected original-work admission; select protected dispatch, online authority and numerical withdrawal bounds. Keep optional children/offline profiles separate. Demonstrate genuine authority and trusted request attribution; list unsupported runtime/profile combinations. |
-| B. Durable broker | Implement reservations, claims, protected custody, delivery gates, closure, and deletion-safe cleanup. Inject failures at each commit/provider/delivery boundary across replicas and restart. |
-| C. GitHub issuer | Verify enrollment, explicit and returned scope, expiry, overlap, and individual revoke with a disposable App installation. |
-| D. Preparation and execution | Verify staging, containment, commit, stopped writers, restart generations, and safe activation/rollback. |
-| E. Managed reads and publication | Verify real gVisor origin, split DNS, both TLS legs, no-bypass fencing, and pinned Git/REST reads. Then qualify exact-candidate approval and separate push/PR effects. Select GraphQL reads only where required. |
-| F. Operator release | Test the complete selected profile against live GitHub. Measure denial/cleanup and outage reporting; provide artifact-linked evidence and enrollment, rotation, disable, and recovery guidance. |
-| G. Later transparent writes | Qualify `git push` and `gh pr create` adapters against the same immutable candidate, approval, publisher and effect records; no raw write passthrough. |
+| A. Managed reads | Implement the proposed admin configuration and Installation-selected credential gateway with genuine root Work and current operation authority, durable broker/custody, verified issuer scope/revoke, safe preparation, gVisor origin and routing, and mediated metadata/clone/fetch. Measure denial and cleanup against live GitHub. |
+| B. Coding workflow | Add selected issue/PR reads and exact-candidate human approval; qualify atomic expected-old push and separate draft-PR effects, including lost responses and partial success. |
+| C. Durable work and lifecycle | Qualify broader durable Work and independently admitted child records with ancestry/cancellation, then Stop task / Stop Agent / Start Agent and their selected delivery behavior. |
 
-Interfaces and synthetic fixtures may precede deployed dependencies. Native
-checks remain development/testing evidence; neither replaces the authority,
-provider, runtime, or mediated E/F release tests.
+Each stage needs artifact-linked authority, provider, runtime, and recovery
+evidence. Qualification of A does not establish B or C. Later transparent
+`git push` / `gh pr create` adapters reuse the same publisher and effects;
+independent-human and scoped automatic policy modes require separate approval
+qualification. Active-session migration/replay is outside these stages.
+Interfaces, synthetic fixtures, and native checks do not qualify production.
 
 ## Acceptance matrix
 
-C1-C5, S1, P1, and O1 apply across providers using their expiry/cleanup rules.
-O2 applies only to a future enabled read-continuity/maintenance profile and is
-not a first GitHub gate. Child and completed-delivery tests apply only when those
-features are admitted; rejecting unsupported combinations is required. G2 is
-development/testing only. Production requires M1-M3 and the combined E1 test,
-as well as the applicable shared, provider, publication, and preparation tests.
+Tests apply to the selected stage and permission profile; unsupported features
+must deny. Shared tests use each provider's own expiry/cleanup rules.
+
+| Gate | Required evidence |
+| --- | --- |
+| A | C1-C5, root/assignment portions of S1/P1, G1 reads and revoke, R1, M1-M3 reads, O1, and E1 through live metadata/clone/fetch. Publication remains disabled. |
+| B | A plus coding/permission-narrowing cases, G1 publication, G3/G4, selected coding reads in M3, and E1 with human-approved publication. |
+| C | B plus separately admitted children in P1 and selected stop/start/completed-delivery behavior in S1/E1. |
+| Later policy modes | G5 plus the same exact-candidate, current-authority, destination, and effect checks as G4. Neither mode is enabled in the MVP. |
+| Other profiles | G2 is native development/testing only. O2 requires separate future read-continuity selection and qualification. |
 
 | ID | Required test |
 | --- | --- |
@@ -201,6 +209,7 @@ as well as the applicable shared, provider, publication, and preparation tests.
 | G2 | [Pinned native clients](#g2-pinned-native-clients) |
 | G3 | [Public publication](#g3-public-publication) |
 | G4 | [Exact-candidate publication](#g4-exact-candidate-publication) |
+| G5 | [Later publication policy modes](#g5-later-publication-policy-modes) |
 | R1 | [Preparation/runtime](#r1-preparationruntime) |
 | M1 | [Copy resistance](#m1-copy-resistance) |
 | M2 | [Boundary enforcement](#m2-boundary-enforcement) |
@@ -215,8 +224,15 @@ Each test below states its required evidence and outcomes.
 
 - Deny forged/cross-Namespace references, stale revision/incarnation, closed
   leases, and wrong work; allow legitimate current work.
-- Check requester invocation permission separately from service/workload
-  permission.
+- Authorize the administrator's exact Namespace, Agent/Configuration mutation,
+  and each referenced binding/broker/Secret. Deny an Agent editor who lacks
+  binding authority. Freeze verified repository IDs, refs, profile and policy
+  generations; config edits cannot silently change a serving revision.
+- Check requester user/channel invocation permission separately from
+  service/workload repository permission. Neither personal GitHub access nor
+  App-wide installation scope can widen the intersection.
+- Exercise the selected credential gateway through genuine admitted handles;
+  configuration or reconstructed handles cannot supply missing Work/IAM/custody.
 - Give two grants with the same provider/profile distinct leases. Closing one
   grant preserves the other; closing logical work closes both. A turn ending
   alone does neither.
@@ -254,9 +270,10 @@ Each test below states its required evidence and outcomes.
 
 ### C5: Scope narrowing
 
-- Narrow a live coding lease to views without changing its recorded ceiling.
-  Deny immediately; serving changed permissions in the first GitHub profile
-  requires fresh Pod/gVisor isolation and new assignment-bound leases.
+- From A, narrow or withdraw selected read authority without changing its
+  recorded ceiling; from B, also narrow a live coding lease to views. Deny old
+  authority immediately. Serving changed permissions requires fresh Pod/gVisor
+  isolation and new assignment-bound leases.
 - Deny writes and broader-token reuse; allow a supported narrower issuance/read
   only when authority, capacity, and holds permit.
 - Retain the broader token's identity and cleanup obligation. All scopes count
@@ -269,11 +286,13 @@ Each test below states its required evidence and outcomes.
 - Verify connector identity, represented assignment, original-work grant, and
   enforcement lease independently. Deny an allowed connector's claim for an
   unassigned execution.
-- During stop, deny new work and enforce the original drain deadline.
+- From A, cancellation/withdrawal denies new effects and retains cleanup.
+  In C, also verify Stop task, Stop Agent and Start Agent against the selected
+  lifecycle contract; any admitted drain retains its original deadline.
 - Fresh reassignment requires current authority and predecessor stop evidence;
   old access leases remain closed.
-- Graceful stop preserves only separately admitted completed-result delivery;
-  cancellation/security revoke withdraws it while already stopped.
+- In C, graceful stop preserves only separately admitted completed-result
+  delivery; cancellation/security revoke withdraws it while already stopped.
 - Correlate business receipts, credential attempts, and lifecycle operations
   without replaying uncertain effects.
 
@@ -283,9 +302,12 @@ Each test below states its required evidence and outcomes.
   queued/retried requests; allow B without importing A's authority.
 - Test concurrency, narrowing, cancellation, reconnect, and restart. Continue
   admitted work across turn completion.
-- If attached children are enabled, renew a child with a stopped coordinator
-  and expired parent execution lease while logical ancestors remain open; deny after ancestor
-  cancellation.
+- From A/B, enable subordinate helpers only after proving the same context,
+  scope, root attribution, and cancellation. They cannot acquire independent
+  durable Work; unsupported helpers deny while root-only execution can qualify.
+- In C, renew a separately admitted child with a stopped coordinator and expired
+  parent execution lease while logical ancestors remain open; deny after
+  ancestor cancellation.
 - Enforce eligible shared state and private/additional-authority isolation
   independently of equal repository scope. Unsupported attribution or admission
   denies.
@@ -325,8 +347,13 @@ scope checks provide partial protection.
 
 ### G4: Exact-candidate publication
 
-- Missing approver policy or self-approval selection denies. Authenticate the
-  configured approver against current policy and record the exact action digest.
+- Require a configured, currently authorized human and record the exact action
+  digest. Require current IAM `operate` on the exact Agent and configured human
+  approver membership. Allow the requester when eligible; deny Agent/helper
+  self-approval and wrong-Agent or list-only approval.
+  Missing policy, expired approval, or revoked approver authority denies.
+- Stage A denies publication; stage B rejects independent-human and automatic
+  policy modes until separately enabled and qualified.
 - Reject changed objects, manifests, base/target refs, expected prior tips,
   repository identity or PR metadata after approval; capture and approve anew.
 - Enforce exact ref allowlists, branch-creation permission, and atomic
@@ -338,6 +365,19 @@ scope checks provide partial protection.
   lost responses, cancellation, reconnect or restart.
 - Compare the attributed PR response, including observed head/base OIDs, against
   the candidate. A mismatch stays unknown without erasing the confirmed push.
+
+### G5: Later publication policy modes
+
+Separate future qualification; these modes are not MVP requirements or defaults.
+
+- Independent-human mode rejects requester approval and accepts only a distinct,
+  configured, currently authorized human.
+- Scoped automatic mode accepts only the configured repository, operation, and
+  exact branch/candidate under current policy. It records the exact decision
+  without requiring per-operation human approval; out-of-policy requests deny.
+- Missing, stale, or withdrawn policy never falls back to automation or another
+  mode. Both modes retain G4's exact candidate, destination, concurrency,
+  separate effect, and unknown-outcome checks.
 
 ### R1: Preparation/runtime
 
@@ -364,8 +404,9 @@ scope checks provide partial protection.
 
 ### M3: Protocol scope
 
-- Run selected Git/REST reads and any explicitly selected GraphQL reads with
-  real pinned clients; test the trusted publication action independently.
+- In A, run metadata and Git clone/fetch with real pinned clients. In B, add
+  selected issue/PR reads and any required GraphQL shapes; test the trusted
+  publication action independently.
 - Deny direct Agent receive-pack and PR mutations in the first profile. Later
   transparent adapters require separate qualification against the same publisher.
 - Deny redirects, ambiguous targets, cross-repository node IDs, extra GraphQL
@@ -403,9 +444,10 @@ Future optional broker profile only; excluded from the first GitHub release.
 1. Pin one implementation, configuration, runtime, and client manifest.
 2. With a disposable live App/repository, enroll/admit through the actual
    authority, broker, issuer, and inventory.
-3. Prepare/activate; run selected reads and Approve and publish through the
-   trusted publisher; cross token replacement under the same original work.
-   Observe separate push and draft-PR results and fail closed on OCC outage.
+3. In A, prepare/activate and run metadata/clone/fetch; cross token replacement
+   under the same root Work and deny dispatch on OCC outage. In B, add selected
+   coding reads and human Approve and publish; observe separate push and draft-PR
+   outcomes. In C, add separately admitted children and selected stop/start flows.
 4. Close that work and observe denial while the process survives, plus separate
    provider cleanup. New work cannot revive old requests.
 5. Separately observe required execution termination; restart and recover an
@@ -430,15 +472,15 @@ they do not establish the full lifecycle or mediated origin guarantee.
 
 ## Upstream decision and implementation handoff
 
-RFC approval covers the platform boundary, original-work integration, online
-production mediation, and the selected managed-read/trusted-publication profile.
-The broader broker contract records future read continuity and optional child
-semantics without making them first-release dependencies.
-Record the remaining decisions:
+RFC approval covers the proposed admin configuration and credential gateway,
+minimum original-work authority, and sequential A/B/C delivery. Read continuity,
+advanced scheduling, and active-session migration/replay remain outside those
+initial gates. Independent-human and scoped automatic publication are later,
+separately selected policy modes. Record remaining deployment choices:
 
 - Qualified runtime attachment, protected dispatch, and exact read command matrix.
-- Configured approvers, self-approval behavior, exact allowed refs, and approval lifetime.
-- Numerical withdrawal bounds and the initially supported helper/child subset.
+- Eligible human approvers, exact allowed refs, and approval lifetime.
+- Measured withdrawal bounds and which same-scope subordinate helpers qualify.
 
 Follow the repository's acceptance process: keep draft status until acceptance,
 then create an implementation issue with milestone and evidence owners. RFC

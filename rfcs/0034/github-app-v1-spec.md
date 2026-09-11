@@ -17,13 +17,21 @@ and unlisted operations are excluded.
 | Mediated | Required in production under [RFC 0027's credential boundary](../0027-openclaw-enterprise.md#secret-access). |
 | Native | Development/testing only; never a production fallback. |
 
-The first production profile uses a dedicated Kubernetes/gVisor sandbox, managed
-HTTPS clone/fetch and selected REST reads, then a trusted **Approve and publish**
-action. Add exact GraphQL read shapes only when required by the qualified command
-matrix. Transparent `git push` and `gh pr create` are a later adapter milestone;
-they reuse the same publisher, approval and effect records. Local Git operations
-remain ordinary Git. The model-credential proxy and token-forwarding transport
-components do not establish production GitHub mediation.
+Delivery is sequential, with a separate production gate for each stage:
+
+| Stage | Qualified scope |
+| --- | --- |
+| A — Managed reads | Dedicated Kubernetes/gVisor execution; mediated repository metadata and HTTPS clone/fetch with verified preparation. |
+| B — Coding workflow | Selected issue/PR reads and trusted **Approve and publish** for an exact candidate. Add GraphQL read shapes only where qualified commands require them. |
+| C — Durable work | Broader durable Work and separately admitted children, plus Stop task / Stop Agent / Start Agent controls. |
+
+Stages A and B require genuine root Work and current operation authority.
+Subordinate helpers may operate only within that root's qualified context,
+scope, and cancellation; root-only execution may qualify first. Helpers do not
+receive independent durable Work. Local Git operations remain ordinary Git.
+Transparent `git push` and `gh pr create` adapters are later work using the same
+publisher and effect records. Model-credential proxies and token-forwarding
+components alone do not establish production GitHub mediation.
 
 Execution and logical work may be explicitly uncapped. Access/enforcement leases,
 provider credentials, and operation time/resource limits remain finite and fit
@@ -40,6 +48,12 @@ qualify these pins. [Git credential helper interface](https://git-scm.com/docs/g
 ## Enrollment and configuration
 
 ### Enrollment
+
+The [proposed Agent configuration](repository-configuration.md) is admin-managed
+and frozen into `AgentRevision`; it is not an existing public repository field.
+OCC authorizes the exact Namespace administrator, Agent/Configuration operation,
+and each referenced binding, broker, and Secret. Invocation allowlists and the
+App's broader installation access cannot replace these service grants.
 
 1. An Installation operator selects the issuer and trusted GitHub.com endpoints.
    The organization installs the App on explicit repositories within supported
@@ -75,11 +89,15 @@ type GitHubAccessV1 = {
   permissionProfile: "checkout" | "views" | "coding";
   accessMode: "native" | "mediated";
   checkoutCommit: string; // resolved full object ID for the admitted repository
+  publicationPolicyDigest: string; // disabled or human-approval policy frozen in revision
+  publicationPolicyGeneration: number;
   accessHorizon: Timestamp | null; // explicit uncapped grant ceiling; leases stay finite
 };
 ```
 
-`OccReference` and `Timestamp` use existing validated codecs. The binding resolves
+`OccReference` and `Timestamp` use validated OCC codecs. Publication policy is
+frozen from the proposed selection: stage A permits only `disabled`; stage B
+may admit the configured human-approval policy. The binding resolves
 host, App ID, installation ID, organization identity, and protected key version.
 Workload requests cannot supply another host, account, key reference, permission
 map, or longer horizon. Unknown fields and malformed or cross-Namespace
@@ -137,11 +155,14 @@ before requesting approval. Its action digest binds:
   finite object, byte, path, and capture limits.
 - Exact draft PR title/body and ordered actions: push, then create draft PR.
 
-The deployment must explicitly configure eligible approvers, self-approval
-behavior, exact repository and base/target ref allowlists, branch-creation
-permission, and a finite approval lifetime. Missing policy denies publication.
-OCC and the selected IAM authority authenticate the approver and commit approval
-in durable storage for that exact digest;
+Stage B requires explicit approval from a configured, currently authorized
+human. The requester may approve if eligible; the Agent and its helpers cannot
+self-approve. Eligibility requires current IAM `operate` permission on the
+exact Agent and membership in its configured human approver list, as proposed
+in [the configuration contract](repository-configuration.md#publication-modes-and-delivery). Configure exact repository and base/target ref allowlists,
+branch-creation permission, eligible human principals, and a finite approval
+lifetime. Missing policy denies publication. OCC and the selected IAM authority
+authenticate the approver and commit approval durably for that exact digest;
 a candidate ID, signature on a Git commit, or workload claim is not approval.
 Changed content, base, ref, expected prior tip, or PR metadata invalidates approval
 for the changed candidate. No broad branch-write permission substitutes for these
@@ -166,6 +187,16 @@ A mismatch or unattributable result remains unknown; preserve the confirmed push
 as its own outcome. Matching an existing PR's text is not evidence this attempt
 created it. Fork-to-upstream PRs remain unsupported.
 [gh PR creation](https://cli.github.com/manual/gh_pr_create)
+
+#### Later authorization modes
+
+Two future modes may be selected independently: require a human other than the
+requester, or automatically authorize narrowly configured operations, such as
+an allowlisted branch push or draft PR. Automatic mode records a current policy
+decision for the exact candidate/effect without requiring per-operation human
+approval. Neither mode is enabled in the MVP, and missing policy never falls
+back to automation. Both retain current Work/IAM authority, the same destination
+and object/ref constraints, durable separate effects, and unknown-outcome rules.
 
 ### Scope changes and closure
 
@@ -494,12 +525,12 @@ The proxy validates the full provider operation before choosing a token:
 
 ### Supported surfaces
 
-| Surface | Initial target and validation |
+| Surface | Stage and validation |
 | --- | --- |
-| HTTPS Git fetch | `info/refs` for `git-upload-pack` and `git-upload-pack` on the exact admitted repository. Validate service/method/path and supported protocol negotiation. Fetched history remains readable. |
-| Trusted publication | Freeze, approve, and publish one exact candidate through the publisher contract above. No direct Agent receive-pack or raw mutation route in the first profile. |
-| REST reads | Exact repository metadata, commit lookup, and bounded issue/PR list/view routes. Validate repository identity and route parameters, including pagination targets. |
-| GraphQL reads, if selected | Exact repository/issue/PR reads required by qualified commands. Use reviewed documents with constrained variables or a semantic validator covering aliases, fragments, batching, and node IDs. Arbitrary operations and mutations deny. |
+| HTTPS Git fetch | A: `info/refs` for `git-upload-pack` and `git-upload-pack` on the exact admitted repository. Validate service/method/path and supported protocol negotiation. Fetched history remains readable. |
+| Trusted publication | B: Freeze, approve, and publish one exact candidate through the publisher contract above. No direct Agent receive-pack or raw mutation route in the first profile. |
+| REST reads | A: exact repository metadata. B: selected commit lookup and bounded issue/PR list/view routes. Validate repository identity and route parameters, including pagination targets. |
+| GraphQL reads, if selected | B: Exact repository/issue/PR reads required by qualified commands. Use reviewed documents with constrained variables or a semantic validator covering aliases, fragments, batching, and node IDs. Arbitrary operations and mutations deny. |
 
 A `/graphql` allowlist or operation name cannot check permissions. Resolve node
 IDs to admitted repositories; reject additional operations/targets and
@@ -508,8 +539,8 @@ passthrough, implicit fork/push, and unvalidated `gh` commands are unsupported.
 
 ### Command qualification
 
-Initial targets are clone/fetch and explicitly selected REST reads, including
-qualified `gh api` read shapes; add `gh repo view`, bounded `gh issue list/view`,
+Stage A targets clone/fetch and repository metadata, including only qualified
+`gh api` read shapes. Stage B adds `gh repo view`, bounded `gh issue list/view`,
 and `gh pr view` only with their exact request manifests. Local history is
 permitted; strict history isolation is an optional separate mode. Integration
 uses explicit fast-forward updates; rebase requires configuration and explicit
@@ -548,10 +579,12 @@ behavior independently before enabling these adapters.
 
 ## Acceptance
 
-Production requires the shared broker, real provider scope/revocation evidence,
-safe preparation, original-work attribution, online-only dispatch, exact-candidate
-publication, mediated origin replay negatives, and selected semantic protocol
-compatibility. Attached children and active-session migration are not blanket
-first-release gates; unsupported child/execution combinations deny admission. Native helper evidence supports
-development/testing only. An issuer or helper alone cannot satisfy the
-[acceptance matrix](lifecycle.md#acceptance-matrix).
+Stage A requires the shared broker, real provider scope/revocation evidence,
+safe preparation, genuine root Work and operation authority, online-only
+dispatch, mediated origin replay negatives, and its selected read protocols.
+Stage B adds selected coding reads and exact-candidate human-approved
+publication. Stage C separately qualifies durable children and lifecycle
+controls; active-session migration/replay remains later scope. Unsupported
+helper/child/execution combinations deny admission. Native helper evidence
+supports development/testing only. An issuer or helper alone cannot satisfy
+the [acceptance matrix](lifecycle.md#acceptance-matrix).

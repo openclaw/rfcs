@@ -10,13 +10,14 @@ V1 manages credentials for admitted external access through an internal issuer b
 
 | Owner | Responsibility |
 | --- | --- |
-| OCC | Configuration, resource lifecycle, and canonical execution assignments. |
+| OCC/IAM | Sole platform authorizer; configuration, resource lifecycle, canonical execution assignments, and current operation decisions. |
+| Proposed `CredentialGatewayDriver` | Installation-selected composition of mediation and broker/issuer lifecycle through admitted handles. See [configuration and Driver contract](repository-configuration.md). |
 | SecretBroker | Consume authorization; coordinate protected custody, inventory, delivery/use, and cleanup. |
 | Issuer | Perform authorized provider operations. |
 | `SecretDriver` | Manage backend storage. Protected custody and durable inventory also require the guarantees below. |
 | `ServiceAccountDriver` | Provision accounts. |
 
-Trusted platform services host the broker, issuer, and protected-material client outside Agent execution. Existing services may host them; the Namespace gateway routes requests without gaining credential authority. The GitHub profile's host connector also runs outside execution.
+Trusted platform services host the broker, issuer, and protected-material client outside Agent execution. The proposed credential gateway is distinct from the Agent messaging gateway. One deployment may cohost broker and mediator; routing messages confers no credential authority. The GitHub profile's host connector also runs outside execution.
 
 The issuer interface is local. Protected handles have no public constructor, serialization, or workload-facing byte accessor. Remote issuers require a separately specified authenticated protocol; JSON handles confer no authority. Brokers need no dedicated process per Agent or provider. Durable state survives process replacement and supports multiple service instances.
 
@@ -35,7 +36,16 @@ Use [RFC 0035's execution-assignment contract](https://github.com/openclaw/rfcs/
 | Data and audience | Data eligibility and result audience require their own checks. |
 | Preparation and cleanup | Preparation uses a separately admitted control purpose; cleanup uses independently retained platform authority. |
 
-The broker's access lease references the original logical work and digest, exact admitted repository grant, and current execution assignment. It can only narrow that authority. Logical work may span turns and execution replacements; a broker access lease cannot change its work or assignment. A replacement needs fresh current authorization and the required predecessor termination evidence, then new access leases. Old assignment leases remain closed.
+Stage A requires genuine root Work, immutable Agent/revision/assignment binding,
+current per-operation authorization, cancellation/withdrawal, protected custody,
+and durable operation outcomes. An interface declaration or record ID cannot
+supply missing authority. Stages A/B may qualify root-only execution first;
+subordinate helpers require the same qualified context, scope, and cancellation.
+Separately admitted durable children and user-facing lifecycle controls follow
+in stage C. Deferring those features does not defer the minimum authority or
+cleanup contract.
+
+The broker's access lease references the original logical work and digest, exact admitted repository grant, and current execution assignment. It can only narrow that authority. Logical work may span turns; a broker access lease cannot change its work or assignment. Early replacement retires the old assignment and admits fresh Work after current authorization and predecessor termination evidence. Continuing the same Work across execution replacements requires a later qualified profile, fresh assignment authorization, and new access leases. Old assignment leases remain closed.
 
 Business-operation receipts, credential-issuance records, and lifecycle operations have distinct identities and owners. Link their references so a token refresh, reconnect, or runtime replacement cannot create another attempt at an uncertain business effect. An issuance result is not the result of the business request that needed it.
 
@@ -134,7 +144,7 @@ Each supported provider operation must declare required permissions, constraints
 
 ### Persistent processes and background work
 
-Persistent execution is required. Lease closure denies new credentialed effects and starts cleanup even if a process or connection survives. Neither survival nor later work renews closed authority. Workspace replacement requires Compute to observe previous writers stopped.
+A process may persist across turns under its original Work. Lease closure denies new credentialed effects and starts cleanup even if a process or connection survives. Neither survival nor later work renews closed authority. Workspace replacement requires Compute to observe previous writers stopped.
 
 #### Reusable workers
 
@@ -142,7 +152,7 @@ Each request belongs to explicitly admitted logical work with its own immutable 
 
 #### Long-lived work and attached children
 
-Service-owned work may outlive the initiating turn within its original scope. Execution and work may be explicitly uncapped; every configured horizon remains immutable. Broker/enforcement leases, credentials, and operation bounds stay finite. The child behavior below applies only if the selected profile admits attached children; the initial GitHub child subset remains open. Each attached child has its own admitted work record and immutable lineage. Fresh child renewal requires current authority and open, authorized logical ancestors; it does not require a live coordinator process or an unexpired parent execution lease. Ancestor cancellation withdraws descendants. Independent work requires its own admission.
+Service-owned work may outlive the initiating turn within its original scope. Execution and work may be explicitly uncapped; every configured horizon remains immutable. Broker/enforcement leases, credentials, and operation bounds stay finite. Stages A/B permit only qualified subordinate helpers sharing root context, scope, and cancellation; they do not receive independent durable Work. The following separately admitted child behavior belongs to stage C. Each attached child has its own admitted work record and immutable lineage. Fresh child renewal requires current authority and open, authorized logical ancestors; it does not require a live coordinator process or an unexpired parent execution lease. Ancestor cancellation withdraws descendants. Independent work requires its own admission.
 
 RFC 0036 owns work admission, child lineage, and cancellation relationships. The admission producer and protected dispatch mechanism require implementation and qualification. The broker cannot invent work or silently detach children. RFC 0037's completed-state recovery supplies no authority to resume provider operations; separately admitted finite delivery has its own exact scope and current write authorization.
 
@@ -278,7 +288,7 @@ Access-lease closure or expiry, grant withdrawal, binding rotation, incarnation 
 
 ### Agent stop and result delivery
 
-An Agent stop first closes admission of new work under RFC 0037. The default Stop semantics remain an explicit product decision. If a selected graceful-stop profile admits finite drain, existing work may use or replace eligible credentials only within its unchanged original scope, enforcement evidence, and recorded drain deadline. Authority renewal requires current decisions and cannot extend the stop deadline. Completion, deadline, cancellation, disable, or retirement closes affected authority.
+Stage C introduces the user-facing Stop task / Stop Agent / Start Agent controls under RFC 0037. Stages A/B still require cancellation, authority withdrawal, and safe execution retirement. The following drain and completed-delivery behavior applies only to a separately admitted lifecycle profile. An Agent stop first closes admission of new work. If a selected graceful-stop profile admits finite drain, existing work may use or replace eligible credentials only within its unchanged original scope, enforcement evidence, and recorded drain deadline. Authority renewal requires current decisions and cannot extend the stop deadline. Completion, deadline, cancellation, disable, or retirement closes affected authority.
 
 The accepting-service protocol must order runtime-purpose withdrawal, work closure, and broker dispatch, including qualified disconnected readers and their withdrawal bounds. An open connection, renewed SVID, or refreshed GitHub token cannot bypass those bounds.
 
