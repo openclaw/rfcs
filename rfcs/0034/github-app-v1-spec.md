@@ -17,9 +17,17 @@ and unlisted operations are excluded.
 | Mediated | Required in production under [RFC 0027's credential boundary](../0027-openclaw-enterprise.md#secret-access). |
 | Native | Development/testing only; never a production fallback. |
 
-The initial subset includes the specified REST and GraphQL requests. Broader
-compatibility requires separate specification and qualification. The
-model-credential proxy does not establish GitHub mediation.
+The first production profile uses a dedicated Kubernetes/gVisor sandbox, managed
+HTTPS clone/fetch and selected REST reads, then a trusted **Approve and publish**
+action. Add exact GraphQL read shapes only when required by the qualified command
+matrix. Transparent `git push` and `gh pr create` are a later adapter milestone;
+they reuse the same publisher, approval and effect records. Local Git operations
+remain ordinary Git. The model-credential proxy and token-forwarding transport
+components do not establish production GitHub mediation.
+
+Execution and logical work may be explicitly uncapped. Access/enforcement leases,
+provider credentials, and operation time/resource limits remain finite and fit
+every configured original horizon. No universal Agent or job duration is imposed.
 
 ## Client versions
 
@@ -67,7 +75,7 @@ type GitHubAccessV1 = {
   permissionProfile: "checkout" | "views" | "coding";
   accessMode: "native" | "mediated";
   checkoutCommit: string; // resolved full object ID for the admitted repository
-  accessHorizon: Timestamp;
+  accessHorizon: Timestamp | null; // explicit uncapped grant ceiling; leases stay finite
 };
 ```
 
@@ -82,7 +90,10 @@ references deny.
 Visibility changes, transfers, and enrollment changes require denial and
 revalidation of affected access. Display-name changes cannot silently redirect a
 grant. Configuration/profile edits require new admitted revisions; revocation
-can narrow active access immediately without redeployment.
+can deny active access immediately. Both permission increases and decreases require
+a fresh Pod/gVisor sandbox and eligible context before serving the changed
+authority; a new container in the old Pod is insufficient. Existing connections,
+background processes, caches, and queued requests cannot inherit the new context.
 
 Planned key rotation follows the
 [shared sequence](credential-broker-v1-spec.md#configuration-and-admitted-records):
@@ -95,7 +106,7 @@ the working binding.
 ### Admission and grant selection
 
 At logical-work admission, OCC records the selected immutable repository grants,
-supported narrower profiles, and original horizon. IAM authorizes requester
+supported narrower profiles, and any configured original horizon. IAM authorizes requester
 invocation separately from service/workload repository access. Chat requests,
 local remotes, and personal GitHub access confer no provider authority.
 
@@ -112,13 +123,48 @@ selection denies. No session-wide token combines permissions.
 | `coding` on `org/service`; `views` on `org/library` | Pushes and PRs in `service`; reads only in `library`. |
 | `coding` on both repositories | Changes use two branches and two same-repository PRs. |
 
-### Pull requests
+### Trusted publication
 
-Push the prepared branch first, then create a draft PR with explicit repository,
-base, and head in that same repository. Do not let `gh` implicitly fork or push.
-Report each PR's outcome independently and never blindly replay an uncertain
-write. Fork-to-upstream PRs are unsupported; they require separate head/base
-identity, grant, visibility, and compatibility validation.
+The first write interface is **Approve and publish**, backed by a trusted
+publisher outside Agent execution. Freeze and retain one immutable candidate
+before requesting approval. Its action digest binds:
+
+- Original work, invocation, execution assignment, authority revision, and scope.
+- Stable numeric repository and App installation identity.
+- Exact base ref and captured base OID; exact allowed target ref and expected
+  prior remote OID, or explicit authorized branch creation.
+- Proposed commit OID, complete retained object manifest and pack digest, with
+  finite object, byte, path, and capture limits.
+- Exact draft PR title/body and ordered actions: push, then create draft PR.
+
+The deployment must explicitly configure eligible approvers, self-approval
+behavior, exact repository and base/target ref allowlists, branch-creation
+permission, and a finite approval lifetime. Missing policy denies publication.
+OCC and the selected IAM authority authenticate the approver and commit approval
+in durable storage for that exact digest;
+a candidate ID, signature on a Git commit, or workload claim is not approval.
+Changed content, base, ref, expected prior tip, or PR metadata invalidates approval
+for the changed candidate. No broad branch-write permission substitutes for these
+checks. Validate and retain bounded, complete Git object graphs outside execution
+without repository hooks, filters, helpers, or ambient configuration. Isolate
+untrusted Git parsing from signing-key and credential custody.
+
+At each effect, recheck current online work, approval, IAM, and destination
+controls. Push uses one atomic expected-old ref update to the exact approved OID,
+with a separate fast-forward requirement. A preflight read or generic non-force
+update is insufficient. See the [Git push semantics](https://git-scm.com/docs/git-push)
+and [pack protocol](https://git-scm.com/docs/pack-protocol). Deny multiple refs, force updates, deletion, and tags.
+Only a confirmed, recorded push permits a separate draft-PR effect with explicit
+same-repository base/head and exact approved metadata. Do not implicitly fork or
+push. Unknown effects retain their original claims and observations and never
+trigger automatic replay, including after retries or restart.
+
+PR creation uses moving branch names: this proposal does not assume an atomic
+base/head OID precondition in GitHub's PR API. Retain and compare the attributed
+response's repository, refs, OIDs, title, body, and draft state with the candidate.
+A mismatch or unattributable result remains unknown; preserve the confirmed push
+as its own outcome. Matching an existing PR's text is not evidence this attempt
+created it. Fork-to-upstream PRs remain unsupported.
 [gh PR creation](https://cli.github.com/manual/gh_pr_create)
 
 ### Scope changes and closure
@@ -186,8 +232,9 @@ outside the guarantee. Making a repository public exposes its existing contents.
 All profiles include required `metadata:read`; workflow, administration, and
 secrets permissions are excluded. Coding tokens are not limited to drafts or
 particular branches: `contents:write` satisfies the PR-merge permission check
-even without `pull_requests:write`. GitHub repository rules with no App bypass
-must enforce branch/merge restrictions.
+even without `pull_requests:write`. The trusted publisher enforces the exact
+approved ref update and denies merge operations. GitHub repository rules with no
+App bypass provide defense in depth; they do not replace publisher constraints.
 [Merge permissions](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request)
 
 ### Issuance and validation
@@ -237,9 +284,9 @@ Naming a profile cannot encode those restrictions.
 | --- | --- |
 | Repository and permission category | Explicit mint scope and validation of each request against the effective grant. |
 | Supported operation and parameters | Mediator validates actual Git/REST/GraphQL semantics, including same-repository targets and draft PR state. |
-| Branch and merge restrictions | GitHub repository rules with no App bypass. V1 adds no proxy-side branch policy. |
+| Exact publication and ref restrictions | Trusted publisher checks approved objects, exact allowed refs and expected-old update; deny merges, force, deletion, and multiple refs. GitHub rules add defense in depth. |
 | Approved non-public destination | Current ownership/visibility checks plus the organization controls required by the publication policy. |
-| Work purpose, horizon, withdrawal | Current OCC/IAM decision or qualified existing read enforcement lease, plus broker access-lease enforcement at dispatch. |
+| Work purpose, horizon, withdrawal | Current online OCC/IAM decision for every dispatch, plus finite broker and enforcement leases. |
 | Execution origin | Trusted runtime/host mapping and enforced routing; no workload-visible proof is sufficient by possession. |
 
 ### Narrowing and additions
@@ -271,8 +318,8 @@ restrictions after separate qualification.
 Cache by exact binding/profile, Namespace/Agent/revision, assignment/incarnation,
 original work and access lease/purpose, repository/effective permissions, and
 generation. Never substitute broader admitted scope or share tokens across
-independently revocable leases. Every use enforces its current decision or
-qualified read lease; native delivery requires current authority.
+independently revocable leases. Every use requires current online authority, including reads and credential
+maintenance; native delivery also requires current authority.
 
 Supported narrower issuances under the same open lease have distinct exact-scope
 cache entries. All scopes share that lease's mint claim and two-credential overlap
@@ -296,16 +343,16 @@ retries and the shared no-remint rule for uncertain issuance.
 
 ### Authority outages
 
-During an authority outage, existing qualified reads may use only their
-unexpired enforcement lease. Trusted token maintenance requires explicit
-preauthorization for the same work, assignment, access lease, repository, and a
-read-only `checkout` or `views` profile. It cannot renew an authority deadline,
-issue for new work, or reuse/replace a write-capable token offline.
+Require current online OCC authority for every GitHub dispatch: reads, writes,
+issuance, renewal, and credential maintenance. Existing tokens and unexpired
+leases do not permit offline dispatch. If any required authority, provider,
+custody, or inventory check is unavailable, deny the affected operation.
+Independently retained cleanup still owns its obligations and needs its own
+applicable authority; work authorization cannot stand in for cleanup authority.
 
-All provider verification, custody, inventory, overlap, and unknown-mint checks
-still apply; unavailable inventory denies maintenance. A new one-hour provider
-token does not extend the original enforcement deadline. Without a qualified
-maintenance profile, token expiry can interrupt otherwise authorized reads.
+The shared broker's qualified offline-read/maintenance option is future profile
+work and is not enabled here. Accepted upstream operations may finish; report
+their outcomes and cleanup separately from the denied next operation.
 
 ### Unknown-mint hold
 
@@ -393,7 +440,9 @@ restart and distinguish sibling containers and each request's original work.
 Persistent workers require the
 [protected work-binding contract](credential-broker-v1-spec.md#persistent-processes-and-background-work);
 old queued requests cannot inherit successor authority. The dispatcher/channel
-remains a release blocker until demonstrated.
+remains a release blocker until demonstrated. Until then, constrain execution to
+one immutable admitted authority context and deny mixed-authority reuse; serial
+scheduling alone does not stop old requests inheriting new authority.
 
 SPIFFE identifies its authorized consumer and supplies private key material; an
 SVID key inside execution cannot establish copy resistance.
@@ -414,8 +463,13 @@ the original authorized container as a relay is outside this guarantee.
 
 ### Client transport
 
-Select and test either a GitHub-compatible service endpoint or managed TLS
-termination for ordinary GitHub destinations before qualification. Plain CONNECT
+The first deployment selects split DNS to an external trusted TLS/HTTP mediator
+for ordinary GitHub destinations. DNS answers must derive from the authenticated
+runtime attachment and current work; source IP, Pod name, or a caller receipt is
+insufficient. The mediator resolves upstream GitHub independently. DNS steering
+alone grants no operation authority: the installed network fence and mediator
+must deny cached-address, existing-connection, direct-route, and tunnel bypass.
+Qualify the complete runtime attachment and both TLS legs before release. Plain CONNECT
 cannot substitute credentials in encrypted HTTP; `GH_HOST` selects a GitHub
 host, not a generic proxy. Keep trust private to the selected runtime/client and
 validate upstream GitHub TLS independently.
@@ -443,9 +497,9 @@ The proxy validates the full provider operation before choosing a token:
 | Surface | Initial target and validation |
 | --- | --- |
 | HTTPS Git fetch | `info/refs` for `git-upload-pack` and `git-upload-pack` on the exact admitted repository. Validate service/method/path and supported protocol negotiation. Fetched history remains readable. |
-| HTTPS Git push | `info/refs` for `git-receive-pack` and `git-receive-pack` for the exact repository under `coding`. Validate framing and repository/service targets. GitHub rules enforce ref and merge restrictions; V1 adds no proxy-side branch policy. |
+| Trusted publication | Freeze, approve, and publish one exact candidate through the publisher contract above. No direct Agent receive-pack or raw mutation route in the first profile. |
 | REST reads | Exact repository metadata, commit lookup, and bounded issue/PR list/view routes. Validate repository identity and route parameters, including pagination targets. |
-| GraphQL | The repository/issue/PR read operations and explicit same-repository draft PR creation emitted by the qualified `gh` commands. Use reviewed documents with constrained variables or a semantic validator covering aliases, fragments, batching, node IDs, and mutation targets. |
+| GraphQL reads, if selected | Exact repository/issue/PR reads required by qualified commands. Use reviewed documents with constrained variables or a semantic validator covering aliases, fragments, batching, and node IDs. Arbitrary operations and mutations deny. |
 
 A `/graphql` allowlist or operation name cannot check permissions. Resolve node
 IDs to admitted repositories; reject additional operations/targets and
@@ -454,10 +508,21 @@ passthrough, implicit fork/push, and unvalidated `gh` commands are unsupported.
 
 ### Command qualification
 
-Target commands are clone/fetch, prepared-branch push, `gh repo view`, bounded
-`gh issue list/view`, `gh pr view`, explicit draft `gh pr create`, and the selected
-REST reads. Publish exact argument variants and observed request manifests for
-pinned clients. These are compatibility targets pending qualification.
+Initial targets are clone/fetch and explicitly selected REST reads, including
+qualified `gh api` read shapes; add `gh repo view`, bounded `gh issue list/view`,
+and `gh pr view` only with their exact request manifests. Local history is
+permitted; strict history isolation is an optional separate mode. Integration
+uses explicit fast-forward updates; rebase requires configuration and explicit
+dirty/conflict handling. Publish argument variants and observed manifests for
+pinned clients. These remain compatibility targets pending qualification.
+
+Later `git push` / `gh pr create` adapters must capture and validate the complete
+candidate before any write, then use the same approval and publication effects.
+Unapproved calls return approval-required or use a separately bounded pending
+interaction. Retry references the original immutable candidate/effect; it cannot
+hold an unbounded stream or create a new effect. Qualify receive-pack framing,
+pack/object limits, exact one-ref mapping, PR request shapes, and lost-response
+behavior independently before enabling these adapters.
 [Pinned gh repository queries](https://github.com/cli/cli/blob/f96972ce1c11fdb8eaa556257fde962a363dffde/api/queries_repo.go)
 
 ## Repository preparation
@@ -484,7 +549,9 @@ pinned clients. These are compatibility targets pending qualification.
 ## Acceptance
 
 Production requires the shared broker, real provider scope/revocation evidence,
-safe preparation, persistent-work attribution, mediated origin replay negatives,
-and selected semantic protocol compatibility. Native helper evidence supports
+safe preparation, original-work attribution, online-only dispatch, exact-candidate
+publication, mediated origin replay negatives, and selected semantic protocol
+compatibility. Attached children and active-session migration are not blanket
+first-release gates; unsupported child/execution combinations deny admission. Native helper evidence supports
 development/testing only. An issuer or helper alone cannot satisfy the
 [acceptance matrix](lifecycle.md#acceptance-matrix).

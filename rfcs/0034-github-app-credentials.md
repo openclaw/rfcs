@@ -3,7 +3,7 @@ title: Credential lifecycle and GitHub App access for Enterprise Agents
 authors:
   - Free Wortley
 created: 2026-09-05
-last_updated: 2026-09-09
+last_updated: 2026-09-11
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/68
@@ -13,7 +13,7 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/68
 
 ## Summary
 
-Extend OpenClaw Enterprise's `SecretBroker` to manage issued credentials, starting with GitHub Apps. The OpenClaw Controller (OCC) authorizes access; the broker owns issuance, renewal, and cleanup. Production requests pass through a trusted mediator that checks each operation and adds tokens outside Agent execution.
+Extend OpenClaw Enterprise's `SecretBroker` to manage issued credentials, starting with GitHub Apps. The OpenClaw Controller (OCC) authorizes access; the broker owns issuance, renewal, and cleanup. Production requests pass through a trusted mediator that obtains current online authority for each operation and adds tokens outside Agent execution. The first GitHub profile provides managed reads and a trusted Approve and publish action for an exact candidate.
 
 ## Motivation
 
@@ -47,11 +47,11 @@ A broker **access lease** binds one original service-owned logical work record a
 
 ### Constraints
 
-The [GitHub profile](0034/github-app-v1-spec.md) covers selected clone/fetch, prepared-branch push, views, and explicit draft PR creation. Writes require approved non-public destinations and visibility-change controls; GitHub enforces branch and merge restrictions. Production routing must prevent bypass. Each command variant needs qualification. Unsupported operations deny; native token delivery is development/testing only.
+The [GitHub profile](0034/github-app-v1-spec.md) starts with managed clone/fetch and selected reads, followed by trusted **Approve and publish**. Approval binds the exact approved non-public repository, candidate objects, base, target ref, expected prior remote tip, and draft PR metadata. The publisher enforces configured approvers and exact allowed refs, performs an atomic expected-old ref update, then records PR creation as a separate effect. Missing approval policy denies; changed content or targets require new approval. GitHub rules add defense in depth. Transparent `git push` and `gh pr create` adapters follow later using the same authority and effect records. Native token delivery is development/testing only; production routing must prevent bypass.
 
-Logical work may outlive turns and tokens. Persistent requests retain original-work attribution. Attached children need their own admission and immutable lineage; renewal requires open, authorized logical ancestors, not a live coordinator. Later work cannot expand or revive old authority.
+Logical work may outlive turns and tokens; execution and work duration may be explicitly uncapped. Broker and enforcement leases, credentials, and individual operation bounds stay finite, and every configured horizon remains immutable. Persistent requests retain original-work attribution. Permission increases and decreases require a fresh Pod/gVisor sandbox and eligible context; a sibling container is insufficient. The initial child subset remains a separate decision, and active-session migration/replay is later scope.
 
-Writes, authority renewal, and new assignments require current authority. Only qualified reads may continue during outages under an existing unexpired enforcement lease; expressly preauthorized read-only credential maintenance cannot extend its deadline.
+Every first-profile GitHub dispatch, including reads, issuance, and credential maintenance, requires current online OCC authority. Unavailable authority denies dispatch. The shared broker describes a future qualified read-continuity option; it is not enabled for this GitHub profile.
 
 ## Rationale
 
@@ -59,4 +59,4 @@ A shared broker centralizes lifecycle behavior while issuers retain provider rul
 
 ## Unresolved questions
 
-The [acceptance matrix](0034/lifecycle.md#acceptance-matrix) remains a production gate. Which protected dispatcher binds persistent requests to original work? Which reads and maintenance qualify during outages? What numerical lease and withdrawal bounds meet the selected security and availability requirements?
+The [acceptance matrix](0034/lifecycle.md#acceptance-matrix) defines the selected profile’s production gates. Which protected dispatcher and runtime attachment establish original-work attribution? Which approvers, self-approval rule, exact allowed refs, and numerical withdrawal bounds should deployments select? Which subordinate helpers or separately admitted children belong in the initial profile?

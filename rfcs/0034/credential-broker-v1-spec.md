@@ -29,7 +29,7 @@ Use [RFC 0035's execution-assignment contract](https://github.com/openclaw/rfcs/
 | Contract | Meaning for the broker |
 | --- | --- |
 | Canonical execution assignment | OCC owns one assignment and generation. Broker bindings and runtime observations reference it; the broker cannot independently choose the current execution. |
-| Logical work | RFC 0036 owns service-owned work, immutable scope and horizon, requester provenance, and child lineage. |
+| Logical work | RFC 0036 owns service-owned work, immutable scope and any configured horizon, requester provenance, and child lineage. |
 | Enforcement lease | RFC 0035 owns bounded enforcement authority and its issuance/withdrawal protocol. |
 | Invocation and provider permission | Requester invocation authorization is separate from service/workload provider permission. Provider effects do not use an ambient intersection with the requester's human permissions. |
 | Data and audience | Data eligibility and result audience require their own checks. |
@@ -46,12 +46,12 @@ These internal, versioned records use existing OCC identifier codecs and add no 
 | Record | Required contents and owner |
 | --- | --- |
 | Issuer binding | OCC: Installation and Namespace, exact broker and Secret references, selected issuer implementation/profile versions, protected provider-account binding, configuration generation, and enabled state. No key or token bytes. |
-| Admitted access | OCC: immutable internal `admittedAccessRef`, Agent/revision, binding/profile versions, provider-typed resource and permission grant, allowed mode, purpose, absolute access horizon, and limits. Its digest commits these fields. Current policy may narrow or revoke it. |
+| Admitted access | OCC: immutable internal `admittedAccessRef`, Agent/revision, binding/profile versions, provider-typed resource and permission grant, allowed mode, purpose, explicit finite-or-uncapped access ceiling, and limits. Its digest commits these fields. Current policy may narrow or revoke it. |
 | Admission selection | OCC: selected admitted-access references, supported narrower permissions, and horizon. Selected IAM authorizes invocation separately from service/workload access. Session references retain provenance and any explicit cancellation relationship. |
 | Logical work | Reference to RFC 0036's authoritative service-owned work and immutable digest: original selection, owner and requester, admitted-access references, scope/horizon, and child lineage. A model turn or connection does not define its lifetime. |
 | Enforcement lease | OCC authority: bounded permission for exact work, assignment, receiver, operation profile, and original absolute deadline, with issuance ordering and withdrawal evidence. The broker cannot issue or extend it. |
 | Execution binding | Reference to OCC's canonical assignment and execution generation, exact Agent/revision and incarnation. Runtime work requires a protected link to its original work and child/request channel. |
-| Access lease | Broker: immutable original work or preparation identity, execution binding, exact admitted-access reference and digest, scope ceiling fixed at admission, current generation/version, deadline within the original work/purpose horizon, and `open` or `closed` state. It grants no use beyond valid enforcement authority. |
+| Access lease | Broker: immutable original work or preparation identity, execution binding, exact admitted-access reference and digest, scope ceiling fixed at admission, current generation/version, finite deadline within every configured original work/purpose horizon, and `open` or `closed` state. It grants no use beyond valid enforcement authority. |
 | Issuance record | Inventory: stable operation and provider-attempt identities, intent digest, original lease/binding/generation, provider outcome, protected material references, actual expiry/scope evidence, delivery state, and cleanup state. |
 
 ### Binding changes and enrollment
@@ -79,6 +79,11 @@ Agents use their explicitly granted service/workload authority. Human roles, ses
 
 ### Current decisions and bounded read continuity
 
+The first GitHub production profile requires current online OCC authority for
+all dispatches, including reads, issuance and maintenance. The offline exceptions
+below describe a future, separately selected and qualified broker profile; they
+are not enabled by this RFC’s first GitHub release.
+
 | Action | Required authority |
 | --- | --- |
 | Writes, new admission, enforcement/access-lease renewal, expansion, and new execution assignment | Current authority. |
@@ -87,7 +92,7 @@ Agents use their explicitly granted service/workload authority. Human roles, ses
 
 For continued reads, protected origin, locally enforced withdrawal, operation semantics, scope, inventory, approval, freshness, and all other required evidence still apply. An HTTP method alone does not classify an operation as a read. Missing or untrustworthy clock/revocation state requires synchronization before serving.
 
-This bounded read profile deliberately extends RFC 0027's denial on unavailable authority; it is not an existing platform guarantee. Each lease fits the original work and ancestor horizons, purpose/stop deadlines, and every applicable withdrawal target after clock and enforcement allowance. Ordinary profiles may target minutes and sensitive profiles seconds; exact numerical bounds need qualification. Allocated operation budgets require durable consumption across restart. A lease cannot substitute for required live approval, freshness, or provider checks.
+This future bounded read profile would extend RFC 0027's denial on unavailable authority; it is not an existing platform guarantee. Each lease fits every configured original work and ancestor horizon, purpose/stop deadlines, and every applicable withdrawal target after clock and enforcement allowance. Ordinary profiles may target minutes and sensitive profiles seconds; exact numerical bounds need qualification. Allocated operation budgets require durable consumption across restart. A lease cannot substitute for required live approval, freshness, or provider checks.
 
 Trusted credential maintenance may preserve those existing reads only when expressly preauthorized under the same enforcement lease. It must:
 
@@ -113,7 +118,7 @@ The lease's scope ceiling is immutable. Each issuance/use computes current effec
 | A native copy was already delivered | It remains provider-valid until actual revocation or expiry. |
 | Narrowing, renewal, or later policy recovery | Continue enforcing overlap limits and unknown-issuance holds. |
 
-A wider selection requires fresh work admission within current Agent authority. Existing work and renewals cannot exceed their original selection. Logical-work closure closes its affected access leases. A session or turn ending closes work only when its admitted lifecycle explicitly requires that relationship. Preparation uses its separately admitted selection.
+A wider selection requires fresh work admission within current Agent authority. In the first GitHub profile, both permission increases and decreases also require a fresh Pod/gVisor sandbox and eligible context before the changed authority serves. Durable closure denies subsequent local admission; effective withdrawal requires the selected profile's accepting-service or expiry evidence. Replacing only a container in the old Pod is insufficient. Existing work and renewals cannot exceed their original selection. Logical-work closure closes its affected access leases. A session or turn ending closes work only when its admitted lifecycle explicitly requires that relationship. Preparation uses its separately admitted selection.
 
 ### Protected work attribution
 
@@ -137,7 +142,7 @@ Each request belongs to explicitly admitted logical work with its own immutable 
 
 #### Long-lived work and attached children
 
-Service-owned work may outlive the initiating turn within its original scope and finite horizon. Each attached child has its own admitted work record and immutable lineage. Fresh child renewal requires current authority and open, authorized logical ancestors; it does not require a live coordinator process or an unexpired parent execution lease. Ancestor cancellation withdraws descendants. Independent work requires its own admission.
+Service-owned work may outlive the initiating turn within its original scope. Execution and work may be explicitly uncapped; every configured horizon remains immutable. Broker/enforcement leases, credentials, and operation bounds stay finite. The child behavior below applies only if the selected profile admits attached children; the initial GitHub child subset remains open. Each attached child has its own admitted work record and immutable lineage. Fresh child renewal requires current authority and open, authorized logical ancestors; it does not require a live coordinator process or an unexpired parent execution lease. Ancestor cancellation withdraws descendants. Independent work requires its own admission.
 
 RFC 0036 owns work admission, child lineage, and cancellation relationships. The admission producer and protected dispatch mechanism require implementation and qualification. The broker cannot invent work or silently detach children. RFC 0037's completed-state recovery supplies no authority to resume provider operations; separately admitted finite delivery has its own exact scope and current write authorization.
 
@@ -154,7 +159,7 @@ These required local ports may adapt existing methods without adding another aut
 | Operation | Required input | Result and behavior |
 | --- | --- | --- |
 | `beginAccess` | Authenticated admission context; original work/preparation reference; exact `admittedAccessRef`, requested scope ceiling and execution binding; stable request ID. | Resolve authoritative records, check current authority, commit the authorized ceiling and unique lease binding, and return an opaque reference and deadline. |
-| `renewAccess` | Same original binding, lease reference, expected version, stable request ID. | Recheck authority and conditionally advance version/deadline within the original absolute horizon. Preserve principal, purpose, resources, mode, and incarnation. Closed leases cannot reopen. |
+| `renewAccess` | Same original binding, lease reference, expected version, stable request ID. | Recheck authority and conditionally advance version/deadline within every configured original horizon. Preserve principal, purpose, resources, mode, and incarnation. Closed leases cannot reopen. |
 | `acquireCredential` | Authorized operation, open access lease/version, enforcement evidence, exact provider-typed grant. | Select an eligible recorded credential or run the durable issuance protocol. During authority outage, allow only the expressly preauthorized read-only maintenance exception. Return a protected reference to the trusted delivery/forwarding owner only. |
 | `deliverNative` | Current original authority, exact recorded credential and lease, immutable receiving child/channel, delivery ID. | Require admitted native mode and durably committed delivery intent before release on that exact channel. Return safe delivery status separately from issuance status. |
 | `authorizeUse` | Current authority or qualified read enforcement lease, original work binding, access lease/version, validated provider operation and request digest. | Authorize one mediated dispatch; the trusted protocol adapter uses protected credentials. It cannot expose an arbitrary signing or forwarding endpoint. |
@@ -273,11 +278,11 @@ Access-lease closure or expiry, grant withdrawal, binding rotation, incarnation 
 
 ### Agent stop and result delivery
 
-An Agent stop first closes admission of new work under RFC 0037. During its recorded finite drain, existing work may use or replace eligible credentials only within its unchanged original scope, enforcement evidence, and drain deadline. Authority renewal requires current decisions and cannot extend the stop deadline. Completion, deadline, cancellation, disable, or retirement closes affected authority.
+An Agent stop first closes admission of new work under RFC 0037. The default Stop semantics remain an explicit product decision. If a selected graceful-stop profile admits finite drain, existing work may use or replace eligible credentials only within its unchanged original scope, enforcement evidence, and recorded drain deadline. Authority renewal requires current decisions and cannot extend the stop deadline. Completion, deadline, cancellation, disable, or retirement closes affected authority.
 
 The accepting-service protocol must order runtime-purpose withdrawal, work closure, and broker dispatch, including qualified disconnected readers and their withdrawal bounds. An open connection, renewed SVID, or refreshed GitHub token cannot bypass those bounds.
 
-Graceful stop preserves pending delivery of an already completed result when its separate finite delivery responsibility was admitted before work closure; it cannot keep computation's access leases open. Any GitHub write used for that delivery needs its own exact admitted scope and current authority. Cancellation or security revocation withdraws affected delivery even if the Agent is already stopped. Already admitted provider effects and independently authorized cleanup remain separately tracked.
+An explicitly selected graceful-stop delivery profile preserves pending delivery of an already completed result when its separate finite responsibility was admitted before work closure; it cannot keep computation's access leases open. Any GitHub write used for that delivery needs its own exact admitted scope and current authority. Cancellation or security revocation withdraws affected delivery even if the Agent is already stopped. Already admitted provider effects and independently authorized cleanup remain separately tracked.
 
 ### Cleanup authority
 
