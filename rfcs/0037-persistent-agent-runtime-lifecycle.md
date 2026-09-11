@@ -43,7 +43,9 @@ The full public lifecycle API and its unselected default Stop behavior do not bl
 
 OCC owns policy; Compute and Sandbox drivers realize admitted intent and report observations. Use [RFC 0035's assignment](https://github.com/openclaw/rfcs/pull/69) and [RFC 0036's work authority](https://github.com/openclaw/rfcs/pull/70). Admission fixes the effective finite-or-uncapped execution selection on the original attempt, including startup and waiting. Draft edits, reconnects, and credential rotation cannot change it. Uncapped execution still requires finite enforcement leases and current authority; missing authority never means uncapped permission. Both modes retain an owner responsible for stopping exact native construction and all supported helpers.
 
-Preserve RFC 0027's replacement order:
+The [current ordinary Kubernetes controller](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/apps/controller/src/worker.ts#L987) selects and requests successor activation before requesting predecessor retirement. Its activation checks and Recreate gateway rollout do not establish the full observed-stop and shared-writer exclusion contract required here. This call order alone does not prove concurrent writers.
+
+Implement RFC 0027's required replacement order:
 
 1. Prepare an isolated, nonserving candidate with Harness execution disabled.
 2. Retire the predecessor and observe that its Harness and owned writers have terminated. Resolve uncertain creates before any successor writes shared storage.

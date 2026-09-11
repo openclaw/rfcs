@@ -186,6 +186,8 @@ acceptance, dispatch, and observation so each outcome remains truthful.
 
 ## Activation and writer exclusion
 
+In the merged ordinary Kubernetes path, [activation](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/apps/controller/src/drivers/compute/kubernetes/index.ts#L1647) precedes the [retirement request](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/apps/controller/src/drivers/compute/kubernetes/index.ts#L1817); retirement requests Deployment deletion without observing that all predecessor writers have stopped. Activation checks and the Recreate gateway rollout do not establish this specification's complete writer-exclusion barrier.
+
 Preserve RFC 0027's activation order:
 
 1. Prepare an isolated, nonserving candidate with Harness execution disabled.
