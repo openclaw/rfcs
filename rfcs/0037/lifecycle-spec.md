@@ -3,24 +3,66 @@
 This supporting specification contains the detailed requirements of
 [RFC 0037](../0037-persistent-agent-runtime-lifecycle.md). It extends
 [RFC 0027's Agent deployment](../0027-openclaw-enterprise.md#agent-deployment)
-with durable lifecycle intent, completed-state recovery, single-writer handoff,
-and separately reported outcomes. These are proposed requirements, not claims of
-implemented runtime behavior.
+with a staged runtime baseline and later durable lifecycle intent,
+completed-state recovery, single-writer handoff, and separately reported
+outcomes. The later controls and recovery profiles are proposed requirements,
+not claims of implemented runtime behavior.
 
 Work can outlive a process, but restart is not transparent continuation:
 credentials change, writes remain unfinished, and provider operations may have
 completed. Persisted stop intent, denied requests, process termination, and
-credential cleanup are separate facts. The initial recovery profile preserves
-Agent identity, completed context, files, and effect receipts on compatible
-same-cluster retained storage. It does not restore authority or replay
-interrupted actions.
+credential cleanup are separate facts. If completed-state recovery is selected,
+its first profile preserves Agent identity, completed context, files, and effect
+receipts on compatible same-build, same-cluster retained storage. It does not
+restore authority or replay interrupted actions.
+
+## Delivery sequence and implementation boundary
+
+1. **Mediated reads.** Require exact runtime assignment and immutable authority,
+   containment, retained cancellation and revision-retirement responsibility,
+   and observed writer termination before successor writes. Initial reads and
+   approved publication use root Work with qualified subordinate helpers. Where
+   helper authority, aggregate limits, containment, cancellation, and physical
+   cleanup are unproven, qualify a root-only profile and reject unsupported
+   helper requests. These obligations apply without the later public lifecycle
+   API.
+2. **Full coding reads + Approve and publish.** Any configured human approver,
+   including the requester, may approve the MVP publication; an Agent cannot
+   approve its own publication.
+3. **Broader persistent Work and controls.** Independently admitted durable
+   children, public Stop task/Stop Agent/Start Agent, and selected recovery,
+   drain, and completed-delivery profiles follow later. Independent-human
+   approval and explicit policy authorization for automatic, allowlisted
+   push/draft-PR publication are later choices. The automatic policy need not
+   require per-operation human approval; it retains the same exact-candidate and
+   exact-effect checks.
+
+Publication always requires current authority for the reviewed candidate and
+exact effect. A late approval cannot start stopped execution, reopen canceled
+Work, or make an unknown publication outcome safe to repeat. Separate
+completed-result delivery can outlive a worker only under the explicitly
+selected profile below.
+
+Configurable execution-cap components and authorized lifecycle status GETs have
+implementations. The cap components provide configuration, immutable selections,
+optional deadline enforcement, and retained stop responsibility. Status reads
+expose recorded observations; they do not produce runtime evidence or supply
+complete mutation handlers. Complete production dispatch, authority, and
+native-runtime composition and full runtime qualification remain pending. This RFC does not
+present the proposed Stop/Start controls as existing capabilities.
+
+The whole lifecycle API, default Stop choice, graceful drain, and recovery do not
+gate the first two stages. Exact assignment, immutable authority, containment,
+cancellation/retirement, and observed writer termination remain mandatory.
 
 ## Ownership and records
 
 OCC owns Agent state and lifecycle. Compute and Sandbox drivers realize admitted
 intent and report observations; neither chooses policy nor rewrites revisions.
-Internal records use existing resources, without adding an execution resource
-between `AgentRevision` and its workload.
+The later lifecycle profile uses the following internal records without adding
+an execution resource between `AgentRevision` and its workload. Earlier stages
+still retain the assignment, immutable authority, and cleanup ownership needed
+by their runtime baseline.
 
 | Record | Required contents |
 | --- | --- |
@@ -44,13 +86,16 @@ delivery have separate lifetimes. Work and delivery records retain their
 identity across runtime replacement.
 
 A message acknowledgement, completed model turn, or lost connection does not
-close logical work; retained context does not authorize it. For independently
-admitted children, renewal and required joins follow RFC 0036, including ancestor
-cancellation when no parent process runs. The initial supported child subset is
-an open selection: subordinate native helpers may share one work/attempt only
-when its authority, aggregate limits, cancellation, and physical cleanup cover
-them. Independent children require their own scope, authority, lineage, status,
-and cleanup. A child name or Git worktree supplies no isolation boundary.
+close logical work; retained context does not authorize it. Initial reads and
+approved publication use one root Work with subordinate native helpers only
+when its authority, aggregate limits, containment, cancellation, and physical
+cleanup demonstrably cover them. Otherwise qualify a root-only profile and
+reject unsupported helper requests.
+
+Independently admitted durable children are later scope. Their renewal and
+required joins follow RFC 0036, including ancestor cancellation when no parent
+process runs. Each requires its own scope, authority, lineage, status, and
+cleanup. A child name or Git worktree supplies no isolation boundary.
 
 ## Execution limits and authority
 
@@ -90,6 +135,11 @@ extends its attempt.
 
 ## Inventory and user controls
 
+This section proposes the later public control surface. Existing status reads
+and internal interruption methods do not implement the complete contract.
+Internal cancellation, retirement, and observed writer termination are already
+mandatory for the first supported runtime.
+
 Provide authorized Agent inventory and current-work observations showing intended
 service state, observed execution state, observation time, exact work identity,
 effective cap, pending controls, and unresolved outcomes. A recent response does
@@ -109,14 +159,17 @@ requested/effective authority withdrawal, stopping, observed stopped, failed
 operation, termination unknown, and credential cleanup separately visible. Queue
 completion and provider deletion acknowledgements do not prove observed stopped.
 
-The default Stop action must be selected explicitly. Graceful drain and delivery
-after stop are optional profiles described below, not an implicit consequence of
-uncapped execution. Cancellation and security revocation override drain. Start
-opens eligible new admission; it does not undo a prior task cancellation.
+The default Stop action must be selected before introducing these later public
+controls. Graceful drain and delivery after stop are optional profiles described
+below, not an implicit consequence of uncapped execution. These later product
+decisions do not block initial reads or approved publication. Cancellation and
+security revocation override drain. Start opens eligible new admission; it does
+not undo a prior task cancellation.
 
 ## Durable admission
 
-Conceptually, `stopAgent` and `startAgent` take an Agent reference, expected
+For the later public control profile, `stopAgent` and `startAgent` conceptually
+take an Agent reference, expected
 lifecycle generation, and idempotency key; an exact-task stop also binds the
 original task identity and applicable concurrency check. OCC authenticates and
 authorizes the exact actions and references, then atomically records intent,
@@ -142,7 +195,9 @@ Preserve RFC 0027's activation order:
 5. Enable routing only after readiness.
 
 A candidate readiness probe is not runtime authority. Before predecessor
-retirement, failures preserve prior serving. After retirement, service requires
+retirement, failures preserve prior serving. Retirement deliberately creates an
+availability gap while termination and successor activation are verified. This
+contract offers no zero-downtime guarantee. After retirement, service requires
 verified activation or rollback.
 
 Before any successor writes shared retained storage, including initialization,
@@ -154,15 +209,18 @@ writer remains is missing, block replacement and retain the data.
 
 ## Recovery contract
 
-The initial profile requires same-cluster retained volumes and exact compatible
-Harness and build, configuration, adapter protocol, and recovery schema. Preserve
+Recovery is a separately selected later capability, not a prerequisite for
+initial reads or approved publication. Its first profile requires same-build,
+same-cluster retained volumes and exact compatible Harness, configuration,
+adapter protocol, and recovery schema. Preserve
 completed text, supported inert tool observations, and verified workspace
 durability. Exclude RAM, interrupted shells, provider-private reasoning, and
 unsupported native-session details. Compatibility profiles bound recovery
 promises. Active-session migration/replay across containers, builds, or source
 revisions, plus durable coordination for continuing active work and independent
-children, are later capabilities. Changed builds require separately qualified compatibility or migration; neither
-is a gate for the first completed-state retained-volume profile.
+children, require further profiles. Changed builds require separately qualified
+compatibility or migration; neither is a gate for a selected same-build
+completed-state retained-volume profile.
 
 A recovery head is not a historical filesystem snapshot. Expose files changed
 after the completed turn and require explicit disposition. Older context plus
@@ -202,6 +260,9 @@ application-consistent recovery and scale-to-zero;
 event protocols. Both remain proposals, and this RFC selects neither.
 
 ## Graceful stop and withdrawal
+
+This optional later profile does not select the default public Stop behavior.
+It cannot postpone the first runtime's cancellation and retirement obligations.
 
 ### Drain admission and bounds
 
@@ -262,6 +323,7 @@ retract accepted remote effects.
 
 ## Completed-result delivery
 
+This optional later profile requires its own admission and qualification.
 Graceful stop preserves pending delivery of an already completed result when a
 separate finite delivery responsibility was admitted before logical-work
 closure, possibly at original admission. For a profile supporting independent
@@ -280,6 +342,12 @@ membership evidence blocks delivery. It cannot complete unfinished computation,
 use a fallback audience, or reopen work. A later delivery responsibility needs
 fresh admission, and stopped intent alone permits none.
 
+A late human approval or delivery callback cannot resume the old execution,
+reopen canceled Work, or bypass current candidate, effect, audience, and
+publication checks. Human approval is not evidence that an earlier effect did
+not occur. A publication with an unknown outcome retains its exact identity
+and receipt for reconciliation; approval does not authorize a fresh attempt.
+
 Cancellation or security revocation, including Agent disable, withdraws affected
 delivery even if the Agent is already stopped. That path preserves outstanding
 physical-termination and cleanup obligations and distinguishes requested from
@@ -292,24 +360,44 @@ unknown outcome retains its original receipt and cannot authorize reposting.
 ## Qualification
 
 Qualification requires a real supported Harness. Source contracts and mocks do
-not establish runtime guarantees. First qualify the selected same-build,
-same-cluster completed-state retained-volume profile and its controls:
+not establish runtime guarantees. Evidence is specific to the selected stage;
+the full later lifecycle surface is not an early GitHub-access gate.
 
-- Recover non-self-contained conversation and files; prove predecessor
+### Initial runtime and coding work
+
+- For mediated reads, verify exact assignment and immutable authority,
+  containment, cancellation, and revision retirement. Exercise cancellation
+  during construction, model streaming, and blocked tools. Observe all owned
+  writer termination or report termination unknown and block writable
+  replacement. Required-authority withdrawal must interrupt affected work under
+  the selected enforcement profile even during blocked activity.
+- For initial reads and coding work, demonstrate root Work and each supported
+  subordinate helper under the same authority, aggregate limits, containment,
+  cancellation, and observed cleanup. If helper closure is unqualified, qualify
+  a root-only profile and reject unsupported helper requests.
+- Qualify the selected execution profile's default uncapped behavior with useful
+  native execution beyond the former fifteen-minute ceiling, and configured
+  finite expiry from the original anchor. Configuration edits and credential
+  rotation preserve the original selection; missing persisted policy rejects
+  rather than implying uncapped execution. Cap-component tests alone do not
+  qualify this behavior.
+- For Approve and publish, accept an authorized configured human, including the
+  requester, and reject Agent self-approval. Retain the exact reviewed candidate
+  and permitted effect through publication. Cancellation, retirement, late
+  approval, and unknown publication outcomes cannot cause execution resurrection
+  or replay.
+
+### Later public controls and selected recovery
+
+- For Stop task/Stop Agent/Start Agent, verify distinct own-task, shared-task,
+  and Agent permissions. Prevent inventory reads from disclosing unauthorized
+  task content. Incoming messages, stale queue work, concurrent controls, and
+  restart cannot undo stopped intent. Start cannot bypass disabled intent or
+  unresolved writers.
+- For selected completed-state recovery, recover non-self-contained conversation
+  and files on same-build, same-cluster retained storage; prove predecessor
   exclusion; survive controller restart; preserve stopped intent; expose
-  incompatible restore and ambiguous effects.
-- Demonstrate useful native execution beyond fifteen minutes with the default
-  uncapped selection, plus configured finite expiry from the original anchor.
-  Configuration edits and credential rotation preserve the original selection;
-  missing persisted policy rejects rather than implying uncapped execution.
-- Stop during construction, model streaming, and blocked tools; observe owned
-  helper cleanup or report termination unknown. Incoming messages, stale queue
-  work, concurrent controls, and restart cannot undo stopped intent. Start
-  cannot bypass disabled intent or unresolved writers. Required-authority
-  withdrawal interrupts affected work under the selected enforcement profile,
-  including during blocked model/tool activity.
-- Verify distinct own-task, shared-task, and Agent permissions, and prevent
-  inventory reads from disclosing unauthorized task content.
+  incompatible restore, residual files, and ambiguous effects.
 
 Qualify optional drain, outage-read, delivery, and continuation profiles only
 when selected; they are not evidence for unselected capabilities:
@@ -329,16 +417,20 @@ when selected; they are not evidence for unselected capabilities:
   the Agent is already stopped.
 
 Full independent-child coordination and active-session or changed-build migration
-need separate scope and evidence; they do not block the first completed-state
-recovery profile.
+need separate scope and evidence. Neither they nor completed-state recovery and
+the public Stop/Start controls block the initial read and approved-publication
+stages. Each stage still requires its applicable runtime safety evidence.
 
 ## Open decisions
 
-- Which Harness, build, and configuration combinations form the first profile?
-- What is the default Stop action, and are graceful drain and post-stop delivery
-  offered in the initial profile?
-- Which subordinate helpers or independently admitted children are supported
-  initially, with what aggregate limits and observable cleanup?
+- Which Harness, build, and configuration combinations are qualified at each
+  stage, and which subordinate helpers demonstrate the required aggregate
+  limits and observable cleanup? Without that evidence, qualify a root-only
+  profile and reject unsupported helper requests.
+- For the later public controls, what is the default Stop action, and which
+  optional profiles offer graceful drain and post-stop delivery?
+- Which later profile admits independent durable children, with what lineage,
+  cancellation, joins, and cleanup?
 - What drain bounds and escalation apply when writers cannot be observed?
 - Which withdrawal profiles, clock assumptions, and observation evidence bound
   qualified reads and prove effective closure?

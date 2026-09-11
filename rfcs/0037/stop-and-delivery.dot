@@ -4,6 +4,8 @@ digraph StopAndDelivery {
     bgcolor="white",
     fontname="DejaVu Sans",
     fontsize=13,
+    label="Optional later profile: graceful stop and completed-result delivery",
+    labelloc="t",
     nodesep=0.34,
     ranksep=0.62,
     margin=0.08,
@@ -35,7 +37,7 @@ digraph StopAndDelivery {
   stop [label="Graceful stop\nPersist stopped intent", fillcolor="#E4F3EE", color="#458878"];
   drain [label="Finite drain\nEligible work; fixed deadline"];
   termination [label="Worker termination\nExact workload confirmed stopped"];
-  delivery [label="Pre-admitted delivery\nCompleted result; exact audience\nOriginal finite horizon", fillcolor="#E4F3EE", color="#458878"];
+  delivery [label="Pre-admitted delivery\nCompleted result; exact audience\nOriginal finite horizon\nNo execution resurrection", fillcolor="#E4F3EE", color="#458878"];
   revoke [label="Cancel / security revoke\nAlso when already stopped\nTermination remains required", fillcolor="#F9ECEF", color="#AE6D7D"];
 
   { rank=same; stop; revoke; }
