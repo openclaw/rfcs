@@ -7,23 +7,47 @@ authorization, stable Agent identity, Namespace authorization and the single
 active revision. SPIFFE supplies identity documents; SPIRE supplies registration
 and attestation. Neither selects active revisions or grants OpenClaw permissions.
 
-## Authentication profiles
+## Identity model
 
-Each Agent retains its OCC-created `WorkloadIdentity`. An internal assignment
-binds it to an admitted revision and execution, without introducing a user-facing
-resource between AgentRevision and its workload. The Agent resource may persist
-indefinitely; its stable identity is distinct from an execution assignment, its
-SVID and each finite authority lease. Gateways, registrars and cleanup
-services use their own narrowly authorized identities; they cannot assume Agent
-identity.
+The target IAM subjects remain those of RFC 0027:
+
+| Identity or account | Meaning and authority |
+| --- | --- |
+| Human `Principal` | Existing OCC identity resolved from verified external identity; may approve publication when configured. |
+| Automation `ServicePrincipal` | Explicit Installation- or Namespace-scoped automation subject with its own bindings. |
+| Agent `WorkloadIdentity` | One stable OCC-created IAM subject per Agent, shared across revisions; bindings are confined to its Namespace or exact resources there. |
+| Execution assignment and SVID | One admitted incarnation of that Agent; the SVID authenticates its registered execution subject and grants no permission. |
+| Kubernetes `ServiceAccount` | Infrastructure identity backing the workload; its pod-bound token is the baseline runtime authentication credential. |
+| Native OCE `ServiceAccount` | Provider-agnostic account resource with an opaque credential reference; it is neither an IAM subject nor a Kubernetes ServiceAccount. |
+
+Current implementation persists the Agent's identity as an Agent-owned,
+Namespace-scoped `ServicePrincipal`. `Agent.servicePrincipalId`, allocated as
+`service-agent-<Agent ID>` and copied into revisions, references that record.
+This is the current representation of the design's stable `WorkloadIdentity`;
+it is not a separately implemented identity type. The proposed mapping preserves
+one stable workload subject per Agent without reclassifying general automation
+`ServicePrincipal`s. Whether implementation retains the field or introduces a
+distinct contract/persistence kind remains unresolved.
+
+Before selecting this profile, OCC must unambiguously resolve the Agent, stable
+subject, applicable bindings and current assignment within one Namespace.
+Any binding transition preserves exact subject and scope without adding
+permissions or transferring human/automation bindings. An execution SVID
+resolves through the assignment to that stable role-bearing subject.
+
+An assignment is internal, without a user-facing execution resource. Gateways,
+registrars and cleanup services use their own narrowly authorized identities;
+they cannot assume Agent identity. Agents cannot inherit human sessions, roles
+or provider credentials.
+
+## Authentication profiles
 
 Installation configuration selects authentication; workloads cannot choose trust
 roots. RFC 0027's pod-bound
 ServiceAccount-token profile remains the baseline. RFC 0035 proposes an optional
 X.509-SVID profile at explicitly selected OCC runtime boundaries. An X.509-SVID is
-a certificate carrying a SPIFFE identity. The dedicated Kubernetes ServiceAccount
-retains infrastructure authorization; IAM bindings remain attached to stable OCC
-identities. No human permissions transfer.
+a certificate carrying a SPIFFE identity. Kubernetes retains infrastructure
+authorization; IAM bindings remain attached to stable OCC subjects.
 
 Verification failure cannot switch profiles or admit another credential type.
 Migration requires an explicit rollout, current assignment bindings and withdrawal
@@ -34,6 +58,34 @@ This proposal does not replace human login, OAG admission, IAMAdapter policy or
 Kubernetes authorization. Cross-Installation federation and cross-Namespace
 references remain outside its scope. Identity does not establish containment,
 prevent all credential theft or prove physical termination from authorization.
+
+## Stage requirements
+
+Delivery starts with RFC 0034's mediated metadata, clone and fetch operations,
+then adds approved publication. Both stages require:
+
+- A genuine root-work record identifying the verified requester, service owner
+  and represented Agent, immutable admitted scope and finite-or-uncapped horizon,
+  cancellation state and exact current execution assignment.
+- Protected caller origin and online OCC authorization for each operation,
+  with operation/effect attribution and provider credentials outside workloads.
+- Subordinate helpers sharing the root work's execution context, authority,
+  aggregate resource limits, cancellation and expiry, without independent
+  admission or renewal. The runtime must demonstrate physical stop for every
+  helper; otherwise only root execution is supported.
+
+No broad Work API or child hierarchy is required. Unsupported independent
+children are denied; root-only work needs no child lineage. Cancellation blocks
+new dispatch; uncertain provider outcomes are recorded without blind replay.
+
+Publication additionally requires approval for the exact operation under RFC
+0034. The MVP permits a configured human, including the requester, to approve;
+Agents cannot approve publication. Independent-human approval and automatic
+authorization for specific operations under an explicit policy follow later.
+
+Full durable Work and independent children follow under RFC 0036, with the
+ancestry rules below; user-facing Stop/Start follows under RFC 0037.
+Active-session migration and effect replay are outside initial delivery.
 
 ## Execution registration
 
@@ -49,48 +101,41 @@ Assignments record Installation, Namespace, participant kind, stable identity,
 applicable revision, opaque assignment ID, execution generation, qualified
 compartment and registration reference. Restart or replacement creates a fresh
 execution binding even with unchanged Agent, ServiceAccount or Pod UID.
-Compartment selection must satisfy
-[RFC 0036's shared-state or isolation requirements](https://github.com/openclaw/rfcs/pull/70);
-identity labels cannot prove that isolation.
+Compartment selection must enforce the admitted scope's shared-state or
+isolation requirements. [RFC 0036](https://github.com/openclaw/rfcs/pull/70)
+extends these to independent children; identity labels cannot prove isolation.
 
-In the selected Kubernetes/gVisor profile, a permission increase or decrease
-requires a fresh Pod/gVisor sandbox, assignment and execution-bound SVID. Another
-container sharing the old Pod is insufficient. Withdraw old dispatch authority
-before admitting dispatch under the changed scope; do not change permissions in
-place while retaining old processes, memory, credentials or reusable state.
-Approved workspace or context handoff requires explicit scope and isolation
-checks; it cannot carry old authority or disallowed higher-authority data into
-the successor.
+Permission increases and decreases require a fresh Pod/gVisor sandbox,
+assignment and execution-bound SVID; another container in the old Pod is
+insufficient. Withdraw old dispatch authority before admitting the changed
+scope. Retained processes, memory, credentials and state cannot gain changed
+permissions in place. Workspace/context handoff requires scope and isolation
+checks and excludes old authority and disallowed higher-authority data.
 
-An Agent may handle multiple messages and turns under one unchanged authorized
-context; a message alone does not require a new Pod. Reusing a context across
-assignments remains a future optimization requiring proof of unchanged effective
-authority and data scope, currentness, work attribution and retained-state
-isolation. Comparing one permission label cannot qualify reuse.
+Multiple messages and turns may share one unchanged authorized context.
+Cross-assignment reuse remains a future optimization requiring unchanged
+effective authority and data scope, currentness, attribution and retained-state
+isolation; comparing permission labels is insufficient.
 
-The registered SPIFFE ID identifies one execution binding and must never be
-rebound to a successor. Attested selectors must distinguish that execution from
-other workloads and earlier incarnations. A fresh registration name with
-unchanged, insufficient selectors cannot do so. Renewal preserves the same
-binding. If an old certificate remains valid after replacement, it still resolves
-only to the old, retired assignment.
+Registered SPIFFE IDs never rebind to successors. Attested selectors must
+distinguish actual executions, including restarts; new names with insufficient
+selectors cannot do so. Renewal preserves the binding. Old certificates resolve
+only to their old assignments, even when still valid after replacement.
 
-[RFC 0037's observations](https://github.com/openclaw/rfcs/pull/71) reference OCC's
-canonical assignment; they cannot select another current execution. Lifecycle
-intent has a separate generation: stop need not change execution generation;
-replacement does.
+[RFC 0037](https://github.com/openclaw/rfcs/pull/71) observes OCC's canonical
+assignment. Lifecycle intent has a separate generation: stop need not change
+execution generation; replacement does.
 
 Record registration intent before dispatch. The registrar uses its own authority
 and protected Compute evidence, never the target's credential. Workloads cannot
 choose subjects, parents or selectors. A timed-out create requires exact
 reconciliation, not an unrelated registration.
 
-Pre-activation registration grants no Harness execution, Channel traffic or
-SecretBroker access. Independently authorized readiness paths preserve RFC 0027's
-activation order. Logical work and execution assignment are separate: work may
-survive a process, but selecting a replacement requires current authority and new
-execution-bound evidence. Neither recovered work nor its old lease authorizes the
-replacement.
+Pre-activation registration grants no Harness, Channel or SecretBroker access.
+Independently authorized readiness preserves RFC 0027's activation order.
+Where work continuation is later supported, replacement still requires current
+authority and fresh execution evidence; recovered work or an old lease cannot
+authorize it.
 
 ## Request verification
 
@@ -100,9 +145,9 @@ For each protected request:
 2. Resolve trusted registration and protected execution evidence to the exact
    assignment. Caller headers or serialized identity objects are insufficient.
 3. Check permitted purpose: serving, bounded drain of admitted work, permitted
-   control, or retained cleanup. Drain uses the original work ceiling and RFC
-   0037's finite deadline; it admits no new work. Purpose checks use current
-   authority or a qualified enforcement lease as specified below.
+   control, or retained cleanup. Drain uses the original work ceiling and a
+   finite deadline; it admits no new work. RFC 0037 defines the later Stop/Start
+   flow. Purpose checks use current authority or a qualified enforcement lease.
 4. Apply existing IAM, Restrictions, logical-work and effect constraints. The
    service owner, verified requester and executing workload remain distinct under
    RFC 0036. Authentication grants no permission.
@@ -124,40 +169,33 @@ here. Connector and gateway identities cannot replace caller authority.
 
 ## Outage operation
 
-The first GitHub mediation profile requires online OCC authority for every
-protected dispatch. It selects no outage exception for reads or credential maintenance.
-The exception below is an optional profile proposal, requiring separate explicit
-selection and qualification; finite leases alone do not enable it. Provider tokens
-may be cached only while every use passes the selected current-authority checks.
+The first GitHub profile requires online OCC authority for every operation,
+including reads and credential maintenance. Cached provider tokens do not bypass
+these checks. The following optional exception needs separate selection and
+qualification; finite leases alone do not enable it.
 
-Long-lived connections and streams recheck purpose before privileged dispatch or
-protected delivery. Application writes, message posting, new admission, renewal,
-expansion and new execution assignment require current authority. Only explicitly
-qualified application reads may continue during an authority outage under an
-existing unexpired enforcement lease. Eligibility follows operation semantics,
-not the HTTP method.
+Writes, message posting, admission, renewal, expansion and reassignment require
+current authority. Only qualified application reads may continue during an
+authority outage under an existing unexpired lease. Eligibility follows operation
+semantics, not HTTP methods.
 
-Protected origin, local revocation state, trustworthy time and every other
-mandatory check still apply; missing evidence denies the affected operation. OCC
-and each resource's selected IAM authority still own permission decisions; a
-connector cannot invent an outage profile. Read freshness and protected content
-versions require explicit qualification. A lease for a resource does not by
-itself authorize newly protected content at that resource.
+Protected origin, complete local revocation state, trustworthy time and all
+mandatory evidence remain required. OCC and the selected IAM authority retain
+permission decisions. Read freshness and protected content versions need explicit
+qualification; a resource lease does not authorize newly protected content.
 
-This is a proposed refinement of RFC 0027's per-operation current-authority and
-unavailable-state denial rules, including SecretBroker access. The accepted
-baseline is unchanged until this refinement is accepted.
+This refines RFC 0027's current-authority and unavailable-state denial rules,
+including SecretBroker access; its baseline stands until the refinement is accepted.
 
-Trusted credential maintenance may preserve existing read access only when
-expressly preauthorized under that same lease and qualified by RFC 0034. It cannot
-create work, expand access or extend an authority deadline. This does not permit
-application writes during an outage. Write interruption and restricted read
-freshness are deliberate initial limitations; broader outage profiles require a
+Credential maintenance may preserve read access only when preauthorized under
+the same lease and qualified by RFC 0034. It cannot create work, expand access,
+extend deadlines or permit application writes. Broader outage profiles require a
 separate proposal.
 
 ## Lease issuance and ordering
 
-OCC and the selected policy authorities issue leases for RFC 0036's admitted work.
+OCC and the selected policy authorities issue leases for admitted original work,
+using the root record in the initial stages and RFC 0036's hierarchy later.
 Each lease records:
 
 - Issuer and committed issuance version.
@@ -183,9 +221,12 @@ guarantees or remain unavailable for this profile.
 
 ## Lease bounds and ancestry
 
-Execution duration and logical-work horizons may be explicitly uncapped under
-the selected policy. An omitted or unknown policy is not evidence of uncapped
-authority. Each enforcement lease still has a finite absolute expiry.
+Execution duration defaults to uncapped under the selected initial policy.
+Admission records that choice or an explicitly configured finite horizon;
+missing or unverifiable policy state is not an uncapped choice. Logical work
+may also have a finite or uncapped horizon. The admitted work and execution
+horizons are immutable: renewal and reconnect cannot extend a configured cap.
+Each enforcement lease still has a finite absolute expiry.
 
 For issuance committed at `t`, expiry must satisfy:
 
@@ -248,9 +289,10 @@ fresh issuance.
 ## Dispatch and lifecycle
 
 Dispatch permits bind assignment/generation, original work and authority version,
-operation digest and evidence deadline. The accepting service rechecks mandatory
-evidence at final submission; reservation or queuing cannot postpone submission
-past the deadline. Offline allowance consumption requires a qualified
+operation digest and evidence deadline. Connections and streams recheck purpose
+before privileged dispatch or protected delivery. The accepting service rechecks
+mandatory evidence at final submission; reservation or queuing cannot postpone
+submission past the deadline. Offline allowance consumption requires qualified
 preallocation and durable accounting; exhaustion cannot authorize fresh credit.
 
 The effective dispatch deadline is no later than any applicable certificate,

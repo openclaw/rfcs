@@ -13,50 +13,58 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/69
 
 ## Summary
 
-Propose optional SPIFFE/SPIRE authentication and bounded enforcement leases for Enterprise runtimes. Preserve [RFC 0027](0027-openclaw-enterprise.md#iam-and-authority)'s stable Agent identity, Namespace authorization and single active revision while distinguishing execution identity from current authority.
+Propose optional SPIFFE/SPIRE authentication and finite authority leases for Enterprise runtimes. Preserve [RFC 0027](0027-openclaw-enterprise.md#iam-and-authority)'s stable Agent identity, Namespace authorization and single active revision. Give each execution its own authenticated identity while checking current permission for each operation.
 
 ## Motivation
 
-Connections and certificates can outlive executions. Authentication must never restore retired authority. SPIFFE/SPIRE provide identity and attestation; OCC and policy authorities control permissions.
+An Agent can keep working across many turns and restart with the same configuration. Its certificates and connections may outlive an execution or permission change. The system must recognize the stable Agent without allowing old processes or credentials to recover withdrawn authority.
 
 ## Goals
 
-Distinguish executions and restarts, bound authority withdrawal, and preserve independently authorized bootstrap, retirement and cleanup.
+Separate stable identity, execution identity and permission; bound authority withdrawal; support long-running work; and preserve independently authorized bootstrap and cleanup.
 
 ## Non-Goals
 
-Replacing human login, OAG, IAMAdapter or Kubernetes authorization; adding user-facing execution resources; proving containment or physical termination; federation or cross-Namespace references.
+Replacing human login, OAG, IAMAdapter or Kubernetes authorization; adding a user-facing execution resource; federation; cross-Namespace references; or proving physical termination from authorization alone.
 
 ## Proposal
 
-The [enforcement specification](0035/enforcement-spec.md) retains the detailed contracts.
+### Identity and authority
 
-Installation configuration explicitly selects optional X.509-SVID authentication. [Profile selection](0035/enforcement-spec.md#authentication-profiles) forbids automatic fallback. RFC 0027's pod-bound token profile remains the baseline; this draft's outage refinement, including SecretBroker access, awaits acceptance.
+[RFC 0027](0027-openclaw-enterprise.md#iam-and-authority) distinguishes a human `Principal`, an automation `ServicePrincipal` and an Agent's `WorkloadIdentity`. Explicit `AccessBinding`s grant roles to the appropriate stable subject. An Agent never inherits its creator's identity or permissions.
 
-Under [execution registration](0035/enforcement-spec.md#execution-registration), OCC selects assignments; Compute supplies execution evidence; registrars/SPIRE bind identities; transport verifies peers; accepting services authorize operations. Agents retain OCC-created `WorkloadIdentity` objects. Each restart or replacement receives an immutable execution binding; registered subjects are never rebound, and selectors must distinguish actual incarnations.
+Current implementation represents Agent identity with an Agent-owned `ServicePrincipal`, referenced by `Agent.servicePrincipalId` and allocated as `service-agent-<Agent ID>`. This draft maps that Agent-specific identity to its one stable `WorkloadIdentity`; it does not equate general automation `ServicePrincipal`s with workloads. The exact schema and binding transition remain an implementation decision. The [identity model](0035/enforcement-spec.md#identity-model) defines the mapping and distinguishes native and Kubernetes ServiceAccounts.
 
-[Request verification](0035/enforcement-spec.md#request-verification) requires qualified transport to establish required execution origin. Ordinary TLS proves key possession; copied identity fields cannot recreate connection-bound evidence. Missing origin proof denies affected operations. [RFC 0034 mediation](https://github.com/openclaw/rfcs/pull/68) binds connector, represented Agent and [RFC 0036 original work](https://github.com/openclaw/rfcs/pull/70); service identity cannot replace caller authority. [RFC 0037](https://github.com/openclaw/rfcs/pull/71) observes OCC's canonical assignment.
+OCC selects the admitted revision and execution assignment. Compute supplies execution evidence; a constrained registrar and SPIRE issue an execution-bound X.509-SVID, a certificate carrying a SPIFFE identity. Restart or replacement creates a new binding that cannot reuse an old execution's authority. The SVID authenticates that execution; accepting services still authorize each operation against the Agent, original work and current assignment.
 
-Application writes, admission, renewal, expansion and reassignment require current authority. The first GitHub mediation profile requires online OCC authority for every dispatch and selects no outage exception for reads or credential maintenance. An optional [outage profile](0035/enforcement-spec.md#outage-operation) would permit only qualified existing application reads under an existing, unexpired lease. Protected origin, trustworthy time, complete revocation state and all mandatory evidence remain required; missing evidence denies use. Read eligibility, freshness, protected content versions and preauthorized credential maintenance require explicit qualification; maintenance cannot expand access or extend deadlines.
+Installation configuration explicitly selects the optional SVID profile. RFC 0027's pod-bound Kubernetes ServiceAccount token remains the baseline. Authentication failure never changes profiles. A required execution-origin check must bind the actual caller to its assignment; copied identity fields or ordinary TLS key possession alone cannot establish that origin.
 
-A stable Agent may persist across executions. Logical work and execution duration may be explicitly uncapped, but every enforcement lease remains finite and binds exact work and execution. Any finite work, ancestor, stop or purpose deadline still bounds authority. Replacement requires current authority and new evidence.
+### Delivery stages
+
+The first stage supports [RFC 0034's mediated metadata, clone and fetch operations](https://github.com/openclaw/rfcs/pull/68). It needs a genuine root-work record with requester, immutable scope and horizon, current cancellation and assignment state, and operation/effect attribution. Subordinate helpers share that work's authority, resource limits and cancellation; the runtime must demonstrate physical stop for every helper or support root-only execution. A broad Work API and durable child hierarchy are unnecessary for this stage.
+
+Approved publication follows, with approval bound to the exact operation and checked alongside current authority. A configured human, including the requester, may approve in the MVP; Agents cannot approve publication. Independent-human approval and automatic authorization for specific operations under an explicit policy are later profiles owned by RFC 0034.
+
+Full durable Work, independently continuing children and user-facing Stop/Start follow under [RFC 0036](https://github.com/openclaw/rfcs/pull/70) and [RFC 0037](https://github.com/openclaw/rfcs/pull/71). Initial delivery does not require active-session migration or effect replay. The [stage requirements](0035/enforcement-spec.md#stage-requirements) keep the necessary identity and cancellation checks in every stage.
+
+### Runtime enforcement
+
+Every operation in the first GitHub profile requires online OCC authority, including reads and credential maintenance. Provider credentials remain outside Agent workloads. An optional [read-outage profile](0035/enforcement-spec.md#outage-operation) requires separate selection; finite leases alone never enable offline access.
+
+Execution duration defaults to uncapped; configured work and execution horizons are immutable for the admitted context. Every enforcement lease has a finite expiry and binds exact work and execution. Renewal requires current authority and cannot extend a configured cap. Later children also remain bounded by any configured ancestor horizons.
 
 ![Authority lifetimes](0035/authority-lifetimes.png)
 
-*Work may outlive execution and need not have a duration cap; leases always have finite expiry.*
+*Work and executions may run without a duration cap. Every authority lease expires.*
 
-[Issuance and revocation](0035/enforcement-spec.md#lease-issuance-and-ordering) must be authoritatively ordered and stale issuers fenced. Late delivery retains original expiry. [Lease bounds](0035/enforcement-spec.md#lease-bounds-and-ancestry) respect ancestor horizons, purpose deadlines and withdrawal targets. Issuance and renewal recheck current policy and open logical ancestors; offline attenuation only narrows existing authority.
+In the Kubernetes/gVisor profile, permission increases and decreases require a fresh Pod/gVisor sandbox and execution identity. Withdraw old dispatch authority before admitting the changed scope. Retained processes, credentials or state cannot acquire new permissions in place; context handoff requires scope and isolation checks.
 
-Effective withdrawal requires complete holder acknowledgements or proven expiry, including descendants and clock/enforcement allowances. Leases cannot promise immediate withdrawal from unreachable holders. Lost continuity after restart, untrustworthy time, revocation gaps or rollback block affected use until trustworthy synchronization returns; [continuity contracts](0035/enforcement-spec.md#revocation-and-continuity) define the required evidence.
-
-In the selected Kubernetes/gVisor profile, permission increases and decreases require a fresh Pod/gVisor sandbox and execution identity. Withdraw old dispatch authority; old processes and retained state cannot acquire changed permissions in place. Unchanged-scope reuse remains a future qualified optimization.
-
-[Dispatch and lifecycle](0035/enforcement-spec.md#dispatch-and-lifecycle) recheck evidence at final submission and protected delivery. Queuing, reconnect and identity renewal cannot extend deadlines. Effective retirement requires established withdrawal; physical termination remains separate. Compute must observe predecessor termination before a writable successor; retained cleanup authority survives deletion.
+[Dispatch and lifecycle enforcement](0035/enforcement-spec.md#dispatch-and-lifecycle) rechecks evidence at final submission and protected delivery. Queues and reconnects cannot extend deadlines. Effective withdrawal requires complete holder acknowledgements or proven expiry; physical termination remains separate. Compute observes predecessor termination before a writable successor, and cleanup retains its own authority after Agent deletion.
 
 ## Rationale
 
-Tokens are simpler; SPIFFE offers common service authentication with added registrar, trust and attestation operations. Execution-specific subjects avoid inherited authority; certificates cannot track current policy. Qualified read leases trade bounded withdrawal delay for outage availability.
+SPIFFE offers shared service authentication with additional registration and attestation operations. Stable IAM subjects preserve policy across restarts; separate execution identities prevent a successor from inheriting stale authority. Online checks keep the first profile simple. Optional read leases trade outage availability for bounded withdrawal delay.
 
 ## Unresolved questions
 
-Which gVisor attestation, transport, lease mechanisms, reads, lifetimes and measured bounds qualify? Acceptance qualifies no runtime or profile. [Runtime qualification](0035/enforcement-spec.md#runtime-qualification) requires installed-runtime evidence; unit fixtures are insufficient.
+How should the current Agent principal field and bindings become the target `WorkloadIdentity` mapping? Which gVisor origin mechanism, lease protocol and measured withdrawal bounds qualify? Runtime-authority persistence and GitHub mediation components exist; positive runtime-purpose authorization and protected repository use still need their authoritative producers integrated. The [enforcement specification](0035/enforcement-spec.md) defines the required behavior; an installed SPIRE/gVisor profile remains deployment work.
