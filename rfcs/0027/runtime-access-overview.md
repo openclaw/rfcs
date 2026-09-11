@@ -11,6 +11,20 @@ This informational guide connects four **draft** proposals under accepted [RFC 0
 | [0034: credentials and GitHub](https://github.com/openclaw/rfcs/pull/68) | Credential issuance, protected custody, mediated use, and cleanup. |
 | [0037: runtime and delivery](https://github.com/openclaw/rfcs/pull/71) | Stop/resume, bounded drain, writer exclusion, completed-state recovery, and completed-result delivery. |
 
+## Changes from the merged implementation
+
+The comparison below is anchored to merged source `3eeacb8`. The named profiles have different credential and runtime boundaries.
+
+| Boundary | Existing implementation | Addition or required change |
+| --- | --- | --- |
+| Identity and configuration | An [Agent-associated ServicePrincipal and revision selections](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/packages/contracts/src/index.ts#L309) for Provider and ServiceAccount. | 0035 binds authenticated execution to work authority. 0034 adds the proposed `repositoryAccess` selection and `credential_gateway` capability. |
+| Credentials | [Provider-managed model tokens](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/docs/reference/service-accounts.md#L85) reach dedicated Codex through Compute's account Secret. Ordinary [SecretDriver bindings](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/docs/flows/secret-storage-and-delivery.md#L113) reach the consuming gateway environment. | 0034 adds mediated GitHub access with protected tokens and current OCC authority per dispatch. Existing model and ServiceAccount credential paths remain. |
+| Replacement | The [ordinary Kubernetes controller](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/apps/controller/src/worker.ts#L987) selects and requests successor activation before requesting predecessor retirement. | 0037 requires observed predecessor termination before successor execution or shared writes, preserving RFC 0027's order and accepting an availability gap. |
+
+![Existing dedicated-Codex credential delivery and ordinary Kubernetes call order, compared with additive GitHub mediation and the required observed-stop handoff.](baseline-and-proposal.png)
+
+The messaging gateway remains Agent-owned, provisioned by Compute, and separate from the proposed credential gateway. In dedicated Codex, it receives neither managed account token nor workspace ID. Current [activation](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/apps/controller/src/drivers/compute/kubernetes/index.ts#L1647) and [retirement](https://github.com/openclaw/openclaw-enterprise/blob/3eeacb85d9e8e087bc3e74d792778e4ef3123412/apps/controller/src/drivers/compute/kubernetes/index.ts#L1817) calls do not establish the full observed-stop contract; their order alone does not prove concurrent writers.
+
 ## Delivery stages
 
 ![Stage A delivers managed reads, clone and fetch with minimal internal work authority. Stage B adds coding and explicit human Approve and publish. Stage C adds broader durable work and children plus Stop task, Stop Agent and Start Agent.](runtime-access-overview.png)

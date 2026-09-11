@@ -1,0 +1,50 @@
+digraph BaselineAndProposal {
+  graph [rankdir=TB, bgcolor="white", pad="0.18", nodesep="0.36", ranksep="0.32", splines=polyline, fontname="Arial", fontsize=12];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=13, fontcolor="#24323B", color="#82949D", penwidth=1.1, margin="0.16,0.12"];
+  edge [fontname="Arial", fontsize=10, fontcolor="#425963", color="#6B818A", penwidth=1.2, arrowsize=0.7];
+
+  subgraph cluster_current_credentials {
+    label="EXISTING / Provider-managed model token, dedicated Codex\nThe separate Agent messaging gateway receives neither value.";
+    labelloc=t; labeljust=l; style=rounded; color="#BDCBD1"; fontcolor="#425963"; margin=16;
+    issue [label="ServiceAccountDriver\nIssue model token", fillcolor="#EFF3F6"];
+    compute [label="API-side Compute\nStore credential", fillcolor="#EFF3F6"];
+    secret [label="Account Secret\nToken + workspace ID", fillcolor="#EFF3F6"];
+    codex [label="Dedicated Codex\nReceive token +\nworkspace ID", fillcolor="#EFF3F6"];
+    { rank=same; issue; compute; secret; codex; }
+    issue -> compute -> secret -> codex;
+  }
+
+  subgraph cluster_proposed_credentials {
+    label="ADDITION / Proposed managed GitHub profile\nCurrent OCC authority is required for every GitHub dispatch; the existing model-credential path remains.";
+    labelloc=t; labeljust=l; style=rounded; color="#9FBFB6"; fontcolor="#355F54"; margin=16;
+    agent [label="Agent execution\nNo GitHub token", fillcolor="#E9F3F1", color="#578D82"];
+    connector [label="Trusted connector\nVerify execution + Work", fillcolor="#E9F3F1", color="#578D82"];
+    broker [label="CredentialGatewayDriver\n(proposed)\nBroker + mediator", fillcolor="#E9F3F1", color="#578D82"];
+    github [label="GitHub\nScoped request", fillcolor="#E9F3F1", color="#578D82"];
+    { rank=same; agent; connector; broker; github; }
+    agent -> connector -> broker -> github;
+  }
+
+  subgraph cluster_current_cutover {
+    label="EXISTING / Ordinary Kubernetes reconciliation: source call order\nActivation and a Recreate gateway rollout do not establish the full observed-stop contract below.";
+    labelloc=t; labeljust=l; style=rounded; color="#BDCBD1"; fontcolor="#425963"; margin=16;
+    select [label="Commit successor\nas active revision", fillcolor="#EFF3F6"];
+    activate [label="Request successor\nactivation", fillcolor="#EFF3F6"];
+    retire [label="Request predecessor\nretirement", fillcolor="#EFF3F6"];
+    { rank=same; select; activate; retire; }
+    select -> activate -> retire;
+  }
+
+  subgraph cluster_required_cutover {
+    label="REQUIRED / RFC 0027 activation order, specified by RFC 0037\nObserved predecessor termination gates successor execution and shared writes; serving has an availability gap.";
+    labelloc=t; labeljust=l; style=rounded; color="#A9BCD0"; fontcolor="#426381"; margin=16;
+    prepare [label="Isolated candidate\nExecution disabled", fillcolor="#EAF1F8", color="#6489B0"];
+    stop [label="Observe predecessor\nHarness + writers stopped\nResolve uncertain creates", fillcolor="#EAF1F8", color="#6489B0"];
+    permit [label="Select successor\nPermit execution", fillcolor="#EAF1F8", color="#6489B0"];
+    route [label="Enable routing\nafter readiness", fillcolor="#EAF1F8", color="#6489B0"];
+    { rank=same; prepare; stop; permit; route; }
+    prepare -> stop -> permit -> route;
+  }
+
+  issue -> agent -> select -> prepare [style=invis];
+}
