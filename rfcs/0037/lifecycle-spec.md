@@ -37,24 +37,91 @@ prove neither death nor exclusive ownership. Agent authentication need not use
 SPIFFE.
 
 [RFC 0036](https://github.com/openclaw/rfcs/pull/70) owns logical work, its service
-owner and requester attribution, immutable scope and original horizon, and
-attached-child lineage. This RFC owns runtime transitions and finite
+owner and requester attribution, immutable scope and any configured original
+horizon, and attached-child lineage. This RFC owns runtime transitions and finite
 completed-result delivery. Logical work, runtime execution, bounded drain, and
 delivery have separate lifetimes. Work and delivery records retain their
 identity across runtime replacement.
 
 A message acknowledgement, completed model turn, or lost connection does not
-close logical work; retained context does not authorize it. Attached-child
-renewal and required joins follow RFC 0036, including ancestor cancellation when
-no parent process runs.
+close logical work; retained context does not authorize it. For independently
+admitted children, renewal and required joins follow RFC 0036, including ancestor
+cancellation when no parent process runs. The initial supported child subset is
+an open selection: subordinate native helpers may share one work/attempt only
+when its authority, aggregate limits, cancellation, and physical cleanup cover
+them. Independent children require their own scope, authority, lineage, status,
+and cleanup. A child name or Git worktree supplies no isolation boundary.
+
+## Execution limits and authority
+
+An Agent may exist indefinitely as a stable identity and configuration. Revision,
+Pod, Harness, conversation, logical work, and execution-attempt lifetimes remain
+separate. Persistence promises neither a failure-free process nor automatic
+continuation on replacement.
+
+Execution duration defaults to uncapped. An optional finite cap limits one
+original attempt from its dispatch anchor, including startup, tool execution,
+and waiting. Admission records the effective finite-or-uncapped selection and
+its policy provenance immutably. Configuration changes affect future admission;
+activity, model rounds, reconnects, and credential rotation cannot extend an
+admitted cap. Applicable Restrictions may require or narrow a finite cap.
+Missing authority or missing persisted policy is an error, not an uncapped
+fallback. Extending an active budget is outside the initial scope.
+
+Uncapped means elapsed time alone does not stop the attempt. Completion, explicit
+stop, required-authority withdrawal, and independently configured resource or
+spend limits still apply. Work horizons may be absent under an uncapped policy;
+a configured finite work or ancestor horizon remains binding. Enforcement
+leases, credentials, operation deadlines, drain deadlines, and completed-delivery
+horizons remain finite. Lease and credential renewal requires current
+exact-operation authority and cannot broaden scope, reopen terminal work, or
+reset an existing cap or deadline.
+
+Both modes retain an independently authorized stop owner for exact native
+construction and owned helpers before execution can begin. Finite mode enforces
+the original monotonic deadline with bounded timer waits; uncapped mode creates
+no duration-expiry timer. Protective cleanup must remain usable when ordinary
+continuation authority is unavailable. A cancellation acknowledgement, terminal
+model event, or socket close does not prove physical closure of every mutator.
+Retain capacity and writer ownership while closure or provider effects remain
+uncertain. Identity and provider credential rotation require qualified client
+behavior; a new token neither refreshes an existing process environment nor
+extends its attempt.
+
+## Inventory and user controls
+
+Provide authorized Agent inventory and current-work observations showing intended
+service state, observed execution state, observation time, exact work identity,
+effective cap, pending controls, and unresolved outcomes. A recent response does
+not refresh old runtime evidence. Agent visibility alone does not permit reading
+private task content.
+
+| Control | Required outcome |
+| --- | --- |
+| Stop task | Stop one exact task and its owned helpers or admitted descendants. Other work remains subject to normal admission and writer exclusion. |
+| Stop Agent | Persist stopped intent, block new work including incoming messages and stale queued dispatch, and drive affected work to stop. Preserve Agent identity, configuration, retained files, and unresolved cleanup obligations. |
+| Start Agent | Admit a separately authorized running transition. Do not bypass administrative disable, revive canceled work, replay uncertain operations, or bypass predecessor writer exclusion. |
+
+Own-task, shared-task, and Agent lifecycle permissions are separate exact-resource
+decisions. An administrator label is not itself authorization. Persist attributable
+acceptance and its audit atomically. Keep acceptance, new-work blocking,
+requested/effective authority withdrawal, stopping, observed stopped, failed
+operation, termination unknown, and credential cleanup separately visible. Queue
+completion and provider deletion acknowledgements do not prove observed stopped.
+
+The default Stop action must be selected explicitly. Graceful drain and delivery
+after stop are optional profiles described below, not an implicit consequence of
+uncapped execution. Cancellation and security revocation override drain. Start
+opens eligible new admission; it does not undo a prior task cancellation.
 
 ## Durable admission
 
-Conceptually, `stopAgent` and `resumeAgent` take an Agent reference, expected
-lifecycle generation, and idempotency key. OCC authenticates and authorizes the
-exact actions and references, then atomically records intent, operation,
-attribution, and reconciliation work with a compare-and-set against the expected
-generation. Repeated keys identify the same operation; conflicting inputs or
+Conceptually, `stopAgent` and `startAgent` take an Agent reference, expected
+lifecycle generation, and idempotency key; an exact-task stop also binds the
+original task identity and applicable concurrency check. OCC authenticates and
+authorizes the exact actions and references, then atomically records intent,
+operation, attribution, and reconciliation work with a compare-and-set against
+the expected generation. Repeated keys identify the same operation; conflicting inputs or
 stale generations are rejected.
 
 The acceptance receipt reports durable admission, not completed startup or
@@ -92,7 +159,10 @@ Harness and build, configuration, adapter protocol, and recovery schema. Preserv
 completed text, supported inert tool observations, and verified workspace
 durability. Exclude RAM, interrupted shells, provider-private reasoning, and
 unsupported native-session details. Compatibility profiles bound recovery
-promises; changed builds require separately qualified compatibility or migration.
+promises. Active-session migration/replay across containers, builds, or source
+revisions, plus durable coordination for continuing active work and independent
+children, are later capabilities. Changed builds require separately qualified compatibility or migration; neither
+is a gate for the first completed-state retained-volume profile.
 
 A recovery head is not a historical filesystem snapshot. Expose files changed
 after the completed turn and require explicit disposition. Older context plus
@@ -110,11 +180,13 @@ grants as authority.
 
 Continuing still-open logical work also requires a fresh authoritative
 assignment to the qualified successor and fresh enforcement authority within
-the work's immutable scope and original horizon. Preserve original operation
-fingerprints, allowance reservations, submission receipts, and unknown outcomes.
-Replacement cannot reopen terminal work, reset its horizon, or convert an
-unresolved effect into a new attempt. The work model neither expands recovery
-compatibility nor removes existing attempt limits.
+the work's immutable scope and any original configured horizon. Preserve original
+operation fingerprints, allowance reservations, submission receipts, and unknown
+outcomes. Replacement cannot reopen terminal work, reset a configured horizon, or
+convert an unresolved effect into a new attempt. The work model neither expands
+recovery compatibility nor removes existing attempt limits. This is a constraint on any
+later continuation profile, not a promise of initial active-session migration
+or transparent retry as a new attempt.
 
 Stopped intent survives restart and incoming messages. Resume requires fresh
 explicit authorization and current build eligibility; failed recovery cannot
@@ -135,8 +207,8 @@ event protocols. Both remain proposals, and this RFC selects neither.
 
 Graceful stop durably records stopped intent, closes new ordinary-work
 admission, and records a finite drain deadline for the exact execution. Eligible
-existing work may finish only within its unchanged scope, original horizon, and
-that deadline. Current authoritative renewal may maintain access within those
+existing work may finish only within its unchanged scope, any original configured
+horizon, and that deadline. Current authoritative renewal may maintain access within those
 bounds; stop cannot extend them or admit new work. Without a qualified drain
 profile, OCC admits no draining execution authority.
 
@@ -146,9 +218,9 @@ an existing unexpired enforcement lease and all required local checks from
 [RFC 0035](https://github.com/openclaw/rfcs/pull/69). The outage permits no
 admission, renewal, expansion, or new execution assignment.
 
-Each issued lease must fit applicable work and ancestor horizons, drain
-deadlines, and profile withdrawal bounds, including clock and enforcement
-allowances. A newly imposed stop or tighter withdrawal target must account for
+Each issued lease stays finite and must fit applicable configured work and
+ancestor horizons, drain deadlines, and profile withdrawal bounds, including
+clock and enforcement allowances. A newly imposed stop or tighter withdrawal target must account for
 outstanding disconnected leases before claiming the new bound. Minutes for
 ordinary work and seconds for sensitive work are tolerance scales to qualify,
 not guaranteed values. Reconnect and restart cannot move an existing deadline.
@@ -192,8 +264,9 @@ retract accepted remote effects.
 
 Graceful stop preserves pending delivery of an already completed result when a
 separate finite delivery responsibility was admitted before logical-work
-closure, possibly at original admission. Completion follows required child
-joins and preserves unresolved effects under RFC 0036.
+closure, possibly at original admission. For a profile supporting independent
+children, completion follows its required child joins under RFC 0036. All
+profiles preserve unresolved effects.
 
 The delivery responsibility records its owner, originating work, cancellation
 relationships, and operation receipt. It fixes the permitted output, exact
@@ -219,11 +292,28 @@ unknown outcome retains its original receipt and cannot authorize reposting.
 ## Qualification
 
 Qualification requires a real supported Harness. Source contracts and mocks do
-not establish runtime guarantees. Demonstrate each of the following:
+not establish runtime guarantees. First qualify the selected same-build,
+same-cluster completed-state retained-volume profile and its controls:
 
 - Recover non-self-contained conversation and files; prove predecessor
   exclusion; survive controller restart; preserve stopped intent; expose
   incompatible restore and ambiguous effects.
+- Demonstrate useful native execution beyond fifteen minutes with the default
+  uncapped selection, plus configured finite expiry from the original anchor.
+  Configuration edits and credential rotation preserve the original selection;
+  missing persisted policy rejects rather than implying uncapped execution.
+- Stop during construction, model streaming, and blocked tools; observe owned
+  helper cleanup or report termination unknown. Incoming messages, stale queue
+  work, concurrent controls, and restart cannot undo stopped intent. Start
+  cannot bypass disabled intent or unresolved writers. Required-authority
+  withdrawal interrupts affected work under the selected enforcement profile,
+  including during blocked model/tool activity.
+- Verify distinct own-task, shared-task, and Agent permissions, and prevent
+  inventory reads from disclosing unauthorized task content.
+
+Qualify optional drain, outage-read, delivery, and continuation profiles only
+when selected; they are not evidence for unselected capabilities:
+
 - With a live connection, deny new work, allow only eligible original work
   before deadline, deny new dispatch after effective withdrawal, and let
   cancellation or disable override drain.
@@ -232,15 +322,23 @@ not establish runtime guarantees. Demonstrate each of the following:
   start point through accepting-service enforcement.
 - Retain the same deadline and operation across restart. Unknown
   execution-authority closure or termination must block writable replacement.
-- Assign still-open work freshly without widening its scope or horizon or
-  losing effect receipts.
+- Assign still-open work freshly without widening its scope or any configured
+  horizon or losing effect receipts.
 - Deliver completed results after graceful stop; exercise expiry without
   horizon reset, unknown posting outcomes, and cancellation or disable after
   the Agent is already stopped.
 
+Full independent-child coordination and active-session or changed-build migration
+need separate scope and evidence; they do not block the first completed-state
+recovery profile.
+
 ## Open decisions
 
 - Which Harness, build, and configuration combinations form the first profile?
+- What is the default Stop action, and are graceful drain and post-stop delivery
+  offered in the initial profile?
+- Which subordinate helpers or independently admitted children are supported
+  initially, with what aggregate limits and observable cleanup?
 - What drain bounds and escalation apply when writers cannot be observed?
 - Which withdrawal profiles, clock assumptions, and observation evidence bound
   qualified reads and prove effective closure?
