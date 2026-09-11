@@ -2,7 +2,7 @@
 
 This supporting specification expands [RFC 0036](../0036-turn-bound-delegated-authority.md), proposed in [PR #70](https://github.com/openclaw/rfcs/pull/70). It describes proposed behavior, not an implemented or qualified production guarantee.
 
-Logical work gives service-owned Enterprise Agents bounded authority across messages, model turns and runtime replacements. OCC records the verified requester, service owner, immutable scope and an explicit duration policy with any configured work horizon. Trusted services enforce finite, renewable leases tied to the original work and exact execution. Invocation permission, service permission and data access remain separate. The proposal reuses OCC, selected IAM authorities, Restrictions and trusted broker enforcement.
+Logical Work gives service-owned Enterprise Agents scoped authority across messages and model turns. The initial profile admits one root Work with subordinate helpers in the same execution context. Continuation across replacement attempts and separately admitted durable children are later capabilities. OCC records the verified requester, service owner, immutable scope and explicit duration policy with any configured work horizon. Trusted services enforce finite, renewable leases tied to the original Work and exact execution. Invocation permission, service permission and data access remain separate.
 
 The proposal extends [RFC 0027's IAM and authority model](../0027-openclaw-enterprise.md#iam-and-authority). Responsibilities across the series are:
 
@@ -12,6 +12,32 @@ The proposal extends [RFC 0027's IAM and authority model](../0027-openclaw-enter
 | [0035 / PR #69](https://github.com/openclaw/rfcs/pull/69) | Execution assignment, enforcement-lease issuance and withdrawal. |
 | [0036 / PR #70](https://github.com/openclaw/rfcs/pull/70) | Logical work admission and closure, bounded renewal authorization and attached lineage. |
 | [0037 / PR #71](https://github.com/openclaw/rfcs/pull/71) | Execution, recovery, completed-result delivery and runtime lifecycle. |
+
+## Selected Delivery Sequence
+
+These stages define the supported scope. Later requirements below do not expand the initial profile.
+
+| Stage | Admission and operations |
+| --- | --- |
+| **Repository reads** | One service-owned root Work, metadata and clone/fetch for administrator-granted repositories, and subordinate helpers only where complete stop ownership is qualified. |
+| **Approved publication** | Selected repository read workflows plus scoped branch push and draft PR creation. Publication requires a configured human approver; the requester is eligible when configured. Root Work and the same subordinate-helper boundary remain the default. |
+| **Work lifecycle** | General persistent Work UI/API, separately admitted durable children, continuation after coordinator loss across fresh attempts, and separately authorized Stop/Start under RFC 0037. Each needs its own qualification. |
+
+Advanced scheduling and orchestration remain a separate roadmap. Independent human approval is a later option. Automatic authorization by policy for explicitly permitted operations, such as an allowlisted branch push or draft PR, is also later; the MVP does not automatically authorize publication. Approval covers the exact publication content, repository and branch/destination under the publication contract in RFC 0034. An edit invalidates approval for the prior content. An approval neither grants repository access nor expands the original Work ceiling, audience or horizons.
+
+The initial administrative model is a direct service grant for selected repositories and operations. Native-channel user and channel allowlists govern invocation separately. They cannot confer service repository access, and a service grant cannot admit an otherwise unauthorized invocation. Richer IAM administration is not required to express this initial policy.
+
+### Minimum root Work remains required
+
+Root Work admission must durably bind the original authenticated invocation, service owner, Installation/Namespace, Agent/revision, exact assignment, immutable repository/action scope, purpose, eligible data, audience and provider selections. It records the effective duration policy, any original configured horizons, aggregate resource limits and cancellation or withdrawal dependencies. Each operation retains its original identity, immutable request, submission state and outcome. Provider credential custody remains with trusted mediation.
+
+The root has no parent or independent child authority. Existing Agent/request records may host these facts; admission, current service authorization, enforcement and recovery remain required.
+
+Repository read and publication operation owners exist as components; general Work ports are declarations. No complete general Work supplier exists today. Authentic invocation, State, execution and credential-custody suppliers must be integrated and qualified for the read release. Component checks do not establish a released or deployed repository flow.
+
+### Initial helper boundary
+
+A subordinate helper remains in the root's original Work and execution context, with the same authority, aggregate resource budget, cancellation and physical stop ownership. It has no independent renewal or admission. Creation cannot reset a duration or resource limit. The supported runtime must demonstrate physical stop for every helper; mechanisms that lack this custody remain unsupported. Request labels and logical subagent names do not prove isolation.
 
 ## Principals and Admission
 
@@ -37,7 +63,7 @@ Session closure withdraws work explicitly bound to that session. Service-owned w
 
 ### Admit an explicit duration policy
 
-An Agent may persist indefinitely; a process, execution attempt and logical work have separate lifetimes. Execution duration defaults to uncapped, meaning elapsed time alone does not end an attempt. Completion, cancellation, service stop, required-authority withdrawal and independently configured resource or spend limits still apply.
+An Agent may retain its identity indefinitely; that does not authorize an arbitrary process to run forever. A process, execution attempt and logical Work have separate lifetimes. Execution duration defaults to uncapped, meaning elapsed time alone does not end an attempt. Completion, cancellation, service stop, required-authority withdrawal and independently configured resource or spend limits still apply.
 
 Admission resolves configuration and applicable Restrictions into an explicit immutable finite-or-uncapped selection. Restrictions may require or narrow a cap. A finite attempt cap runs from its original dispatch anchor, including startup and waiting; a configured absolute work horizon remains binding across attempts. Missing authority, or missing or unsupported persisted policy, denies execution. A creation-time default does not reinterpret historical records.
 
@@ -69,13 +95,13 @@ The [memory ACL proposal](https://github.com/openclaw/rfcs/pull/30) remains a se
 
 A qualified compartment must prevent retained code or state from acquiring another work's handles, private data or authority. Request labels, different logical subagents and narrowed opaque handles do not prove isolation. Unsupported isolation denies the affected work.
 
-A persistent shared Agent must distinguish work requested by different people. An old process cannot acquire a later request's permissions, and shared repository access cannot expose another person's private attachment. Work identity, runtime identity and permission to share data answer different questions.
+A persistent shared Agent must distinguish work requested by different people. An old process cannot acquire a later request's permissions, and shared repository access cannot expose another person's private attachment. Permission changes follow RFC 0027's fresh-Pod path; narrowing a handle in an existing Pod does not replace that requirement. Work identity, runtime identity and permission to share data answer different questions.
 
 ## Durable Records
 
 ### Separate work, execution, leases and effects
 
-OCC owns internal durable records attached to existing Agent and request identities. They do not introduce a user-facing execution resource between an AgentRevision and its workload.
+OCC owns internal durable records attached to existing Agent and request identities. They do not introduce a user-facing execution resource between an AgentRevision and its workload. The read stage needs root admission, the exact assignment, finite leases and durable operation receipts. Its lineage is explicitly root-only. The general Work UI/API and independent child/attempt lifecycle remain in the Work lifecycle stage; separately admitted delivery applies only where that feature is supported.
 
 | Record | Required contents |
 | --- | --- |
@@ -91,7 +117,7 @@ The work record also retains admitted provider selections and scopes. RFC 0034's
 
 Durably record work admission before acknowledging it. Duplicate keys resolve to the same admission; conflicting inputs deny. An admission receipt proves neither tool dispatch nor completion and creates no implicit execution queue. Wire formats remain open.
 
-Logical work can span execution attempts under its admitted duration policy. A message acknowledgement, model response, certificate renewal, provider-token refresh or lost connection neither completes work nor renews its authority. Work closes terminally on completion, cancellation or expiry according to its admitted policy. Recovery cannot reopen it.
+In the Work lifecycle stage, logical Work can span execution attempts under its admitted duration policy. The read stage retains durable admission and effect history but does not offer coordinator-loss continuation across fresh attempts. A message acknowledgement, model response, certificate renewal, provider-token refresh or lost connection neither completes Work nor renews its authority. Completion, cancellation or Work's own configured expiry closes it terminally. Lease expiry ends only that lease's authority; an open Work still requires current authorization for renewal. Recovery cannot reopen closed Work.
 
 OCC admits and closes work and authorizes bounded lease renewal. RFC 0035 owns enforcement-lease issuance and withdrawal; RFC 0037 owns execution, recovery and delivery lifecycle.
 
@@ -104,7 +130,7 @@ An opaque work reference is bound to an authenticated presenter and protected or
 ### Admission and dispatch sequence
 
 1. Authorize invocation, service access, workload access, data eligibility and exact scope through OCC and the selected authorities. Freeze the work ceiling, effective duration policy and any configured work horizon.
-2. Select a qualified execution under current authority. Replacement requires RFC 0037's predecessor evidence. A former assignment's lease cannot authorize its successor.
+2. Select a qualified execution under current authority. A former assignment's lease cannot authorize its successor. From the initial release, any successor must have observed termination of the old writer before writing retained state, alongside assignment fencing and the fresh-Pod rule for permission changes. RFC 0037 owns that evidence. Continuing the same Work across replacement attempts remains a later Work lifecycle capability.
 3. Issue a finite enforcement lease in an authoritative order with cancellation and revocation. Bind it to the work, assignment and accepting service.
 4. At dispatch, authenticate the workload and establish original-work origin through the protected connector path. Derive action and resource from the actual operation, including relevant request-body and redirect behavior. Check the lease, applicable policies, purpose, scope, allowances and mandatory evidence under the selected freshness profile.
 5. Durably reserve dispatch responsibility and allowances under the original operation key. Preserve request identity and bytes through submission and record the observed outcome. Duplicates resolve the original dispatch state; pending or unknown submission cannot trigger another submission.
@@ -144,7 +170,7 @@ Ordinary profiles may target withdrawal on the scale of minutes; sensitive profi
 
 RFC 0035 owns each profile's withdrawal start point, external-IAM observation delay, issuer fencing, holder enforcement delay, trusted-clock assumptions and provider-effect boundary. Requested withdrawal and proven effective withdrawal remain distinct.
 
-A disconnected holder denies new dispatch by its original deadline. Reconnection or restart cannot move that deadline. Tightening a target must account for outstanding leases before advertising the tighter guarantee: new policy cannot retroactively shorten an unseen old lease.
+Selected GitHub dispatch stops whenever current OCC authorization is unavailable. A future qualified outage-read profile must stop by its original lease deadline; reconnection or restart cannot move that deadline. Tightening a target must account for outstanding leases before advertising the tighter guarantee: new policy cannot retroactively shorten an unseen old lease.
 
 ### Preserve state through restart and collection
 
@@ -176,7 +202,9 @@ Missing provider or inventory evidence denies maintenance. RFC 0034 retains its 
 
 In a selected future outage profile, finite enforcement leases would bound disconnected use while allowing expressly qualified reads to finish. Requiring current authority for writes and renewal makes the availability tradeoff explicit.
 
-## Attached Children
+## Later Capability: Attached Children
+
+This section specifies the Work lifecycle stage. Initial repository Work uses the root and subordinate-helper profile above. Independent child admission and continuation without a running coordinator are not initial release requirements.
 
 ### Admit distinct, bounded child work
 
@@ -184,11 +212,7 @@ An attached child has a distinct work identity, immutable parent/ancestor links,
 
 A child need not create another Agent. A logical child in a shared process gains no separate security boundary.
 
-### Select the initial helper and child subset separately
-
-The initial supported subset remains open. Subordinate helpers can remain part of one work/attempt only when original authority, aggregate resource limits, cancellation and physical stop ownership cover them. Their creation cannot reset the original attempt budget or grant independent renewal.
-
-Separately admitted children require their own scope, authority, lineage, status and cleanup. The following renewal and join rules describe that proposed capability; they do not make every independent-child mechanism an initial implementation gate. Root work and owned-helper cancellation still require complete enforcement for any supported execution.
+Separately admitted children require their own scope, authority, lineage, status and cleanup. Initial root/helper cancellation and physical stop remain mandatory independently of this later capability.
 
 ### Renew without a running parent process
 
@@ -220,11 +244,13 @@ Attached lineage supports ordinary child work without requiring a general schedu
 
 ### Admit finite delivery before closure
 
-Before logical work closes, bind its completed result to RFC 0037's finite, separately admitted delivery responsibility. Delivery may be admitted with the original work; binding content at completion must satisfy the admitted output contract.
+Where completed-result delivery is supported, bind the completed result to RFC 0037's finite, separately admitted delivery responsibility before logical Work closes. Delivery may be admitted with the original Work; binding content at completion must satisfy the admitted output contract. This section does not admit GitHub publication: the publication stage separately requires exact publication scope and configured human approval. A delivered report cannot implicitly push a branch or create a PR.
 
 The exact audience, destination and original absolute delivery horizon cannot grow. Creating delivery responsibility after closure requires fresh admission.
 
 ### Authorize task and Agent controls separately
+
+Initial root/helper cancellation requires authority withdrawal, physical stop evidence and terminal closure. The Work lifecycle stage adds richer controls; earlier services may qualify narrower controls or delivery. Their permissions remain separate wherever exposed.
 
 Stop task targets one exact work and its owned helpers or admitted descendants. Own-task, shared-task and Agent lifecycle permissions remain distinct; permission to invoke the service or view its inventory does not imply permission to stop other work. Each new control requires current exact-resource authorization and attributable durable acceptance. Already-admitted protective cleanup retains its independent stop responsibility when ordinary continuation authority is unavailable.
 
@@ -258,10 +284,12 @@ This specification does not establish an implemented issuer, trusted transport o
 | Authority changes | Allow/deny, shrinking permissions, expiry and policy recovery without scope growth. |
 | Durable admission and effects | Duplicate admission, conflicting inputs, crash uncertainty and retained unknown provider outcomes. |
 | Renewal and duration | Finite leases for explicit uncapped work; finite configured caps retained across turns and provider-token replacement; missing policy denied and no automatic horizon extension. |
-| Helpers and children | Aggregate budget, cancellation and physical stop custody for subordinate helpers; for separately admitted children, renewal without a parent process and ancestor cancellation. |
-| Controls and delivery | Separate exact-task/shared-task/Agent permissions; durable stopped intent; exact-audience delivery under selected graceful-stop policy and withdrawal after cancellation. |
+| Helpers | Repository reads: shared original context and aggregate budget, cancellation and demonstrated physical stop custody; unsupported helper mechanisms denied. |
+| Publication | Approved publication: exact content and destination, current repository access, configured human approval including an eligible requester, and no automatic publication authorization. |
+| Durable children and continuations | Work lifecycle: separate child admission, parentless renewal, ancestor cancellation, required joins and qualified continuation across fresh attempts. |
+| Controls and delivery | Initial root/helper stop and terminal closure; separate exact-resource control permissions wherever exposed. The Work lifecycle stage adds richer controls and selected graceful delivery, with exact audience and cancellation withdrawal. |
 | Outage and restart | Initial GitHub reads and maintenance denied without current OCC authority; any future qualified-read profile distinguished from writes and admission; preserved deadlines, stale-issuer fencing and measured withdrawal for each selected profile. |
-| Replacement | Predecessor exclusion and denial of old assignments while their credentials remain valid. |
+| Assignment and replacement | Initially: fresh Pod on permission changes, denial of old assignments while credentials remain valid, and observed old-writer termination before any successor writes retained state. Work lifecycle: qualified continuation of the same Work across replacement attempts. |
 
 Unknown provider outcomes must remain unknown rather than becoming manufactured successful retries. Audit preserves attribution and safe references while excluding credentials and message bodies.
 
@@ -271,6 +299,8 @@ Unknown provider outcomes must remain unknown rather than becoming manufactured 
 - Which selected IAM policies govern continued invocation eligibility, requester withdrawal and audience checks?
 - Which protected origin and compartment mechanisms qualify each supported Harness and runtime?
 - What numerical lease profiles, clock assumptions and issue/revoke protocol meet measured withdrawal targets?
-- Which operations qualify as outage reads, and which providers support bounded read-only credential maintenance?
-- Which initial child subset and join, allowance, approval and delivery-horizon policies should the first supported services admit?
-- How should service-owner admission integrate with existing original-requester dependencies, and which default Stop/graceful-drain semantics should be selected?
+- Which original invocation, State, execution and custody suppliers will complete and qualify the initial root Work flow?
+- Which runtimes can demonstrate complete physical stop custody for subordinate helpers?
+- For later stages, which child join, allowance and delivery-horizon policies should be admitted, and which Stop/graceful-drain semantics should be selected?
+- For a later outage profile, which reads and providers can qualify bounded read-only credential maintenance?
+- How should service-owner admission integrate with existing original-requester dependencies without weakening their cancellation or withdrawal behavior?

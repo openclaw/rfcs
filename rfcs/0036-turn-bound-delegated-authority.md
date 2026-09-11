@@ -13,48 +13,66 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/70
 
 ## Summary
 
-Give Enterprise Agents explicit authority for service-owned logical work across turns and runtime replacements. OCC admits work with immutable scope and an explicit duration policy; trusted services enforce finite, renewable leases. Requester, service owner and workload retain independent authorization. This extends [RFC 0027](0027-openclaw-enterprise.md#iam-and-authority) with bounded renewal and attached children.
+Give repository Agents the minimum service-owned Work authority needed to bind each operation to its original request, exact execution and current service permissions. Ship repository reads first, then human-approved publication. Broader persistent Work and lifecycle features follow later. This extends [RFC 0027](0027-openclaw-enterprise.md#iam-and-authority) without requiring a general Work product for the first release.
 
 ## Motivation
 
-A repository review may outlast its initiating turn or provider token. Its coordinator may stop running while child reviews continue. Tying authority to a process interrupts valid work or leaves background access unbounded. Shared Agents also need to keep each request's permissions and private data separate.
+A review can take many turns and outlast a provider token. The service still needs to know which request each operation belongs to, whether it was canceled, and whether an earlier submission succeeded. Repository access alone cannot answer those questions. A small root Work profile supplies that missing authority while keeping the first release practical.
 
 ## Goals
 
-Bind operations to their original work and qualified execution; support service-owned work with optional finite horizons and attached children; preserve cancellation, scope, audience and effect identity.
+Preserve original request identity, current authorization, configured limits, cancellation and durable outcomes. Support a root review with subordinate helpers, then add approved publication through the same authority boundary.
 
 ## Non-Goals
 
-User-owned execution, human impersonation, cross-Namespace access, general scheduling, detached delegation, a new IAM system, offline application writes or guaranteed exactly-once provider effects.
+The initial release excludes a general Work UI/API, separately admitted durable children, continuation after coordinator loss across fresh attempts, and advanced orchestration. User-owned execution, human impersonation, cross-Namespace access, offline GitHub operations and guaranteed exactly-once provider effects are outside this proposal.
 
 ## Proposal
 
-OCC separately authorizes invocation, service access, workload permissions, data eligibility and purpose through selected authorities. The requester supplies attribution; the service owner supplies service authority and lifecycle policy; the workload performs operations under its own permissions. Records model user and service owners, but initial admission accepts only service owners.
+### Deliver in three stages
 
-Execution duration defaults to uncapped. Admission records an explicit effective policy, immutable resource/action ceiling `W` and any configured absolute work horizon; missing policy or authority denies admission. Applicable Restrictions may require a finite cap. Renewal, activity and draft edits cannot extend an admitted cap.
+| Stage | Supported scope |
+| --- | --- |
+| **Repository reads** | Metadata and clone/fetch for administrator-granted repositories, using root Work and qualified subordinate helpers. |
+| **Approved publication** | Selected repository read workflows plus scoped branch push and draft pull request creation. A configured human approver may be the requester. |
+| **Work lifecycle** | General persistent Work interfaces, separately admitted durable children, continuation across fresh attempts, and authorized Stop/Start under [RFC 0037](https://github.com/openclaw/rfcs/pull/71). |
 
-Shared execution requires `W` within shared baseline `B`, within Agent maximum `M`. Extra authority requires `W` within `M`, applicable approval and qualified isolation. Private inputs require isolation even within `B`. These ceilings grant no permissions; provider selections and scopes remain independently bounded.
+Advanced scheduling and orchestration remain a separate roadmap. Independent human approval and policy-based automatic authorization for explicitly permitted operations, such as an allowlisted branch push or draft PR, are later capabilities. Neither read grants nor invocation allowlists authorize publication. Automatic publication authorization is excluded from the MVP.
 
-Admission records requester, membership, session and cancellation dependencies. Session closure withdraws explicitly session-bound work; other service-owned work may outlive the session. Relabeling ownership or omitting a session reference cannot escape admitted dependencies.
+### Admit a small root Work record
 
-For example, Alice asks a review service to inspect an approved repository. Her invocation permission does not transfer a provider session. The coordinator admits two attached reviews, then waits without running. Each child has distinct work identity and immutable ancestor links, scope and any configured horizon. Already-admitted children renew through the authority service while logical ancestors remain open and authorized, subject to current workload permissions, eligible execution and all applicable ancestor horizons and withdrawal targets. A former parent execution lease does not cap fresh authoritative issuance. Ancestor cancellation governs both children; neither silently detaches.
+An administrator grants the service access to selected repositories and operations. Native-channel user and channel allowlists separately determine who may invoke it. OCC checks invocation, current service access, workload permissions and data eligibility. The original invocation records attribution; it does not become a continuing service grant or transfer the requester's provider credentials.
 
-![A review coordinator and its attached children](0036/work-and-children.png)
+Before execution, persist the minimum root Work contract:
 
-**Figure 1.** Proposed attached-child behavior: logical parent work remains open while children run and renew. The initial supported child subset remains open; subordinate helpers must share the original work’s resource limits, cancellation and stop ownership.
+- The original invocation, service owner, Installation/Namespace, Agent/revision and exact execution assignment.
+- Immutable repository/action scope, purpose, data eligibility, audience and provider selections.
+- The effective duration policy, any configured original horizons, resource limits and cancellation or withdrawal dependencies.
 
-Renewal requires current authority and cannot expand original scope, provider selections or horizons. [RFC 0035 / PR 69](https://github.com/openclaw/rfcs/pull/69) owns issuance and withdrawal, binding leases to exact assignments and accepting services. The initial GitHub profile requires current OCC authority for every dispatch, including reads and credential maintenance. An optional future outage profile may permit expressly qualified reads under existing unexpired leases with every mandatory check satisfied. Writes, admission, renewal and reassignment require current authority. [RFC 0034 / PR 68](https://github.com/openclaw/rfcs/pull/68) owns provider credential mediation.
+Each dispatch also retains its operation identity, immutable request and durable submission outcome. Provider credentials stay in trusted mediation.
 
-Trusted dispatch preserves the original work and immutable operation identity and request, with a durable receipt tracking submission and outcome. Unknown submission requires reconciliation; replacement credentials or execution cannot justify replay. Completion, cancellation and expiry close work terminally.
+Work admission, enforcement and recovery remain required even when these facts are stored on existing request records. No complete general Work supplier exists today. Repository read and publication operation components exist, but their authentic invocation, State, execution and credential-custody integration still needs qualification. Component tests do not establish a deployed repository flow.
 
-Bind completed content before closure to finite, separately admitted delivery under [RFC 0037 / PR 71](https://github.com/openclaw/rfcs/pull/71). Where explicitly selected, graceful stop preserves this responsibility, with current authorization for the exact content, audience and destination. Cancellation or security revocation withdraws affected delivery. Neither retries nor stop extend its original horizon. Exact task-stop permission, shared-task control and Agent lifecycle permission remain separate; invocation alone grants none of them.
+### Keep helpers inside the root
 
-The [work-authority specification](0036/work-authority-spec.md) preserves admission, isolation, protected origin, outage, receipt, lineage, delivery and qualification requirements.
+A helper shares the original Work context, aggregate resource budget and cancellation. It has no independent authority or renewal and cannot reset a limit. The supported runtime must own and prove physical stop for every helper; an unqualified helper mechanism remains unsupported. Distinct child Work and renewal without a running coordinator belong to the Work lifecycle stage.
+
+![Initial root Work and subordinate helpers](0036/work-and-children.png)
+
+**Figure 1.** Both helpers remain inside one Work's authority and stop boundary.
+
+### Enforce authority throughout execution
+
+Execution duration defaults to uncapped. Finite leases and operation deadlines still apply; configured horizons never extend through activity, token replacement or renewal. Current authority may narrow access, but cannot expand the admitted scope. An Agent can retain its identity indefinitely; that does not authorize an arbitrary process to run forever. Permission changes follow RFC 0027's fresh-Pod path.
+
+[RFC 0035 / PR 69](https://github.com/openclaw/rfcs/pull/69) binds finite leases and withdrawal to the exact assignment. GitHub requires current OCC authority for every dispatch, including reads and credential maintenance. [RFC 0034 / PR 68](https://github.com/openclaw/rfcs/pull/68) owns credential mediation. Unknown submission requires reconciliation; a replacement token, process or Work record cannot justify replay. Completion, cancellation or Work's own configured expiry closes it terminally; lease expiry only ends that lease's authority.
+
+[RFC 0037 / PR 71](https://github.com/openclaw/rfcs/pull/71) owns execution and stop evidence. Where completed-result delivery is supported, it has separate finite authority for the exact content, audience and destination. Delivery cannot extend computation or its horizons.
 
 ## Rationale
 
-Logical work separates authorization lifetime from turns, credentials and processes. Short leases bound disconnected use; current-authority renewal preserves original scope and configured deadlines without imposing a universal execution timeout. Attached lineage supports child work without requiring a scheduler. Separate delivery avoids keeping computation alive solely to post a completed report.
+The root profile makes repository access accountable without making general scheduling or durable child execution a prerequisite. The [supporting specification](0036/work-authority-spec.md) preserves the fuller model and marks later features explicitly.
 
 ## Unresolved questions
 
-Which data classes, isolation mechanisms and IAM policies qualify initial services? What lease profiles and measured withdrawal bounds are supportable? Which reads and credential-maintenance profiles qualify during outages? Which child subset, join, allowance, approval and delivery-horizon policies should be admitted first? How should service-owner admission replace existing requester-dependent execution without weakening admitted dependencies?
+Which runtime can demonstrate complete helper stop ownership? Which isolation, lease and withdrawal profiles qualify the first service? How will the current components be integrated and verified as one deployed root Work flow?
