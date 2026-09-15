@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "live",
+  "completedAt": "2026-09-12T10:42:46Z",
+  "result": "pass",
+  "source": {
+    "repository": "consenlabs/sigil",
+    "commit": "06e93ac627b4a7b7e120e7489996d589a5d5fc28",
+    "path": "docs/superpowers/evidence/2026-09-12-butter-manual-standing-live-drill.json"
+  },
+  "observations": {
+    "standingGrant": {
+      "runClasses": ["scheduled", "manual"],
+      "realOwnerWalletSignature": true,
+      "sameWalletSignatureAcrossBothSuccesses": true
+    },
+    "successfulManualOccurrenceCount": 2,
+    "distinctOccurrenceCount": 2,
+    "distinctExecutionDigestCount": 2,
+    "firstUseGrantReuse": false,
+    "secondUseGrantReuse": true,
+    "secondRunCreatedApprovalRequest": false,
+    "pendingApprovalStoreUnchangedBeforeSecondRun": true,
+    "ledgerAndHostReceiptsCorrelated": true,
+    "allProofReferencesIndependentlyRecomputed": true,
+    "allDecisionReferencesMatchedGatewayRequests": true,
+    "allParameterDigestsMatchedReceipts": true,
+    "ledgerBeforeAuthorizationReceiptBeforeProcessFinish": true,
+    "hostReceiptsStoredRawProof": false,
+    "lastRunStatus": "ok",
+    "consecutiveErrors": 0
+  },
+  "redacted": [
+    "wallet address and signature",
+    "account and channel identifiers",
+    "local paths",
+    "request, job, run, occurrence, receipt, and decision identifiers",
+    "raw command and output",
+    "proof and proof-reference values",
+    "private endpoints"
+  ],
+  "coverageLimit": "Automation-specific broad-resolver prototype; not the RFC 0038 host-owned adapter."
+}
