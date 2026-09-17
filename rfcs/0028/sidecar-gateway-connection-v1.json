@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "requiredFeatureBit": 1,
+  "status": "draft-conformance-fixture",
+  "notes": [
+    "All credentials, payloads, signatures, and tokens are test-only sentinel values.",
+    "The accepted signing path uses deterministic Ed25519 seed bytes 0x07 repeated 32 times."
+  ],
+  "messages": [
+    {
+      "type": "connection-material-request",
+      "requestId": "connect-1",
+      "attempt": 1,
+      "manifestGeneration": 3
+    },
+    {
+      "type": "connection-authorized",
+      "requestId": "connect-1",
+      "connectionGeneration": 7,
+      "attempt": 1,
+      "manifestGeneration": 3,
+      "endpoint": {
+        "url": "wss://gateway.example",
+        "tlsTrust": {
+          "mode": "pinned-leaf-sha256",
+          "sha256": "abababababababababababababababababababababababababababababababab"
+        }
+      },
+      "auth": {
+        "kind": "device-token",
+        "secret": "fixture-device-token"
+      },
+      "identity": {
+        "deviceId": "fe812c12f3ab4ce6ac5db69ac352f906cb1b11ef43fb33e252ef7ff552263889",
+        "publicKeyBase64Url": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw",
+        "platform": "windows",
+        "deviceFamily": "desktop"
+      }
+    },
+    {
+      "type": "signing-request",
+      "connectionGeneration": 7,
+      "attempt": 1,
+      "signingRequestId": "sign-1",
+      "algorithm": "ed25519",
+      "payloadBase64": "djN8ZmU4MTJjMTJmM2FiNGNlNmFjNWRiNjlhYzM1MmY5MDZjYjFiMTFlZjQzZmIzM2UyNTJlZjdmZjU1MjI2Mzg4OXxub2RlLWhvc3R8bm9kZXxub2RlfHwxODAwMDAwMDAwMDAwfGZpeHR1cmUtZGV2aWNlLXRva2VufGZpeHR1cmUtbm9uY2V8d2luZG93c3xkZXNrdG9w",
+      "payloadSha256": "adff2da6601b1d8fc00c5e95c01bda27f29cbd50c85bef72d9be64af29b7651b"
+    },
+    {
+      "type": "signing-result",
+      "connectionGeneration": 7,
+      "attempt": 1,
+      "signingRequestId": "sign-1",
+      "payloadSha256": "adff2da6601b1d8fc00c5e95c01bda27f29cbd50c85bef72d9be64af29b7651b",
+      "outcome": "signed",
+      "signatureBase64Url": "gBSx1Nxb5fqo-srP1MNU1oMA4Le5sLiaMxkR_a8VlvzYM3PxrtERef6JwXJOuhDprnynuk8OQI7WrcocRRYYCQ"
+    },
+    {
+      "type": "issued-device-token",
+      "connectionGeneration": 7,
+      "attempt": 1,
+      "deliveryId": "token-1",
+      "token": "fixture-issued-device-token"
+    },
+    {
+      "type": "issued-device-token-ack",
+      "connectionGeneration": 7,
+      "attempt": 1,
+      "deliveryId": "token-1",
+      "outcome": "stored"
+    },
+    {
+      "type": "connection-retire",
+      "connectionGeneration": 7,
+      "reason": "credential-revoked"
+    },
+    {
+      "type": "connection-retired",
+      "connectionGeneration": 7,
+      "reason": "credential-revoked"
+    }
+  ],
+  "alternateMessages": [
+    {
+      "type": "connection-denied",
+      "requestId": "connect-2",
+      "attempt": 2,
+      "manifestGeneration": 3,
+      "code": "credential-unavailable",
+      "recovery": "pause"
+    },
+    {
+      "type": "signing-request",
+      "connectionGeneration": 8,
+      "attempt": 2,
+      "signingRequestId": "sign-2",
+      "algorithm": "ed25519",
+      "payloadBase64": "djN8ZmU4MTJjMTJmM2FiNGNlNmFjNWRiNjlhYzM1MmY5MDZjYjFiMTFlZjQzZmIzM2UyNTJlZjdmZjU1MjI2Mzg4OXxub2RlLWhvc3R8bm9kZXxub2RlfHwxODAwMDAwMDAwMDAwfGZpeHR1cmUtZGV2aWNlLXRva2VufGZpeHR1cmUtbm9uY2V8d2luZG93c3xkZXNrdG9w",
+      "payloadSha256": "adff2da6601b1d8fc00c5e95c01bda27f29cbd50c85bef72d9be64af29b7651b"
+    },
+    {
+      "type": "signing-result",
+      "connectionGeneration": 8,
+      "attempt": 2,
+      "signingRequestId": "sign-2",
+      "payloadSha256": "adff2da6601b1d8fc00c5e95c01bda27f29cbd50c85bef72d9be64af29b7651b",
+      "outcome": "denied",
+      "code": "identity-unavailable"
+    },
+    {
+      "type": "issued-device-token-ack",
+      "connectionGeneration": 8,
+      "attempt": 2,
+      "deliveryId": "token-2",
+      "outcome": "rejected",
+      "code": "secure-storage-unavailable"
+    },
+    {
+      "type": "connection-ended",
+      "connectionGeneration": 9,
+      "attempt": 3,
+      "reason": "device-token-mismatch"
+    },
+    {
+      "type": "connection-ended-ack",
+      "connectionGeneration": 9,
+      "attempt": 3
+    },
+    {
+      "type": "connection-material-request",
+      "requestId": "connect-fallback-1",
+      "attempt": 4,
+      "manifestGeneration": 3,
+      "recovery": {
+        "kind": "device-token-mismatch",
+        "priorConnectionGeneration": 9
+      }
+    }
+  ],
+  "concurrentTermination": [
+    {
+      "type": "connection-ended",
+      "connectionGeneration": 10,
+      "attempt": 5,
+      "reason": "transport"
+    },
+    {
+      "type": "connection-retire",
+      "connectionGeneration": 10,
+      "reason": "credential-revoked"
+    },
+    {
+      "type": "connection-ended-ack",
+      "connectionGeneration": 10,
+      "attempt": 5
+    },
+    {
+      "type": "connection-retired",
+      "connectionGeneration": 10,
+      "reason": "credential-revoked"
+    }
+  ],
+  "materialCancellationRace": [
+    {
+      "type": "connection-material-request",
+      "requestId": "connect-timeout-1",
+      "attempt": 6,
+      "manifestGeneration": 3
+    },
+    {
+      "type": "connection-material-cancel",
+      "requestId": "connect-timeout-1",
+      "attempt": 6,
+      "manifestGeneration": 3,
+      "reason": "deadline"
+    },
+    {
+      "type": "connection-authorized",
+      "requestId": "connect-timeout-1",
+      "connectionGeneration": 11,
+      "attempt": 6,
+      "manifestGeneration": 3,
+      "endpoint": {
+        "url": "wss://gateway.example",
+        "tlsTrust": {
+          "mode": "system-roots"
+        }
+      },
+      "auth": {
+        "kind": "shared-token",
+        "secret": "fixture-racing-token"
+      },
+      "identity": {
+        "deviceId": "fe812c12f3ab4ce6ac5db69ac352f906cb1b11ef43fb33e252ef7ff552263889",
+        "publicKeyBase64Url": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw",
+        "platform": "windows",
+        "deviceFamily": "desktop"
+      }
+    },
+    {
+      "type": "connection-material-cancelled",
+      "requestId": "connect-timeout-1",
+      "attempt": 6,
+      "manifestGeneration": 3,
+      "connectionGeneration": 11
+    }
+  ],
+  "materialDenialCancellationRace": [
+    {
+      "type": "connection-material-request",
+      "requestId": "connect-timeout-denied-1",
+      "attempt": 7,
+      "manifestGeneration": 3
+    },
+    {
+      "type": "connection-material-cancel",
+      "requestId": "connect-timeout-denied-1",
+      "attempt": 7,
+      "manifestGeneration": 3,
+      "reason": "deadline"
+    },
+    {
+      "type": "connection-denied",
+      "requestId": "connect-timeout-denied-1",
+      "attempt": 7,
+      "manifestGeneration": 3,
+      "code": "credential-unavailable",
+      "recovery": "retry-after-backoff"
+    },
+    {
+      "type": "connection-material-cancelled",
+      "requestId": "connect-timeout-denied-1",
+      "attempt": 7,
+      "manifestGeneration": 3
+    }
+  ],
+  "requiredNegativeMutations": [
+    "unknown-message-type",
+    "unnegotiated-required-extension",
+    "missing-required-feature-bit",
+    "unknown-denial-recovery",
+    "malformed-auth-shape",
+    "pin-with-plaintext-url",
+    "stale-request-id",
+    "cancel-ack-generation-mismatch",
+    "response-after-material-cancel-ack",
+    "stale-attempt",
+    "manifest-generation-mismatch",
+    "reused-connection-generation",
+    "stale-signing-request-id",
+    "payload-digest-mismatch",
+    "invalid-ed25519-signature",
+    "conflicting-token-delivery",
+    "issued-token-ack-timeout",
+    "ready-before-token-ack",
+    "replacement-before-ended-ack",
+    "response-after-retirement",
+    "credential-in-status-or-log"
+  ]
+}
