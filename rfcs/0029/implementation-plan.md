@@ -239,6 +239,13 @@ The adjacent native adopter evidence is also complete:
 | Config LC1 | Consumes a private read-only Config Model through Electron-owned transport and renders authored values plus schema guidance in native React. | Read projection can remain OpenClaw-owned without giving React raw config or write authority. |
 | Board LB1 | Consumes a private Board Model through main-process routing, renders one exact native status-summary widget, and keeps HTML/Canvas/MCP/unknown widgets inert. | OpenClaw board semantics can drive a product-owned Dashboard without importing Control UI or granting renderer authority. |
 
+Independent follow-on adoption is now visible in
+[Lobster PR #12276](https://microsoft.ghe.com/bic/lobster/pull/12276).
+It reuses the existing Control Model binding for bounded native Question
+observation and Answer/Skip brokerage, keeps `operator.questions` out of the
+browser, and remains behind a default-off rollout flight. This strengthens the
+runtime-owned binding evidence without broadening the V1 publication contract.
+
 Board LB1 uses a mocked beta-generation board protocol because pinned
 LobsterClaw 2026.6.33 predates boards. It is conformance evidence, not release
 admission.

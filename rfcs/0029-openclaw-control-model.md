@@ -3,7 +3,7 @@ title: OpenClaw Control Model
 authors:
   - Gio Della-Libera
 created: 2026-08-11
-last_updated: 2026-08-21
+last_updated: 2026-09-17
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/62
@@ -256,6 +256,13 @@ evidence into reviewable product slices:
   allowlisted native table rendering, artifact-only history hydration,
   fallback coverage, live flight rollback, and Gateway/Electron proof. Its
   rollout annotations inherit the existing `EnableOpenClawControlModel` gate.
+- [Lobster PR #12276](https://microsoft.ghe.com/bic/lobster/pull/12276), authored
+  independently by Stanislaw Wilczynski, extends the existing Control Model
+  binding to observe bounded native OpenClaw Question state and broker
+  Answer/Skip through the runtime-owned channel. It keeps
+  `operator.questions` out of the browser and remains behind the default-off
+  `lobster.openclaw_ask_user_enabled` flight. This is independent reuse of the
+  binding boundary, not evidence that the full model is enabled by default.
 
 Two adjacent owner-first projections now have separate fork-only evidence:
 
