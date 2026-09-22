@@ -3,7 +3,7 @@ title: Versioned External-Supervisor Operator Guidance
 authors:
   - Paul Campbell
 created: 2026-09-21
-last_updated: 2026-09-21
+last_updated: 2026-09-22
 status: draft
 issue:
 rfc_pr:
@@ -118,10 +118,10 @@ commands.
 ### Ownership and activation
 
 OpenClaw core owns the v1 schema, validation, action semantics, localization
-boundary, resolution API, human rendering, diagnostics, and conformance tests.
-An external supervisor owns construction of the payload, inheritance into the
-OpenClaw process, command accuracy, execution location, and documentation for
-the command's result.
+boundary, resolution API, surface-rendering contract, diagnostics, and
+conformance tests. An external supervisor owns construction of the payload,
+inheritance into the OpenClaw process, command accuracy, execution location,
+and documentation for the command's result.
 
 `OPENCLAW_SUPERVISOR_GUIDANCE` is optional and has no effect unless
 `OPENCLAW_SUPERVISOR_MODE`, after the existing normalization, equals
@@ -238,25 +238,60 @@ one of:
 Parsing may be cached for the lifetime of the process. A caller must not read
 or parse the environment variable independently.
 
-When the requested command is present, a human renderer retains the existing
-surface-specific refusal and adds a separate copyable command block. For
-example:
+When the requested command is present, each human caller keeps its existing
+note, error, or hint structure and localized action-first wording. It
+identifies the validated supervisor name within that structure and renders the
+supplied command using the surface's existing command styling and copy
+affordance. V1 does not define one universal layout across onboarding, Doctor,
+CLI errors, or other surfaces.
+
+Current OpenClaw already follows this model.
+[Onboarding strings](https://github.com/openclaw/openclaw/blob/673048954c9bf48e8e72b6ea1feaf7bbaadb2139/src/wizard/i18n/locales/en.ts)
+use compact prompts such as `Start now:`, `Or rerun with:`, and
+`Retry the managed service:`.
+[Doctor hints](https://github.com/openclaw/openclaw/blob/673048954c9bf48e8e72b6ea1feaf7bbaadb2139/src/commands/doctor-format.ts)
+use `Run:`, `Then reinstall:`, and `Recover with:`;
+[service hints](https://github.com/openclaw/openclaw/blob/673048954c9bf48e8e72b6ea1feaf7bbaadb2139/src/cli/gateway-cli/shared.ts)
+use `Tip:` and `Or:`; and
+[systemd hints](https://github.com/openclaw/openclaw/blob/673048954c9bf48e8e72b6ea1feaf7bbaadb2139/src/daemon/systemd-hints.ts)
+use `Then run:` and `Verify:`. These phrases illustrate current conventions;
+they are not stable or normative English text.
+[Daemon lifecycle output](https://github.com/openclaw/openclaw/blob/673048954c9bf48e8e72b6ea1feaf7bbaadb2139/src/cli/daemon-cli/lifecycle.ts)
+also retains terminal-aware command presentation; current design language does
+not establish a universal guidance label stack.
+
+When `runFrom` is present, the caller appends it as parenthetical opaque
+context to its localized action label rather than rendering a separate label
+or sentence fragment. A surface may retain an established label such as
+`Start now:`, `Run:`, `Tip:`, or `Recover with:`. When `runFrom` is absent, it
+omits that parenthetical context.
+
+Rendered examples throughout this RFC are illustrative and non-normative. The
+normative rendering requirements are semantic consistency, surface-native
+wording, and command fidelity. One possible onboarding rendering is:
 
 ```text
-OpenClaw gateway lifecycle is managed externally
-(OPENCLAW_SUPERVISOR_MODE=external).
-External supervisor: clawctl
-Run from: Windows host session
-Command:
-  clawctl gateway-service restart
+OpenClaw gateway lifecycle is managed by clawctl (OPENCLAW_SUPERVISOR_MODE=external).
+Start (Windows host session): clawctl gateway-service start
 ```
 
-The command itself must occupy a distinct line and must not receive punctuation,
-quoting, capitalization, interpolation, path normalization, or shell escaping
-from OpenClaw. `External supervisor:`, `Run from:`, and `Command:` are separate
-localized labels. When `runFrom` is absent, the renderer omits the `Run from:`
-line. It does not insert any producer value into localized sentence grammar.
-When the requested action is absent, the renderer uses today's generic
+The command string is an opaque command span, which may appear on the same line
+as the action label. OpenClaw must not rewrite, parse, quote, capitalize,
+interpolate, normalize paths in, shell-escape, add punctuation to, or pass that
+string through `formatCliCommand`. Presentation escaping, ANSI styling, or
+markup may wrap the command span, but copying it must yield exactly the
+validated command string. Label punctuation remains outside the command span.
+
+Across surfaces, semantic consistency means that guided output identifies
+external lifecycle ownership and the validated `name`, presents the requested
+action, includes optional `runFrom` context in the parenthetical form above,
+and exposes the exact command. Surrounding prose, action descriptions, labels,
+and layout remain owned by the OpenClaw surface and are localizable. `name`,
+`runFrom`, and command are opaque operator-supplied literals and must not be
+translated. Presentation-specific escaping of those literals must not change
+the values displayed or copied.
+
+When the requested action is absent, the caller uses today's generic
 action-specific message:
 
 ```text
@@ -266,14 +301,6 @@ OpenClaw gateway lifecycle is managed by an external supervisor
 
 One present action must not affect fallback for another action. For example, a
 payload containing only `start` still receives generic guidance for `repair`.
-
-Surrounding prose, action descriptions, labels, and layout remain owned by the
-OpenClaw surface and are localizable. `name`, `runFrom`, and command are opaque
-operator-supplied literals, not sentence fragments, and must not be translated.
-Renderers that apply Markdown, terminal markup, HTML, or another presentation
-language must escape these literals for that language without changing the
-value a user copies. Copying the rendered command must yield exactly the
-validated command string; emitted markup or terminal bytes may differ.
 
 ### Integration surfaces
 
@@ -334,15 +361,11 @@ OpenClaw gateway lifecycle is managed by an external supervisor
 (OPENCLAW_SUPERVISOR_MODE=external). Use that supervisor to start it.
 ```
 
-With valid v1 guidance, it can end with:
+With valid v1 guidance, an illustrative surface-native rendering is:
 
 ```text
-OpenClaw gateway lifecycle is managed externally
-(OPENCLAW_SUPERVISOR_MODE=external).
-External supervisor: clawctl
-Run from: Windows host session
-Command:
-  clawctl gateway-service start
+OpenClaw gateway lifecycle is managed by clawctl (OPENCLAW_SUPERVISOR_MODE=external).
+Start (Windows host session): clawctl gateway-service start
 ```
 
 Ordinary external-mode `openclaw gateway restart` continues to use the
@@ -366,15 +389,11 @@ services:
       OPENCLAW_SUPERVISOR_GUIDANCE: '{"version":1,"name":"Docker Compose","runFrom":"Docker host","actions":{"start":"docker compose up -d gateway","stop":"docker compose stop gateway","restart":"docker compose restart gateway","repair":"docker compose up -d --force-recreate gateway","update":"docker compose pull gateway && docker compose up -d gateway"}}'
 ```
 
-A blocked start then renders:
+A blocked start could use this illustrative rendering:
 
 ```text
-OpenClaw gateway lifecycle is managed externally
-(OPENCLAW_SUPERVISOR_MODE=external).
-External supervisor: Docker Compose
-Run from: Docker host
-Command:
-  docker compose up -d gateway
+OpenClaw gateway lifecycle is managed by Docker Compose (OPENCLAW_SUPERVISOR_MODE=external).
+Start (Docker host): docker compose up -d gateway
 ```
 
 A deployment using plain Docker can instead provide, for example,
@@ -437,8 +456,9 @@ codes, reasons, and exit behavior are stable and do not change in v1.
 
 Rollout occurs in three independent steps:
 
-1. Core adds the parser, resolver, renderer, diagnostics, and all call-site
-   migrations while preserving generic fallback.
+1. Core adds the parser, resolver, surface-native call-site rendering,
+   diagnostics, and all call-site migrations while preserving generic
+   fallback.
 2. External supervisors add one-line v1 payloads alongside their existing
    ownership and policy variables.
 3. Supervisor documentation adopts the same action names and commands shown by
@@ -455,20 +475,24 @@ non-sensitive validation status there. Diagnostics may report `absent`,
 field contents. `accepted-v1` requires a non-empty valid `actions` object.
 This status is diagnostic text, not a stable machine API.
 
-Rollback consists of removing the producer variable or reverting the core
-renderer. Neither changes the established external ownership marker. A
-malformed rollout therefore degrades to generic guidance instead of restoring
-native service ownership.
+Rollback consists of removing the producer variable or reverting the
+surface integrations. Neither changes the established external ownership
+marker. A malformed rollout therefore degrades to generic guidance instead of
+restoring native service ownership.
 
 ### Validation and conformance
 
 Core acceptance requires behavior tests through real public paths, not source
 inspection:
 
-- each of the seven lifecycle actions renders its exact supplied command on a
-  distinct line in at least one end-to-end CLI or handler path;
+- each of the seven lifecycle actions renders its exact supplied command in at
+  least one end-to-end CLI or handler path using that path's established
+  action wording and command presentation;
 - onboarding, lifecycle refusal, hosted stop, Doctor repair, update refusal,
   system-agent setup, and recovery resolve through the shared behavior;
+- representative onboarding, Doctor, CLI service, and systemd paths retain
+  their surface-native note, error, or hint structure rather than adopting a
+  shared label stack;
 - ordinary external-mode `openclaw gateway restart` retains its existing
   in-Gateway handoff and does not render or require a `restart` guidance entry;
 - absent guidance and each missing action preserve generic per-action output;
@@ -482,9 +506,11 @@ inspection:
 - ASCII and non-ASCII values enforce total and field limits by their UTF-8
   encoded byte length, including when the host stores environment strings as
   UTF-16;
-- human renderers localize the `External supervisor:`, `Run from:`, and
-  `Command:` labels, escape presentation metacharacters, and copy back exactly
-  the validated opaque values;
+- human surfaces localize only surface-owned wording, render `name` and
+  optional `runFrom` as opaque literals, append `runFrom` as parenthetical
+  action context, wrap the command span in any needed presentation escaping or
+  styling, and copy back exactly the validated command without added
+  punctuation or CLI reformatting;
 - JSON output retains its existing schema, codes, reasons, and exit behavior;
 - guidance cannot cause a process launch, filesystem probe, network request,
   service mutation, repair, or update;
@@ -522,6 +548,20 @@ value practical on Windows and Unix, and this contract carries short operator
 commands rather than scripts or documentation. Supervisors with longer
 workflows should provide a short trusted launcher command whose own help and
 logs explain the remaining steps.
+
+### Why surface-native rendering
+
+Onboarding, Doctor, service hints, daemon errors, and systemd guidance already
+use different compact action-first language and presentation helpers. A
+universal mini-form would duplicate established labels, make short hints look
+like forms, and bypass terminal-aware command treatment already owned by each
+surface. The shared resolver supplies semantic consistency; identical prose
+and line layout do not.
+
+Appending `runFrom` as parenthetical context preserves the important execution
+boundary without turning the producer's noun phrase into localized sentence
+grammar. The shared command-fidelity rule preserves the exact operator action
+while allowing each surface to retain its normal styling and copy affordance.
 
 ### Alternatives considered
 
