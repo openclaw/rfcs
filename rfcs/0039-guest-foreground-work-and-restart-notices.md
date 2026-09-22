@@ -6,7 +6,7 @@ created: 2026-09-22
 last_updated: 2026-09-22
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/74
 ---
 
 # Proposal: Guest foreground work and visible restart stops
