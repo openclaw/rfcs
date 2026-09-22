@@ -115,12 +115,12 @@ staff or system identity.
 | Exact run identity and nonresumable admission decision | Existing session/run payload. Prevent recovery of that accepted turn. |
 | Terminal outcome and interruption reason | Existing lifecycle state. Let reconnect and status reads explain the outcome. |
 | User-visible notice | Existing transcript. Preserve the explanation alongside the interrupted work. |
-| Terminal request identity | Existing terminal-source bookkeeping. Stop duplicate retries from becoming new execution. |
+| Terminal request identity | Existing terminal-source bookkeeping and the exact scoped notice. Recognize the stopped run while either receipt remains. |
 
 The marker must survive recovery-state replacement until terminal settlement. A
 subsequent staff turn in the same thread receives its own admission decision. It
-must neither inherit the guest restriction accidentally nor delete the old turn's
-terminal identity.
+must neither inherit the guest restriction accidentally nor make the stopped
+guest turn resumable.
 
 ### 3. Stop recovery and explain it in the thread
 
@@ -134,8 +134,8 @@ For an interrupted guest turn, that owner must:
    must not stop a newer foreground turn.
 2. Commit a nonretryable terminal outcome, retire the active recovery claim, and
    retain the original request's terminal identity.
-3. Append one idempotent notice in the same SQLite transaction as the terminal
-   outcome for the Control UI thread.
+3. Include one idempotent Control UI notice and cancellation or removal of that
+   run's resumable pending-input custody in the same SQLite transaction.
 4. Stop showing the turn as running. Reconnect, history, and API status must agree
    that it ended without automatic resumption.
 
@@ -165,11 +165,23 @@ new request** action may focus the composer. It must not resend the old prompt,
 reuse an approval, or silently change an old idempotency key into a new request.
 If access expired, show that access must be restored before a new request.
 
-Restored browser state, queued input, old request retries, and late approvals must
-not resume the stopped turn. Ordinary reconnect and duplicate-request handling
-return its terminal outcome. Bounded terminal-ID retention must not become an
-authority grant after eviction. Qualify the supported retry window and stale-ID
-behavior without introducing an unbounded replay registry.
+Restored browser state, old request retries, and late approvals must not resume a
+stopped turn while its receipt remains. Same-ID admission must recognize either a
+retained terminal request ID or the exact notice scoped to that session and run.
+Return the recorded terminal result before dispatch. Treat a failed lookup as
+unavailable, not as proof that no receipt exists.
+
+Control UI reconnect retains the original request ID. Exact interrupted
+pending-input custody can cause automatic resubmission. Terminal settlement must
+prevent automatic resubmission of the stopped run. A missing receipt for an
+attempted send leaves delivery unconfirmed and requires manual review.
+
+Eviction from the bounded terminal-ID list does not end this protection while the
+exact notice remains. This proposal does not change retention or promise
+indefinite deduplication after explicit destruction of all relevant receipts.
+Absence then proves neither freshness nor nonexecution. Preserve the UI's
+unconfirmed state and manual-review path. A genuinely new request uses a new ID
+and current authorization, and can continue in the same conversation.
 
 ### 4. Reuse the existing lifecycle and storage owners
 
@@ -194,6 +206,21 @@ They show reusable mechanisms, not an implementation of this guest policy.
   reads the existing `entry_json` representation. The proposal adds no sidecar
   files, table, column, or database. It proposes no schema-version increment,
   subject to the rollout and rollback requirements below.
+
+Additional retry and retention evidence comes from commit
+[`8c001ebd`](https://github.com/openclaw/openclaw/commit/8c001ebde9333e0dfe4402e6b0cdc0778d16a079):
+
+- [Control UI outbox reconciliation](https://github.com/openclaw/openclaw/blob/8c001ebde9333e0dfe4402e6b0cdc0778d16a079/ui/src/pages/chat/chat-outbox-drain.ts#L133-L244)
+  requires positive interrupted custody for automatic replay of attempted input.
+  [Restart-input tests](https://github.com/openclaw/openclaw/blob/8c001ebde9333e0dfe4402e6b0cdc0778d16a079/ui/src/pages/chat/chat-restart-input.test.ts)
+  cover same-ID resubmission, missing receipts, and replacement sessions.
+- [Terminal-source bookkeeping](https://github.com/openclaw/openclaw/blob/8c001ebde9333e0dfe4402e6b0cdc0778d16a079/src/config/sessions/restart-recovery-state.ts)
+  retains at most 64 terminal run IDs. The proposed notice lookup extends
+  recognition while the exact receipt remains, without enlarging that list.
+- [Scoped transcript identity lookup](https://github.com/openclaw/openclaw/blob/8c001ebde9333e0dfe4402e6b0cdc0778d16a079/src/config/sessions/session-accessor.sqlite-transcript-store.ts#L650-L702)
+  provides the existing lookup mechanism. [Transcript deletion](https://github.com/openclaw/openclaw/blob/8c001ebde9333e0dfe4402e6b0cdc0778d16a079/src/config/sessions/session-accessor.sqlite-transcript-state.ts#L367-L382)
+  deletes these identities with their events. A missing receipt cannot establish
+  that the old request never ran.
 
 The first delivery target is the Control UI. Any additional supported channel must
 use the same terminal fact and a qualified notice-delivery path. A failed external
@@ -228,11 +255,15 @@ and keep execution blocked when that proof is missing. Retain the conversation.
 | --- | --- |
 | Restart during guest generation or a tool call | No recovery model/tool dispatch. One persistent notice and terminal outcome. |
 | Hard crash before or after admission commit | No accepted execution without the marker. No false claim about an unproven interruption cause. |
-| Crash between terminal settlement and notice handling | Atomic local state and notice. Repeated startup creates no duplicate notice. |
+| Crash between terminal settlement and notice handling | Atomic terminal state, notice, and cancellation or removal of exact resumable pending custody. Repeated startup creates no duplicate notice. |
 | Promotion, revocation, or reinvitation before restart | Original guest work stays nonresumable. A fresh request uses current permissions. |
 | Shared thread with later staff work | Old recovery cannot stop the new run. Staff admission retains its ordinary behavior. |
 | Tab disconnect and reconnect without restart | The same bounded live turn remains observable without duplicate execution. |
-| Old request retry, stale browser queue, late approval, terminal-ID eviction | No replay or implicit conversion into a fresh authorized request. |
+| Old request retry, stale browser queue, or late approval with a retained receipt | Return the recorded terminal result without dispatch or implicit conversion into a fresh request. |
+| Eviction from the 64-ID list with the exact scoped notice retained | Same-ID admission still recognizes the stopped run and does not dispatch. |
+| Receipt lookup unavailable | Report unavailable. Do not treat lookup failure as receipt absence. |
+| Explicit deletion of all relevant receipts | No indefinite deduplication claim. An attempted UI send remains unconfirmed for manual review, without passive replay. |
+| New request after interruption | A new ID and current authorization can start a new run in the same conversation, subject to resource-stop checks. |
 | Alternate tool, RPC, HTTP, hook, or Code Mode producer | Durable work fails before registration or dispatch, with a visible reason. |
 | Unknown external effect or surviving process | No blind effect replay or overlapping writer. Uncertainty is visible. |
 | Compatible restart and supported rollback | History survives and interrupted guest work does not resume. |
