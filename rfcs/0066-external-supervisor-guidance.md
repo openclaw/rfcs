@@ -82,6 +82,9 @@ The required user scenarios are:
    lifecycle authority and never executes supplied text. New builds fall back
    to the existing generic message; old builds ignore the new variable.
 
+Supporting evidence and non-normative examples are collected in
+[Current behavior proof and illustrative mocks](0066/current-behavior-and-mocks.md).
+
 This RFC concerns only operator guidance. The machine-level graceful-stop
 handshake proposed in
 [openclaw/openclaw#152863](https://github.com/openclaw/openclaw/issues/152863)
