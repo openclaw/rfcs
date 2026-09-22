@@ -147,14 +147,14 @@ This Gateway is managed by an external supervisor. Use your server or deployment
 Illustrative actionable form:
 
 ```text
-This Gateway is managed by clawctl.
-Update (Windows host session): clawctl update
+This Gateway is managed by Docker Compose.
+Update (Docker host): docker compose pull gateway && docker compose up -d gateway
 The Control UI and `openclaw update` cannot update this installation. No package changes or Gateway restart were attempted.
 ```
 
-In this non-normative mock, `clawctl update` is the exact hypothetical
-producer-supplied command. A real UI copies the validated command unchanged;
-no button executes it.
+In this non-normative mock, the Docker Compose command is the illustrative
+producer-supplied display string. A real UI copies it unchanged; no button
+executes it.
 
 ## What this proves and does not prove
 
