@@ -53,10 +53,10 @@ core guidance path. Other external supervisors face the same integration gap.
 The required user scenarios are:
 
 1. **Packaged service operator -> blocked lifecycle command -> follow the
-   owning launcher.** An operator runs an OpenClaw gateway lifecycle command
-   inside a `clawctl`-managed installation. OpenClaw refuses native ownership,
-   displays the exact `clawctl` action and execution context, and the operator
-   can run the command in the owning environment.
+   owning launcher.** An operator runs an OpenClaw gateway start, stop, or
+   service-setup command inside a `clawctl`-managed installation. OpenClaw
+   refuses native ownership, displays the exact `clawctl` action and execution
+   location, and the operator can run the command in the owning environment.
 2. **Container operator -> blocked in-container action -> act on the host.**
    An operator reaches a stop, repair, or update refusal inside a container.
    OpenClaw identifies that the suggested Docker or Compose command must run
@@ -120,7 +120,7 @@ commands.
 OpenClaw core owns the v1 schema, validation, action semantics, localization
 boundary, resolution API, human rendering, diagnostics, and conformance tests.
 An external supervisor owns construction of the payload, inheritance into the
-OpenClaw process, command accuracy, execution context, and documentation for
+OpenClaw process, command accuracy, execution location, and documentation for
 the command's result.
 
 `OPENCLAW_SUPERVISOR_GUIDANCE` is optional and has no effect unless
@@ -138,21 +138,26 @@ redirects the operation.
 
 ### Environment variable and v1 schema
 
-`OPENCLAW_SUPERVISOR_GUIDANCE` contains a single-line UTF-8 JSON object:
+`OPENCLAW_SUPERVISOR_GUIDANCE` is a single-line JSON text value:
 
 ```json
 {
   "version": 1,
   "name": "clawctl",
-  "context": "in an elevated PowerShell session",
+  "runFrom": "Windows host session",
   "actions": {
     "start": "clawctl gateway-service start",
     "stop": "clawctl gateway-service stop",
-    "restart": "clawctl gateway-service restart",
-    "install": "clawctl gateway-service install"
+    "restart": "clawctl gateway-service restart"
   }
 }
 ```
+
+Process environments expose strings, not encoded byte sequences. Windows stores
+environment strings as UTF-16; Unix-like systems expose platform byte strings
+that the runtime decodes. For deterministic cross-platform limits, OpenClaw
+measures this contract by encoding the complete JSON text and each parsed field
+as UTF-8. A value that cannot be encoded as valid UTF-8 is invalid.
 
 The normative v1 fields are:
 
@@ -160,7 +165,7 @@ The normative v1 fields are:
 |---|---:|---|
 | `version` | Yes | JSON integer `1`. Other values invalidate the payload. |
 | `name` | Yes | Operator-facing supervisor name, 1-128 UTF-8 bytes. |
-| `context` | No | Phrase describing where to run commands, 1-256 UTF-8 bytes. |
+| `runFrom` | No | Execution-location noun phrase, 1-256 UTF-8 bytes. |
 | `actions` | No | Object containing zero or more v1 action command strings. |
 | `actions.<action>` | No | Opaque command text, 1-1,024 UTF-8 bytes. |
 
@@ -170,10 +175,10 @@ JSON types, arrays, and `null` values invalidate the whole payload. Producers
 that need new fields or actions must use a later version rather than silently
 changing v1 semantics.
 
-`name`, `context`, and command strings must not have leading or trailing
+`name`, `runFrom`, and command strings must not have leading or trailing
 whitespace. Each must be non-empty and within its byte limit. The complete raw
-environment value must be no more than 8,192 UTF-8 bytes and must not contain
-CR or LF, including insignificant JSON whitespace.
+environment text, after UTF-8 encoding, must be no more than 8,192 bytes and
+must not contain CR or LF, including insignificant JSON whitespace.
 
 After JSON parsing, every string must be rejected if it contains a Unicode
 character in the `Cc`, `Cf`, `Zl`, or `Zp` general category. This excludes
@@ -224,7 +229,7 @@ one of:
 - inactive, because external supervisor mode is not active;
 - generic, because guidance is absent, invalid, unsupported, or missing the
   requested action; or
-- guided, with validated `name`, optional `context`, and the exact opaque
+- guided, with validated `name`, optional `runFrom`, and the exact opaque
   command for the requested action.
 
 Parsing may be cached for the lifetime of the process. A caller must not read
@@ -235,36 +240,37 @@ surface-specific refusal and adds a separate copyable command block. For
 example:
 
 ```text
-OpenClaw gateway lifecycle is managed by clawctl
+OpenClaw gateway lifecycle is managed externally
 (OPENCLAW_SUPERVISOR_MODE=external).
-Run in an elevated PowerShell session:
+External supervisor: clawctl
+Run from: Windows host session
+Command:
   clawctl gateway-service restart
 ```
 
-The line break shown after `clawctl` is prose wrapping, not a required output
-break. The command itself must occupy a distinct line and must not receive
-punctuation, quoting, capitalization, interpolation, path normalization, or
-shell escaping from OpenClaw.
-
-When `context` is absent, the renderer uses a localized equivalent of `Run:`.
+The command itself must occupy a distinct line and must not receive punctuation,
+quoting, capitalization, interpolation, path normalization, or shell escaping
+from OpenClaw. `External supervisor:`, `Run from:`, and `Command:` are separate
+localized labels. When `runFrom` is absent, the renderer omits the `Run from:`
+line. It does not insert any producer value into localized sentence grammar.
 When the requested action is absent, the renderer uses today's generic
 action-specific message:
 
 ```text
 OpenClaw gateway lifecycle is managed by an external supervisor
-(OPENCLAW_SUPERVISOR_MODE=external). Use that supervisor to restart it.
+(OPENCLAW_SUPERVISOR_MODE=external). Use that supervisor to start it.
 ```
 
 One present action must not affect fallback for another action. For example, a
 payload containing only `start` still receives generic guidance for `repair`.
 
 Surrounding prose, action descriptions, labels, and layout remain owned by the
-OpenClaw surface and are localizable. `name`, `context`, and command are opaque
-operator-supplied literals and must not be translated. Renderers that apply
-Markdown, terminal markup, HTML, or another presentation language must escape
-these literals for that language without changing their displayed characters.
-The copyable command value must remain byte-for-byte equivalent to the
-validated string.
+OpenClaw surface and are localizable. `name`, `runFrom`, and command are opaque
+operator-supplied literals, not sentence fragments, and must not be translated.
+Renderers that apply Markdown, terminal markup, HTML, or another presentation
+language must escape these literals for that language without changing the
+value a user copies. Copying the rendered command must yield exactly the
+validated command string; emitted markup or terminal bytes may differ.
 
 ### Integration surfaces
 
@@ -274,7 +280,9 @@ ownership boundary:
 | Surface | Requested action |
 |---|---|
 | Onboarding postflight start hint | `start` |
-| Gateway service start, stop, restart, install, and uninstall refusal | Matching lifecycle action |
+| Gateway service start, stop, install, and uninstall refusal | Matching lifecycle action |
+| Ordinary external-mode `openclaw gateway restart` | None; retain the existing in-Gateway `runExternalSupervisorRestart` handoff |
+| A recovery or other surface that explicitly defers restart to the external supervisor | `restart` |
 | Hosted gateway stop refusal | `stop` |
 | Doctor service repair redirect | `repair` |
 | Self-update refusal | `update` |
@@ -309,44 +317,60 @@ is serialized on one line.
 $env:OPENCLAW_SUPERVISOR_MODE = "external"
 $env:OPENCLAW_SERVICE_REPAIR_POLICY = "external"
 $env:OPENCLAW_NO_AUTO_UPDATE = "1"
-$env:OPENCLAW_SUPERVISOR_GUIDANCE = '{"version":1,"name":"clawctl","context":"in an elevated PowerShell session","actions":{"start":"clawctl gateway-service start","stop":"clawctl gateway-service stop","restart":"clawctl gateway-service restart","install":"clawctl gateway-service install"}}'
+$env:OPENCLAW_SUPERVISOR_GUIDANCE = '{"version":1,"name":"clawctl","runFrom":"Windows host session","actions":{"start":"clawctl gateway-service start","stop":"clawctl gateway-service stop","restart":"clawctl gateway-service restart"}}'
 ```
 
-Before this contract, `openclaw gateway restart` can end with:
+`clawctl gateway-service status` remains available to the operator but is not
+a mutating guidance action. The example does not advertise `install` or
+`uninstall` because those `clawctl gateway-service` subcommands do not exist.
+
+Before this contract, a refused `openclaw gateway start` can end with:
 
 ```text
 OpenClaw gateway lifecycle is managed by an external supervisor
-(OPENCLAW_SUPERVISOR_MODE=external). Use that supervisor to restart it.
+(OPENCLAW_SUPERVISOR_MODE=external). Use that supervisor to start it.
 ```
 
 With valid v1 guidance, it can end with:
 
 ```text
-OpenClaw gateway lifecycle is managed by clawctl
+OpenClaw gateway lifecycle is managed externally
 (OPENCLAW_SUPERVISOR_MODE=external).
-Run in an elevated PowerShell session:
-  clawctl gateway-service restart
+External supervisor: clawctl
+Run from: Windows host session
+Command:
+  clawctl gateway-service start
 ```
+
+Ordinary external-mode `openclaw gateway restart` continues to use the
+in-Gateway restart handoff described in
+[`Restart and supervision`](https://github.com/openclaw/openclaw/blob/3aa130d87165ab08ce615238c8cc1a606ce19840/docs/cli/gateway/restart-and-supervision.md).
+This guidance contract does not redirect that command to
+`clawctl gateway-service restart`. The v1 `restart` action remains available
+for recovery and other surfaces that actually defer restart to the external
+supervisor.
 
 #### Docker Compose
 
-Compose injects guidance into the container, but the context makes clear that
-the displayed command belongs to the host:
+Compose injects guidance into the container, but `runFrom` makes clear that the
+displayed command belongs to the host:
 
 ```yaml
 services:
   gateway:
     environment:
       OPENCLAW_SUPERVISOR_MODE: external
-      OPENCLAW_SUPERVISOR_GUIDANCE: '{"version":1,"name":"Docker Compose","context":"on the Docker host","actions":{"start":"docker compose up -d gateway","stop":"docker compose stop gateway","restart":"docker compose restart gateway","repair":"docker compose up -d --force-recreate gateway","update":"docker compose pull gateway && docker compose up -d gateway"}}'
+      OPENCLAW_SUPERVISOR_GUIDANCE: '{"version":1,"name":"Docker Compose","runFrom":"Docker host","actions":{"start":"docker compose up -d gateway","stop":"docker compose stop gateway","restart":"docker compose restart gateway","repair":"docker compose up -d --force-recreate gateway","update":"docker compose pull gateway && docker compose up -d gateway"}}'
 ```
 
 A blocked start then renders:
 
 ```text
-OpenClaw gateway lifecycle is managed by Docker Compose
+OpenClaw gateway lifecycle is managed externally
 (OPENCLAW_SUPERVISOR_MODE=external).
-Run on the Docker host:
+External supervisor: Docker Compose
+Run from: Docker host
+Command:
   docker compose up -d gateway
 ```
 
@@ -401,9 +425,9 @@ not support that integer must use generic guidance, not attempt best-effort
 field parsing. OpenClaw must not reinterpret v1 fields incompatibly.
 
 Human text compatibility is intentionally narrow. Existing prose may gain a
-validated name, context, and command in human mode. Exact sentence text and
-line wrapping are not stable interfaces. Existing machine schemas, codes,
-reasons, and exit behavior are stable and do not change in v1.
+validated name, execution location, and command in human mode. Exact sentence
+text and line wrapping are not stable interfaces. Existing machine schemas,
+codes, reasons, and exit behavior are stable and do not change in v1.
 
 ### Rollout and operations
 
@@ -440,6 +464,8 @@ inspection:
   distinct line in at least one end-to-end CLI or handler path;
 - onboarding, lifecycle refusal, hosted stop, Doctor repair, update refusal,
   system-agent setup, and recovery resolve through the shared behavior;
+- ordinary external-mode `openclaw gateway restart` retains its existing
+  in-Gateway handoff and does not render or require a `restart` guidance entry;
 - absent guidance and each missing action preserve generic per-action output;
 - non-external mode ignores even malformed guidance and emits no guidance
   warning;
@@ -447,8 +473,12 @@ inspection:
   oversized input, overlong fields, surrounding whitespace, raw newlines,
   Unicode control/format/line characters, and unpaired surrogates fall back
   without displaying rejected data;
-- human renderers escape presentation metacharacters while preserving the
-  copyable command;
+- ASCII and non-ASCII values enforce total and field limits by their UTF-8
+  encoded byte length, including when the host stores environment strings as
+  UTF-16;
+- human renderers localize the `External supervisor:`, `Run from:`, and
+  `Command:` labels, escape presentation metacharacters, and copy back exactly
+  the validated opaque values;
 - JSON output retains its existing schema, codes, reasons, and exit behavior;
 - guidance cannot cause a process launch, filesystem probe, network request,
   service mutation, repair, or update;
