@@ -166,14 +166,17 @@ The normative v1 fields are:
 | `version` | Yes | JSON integer `1`. Other values invalidate the payload. |
 | `name` | Yes | Operator-facing supervisor name, 1-128 UTF-8 bytes. |
 | `runFrom` | No | Execution-location noun phrase, 1-256 UTF-8 bytes. |
-| `actions` | No | Object containing zero or more v1 action command strings. |
+| `actions` | Yes | Object containing one or more v1 action command strings. |
 | `actions.<action>` | No | Opaque command text, 1-1,024 UTF-8 bytes. |
 
 The only v1 action keys are `start`, `stop`, `restart`, `install`, `uninstall`,
 `repair`, and `update`. Unknown top-level fields, unknown action keys, wrong
-JSON types, arrays, and `null` values invalidate the whole payload. Producers
-that need new fields or actions must use a later version rather than silently
-changing v1 semantics.
+JSON types, arrays, and `null` values invalidate the whole payload. `actions`
+must be present and must contain at least one recognized action with a valid
+command string; an absent or empty `actions` object invalidates the payload.
+Individual action keys remain optional, and a missing requested action uses
+generic per-action fallback. Producers that need new fields or actions must use
+a later version rather than silently changing v1 semantics.
 
 `name`, `runFrom`, and command strings must not have leading or trailing
 whitespace. Each must be non-empty and within its byte limit. The complete raw
@@ -409,8 +412,9 @@ capability signal it is not designed to be.
 The contract is additive:
 
 - New OpenClaw with no guidance produces today's generic text.
-- New OpenClaw with invalid, unknown-version, or partial guidance falls back
-  safely, per action.
+- New OpenClaw with invalid or unknown-version guidance falls back completely.
+- New OpenClaw with a valid payload that omits a requested action falls back
+  safely for that action without discarding other supplied actions.
 - Old OpenClaw ignores `OPENCLAW_SUPERVISOR_GUIDANCE` and continues to honor
   `OPENCLAW_SUPERVISOR_MODE=external`.
 - A supervisor may ship the variable before its minimum OpenClaw version is
@@ -448,7 +452,8 @@ human-facing refusal path or by running Doctor after core exposes the
 non-sensitive validation status there. Diagnostics may report `absent`,
 `accepted-v1`, `unsupported-version`, `oversized`, `invalid-json`,
 `invalid-shape`, `invalid-character`, or `field-too-long`; they must not report
-field contents. This status is diagnostic text, not a stable machine API.
+field contents. `accepted-v1` requires a non-empty valid `actions` object.
+This status is diagnostic text, not a stable machine API.
 
 Rollback consists of removing the producer variable or reverting the core
 renderer. Neither changes the established external ownership marker. A
@@ -469,10 +474,11 @@ inspection:
 - absent guidance and each missing action preserve generic per-action output;
 - non-external mode ignores even malformed guidance and emits no guidance
   warning;
-- wrong versions, malformed JSON, unknown fields/actions, wrong types,
-  oversized input, overlong fields, surrounding whitespace, raw newlines,
-  Unicode control/format/line characters, and unpaired surrogates fall back
-  without displaying rejected data;
+- wrong versions, malformed JSON, missing or empty `actions`, unknown
+  fields/actions, wrong types, oversized input, overlong fields, surrounding
+  whitespace, raw newlines, Unicode control/format/line characters, and
+  unpaired surrogates fall back without displaying rejected data;
+- missing or empty `actions` never reports `accepted-v1`;
 - ASCII and non-ASCII values enforce total and field limits by their UTF-8
   encoded byte length, including when the host stores environment strings as
   UTF-16;
@@ -491,8 +497,9 @@ installation, profile, or network.
 A conforming producer test serializes its payload exactly as inherited by the
 OpenClaw child process, verifies the 8 KiB and field limits by UTF-8 byte
 length, verifies that it contains no forbidden Unicode categories or secrets,
-and checks that every advertised command matches the producer's documented
-operator workflow. Producers are not required to populate all actions.
+verifies that `actions` contains at least one recognized command, and checks
+that every advertised command matches the producer's documented operator
+workflow. Producers are not required to populate all actions.
 
 ## Rationale
 
