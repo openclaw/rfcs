@@ -538,6 +538,34 @@ file. Process inheritance naturally scopes different guidance to different
 gateway instances and requires no new persistence, cleanup, watcher, file
 permissions, or configuration precedence.
 
+The closest existing OpenClaw precedent for this transport shape is
+`OPENCLAW_CUA_DRIVER_ENDPOINT`. The macOS app's
+[`CuaDriverWorkerEndpoint`](https://github.com/openclaw/openclaw/blob/065eb1f58f13c5355be49edd113f82f22bc86f1d/apps/macos/Sources/OpenClaw/ComputerControlProvider.swift#L67-L79)
+defines `v = 1`, `socketPath`, and `binaryPath`, and serializes the value with
+`JSONEncoder`.
+[`MacNodeModeCoordinator`](https://github.com/openclaw/openclaw/blob/065eb1f58f13c5355be49edd113f82f22bc86f1d/apps/macos/Sources/OpenClaw/NodeMode/MacNodeModeCoordinator.swift#L1036-L1044)
+places that serialized value in the worker environment. The CUA worker defines
+[a strict versioned schema](https://github.com/openclaw/openclaw/blob/065eb1f58f13c5355be49edd113f82f22bc86f1d/extensions/cua-computer/src/commands.ts#L43-L49)
+and [caps and validates the input](https://github.com/openclaw/openclaw/blob/065eb1f58f13c5355be49edd113f82f22bc86f1d/extensions/cua-computer/src/commands.ts#L88-L115):
+it rejects values over 4 KiB, parses JSON, rejects NUL and non-absolute paths,
+and verifies that the binary is executable. This is the closest precedent for
+a bounded, versioned, process-scoped app/worker contract.
+
+`OPENCLAW_PLUGIN_INSTALL_OVERRIDES` is a secondary, narrower precedent. Its
+[consumer](https://github.com/openclaw/openclaw/blob/065eb1f58f13c5355be49edd113f82f22bc86f1d/src/plugins/install-overrides.ts#L6-L70)
+parses a JSON object from the environment only when separately gated by
+`OPENCLAW_ALLOW_PLUGIN_INSTALL_OVERRIDES=1`, and its
+[documentation](https://github.com/openclaw/openclaw/blob/065eb1f58f13c5355be49edd113f82f22bc86f1d/docs/plugins/install-overrides.md#L11-L34)
+defines the JSON map for maintainer and E2E package validation. It demonstrates
+a documented JSON environment payload, but it is not a model for v1
+compatibility or versioning.
+
+These precedents justify carrying JSON through process inheritance. They do
+not make this RFC's public schema, action vocabulary, sanitization, or
+compatibility obligations automatic. This RFC remains stricter because
+supervisor guidance is a public cross-supervisor producer contract and reaches
+user-visible output.
+
 The version field makes downgrade behavior explicit. An older OpenClaw ignores
 the variable, while a newer implementation can reject an unsupported version
 without guessing. The strict v1 shape makes producer mistakes visible and
