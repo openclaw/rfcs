@@ -6,7 +6,7 @@ created: 2026-09-21
 last_updated: 2026-09-22
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/75
 ---
 
 # Proposal: Versioned External-Supervisor Operator Guidance
