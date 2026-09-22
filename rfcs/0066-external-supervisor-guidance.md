@@ -18,9 +18,10 @@ operator-facing lifecycle guidance through one process-scoped environment
 variable. When `OPENCLAW_SUPERVISOR_MODE=external`,
 `OPENCLAW_SUPERVISOR_GUIDANCE` may name the supervisor, identify where its
 commands must run, and provide display-only commands for seven lifecycle
-actions. OpenClaw will never execute or interpret this data, and invalid,
-unsupported, absent, or partial guidance will fall back to today's generic
-external-supervisor message without changing lifecycle authorization.
+actions. OpenClaw will never execute or shell-interpret the command strings or
+treat them as authority, and invalid, unsupported, absent, or partial guidance
+will fall back to today's generic external-supervisor message without changing
+lifecycle authorization.
 
 ## Motivation
 
@@ -33,6 +34,20 @@ The same generic guidance reaches
 [lifecycle commands](https://github.com/openclaw/openclaw/blob/3aa130d87165ab08ce615238c8cc1a606ce19840/src/cli/daemon-cli/lifecycle.ts),
 [hosted stop](https://github.com/openclaw/openclaw/blob/3aa130d87165ab08ce615238c8cc1a606ce19840/src/daemon/hosted-stop.ts),
 Doctor repair, update refusal, system-agent setup, and recovery paths.
+
+External mode also reaches an authenticated out-of-process human surface.
+[`update.run`](https://github.com/openclaw/openclaw/blob/d1d05aea8a1127150c1aa2ae0955f7a8232a557e/src/gateway/server-methods/update.ts#L423-L432)
+refuses a Control UI update with
+`external-supervisor-update-required`. The UI
+[maps that reason](https://github.com/openclaw/openclaw/blob/d1d05aea8a1127150c1aa2ae0955f7a8232a557e/ui/src/app/update-overlay-helpers.ts#L45-L60)
+to
+[generic supervisor guidance](https://github.com/openclaw/openclaw/blob/d1d05aea8a1127150c1aa2ae0955f7a8232a557e/ui/src/i18n/locales/en.ts#L654-L666).
+The current
+[end-to-end scenario](https://github.com/openclaw/openclaw/blob/d1d05aea8a1127150c1aa2ae0955f7a8232a557e/ui/src/e2e/update-external-supervisor.e2e.test.ts#L20-L149)
+retains that report in Settings without a retry or triage path. An in-process
+renderer alone therefore cannot make every existing human boundary actionable;
+the authenticated UI needs a bounded display projection of the same validated
+guidance.
 
 That refusal is safe but not actionable. OpenClaw does not know whether "that
 supervisor" is a packaging launcher, Docker, Docker Compose, Kubernetes, a
@@ -87,8 +102,9 @@ commands.
   OpenClaw.
 - Fall back independently for each missing action and fall back completely for
   invalid or unsupported payloads.
-- Preserve current lifecycle authorization, JSON schemas, reason codes, and
-  safe behavior across upgrades and downgrades.
+- Preserve current lifecycle authorization, required protocol fields, reason
+  codes, exit behavior, and safe behavior across upgrades and downgrades while
+  permitting a narrow additive optional display projection.
 - Make invalid guidance diagnosable without logging its potentially sensitive
   contents.
 - Define conformance tests that an OpenClaw implementation and an external
@@ -105,8 +121,8 @@ commands.
   `OPENCLAW_NO_AUTO_UPDATE`, or any other repair or update policy.
 - Defining a graceful-stop, restart, health, readiness, or process-control
   protocol between OpenClaw and a supervisor.
-- Advertising supervisor capabilities or adding stable fields to
-  machine-readable output in v1.
+- Defining an executable action-discovery, capability, or authorization
+  protocol, or projecting the general supervisor action map.
 - Standardizing the syntax, exit codes, privileges, or availability of the
   displayed commands.
 - Persisting guidance in OpenClaw configuration or a machine-level file.
@@ -196,12 +212,14 @@ most one warning per process that names the variable and a non-sensitive
 reason, and falls back to generic guidance. The warning must never echo the raw
 value or an individual field.
 
-The 8 KiB total limit leaves room for all seven maximum-size ASCII commands
-while bounding parser and log exposure. It also keeps this optional variable
-to roughly one quarter of the 32,767-character Windows environment block in
-the common ASCII case and well below typical Unix argument-plus-environment
-limits. The field limits allow practical host commands without turning a
-refusal message into a general-purpose content channel.
+The 8 KiB total limit supports several practical commands while bounding
+parser, log, and environment exposure. It also keeps this optional variable to
+roughly one quarter of the 32,767-character Windows environment block in the
+common ASCII case and well below typical Unix argument-plus-environment
+limits. The total cap always overrides the per-field maxima, including when
+JSON escaping expands a command. The field limits allow practical host
+commands without turning a refusal message into a general-purpose content
+channel.
 
 ### Action semantics
 
@@ -315,7 +333,8 @@ ownership boundary:
 | A recovery or other surface that explicitly defers restart to the external supervisor | `restart` |
 | Hosted gateway stop refusal | `stop` |
 | Doctor service repair redirect | `repair` |
-| Self-update refusal | `update` |
+| CLI self-update refusal | `update` |
+| Control UI update refusal and retained Settings report | `update` |
 | System-agent setup that requires external installation | `install` |
 | Recovery flow | The exact operation recovery asks the operator to perform |
 
@@ -324,16 +343,55 @@ Recovery code must select the real next action rather than a generic
 may render more than one independently resolved command, with each missing
 entry falling back independently.
 
-Human messages in onboarding, the CLI, Doctor, update, system-agent setup, and
-recovery must use the same resolver and validation result. No consumer may
-special-case `clawctl`, Docker, or another supervisor.
+Human messages in onboarding, the CLI, Doctor, update, system-agent setup,
+recovery, and the Control UI must use the same resolver and validation result.
+No consumer may special-case `clawctl`, Docker, or another supervisor.
 
-Version 1 adds no fields to stable JSON or protocol output. Existing JSON
-schemas, error codes, reason strings such as
+### Authenticated display projection and Control UI
+
+V1 defines one reusable, action-specific wire shape named
+`ExternalSupervisorDisplayGuidanceV1`:
+
+| Field | Contract |
+|---|---|
+| `version` | Integer `1`, identifying this display projection contract. |
+| `action` | The one v1 action requested by the enclosing response. |
+| `name` | Exact validated `name` from the accepted guidance payload. |
+| `runFrom` | Optional exact validated `runFrom` from that payload. |
+| `command` | Exact validated command for `action`. |
+
+Core constructs this projection only from an already validated payload and
+only when that payload contains the requested action. It never sends the raw
+environment value or the full action map. The projection is display-only and
+non-authoritative. A client must not execute, shell-parse, probe, or treat it
+as capability or authorization data.
+
+For the current Control UI, authenticated `update.status` gains an optional
+`externalSupervisorGuidance` field. The refused `update.run` response gains the
+same optional field only when its reason is
+`external-supervisor-update-required`. In both responses the field is present
+only when valid `update` guidance exists, and its `action` is `update`.
+
+The durable update run record must not store the projection or command.
+`update.status` resolves and projects current process guidance so a retained
+Settings report never preserves a stale deployment command. The immediate
+refused `update.run` response carries the same projection resolved for that
+response. A new UI renders the opaque values with its native localized update
+presentation and command copy affordance. When the field is absent, it
+preserves today's generic supervisor message.
+
+An old UI ignores the additive optional field. The update Settings or sidebar
+may remain non-proactive until it has hydrated `update.status`; v1 does not add
+supervisor state to Gateway hello or snapshot. A future out-of-process human
+surface may embed the same action-specific projection only in the relevant
+authenticated response. V1 does not add a general supervisor
+action-discovery endpoint.
+
+Existing required protocol fields, error codes, reason strings such as
 `external-supervisor-update-required`, and exit behavior remain unchanged.
-When a command supports machine-readable output, guidance is omitted from that
-output in v1; only human-mode text is enriched. Consumers must continue to use
-codes and reasons rather than parse refusal prose.
+Other machine-readable output receives no guidance. Consumers must continue
+to use codes and reasons for control flow rather than parse display values or
+refusal prose.
 
 ### Producer examples
 
@@ -407,6 +465,8 @@ output. OpenClaw therefore treats it as untrusted display data:
 
 - It is never passed to a shell, process API, command resolver, filesystem
   probe, network request, or package manager.
+- Only the one validated action relevant to an authenticated operator response
+  may cross the protocol boundary; the raw payload and full action map do not.
 - Validation occurs before any field is logged or rendered.
 - Control, format, multiline, and bidirectional characters are rejected to
   prevent terminal escape injection, hidden direction changes, and misleading
@@ -441,6 +501,13 @@ The contract is additive:
 - Removing the feature from a deployment requires only unsetting the guidance
   variable. External ownership remains active until the separate supervisor
   mode variable is changed.
+- Old clients ignore the additive optional display projection. New clients
+  preserve today's generic text when the projection is absent.
+- Only authenticated operator surfaces receive a projection, and only for the
+  action relevant to that response. No raw environment value or full action
+  map crosses the protocol boundary.
+- Durable update run records do not retain commands. Each `update.status` and
+  refused `update.run` response projects guidance current to that response.
 
 Version 1 is supported as a public producer contract once released. A future
 version uses a different integer in the same variable. Implementations that do
@@ -449,19 +516,24 @@ field parsing. OpenClaw must not reinterpret v1 fields incompatibly.
 
 Human text compatibility is intentionally narrow. Existing prose may gain a
 validated name, execution location, and command in human mode. Exact sentence
-text and line wrapping are not stable interfaces. Existing machine schemas,
-codes, reasons, and exit behavior are stable and do not change in v1.
+text and line wrapping are not stable interfaces. Required machine fields,
+codes, reasons, and exit behavior remain stable; only the optional
+action-specific display projection is additive.
 
 ### Rollout and operations
 
-Rollout occurs in three independent steps:
+Rollout occurs in four compatible steps:
 
 1. Core adds the parser, resolver, surface-native call-site rendering,
-   diagnostics, and all call-site migrations while preserving generic
+   diagnostics, and in-process call-site migrations while preserving generic
    fallback.
-2. External supervisors add one-line v1 payloads alongside their existing
+2. The Gateway adds the optional projection to `update.status` and refused
+   `update.run`, and the Control UI consumes it with generic fallback. The
+   protocol and UI changes can ship in either order because the field is
+   optional and ignored by older clients.
+3. External supervisors add one-line v1 payloads alongside their existing
    ownership and policy variables.
-3. Supervisor documentation adopts the same action names and commands shown by
+4. Supervisor documentation adopts the same action names and commands shown by
    OpenClaw.
 
 Core can ship first with no producer. A producer can also ship first because
@@ -511,9 +583,23 @@ inspection:
   action context, wrap the command span in any needed presentation escaping or
   styling, and copy back exactly the validated command without added
   punctuation or CLI reformatting;
-- JSON output retains its existing schema, codes, reasons, and exit behavior;
+- authenticated `update.status` includes current `update` guidance only when
+  valid guidance exists, while absence preserves the generic UI message;
+- a refused `update.run` with
+  `external-supervisor-update-required` carries the same current
+  action-specific projection, without changing its required fields, reason,
+  or exit behavior;
+- a retained Settings report resolves the current projection through
+  `update.status`; the durable update run record, `update.runs.get`,
+  `update.runs.list`, Gateway hello, and Gateway snapshot never persist or
+  expose the command or full action map;
+- old clients ignore the optional field, and new clients preserve generic
+  guidance when the field is absent;
+- Control UI rendering escapes and styles opaque values without changing the
+  command copied by the operator;
 - guidance cannot cause a process launch, filesystem probe, network request,
-  service mutation, repair, or update;
+  service mutation, repair, or update, whether consumed in-process or through
+  the display projection;
 - repeated resolution emits at most one invalid-input warning per process.
 
 Tests must inject an isolated environment and fake lifecycle dependencies.
@@ -626,11 +712,14 @@ in an offline deployment, and adds URL trust and rendering concerns. A future
 version can consider a bounded documentation reference if concrete consumers
 need one.
 
-**Stable guidance fields in JSON output.** This would create an automation
-contract before action availability, trust, and cross-version semantics are
-proven. Existing codes and reasons already let automation identify the
-refusal. V1 improves humans only and leaves machine expansion to a separate
-proposal.
+**A full guidance map in Gateway hello or snapshot.** This would expose every
+advertised action to clients that do not need it, preserve commands outside
+the refusal that makes them relevant, and invite capability discovery or
+automation against display strings. The chosen projection is narrower: it is
+optional, action-specific, display-only, and embedded only in an authenticated
+response that already represents that human operation. Update Settings can
+hydrate it through `update.status`, so Gateway hello and snapshot need no
+supervisor state.
 
 **Inferring commands from hosting profiles.** Hosting profiles describe
 supported deployment posture and readiness, not the exact launcher, project
@@ -646,8 +735,9 @@ than implicit v1 behavior:
 - Should a later version add a bounded documentation reference for workflows
   that cannot be represented by one short command?
 - If concrete automation consumers emerge, should a separate proposal define
-  a narrow machine-readable action-discovery contract? Such a contract must
-  not reuse display strings as executable input.
+  an executable or capability-oriented action contract? V1's machine-readable
+  projection is display-only and must not be repurposed as executable input
+  or general action discovery.
 - Should hosting profiles define recommendations for which actions a profile's
   supervisor normally supplies, while leaving the command values and
   lifecycle authority outside the profile?
