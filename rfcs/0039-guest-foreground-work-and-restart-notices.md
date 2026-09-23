@@ -3,7 +3,7 @@ title: Guest foreground work and visible restart stops
 authors:
   - Vincent Koc
 created: 2026-09-22
-last_updated: 2026-09-22
+last_updated: 2026-09-23
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/74
@@ -13,7 +13,7 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/74
 
 ## Summary
 
-Limit guest execution on participating shared Gateways to bounded foreground turns. Preserve conversation history, but stop interrupted guest turns instead of automatically resuming them after a Gateway restart. Show a durable explanation in the thread and require a fresh, currently authorized request to continue. Reuse existing SQLite session and transcript storage, with minimal admission metadata, without adding tables, columns, a database, or a schema-version bump. Durable guest execution remains a separate proposal.
+Limit guest execution on participating shared Gateways to bounded foreground turns. Preserve conversation history, but stop interrupted guest turns instead of automatically resuming them after a Gateway restart. Show a durable explanation in the thread and require a fresh, currently authorized request to continue. Reuse existing SQLite session, transcript, and sandbox registry payloads for the admission and allocation retirement restrictions. Add no table, column, database, sidecar, or schema-version bump. Durable guest execution remains a separate proposal.
 
 ## Motivation
 
@@ -116,6 +116,7 @@ staff or system identity.
 | Terminal outcome and interruption reason | Existing lifecycle state. Let reconnect and status reads explain the outcome. |
 | User-visible notice | Existing transcript. Preserve the explanation alongside the interrupted work. |
 | Terminal request identity | Existing terminal-source bookkeeping and the exact scoped notice. Recognize the stopped run while either receipt remains. |
+| Allocation retirement policy | Existing sandbox registry payload. Reserve cleanup for the original foreground owner, separately from the session's no-resume decision. |
 
 The marker must survive recovery-state replacement until terminal settlement. A
 subsequent staff turn in the same thread receives its own admission decision. It
@@ -206,6 +207,9 @@ They show reusable mechanisms, not an implementation of this guest policy.
   reads the existing `entry_json` representation. The proposal adds no sidecar
   files, table, column, or database. It proposes no schema-version increment,
   subject to the rollout and rollback requirements below.
+- [Sandbox registry storage](https://github.com/openclaw/openclaw/blob/b6bd69d6e85f9a2d6ae5f0bf15e5fcfe6dd88490/src/agents/sandbox/registry.ts)
+  persists allocation metadata in `sandbox_registry_entries.entry_json`. Reuse
+  this payload for the allocation retirement policy described below.
 
 Additional retry and retention evidence comes from commit
 [`8c001ebd`](https://github.com/openclaw/openclaw/commit/8c001ebde9333e0dfe4402e6b0cdc0778d16a079):
@@ -226,6 +230,29 @@ The first delivery target is the Control UI. Any additional supported channel mu
 use the same terminal fact and a qualified notice-delivery path. A failed external
 notice delivery cannot reopen computation or cause repeated messages.
 
+#### Keep allocation cleanup with its original owner
+
+Record `retirementPolicy: 'foreground-owner'` in the existing
+`sandbox_registry_entries.entry_json` payload for an allocation owned by a
+restricted foreground turn. This is a typed payload addition, not a new table,
+column, schema version, or sidecar. It grants no resumable guest authority.
+
+The session marker prevents recovery of the accepted turn. The allocation marker
+keeps cleanup with its original foreground owner. A terminal session outcome does
+not establish that the allocation's processes stopped.
+
+Generic cleanup must retain marked allocations and rows with unknown retirement
+policy or ownership. Cleanup may remove only the exact allocation after its
+original owner confirms whole-process shutdown, including owned descendants.
+Cleanup must not remove another allocation that later reuses the same session.
+It must preserve conversation history and unrelated workspace data.
+
+A lost owner or shutdown receipt, a failed stop, or uncertain process state leaves
+the allocation and its registry row retained. Report unresolved cleanup and block
+unsafe resource reuse. Do not resume guest work to reconstruct cleanup authority.
+Engine-specific containment and shutdown remain implementation qualification
+requirements, not guarantees established by this RFC.
+
 ### 5. Qualify rollout and rollback
 
 Before enabling this posture, stop new guest admission and inventory outstanding
@@ -234,11 +261,15 @@ owner. Preserve history, files, and effects that already happened. Unknown legac
 origin must not become a guest, staff, or system identity by inference. If that
 uncertainty can affect recovery, block activation until the operator resolves it.
 
-The new payload marker is not an old-binary safety barrier. An older build using
-the same SQLite schema can ignore it. Name and test compatible restart and rollback
-builds before admission. An incompatible rollback requires disabling new guest
-admission and settling affected work under a compatible build first. Disabling the
-visitor plugin alone is not proof that old startup recovery cannot run saved work.
+The session and allocation markers are not old-binary safety barriers. An older
+build can ignore both while using the same SQLite schema. Name and test compatible
+restart and rollback builds before admission. Before an incompatible downgrade,
+quiesce guest admission and reconcile outstanding work and allocations under
+compatible code. Original owners must confirm shutdown before allocation removal.
+Retain unresolved allocations and block a downgrade that could ignore their
+cleanup restriction. Schema compatibility alone does not make rollback safe.
+Disabling the visitor plugin alone does not stop old recovery or cleanup paths
+from ignoring these markers.
 
 If the supported rollout cannot meet this requirement without a reader-version
 barrier, return to RFC review. Do not hide a schema bump inside implementation or
@@ -266,7 +297,11 @@ and keep execution blocked when that proof is missing. Retain the conversation.
 | New request after interruption | A new ID and current authorization can start a new run in the same conversation, subject to resource-stop checks. |
 | Alternate tool, RPC, HTTP, hook, or Code Mode producer | Durable work fails before registration or dispatch, with a visible reason. |
 | Unknown external effect or surviving process | No blind effect replay or overlapping writer. Uncertainty is visible. |
+| Generic cleanup encounters a marked allocation or unknown policy or ownership | Retain the allocation and registry row. Do not infer cleanup authority from age or a terminal session outcome. |
+| Original owner confirms whole-process shutdown | Remove only the exact original allocation. Preserve unrelated allocations, workspace data, and conversation history. |
+| Owner or shutdown receipt is lost, or shutdown is uncertain | Retain the allocation and row, report unresolved cleanup, and block unsafe reuse without resuming guest work. |
 | Compatible restart and supported rollback | History survives and interrupted guest work does not resume. |
+| Downgrade to a build that ignores either marker | Quiesce and reconcile under compatible code first. Unresolved execution or cleanup custody blocks an unsafe downgrade. |
 
 Use an authenticated Gateway and the real lifecycle/storage path for these proofs.
 Mocks alone cannot establish restart, process containment, or rollback behavior.
