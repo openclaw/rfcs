@@ -12,7 +12,9 @@ Status: experimental draft, tied to RFC 0016.
 The coordinated cutover names the product Templates, while `CLAW.md` remains
 its manifest filename. New package metadata selects the manifest through
 `openclaw.template`. The feature is experimental and this is an intentional
-breaking rename, not a new format or a compatibility alias.
+product naming change, not a new manifest format. Historical archive discovery
+is specified separately by the package contract; it does not change manifest
+validation or make an old name a user-facing product alias.
 
 OpenClaw reads `CLAW.md` and equivalent grouped JSON. Following the companion
 implementation cutover, discovery and Add use

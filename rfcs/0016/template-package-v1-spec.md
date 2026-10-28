@@ -509,6 +509,23 @@ namespace remains forbidden regardless of local provenance.
 
 ## Compatibility and Evolution
 
+New package writers must use `openclaw.template`. Previously published immutable
+archives may instead declare `openclaw.claw`; readers may recognize that
+historical selector to locate the same manifest without rewriting any archive
+bytes or changing its digest. Ambiguous or conflicting selector declarations
+must be rejected. Path confinement, strict manifest validation, exact package
+identity, integrity, and consent requirements remain unchanged. Recognizing
+historical archive metadata does not require an old CLI command, public family
+name, or route alias. A historical artifact must not be relabeled as newly
+published or silently rebuilt under its existing immutable coordinate.
+
+Shared-state schemas and registry storage can exist before a person enables a
+Labs feature. A product naming change must not invalidate unrelated settings,
+agent records, or historical packages. Use the existing storage migration owner
+when changing physical schema, or preserve a historical storage identifier
+behind the canonical Template API. Historical upgrade fixtures remain unchanged
+inputs; they must not be rewritten to resemble the candidate schema.
+
 Package v1 is identified by a manifest with `schemaVersion: 1` and the metadata
 contract above. Registry transport may evolve independently as long as it still
 delivers the exact identity, version, digest, and package bytes.

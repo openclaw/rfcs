@@ -16,8 +16,14 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/27
 This maintainer-directed cutover names the product **Templates**; one reusable
 agent definition is a **Template**. The manifest filename remains `CLAW.md`.
 New package metadata selects that file through `openclaw.template`. This is an
-intentional breaking rename of the unused experimental feature, not a second
-package format or a compatibility alias.
+intentional breaking rename of the experimental product vocabulary, not a second
+manifest format. Existing shared databases and immutable published packages are
+real contracts even when local Labs usage is absent. Their data must remain
+readable: storage changes use the established migration owner or preserve a
+historical physical identifier behind the canonical public projection. Readers
+may recognize the historical package selector described in the package spec;
+new writers use only the canonical selector. No old user-facing command or
+navigation alias is required by this compatibility boundary.
 
 The lifecycle sections below retain the original draft proposal and implementation
 history. They are not the current command reference. The coordinated OpenClaw
