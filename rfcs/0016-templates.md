@@ -11,22 +11,25 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/27
 
 # Proposal: Templates
 
-## Current terminology and implementation
+## Terminology and coordinated implementation
 
-The product is named **Templates**; one reusable agent definition is a
-**Template**. The manifest filename remains `CLAW.md`. New package metadata
-selects that file through `openclaw.template`. This is an intentional breaking
-rename of the unused experimental feature, not a second package format or a
-compatibility alias.
+This maintainer-directed cutover names the product **Templates**; one reusable
+agent definition is a **Template**. The manifest filename remains `CLAW.md`.
+New package metadata selects that file through `openclaw.template`. This is an
+intentional breaking rename of the unused experimental feature, not a second
+package format or a compatibility alias.
 
 The lifecycle sections below retain the original draft proposal and implementation
-history. They are not the current command reference. Current OpenClaw exposes
-`templates create`, `validate`, `dev`, `build`, `inspect`, and `add`. Add creates
-an ordinary agent once; it does not create an installed Template with its own
-status, update, remove, or export lifecycle. Discovery and Add use
+history. They are not the current command reference. The coordinated OpenClaw
+implementation exposes `templates create`, `validate`, `dev`, `build`, `inspect`,
+and `add`. Add creates an ordinary agent once; it does not create an installed
+Template with its own status, update, remove, or export lifecycle. The cutover
+renames the existing discovery/Add Labs setting to
 `gateway.controlUi.experimental.templates` in Settings → Labs; ClawHub publication
-has no feature-specific deployment flag. See the
-[current CLI guide](https://docs.openclaw.ai/cli/templates) for shipped behavior.
+has no feature-specific deployment flag. These renamed commands and settings
+require the companion OpenClaw and ClawHub implementations; this specification
+change alone does not make them available. The coordinated
+[CLI guide](https://docs.openclaw.ai/cli/templates) documents that implementation.
 
 ## Summary
 
@@ -214,7 +217,7 @@ and `CLAW.md`, in which YAML frontmatter carries the same typed manifest and the
 Markdown body is documentation only. Export emits `CLAW.md`; JSON remains a
 fully supported serialization of the same grouped schema.
 
-Both representations are covered by the existing
+Following the coordinated implementation cutover, discovery and Add use the
 `gateway.controlUi.experimental.templates` Labs setting. `CLAW.md` adds only reader/export format
 adaptation and no schema, lifecycle, provenance, or ownership branch. While the
 RFC remains experimental, maintainers may revise or remove that envelope before
@@ -560,7 +563,7 @@ the new agent to local channels separately.
 
 #### Experimental incubation gate
 
-The current feature is controlled by
+Following the coordinated implementation cutover, the feature is controlled by
 `gateway.controlUi.experimental.templates` in **Settings → Labs**. Discovery
 and Add require that setting; local authoring, validation, building, and
 inspection do not. No process-level Templates environment flag is registered.

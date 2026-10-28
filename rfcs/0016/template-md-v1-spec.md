@@ -9,16 +9,18 @@ Status: experimental draft, tied to RFC 0016.
 
 ## Incubation Status
 
-The product is named Templates, while `CLAW.md` remains its manifest filename.
-Package metadata selects the manifest through `openclaw.template`. The feature
-is experimental and this is an intentional breaking rename, not a new format
-or a compatibility alias.
+The coordinated cutover names the product Templates, while `CLAW.md` remains
+its manifest filename. New package metadata selects the manifest through
+`openclaw.template`. The feature is experimental and this is an intentional
+breaking rename, not a new format or a compatibility alias.
 
-OpenClaw reads `CLAW.md` and equivalent grouped JSON. Discovery and Add use
+OpenClaw reads `CLAW.md` and equivalent grouped JSON. Following the companion
+implementation cutover, discovery and Add use
 `gateway.controlUi.experimental.templates` in Settings → Labs; local authoring
-and inspection do not require that setting. There is no format-specific flag.
-The RFC's original lifecycle proposal is historical; use the
-[current CLI guide](https://docs.openclaw.ai/cli/templates) for current commands.
+and inspection do not require that setting. This spec change alone does not
+register renamed commands or settings. There is no format-specific flag.
+The RFC's original lifecycle proposal is historical; the coordinated
+[CLI guide](https://docs.openclaw.ai/cli/templates) documents implemented commands.
 
 ## Scope
 
