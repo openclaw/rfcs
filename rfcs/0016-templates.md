@@ -1,33 +1,50 @@
 ---
-title: Claws
+title: Templates
 authors:
   - Gio
 created: 2026-07-03
-last_updated: 2026-07-19
+last_updated: 2026-10-27
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/27
 ---
 
-# Proposal: Claws
+# Proposal: Templates
+
+## Current terminology and implementation
+
+The product is named **Templates**; one reusable agent definition is a
+**Template**. The manifest filename remains `CLAW.md`. New package metadata
+selects that file through `openclaw.template`. This is an intentional breaking
+rename of the unused experimental feature, not a second package format or a
+compatibility alias.
+
+The lifecycle sections below retain the original draft proposal and implementation
+history. They are not the current command reference. Current OpenClaw exposes
+`templates create`, `validate`, `dev`, `build`, `inspect`, and `add`. Add creates
+an ordinary agent once; it does not create an installed Template with its own
+status, update, remove, or export lifecycle. Discovery and Add use
+`gateway.controlUi.experimental.templates` in Settings → Labs; ClawHub publication
+has no feature-specific deployment flag. See the
+[current CLI guide](https://docs.openclaw.ai/cli/templates) for shipped behavior.
 
 ## Summary
 
-Define a **Claw** as a distributable definition of one complete OpenClaw agent
-for one job. Adding a Claw creates a new local agent, creates that agent's
+Define a **Template** as a distributable definition of one complete OpenClaw agent
+for one job. Adding a Template creates a new local agent, creates that agent's
 workspace, installs its skills and plugin dependencies, configures declared MCP
 servers, creates agent-pinned scheduled work, and records provenance for the
 complete installed agent.
 
 The central invariant is:
 
-> One Claw package adds one new agent for one job. It does not merge into,
+> One Template package adds one new agent for one job. It does not merge into,
 > replace, or silently update an agent the operator already built.
 
-Claws compose existing OpenClaw primitives. Skills remain skills, plugins remain
+Templates compose existing OpenClaw primitives. Skills remain skills, plugins remain
 plugins, MCP servers remain top-level OpenClaw MCP configuration, heartbeat
 remains agent configuration, and cron jobs remain Gateway scheduler records.
-The Claw owns their composition and lifecycle for the new agent; it does not
+The Template owns their composition and lifecycle for the new agent; it does not
 replace the underlying owner surfaces.
 
 The public lifecycle is `add`, `status`, `update`, `remove`, and `export`.
@@ -36,13 +53,13 @@ The public lifecycle is `add`, `status`, `update`, `remove`, and `export`.
 
 ## Motivation
 
-A useful Claw should feel like adding a purpose-built employee to OpenClaw. For
+A useful Template should feel like adding a purpose-built employee to OpenClaw. For
 example, adding `@acme/github-triage` creates a GitHub triage agent with its own
 workspace, instructions, skills, tools, MCP dependency, heartbeat behavior, and
 scheduled triage job. It does not rewrite the default agent or borrow an
 unrelated workspace.
 
-Adding a Claw always plans the following owned resources:
+Adding a Template always plans the following owned resources:
 
 1. One new `agents.list[]` entry.
 2. One new workspace assigned to that agent.
@@ -52,7 +69,7 @@ Adding a Claw always plans the following owned resources:
 6. Declared cron jobs stored in the Gateway scheduler and pinned to the new
    agent id.
 7. Provenance connecting every created or referenced resource to the installed
-   Claw and local agent.
+   Template and local agent.
 
 The manifest's `agent.id` supplies the default local agent id. If that id or its
 default workspace already exists, `add` fails closed. A user may explicitly
@@ -63,7 +80,7 @@ adopting or merging into an existing agent or managed workspace.
 ## Goals
 
 - Make a complete job-specific agent distributable as plain, reviewable data.
-- Preserve the one-Claw-one-new-agent invariant across CLI, schema, provenance,
+- Preserve the one-Template-one-new-agent invariant across CLI, schema, provenance,
   updates, removal, export, feeds, and future UI.
 - Keep individual skill and plugin packages on their existing install and
   safety paths.
@@ -80,7 +97,7 @@ adopting or merging into an existing agent or managed workspace.
 - Reuse RFC 0009 feeds for discovery, curation, approval, blocking, and exact
   source resolution of plugin and skill packages without turning MCP server
   declarations into catalog entries.
-- Keep Claw processing out of the per-turn Gateway hot path.
+- Keep Template processing out of the per-turn Gateway hot path.
 
 ## Non-goals
 
@@ -113,37 +130,37 @@ principles.
 
 | Principle | Requirement |
 | --- | --- |
-| Unit of ownership | One Claw describes exactly one new agent and its owned setup. |
+| Unit of ownership | One Template describes exactly one new agent and its owned setup. |
 | Existing agents | `add` never merges into or updates an existing agent. Agent-id and workspace collisions fail closed. |
-| Lifecycle verb | The creation operation is `claws add`; `install` remains an artifact-level operation. |
+| Lifecycle verb | The creation operation is `templates add`; `install` remains an artifact-level operation. |
 | Public schema | The manifest uses grouped `agent`, `workspace`, `packages`, `mcpServers`, and `cronJobs` fields rather than a generic flat entry list. |
-| Completeness | Every declared component is part of the Claw. Unsupported, blocked, or invalid components block `add`; there is no optional `required` flag. |
+| Completeness | Every declared component is part of the Template. Unsupported, blocked, or invalid components block `add`; there is no optional `required` flag. |
 | Package identity | Package name and version come from the enclosing package metadata and authenticated publish operation, following the ClawHub plugin precedent. |
-| Operator control | Models, providers, credentials, channel bindings, and local runtime defaults are not portable Claw settings. |
+| Operator control | Models, providers, credentials, channel bindings, and local runtime defaults are not portable Template settings. |
 | Agent configuration | Only explicitly supported portable job settings can be copied into the new `agents.list[]` entry. |
-| Skills | Skill packages install into the new agent's workspace and are discovered normally; the Claw does not set `agent.skills`. |
+| Skills | Skill packages install into the new agent's workspace and are discovered normally; the Template does not set `agent.skills`. |
 | Plugins | Plugin packages use existing plugin installers, safety checks, enablement rules, and install records. |
-| Discovery and composition | Hosted feeds discover and govern plugin and skill packages; a Claw composes exact resolved package versions and direct MCP declarations rather than defining another catalog. |
-| MCP | Portable stdio and remote MCP declarations map to top-level `mcp.servers`; credentials and completed OAuth state remain local and are not persisted in the manifest or Claw provenance. |
+| Discovery and composition | Hosted feeds discover and govern plugin and skill packages; a Template composes exact resolved package versions and direct MCP declarations rather than defining another catalog. |
+| MCP | Portable stdio and remote MCP declarations map to top-level `mcp.servers`; credentials and completed OAuth state remain local and are not persisted in the manifest or Template provenance. |
 | Scheduled work | Heartbeat is agent behavior; exact schedules are Gateway cron jobs pinned to the new agent id. |
 | Mutation | `add --dry-run` is read-only. Mutating add requires explicit consent. |
-| Provenance | OpenClaw records the installed Claw, local agent id, workspace, package refs, MCP refs, cron refs, and managed-file hashes in shared state. |
-| Removal | `remove` deletes only Claw-owned state after drift checks and preserves local edits and independently owned artifacts. |
+| Provenance | OpenClaw records the installed Template, local agent id, workspace, package refs, MCP refs, cron refs, and managed-file hashes in shared state. |
+| Removal | `remove` deletes only Template-owned state after drift checks and preserves local edits and independently owned artifacts. |
 
 ### Managed and referenced resources
 
-Claws use one ownership model across every capability. A resource relationship
+Templates use one ownership model across every capability. A resource relationship
 is either **managed** or **referenced**:
 
-- A **managed resource** is created specifically for the installed Claw and has
-  an exclusive Claw identity. The Claw lifecycle may reconcile and remove it
+- A **managed resource** is created specifically for the installed Template and has
+  an exclusive Template identity. The Template lifecycle may reconcile and remove it
   after revalidating ownership and drift. The created agent, its workspace
   files, agent-pinned cron jobs, and a newly created collision-free MCP
   declaration are managed resources.
-- A **referenced resource** is a shared resource on which the Claw depends. The
+- A **referenced resource** is a shared resource on which the Template depends. The
   lifecycle records a current dependency edge but does not acquire exclusive
   authority over the resource. Shared package artifacts and plugins are
-  referenced even when Claw add introduced them through their canonical
+  referenced even when Template add introduced them through their canonical
   installer. An identical pre-existing MCP declaration may also be referenced.
 
 The canonical owner identity, not the capability label alone, determines the
@@ -151,7 +168,7 @@ relationship. For example, a skill directory materialized exclusively inside
 the new agent workspace is managed workspace state, while a skill installation
 shared outside that workspace is referenced.
 
-Resource origin (`claw-introduced` or `pre-existing`) is cleanup evidence, not
+Resource origin (`template-introduced` or `pre-existing`) is cleanup evidence, not
 a third ownership mode. Provenance stores current resource identities,
 integrity, dependency edges, and incomplete cleanup state. It does not maintain
 historical reference counts or an operation-history ledger.
@@ -165,12 +182,12 @@ resources while retaining referenced resources by default.
 ### Package and manifest identity
 
 The implementer-facing package contract is captured in
-[`0016/claw-package-v1-spec.md`](0016/claw-package-v1-spec.md). The experimental
+[`0016/template-package-v1-spec.md`](0016/template-package-v1-spec.md). The experimental
 human-readable envelope is captured separately in
-[`0016/claw-md-v1-spec.md`](0016/claw-md-v1-spec.md). This RFC remains the
+[`0016/template-md-v1-spec.md`](0016/template-md-v1-spec.md). This RFC remains the
 product rationale, ownership model, lifecycle, and rollout plan.
 
-A published Claw follows the current ClawHub plugin precedent. Registry identity,
+A published Template follows the current ClawHub plugin precedent. Registry identity,
 version, and publisher ownership come from the enclosing package and the
 authenticated publish operation, not duplicated manifest fields.
 
@@ -182,12 +199,12 @@ Illustrative `package.json`:
   "version": "1.2.0",
   "type": "module",
   "openclaw": {
-    "claw": "openclaw.claw.json"
+    "template": "openclaw.template.json"
   }
 }
 ```
 
-The Claw manifest therefore does not repeat a top-level publisher, package slug,
+The Template manifest therefore does not repeat a top-level publisher, package slug,
 package version, display name, or description. A local unpackaged manifest may
 be inspected during development, but mutating local add must synthesize an
 explicit development identity and record its canonical source path and digest.
@@ -198,7 +215,7 @@ Markdown body is documentation only. Export emits `CLAW.md`; JSON remains a
 fully supported serialization of the same grouped schema.
 
 Both representations are covered by the existing
-`OPENCLAW_EXPERIMENTAL_CLAWS=1` gate. `CLAW.md` adds only reader/export format
+`gateway.controlUi.experimental.templates` Labs setting. `CLAW.md` adds only reader/export format
 adaptation and no schema, lifecycle, provenance, or ownership branch. While the
 RFC remains experimental, maintainers may revise or remove that envelope before
 graduation without creating a separate compatibility promise.
@@ -337,7 +354,7 @@ can include:
 - heartbeat behavior;
 - human-delay behavior.
 
-The following remain operator controlled and are rejected in a Claw manifest:
+The following remain operator controlled and are rejected in a Template manifest:
 
 - model, provider, thinking level, and runtime implementation;
 - API keys, OAuth state, credentials, or secret values;
@@ -429,24 +446,24 @@ does not become an `openclaw.json` field.
 
 ### Workspace semantics
 
-Every added Claw receives a new workspace. By default OpenClaw derives a path
+Every added Template receives a new workspace. By default OpenClaw derives a path
 from the final local agent id, for example
 `~/.openclaw/workspace-github-triage`. The resolved path must not already be an
-existing agent workspace or a Claw-managed workspace.
+existing agent workspace or a Template-managed workspace.
 
 `workspace.bootstrapFiles` names canonical OpenClaw files. The initial keys are
 `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `TOOLS.md`, and `HEARTBEAT.md`. Supporting
 content belongs in `workspace.files` with explicit package-relative source and
 workspace-relative destination paths.
 
-All paths must remain within the unpacked Claw package or the new agent
+All paths must remain within the unpacked Template package or the new agent
 workspace after realpath resolution. Symlink, hardlink, device-file, oversized,
 and traversal escapes fail closed. The dry-run shows each source, destination,
 digest, and action.
 
 Because add always targets a new workspace, v1 does not need general patch or
 merge modes. Any unexpected existing destination is a collision and blocks add.
-Update may replace an unchanged Claw-managed file, but it preserves local edits
+Update may replace an unchanged Template-managed file, but it preserves local edits
 and reports them as manual conflicts.
 
 ### Package semantics
@@ -460,40 +477,40 @@ installers. They are discovered from the workspace normally. Add must not set
 `agents.list[].skills`.
 
 Plugin packages install through existing plugin installers and safety checks.
-Plugin artifacts can be shared with direct user installs or other Claws. Claw
+Plugin artifacts can be shared with direct user installs or other Templates. Template
 provenance is explanation and dependency metadata, not an uninstall lock.
 Shared skill artifacts and plugins are referenced resources even when add
-introduced them. A skill directory materialized exclusively in the Claw's
-workspace is managed as part of that workspace. By default, removing a Claw
+introduced them. A skill directory materialized exclusively in the Template's
+workspace is managed as part of that workspace. By default, removing a Template
 releases dependency edges and retains shared artifacts.
 
 The remove plan must offer explicit cleanup choices for referenced artifacts:
 
-1. `retain` releases only this Claw's dependency edge and is the default.
+1. `retain` releases only this Template's dependency edge and is the default.
 2. `remove-if-unused` invokes the canonical artifact lifecycle only when no
-   other Claw dependency edge or known non-Claw owner remains and the artifact
+   other Template dependency edge or known non-Template owner remains and the artifact
    is complete, unchanged, and unambiguous.
 3. `remove-selected` invokes canonical removal for artifacts explicitly chosen
-   by the operator. It must show every known affected Claw and direct owner and
+   by the operator. It must show every known affected Template and direct owner and
    require stronger confirmation when dependencies remain.
 
 These choices are bound into the integrity-checked remove plan. A failed or
 declined canonical uninstall does not erase the resource's cleanup state.
 Reference discovery belongs to the shared package lifecycle owner used by CLI,
-Gateway, and Control UI uninstall entry points; a Claw command must not bypass
+Gateway, and Control UI uninstall entry points; a Template command must not bypass
 the same warnings by reimplementing removal. A dependency edge is neither a
 hidden refcount lock nor authority to override a confirmed operator uninstall.
 This includes the Control UI plugin-management work in
 [openclaw/openclaw#103176](https://github.com/openclaw/openclaw/pull/103176):
 its install, enablement, disablement, and uninstall controls remain plugin lifecycle
-operations, while Claws contribute references and shared uninstall warnings.
+operations, while Templates contribute references and shared uninstall warnings.
 
-Update installs the exact target package version before advancing Claw
-provenance. Removing a package from a Claw releases only that Claw's reference.
-A global plugin must not be replaced when another installed Claw is pinned to a
+Update installs the exact target package version before advancing Template
+provenance. Removing a package from a Template releases only that Template's reference.
+A global plugin must not be replaced when another installed Template is pinned to a
 different version. Package installers do not currently provide a general
 artifact rollback contract, so a later update failure after installation is
-reported as partial even when Claw reference provenance can be compensated.
+reported as partial even when Template reference provenance can be compensated.
 
 ### MCP server semantics
 
@@ -508,7 +525,7 @@ completed OAuth state.
 
 Server-name collisions fail unless the existing canonical config is identical
 and a referenced dependency edge can be recorded without taking over unrelated
-state. A newly created, collision-free MCP declaration is managed by the Claw;
+state. A newly created, collision-free MCP declaration is managed by the Template;
 an identical pre-existing declaration is referenced. Both cases use the same
 canonical MCP config path, plan preview, capability consent, drift checks, and
 operator-selected cleanup rules as other resources. Environment
@@ -517,7 +534,7 @@ must never be stored in the manifest, plan, logs, or provenance. Provenance uses
 a canonical redacted digest sufficient for drift detection. Remote OAuth and
 other credential completion is an operator-owned local step after add. The
 Control UI may present curated MCP suggestions, but their presentation identity
-is not a Claw package dependency, hosted-feed entry, or provenance key.
+is not a Template package dependency, hosted-feed entry, or provenance key.
 
 ### Heartbeat and cron semantics
 
@@ -529,13 +546,13 @@ Heartbeat and cron jobs are distinct existing OpenClaw concepts:
 
 Every created cron job is pinned to the final local agent id regardless of
 whether the manifest id or `--agent-id` override supplied it. Cron ids must be
-unique within the Claw and must not overwrite existing scheduler records.
+unique within the Template and must not overwrite existing scheduler records.
 Dry-run shows cadence, timezone, session mode, message/action, delivery, and the
 derived `agentId`. Mutating add creates cron jobs only after the agent and
 workspace are ready, and provenance stores stable scheduler ids for status,
 update, disable, and removal.
 
-Channel delivery settings may name portable modes such as `last`, but a Claw
+Channel delivery settings may name portable modes such as `last`, but a Template
 does not embed account ids, group ids, credentials, or bindings. Operators bind
 the new agent to local channels separately.
 
@@ -543,54 +560,28 @@ the new agent to local channels separately.
 
 #### Experimental incubation gate
 
-While this RFC remains draft, every Claws CLI surface is gated behind the
-process-level opt-in `OPENCLAW_EXPERIMENTAL_CLAWS=1`.
+The current feature is controlled by
+`gateway.controlUi.experimental.templates` in **Settings → Labs**. Discovery
+and Add require that setting; local authoring, validation, building, and
+inspection do not. No process-level Templates environment flag is registered.
+The setting is not publication or capability consent.
 
-When the gate is absent or false:
-
-- OpenClaw does not register the `claws` command;
-- Claws do not appear in default help, shell completions, or onboarding;
-- no background service, update flow, or Gateway startup path reads or applies
-  Claw state;
-- encountering Claw package metadata through an ordinary install path does not
-  implicitly enable the experiment.
-
-The hosted experimental guide is intentionally public and may appear in the
-documentation navigation while the local command is disabled. Static hosted
-documentation cannot observe a process environment variable, so it labels the
-feature experimental and shows the opt-in explicitly. Public documentation is
-not a stability promise and does not enable any local runtime surface.
-
-The gate is intentionally an environment opt-in rather than a persisted config
-field. Internal launchers, test lanes, and controlled deployments can enable it
-for a process, but users do not acquire a durable experimental setting that is
-silently carried into later releases or fleet config.
-
-When enabled, text-mode commands print a concise experimental compatibility
-warning before mutation, and machine-readable results include
-`stability: "experimental"` plus their exact output schema version. During the
-draft period, the manifest schema, CLI flags, JSON result shapes, and SQLite
-tables may change without backward-compatibility guarantees. Destructive
-commands still require their normal explicit consent; the experimental gate is
-not consent and does not weaken any safety check.
-
-Removing the gate is a separate maintainer decision after this RFC is accepted.
-That graduation PR must define released migration behavior, stable CLI and JSON
-contracts, documentation, and compatibility policy. Shipping experimental code
-does not itself establish those contracts.
+The following lifecycle command examples describe the original proposal, not
+commands promised by the current implementation. Use the current CLI guide
+linked above for executable commands.
 
 The public CLI is:
 
 ```bash
-openclaw claws inspect <source>
-openclaw claws add <source> --dry-run --json
-openclaw claws add <source> [--agent-id <id>] [--workspace <path>] --yes --plan-integrity <digest>
-openclaw claws status [claw-or-agent]
-openclaw claws update <claw-or-agent> [--from <source>] --dry-run --json
-openclaw claws update <claw-or-agent> [--from <source>] --yes --plan-integrity <digest>
-openclaw claws remove <claw-or-agent> --dry-run --json [cleanup selection]
-openclaw claws remove <claw-or-agent> --yes --plan-integrity <digest> [cleanup selection]
-openclaw claws export <agent> --out <path>
+openclaw templates inspect <source>
+openclaw templates add <source> --dry-run --json
+openclaw templates add <source> [--agent-id <id>] [--workspace <path>] --yes --plan-integrity <digest>
+openclaw templates status [template-or-agent]
+openclaw templates update <template-or-agent> [--from <source>] --dry-run --json
+openclaw templates update <template-or-agent> [--from <source>] --yes --plan-integrity <digest>
+openclaw templates remove <template-or-agent> --dry-run --json [cleanup selection]
+openclaw templates remove <template-or-agent> --yes --plan-integrity <digest> [cleanup selection]
+openclaw templates export <agent> --out <path>
 ```
 
 `inspect` validates package metadata and the grouped manifest without reading or
@@ -626,7 +617,7 @@ adds; it never reports a partial agent as successfully added.
 
 ### Provenance and local state
 
-Claw lifecycle state belongs in OpenClaw's shared SQLite state database, not in
+Template lifecycle state belongs in OpenClaw's shared SQLite state database, not in
 the user config file and not only in marker files inside the workspace.
 
 The installed record must include:
@@ -649,12 +640,12 @@ jobs, and orphaned partial state.
 
 ### Update, remove, and export
 
-Update always targets the installed agent created by the Claw. It never changes
+Update always targets the installed agent created by the Template. It never changes
 another agent merely because a target manifest now uses the same id. Update has
 a read-only plan and a separately consented apply.
 
 Update may add or change portable agent fields, files, package dependencies, MCP
-servers, and cron jobs owned by the installed Claw. Local modifications become
+servers, and cron jobs owned by the installed Template. Local modifications become
 manual conflicts. Operator defaults, models, providers, credentials, bindings,
 and unrelated config remain untouched.
 
@@ -674,19 +665,19 @@ uncertain commit outcome, and an installed package artifact cannot be assumed
 rolled back merely because its reference was restored. Pending owner provenance
 and a partial root status are retained in these cases so status, doctor, and a
 retry can reconcile the actual state rather than claiming cross-owner atomicity.
-Removing a package declaration during update releases the Claw dependency edge;
+Removing a package declaration during update releases the Template dependency edge;
 artifact uninstall is a separately planned remove operation, never an update
 side effect.
 
 Remove first produces a plan. Managed resources are selected for cleanup by
-default: it removes agent-pinned cron jobs, unchanged Claw-managed MCP
-declarations and workspace files, and the Claw-created agent through their
+default: it removes agent-pinned cron jobs, unchanged Template-managed MCP
+declarations and workspace files, and the Template-created agent through their
 canonical owner lifecycles. Referenced packages and MCP declarations are
 retained by default while their dependency edges are released. The operator may
 instead select eligible referenced resources for `remove-if-unused`, or select
 specific referenced resources for canonical removal after reviewing dependency
 warnings. Locally modified files, unrelated MCP servers, channel bindings, and
-operator state remain outside Claw cleanup. Failed cleanup remains visible in
+operator state remain outside Template cleanup. Failed cleanup remains visible in
 status and doctor.
 
 Export is agent-centric. It exports only portable state belonging to the chosen
@@ -701,18 +692,18 @@ manifest.
 ### Feeds, catalogs, and ClawHub
 
 RFC 0009 feeds remain the conceptual discovery and policy layer. A feed may
-expose a Claw package, pin an exact version, recommend or block it, and
-independently block or substitute package dependencies. Approval of the Claw
-does not transitively approve its skills or plugins. While Claws are
-experimental, ClawHub uses a separate gated Claw feed parser, serializer, feed
-id, and route rather than adding `type: "claw"` to RFC 0009's stable plugin and
+expose a Template package, pin an exact version, recommend or block it, and
+independently block or substitute package dependencies. Approval of the Template
+does not transitively approve its skills or plugins. While Templates are
+experimental, ClawHub uses a separate gated Template feed parser, serializer, feed
+id, and route rather than adding `type: "template"` to RFC 0009's stable plugin and
 skill feed schema version 1.
 
 That feed boundary is intentionally narrower than the complete Control UI
 experience. Hosted feeds currently provide official plugin and skill catalog
 entries. Installed MCP servers come from local `mcp.servers`, while the Control
 UI's suggested MCP connectors are a separately curated presentation surface.
-Claws use the first mechanism to resolve exact plugin and skill package inputs,
+Templates use the first mechanism to resolve exact plugin and skill package inputs,
 and use direct portable MCP declarations for the second kind of capability.
 They do not create a third connector registry or infer a stable connector
 identity from a UI suggestion.
@@ -748,17 +739,17 @@ must share the schema and fixtures rather than maintain divergent validators.
   well as ordinary content reconciliation. Other hosts may require a separate
   dialog or aggregate those records before mutating multiple agents.
 - ClawHub trust warnings and resolved dependency identity are part of the
-  separately disclosed capability effect and plan integrity. The Claw CLI's
+  separately disclosed capability effect and plan integrity. The Template CLI's
   exact plan confirmation may acknowledge that warning; an internal
   `acknowledge` parameter must not make the warning disappear from preview.
-- Claws do not introduce capability-specific resource quotas. Existing
-  canonical owner limits apply. Claw manifests are limited to 1 MiB and package
+- Templates do not introduce capability-specific resource quotas. Existing
+  canonical owner limits apply. Template manifests are limited to 1 MiB and package
   metadata to 256 KiB; extraction, managed workspace, and plan limits remain
   parser and resource-safety policy.
 
 ## Rationale
 
-The one-Claw-one-new-agent model gives the lifecycle one understandable unit of
+The one-Template-one-new-agent model gives the lifecycle one understandable unit of
 ownership while continuing to delegate files, packages, MCP configuration, and
 scheduled work to their existing OpenClaw owners. Grouped schema fields make
 those boundaries reviewable; plan-first mutation, provenance, and conservative
@@ -769,11 +760,11 @@ experimental gate rather than promising cross-owner atomicity.
 
 ## Compatibility and migration
 
-Claws are additive. Existing agents, skills, plugins, MCP servers, cron jobs,
-feeds, and plugin bundles continue to work without becoming Claws.
+Templates are additive. Existing agents, skills, plugins, MCP servers, cron jobs,
+feeds, and plugin bundles continue to work without becoming Templates.
 
-The earlier prototype used `openclaw.claw.v1`, a flat `entries[]` list, and
-`claws apply` against a caller-selected workspace. That prototype is not the
+The earlier prototype used the historical identifier `openclaw.claw.v1`, a flat
+`entries[]` list, and the historical command `claws apply` against a caller-selected workspace. That prototype is not the
 accepted public compatibility contract. Before any implementation PR is made
 ready, it must be restacked around the grouped schema and one-new-agent
 invariant. Prototype SQLite tables may be discarded or migrated during the
@@ -793,14 +784,14 @@ Implementation should widen the trust boundary in reviewable slices:
    managed hashes, partial-failure provenance, and local-edit protection.
 4. **Skill and plugin packages.** Reuse existing installers, install skills into
    the new workspace, preserve artifact ownership boundaries, and warn on direct
-   uninstall when Claws reference an artifact.
+   uninstall when Templates reference an artifact.
 5. **MCP servers.** Add validated top-level MCP configuration, collision checks,
    redacted digest provenance, status, and cleanup.
 6. **Heartbeat and cron jobs.** Apply portable heartbeat config and create
    scheduler records pinned to the new agent id with status/disable/remove proof.
 7. **Status, doctor, and remove.** Diagnose complete and partial agents, drift,
    orphaned resources, and conservative cleanup.
-8. **Update planning and apply.** Reconcile only the installed Claw-owned agent
+8. **Update planning and apply.** Reconcile only the installed Template-owned agent
    and resources, separating read-only planning from consented mutation.
 9. **Export and round trip.** Export a selected agent to package metadata,
    grouped manifest, and safe sidecars; prove export-to-add in a fresh state dir.
@@ -849,8 +840,8 @@ the guide must describe no later command or ownership behavior.
 
 These PRs replace the old workspace-apply prototype rather than
 extending its compatibility contract. Every experimental CLI PR remains behind
-`OPENCLAW_EXPERIMENTAL_CLAWS=1`; command registration, help, completion, and
-direct-handler tests must prove the disabled state as well as the enabled state.
+`gateway.controlUi.experimental.templates`; tests must prove discovery and Add
+are unavailable when disabled, while local authoring and inspection remain available.
 
 ### Current ClawHub implementation stack
 
@@ -858,20 +849,20 @@ ClawHub follows the OpenClaw schema and lifecycle contract in four ordered PRs:
 
 1. [#3089](https://github.com/openclaw/clawhub/pull/3089) - shared manifest
    validation, derived summaries, and storage data model. Existing generic
-   publication remains closed to Claws.
+   publication remains closed to Templates.
 2. [#3090](https://github.com/openclaw/clawhub/pull/3090) - guarded publication,
    package ingestion, source-file checks, CLI authoring support, and author
    guidance. It also owns the fail-closed public-read boundary while disabled
    and strips full manifests from every public release serializer. Publication
    retains the exact immutable artifact bytes and bounded summary, validates
    every package path, requires exact manifest/source spelling, applies strict
-   UTF-8 and pre-parse size limits, and accepts Claw npm packs without requiring
+   UTF-8 and pre-parse size limits, and accepts Template npm packs without requiring
    a plugin manifest.
 3. [#3091](https://github.com/openclaw/clawhub/pull/3091) - enabled search,
    detail, and version APIs that expose only the latest or requested release's
    bounded summary.
 4. [#3092](https://github.com/openclaw/clawhub/pull/3092) - separately gated
-   hosted Claw feed with its own experimental wire contract, safe summaries,
+   hosted Template feed with its own experimental wire contract, safe summaries,
    and exact artifact digests, plus a repeatable published-package proof through
    real OpenClaw add dry-run. The versioned route is gated before publication
    lookup and has no ungated unversioned redirect. The proof bounds download,
@@ -880,30 +871,26 @@ ClawHub follows the OpenClaw schema and lifecycle contract in four ordered PRs:
    ZIP package roots.
 
 The #3092 proof is a registry-to-OpenClaw bridge: it selects an exact candidate
-from the experimental Claw feed, verifies and extracts the artifact, then hands
+from the experimental Template feed, verifies and extracts the artifact, then hands
 the package directory to OpenClaw. It proves that the published package produces
-a real non-mutating OpenClaw plan; native OpenClaw Claw-feed resolution remains
+a real non-mutating OpenClaw plan; native OpenClaw Template-feed resolution remains
 a separate dependent integration.
 
-The ClawHub runtime surfaces in this track require
-`CLAWHUB_EXPERIMENTAL_CLAWS=1`. The deployment gate is independent of
-`OPENCLAW_EXPERIMENTAL_CLAWS=1` in the OpenClaw client and is not a replacement
-for explicit add/update consent.
-
-The experimental ClawHub contract accepts both `CLAW.md` and the equivalent
-grouped JSON manifest behind `CLAWHUB_EXPERIMENTAL_CLAWS=1`; it does not add a
-second format-specific gate. Search, detail, and feed APIs expose bounded
-summaries and immutable artifact coordinates; the applying client reviews the
-full declaration from the resolved artifact.
+ClawHub publication uses the ordinary authenticated package pipeline, with no
+feature-specific deployment flag. OpenClaw's local Labs setting is separate
+from that registry pipeline and does not replace explicit capability consent.
+Both `CLAW.md` and grouped JSON use the same strict manifest schema. Search,
+detail, and feed APIs expose bounded summaries and immutable artifact coordinates;
+the applying client reviews the full declaration from the resolved artifact.
 
 ## Acceptance criteria
 
 The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 
 1. Inspect validates package identity and the grouped manifest without mutation.
-2. Without `OPENCLAW_EXPERIMENTAL_CLAWS=1`, the `claws` command is unregistered,
-   absent from help and completions, and cannot be enabled by package content;
-   the public experimental guide remains non-executable documentation.
+2. Without the Templates Labs setting, discovery and Add are unavailable and
+   cannot be enabled by package content. Local authoring, building, validation,
+   and inspection remain available.
 3. Add dry-run shows one new agent, one new workspace, every file/package/MCP/
    cron action, all collisions, and stable machine-readable blockers.
 4. An existing agent id or workspace blocks add unless an explicit unused
@@ -912,7 +899,7 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 6. Canonical and supporting files are confined to the new workspace.
 7. Skills install into that workspace without setting `agent.skills`.
 8. Plugins use existing safety checks and preserve shared/direct ownership;
-   CLI, Gateway, and Control UI uninstall paths all emit Claw-reference warnings
+   CLI, Gateway, and Control UI uninstall paths all emit Template-reference warnings
    through the shared lifecycle owner.
 9. Portable stdio and remote MCP declarations write only validated top-level
    config, store no secrets or completed OAuth state in provenance, and do not
@@ -920,17 +907,17 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
 10. Cron jobs are scheduler records pinned to the final local agent id.
 11. Any declared unsupported or blocked component fails the complete add.
 12. Partial failures remain visible and cleanable; they are not reported as a
-    successfully added Claw.
+    successfully added Template.
 13. Status and doctor explain agent, workspace, package, MCP, cron, and managed
     file drift.
-14. Update changes only Claw-owned state, preserves local/operator edits,
+14. Update changes only Template-owned state, preserves local/operator edits,
     revalidates owner state before mutation, compensates only safely reversible
     completed owners, retains uncertain provenance, and reports uncertain or
     irreversible outcomes as partial.
 15. Remove uses canonical owner lifecycles, selects managed resources for
     cleanup, retains referenced resources by default, offers integrity-bound
     `remove-if-unused` and explicitly selected referenced cleanup, warns about
-    every known affected Claw or direct owner, and preserves modified or
+    every known affected Template or direct owner, and preserves modified or
     unrelated state.
 16. Export emits `CLAW.md`, excludes secrets and operator runtime settings,
     retains grouped JSON read compatibility, and can be added in a fresh state
@@ -948,16 +935,16 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
   authoring/export representation or should export return to grouped JSON?
 - What exact default workspace naming rule should resolve cross-platform path
   and case-folding collisions?
-- Should ordinary `agents delete` eventually delegate attached-Claw recurring
-  work cleanup, or remain distinct from the provenance-aware `claws remove`
+- Should ordinary `agents delete` eventually delegate attached-Template recurring
+  work cleanup, or remain distinct from the provenance-aware `templates remove`
   lifecycle?
-- Should a future audit/history feature retain removed Claw tombstones? V1 keeps
+- Should a future audit/history feature retain removed Template tombstones? V1 keeps
   current ownership and incomplete recovery state only.
 - Which cron delivery modes are portable without embedding local channel
   bindings?
 - What package transports should mutating v1 support beyond ClawHub and local
   development packages?
-- What is the minimum released SQLite migration contract before Claws leave
+- What is the minimum released SQLite migration contract before Templates leave
   draft status?
 - How should OpenClaw and ClawHub publish and version one shared schema and
   fixture suite?

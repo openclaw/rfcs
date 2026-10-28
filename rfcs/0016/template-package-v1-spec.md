@@ -1,7 +1,7 @@
-# Claw Package v1 Specification
+# Template Package v1 Specification
 
 This document is the implementer-facing package and lifecycle-boundary
-specification for RFC 0016, Claws. It defines how one Claw manifest and its
+specification for RFC 0016, Templates. It defines how one Template manifest and its
 referenced files are identified, validated, published, resolved, and handed to
 an OpenClaw lifecycle implementation.
 
@@ -20,7 +20,7 @@ This specification defines:
 - lifecycle ownership requirements for add, update, status, and remove.
 
 The grouped manifest schema and `CLAW.md` envelope are defined by
-[`claw-md-v1-spec.md`](claw-md-v1-spec.md). Equivalent grouped JSON passes
+[`template-md-v1-spec.md`](template-md-v1-spec.md). Equivalent grouped JSON passes
 through the same validator and lifecycle.
 
 This specification does not define:
@@ -40,15 +40,15 @@ This specification does not define:
   and every package file it references.
 - **Owner**: the existing OpenClaw subsystem authoritative for an agent, file,
   skill, plugin, MCP server, or scheduler record.
-- **Managed resource**: a resource created specifically for one installed Claw
-  with an exclusive identity that the Claw lifecycle may reconcile and remove
+- **Managed resource**: a resource created specifically for one installed Template
+  with an exclusive identity that the Template lifecycle may reconcile and remove
   after ownership and drift checks.
-- **Referenced resource**: a shared canonical resource on which a Claw depends
+- **Referenced resource**: a shared canonical resource on which a Template depends
   without acquiring exclusive lifetime authority.
-- **Dependency edge**: the current relationship between an installed Claw and
+- **Dependency edge**: the current relationship between an installed Template and
   a referenced resource. It is warning and cleanup evidence, not an uninstall
   lock or historical reference count.
-- **Resource origin**: whether Claw add introduced a canonical resource or
+- **Resource origin**: whether Template add introduced a canonical resource or
   declaration or found it already present. Origin informs cleanup eligibility
   but is not ownership.
 - **Applied**: every consented mutation completed or an existing canonical owner
@@ -60,7 +60,7 @@ This specification does not define:
 
 ## Package Model
 
-A Claw package is a versioned, immutable distribution of one complete agent
+A Template package is a versioned, immutable distribution of one complete agent
 definition. It contains:
 
 - package identity in `package.json`;
@@ -85,7 +85,7 @@ The package root must contain a UTF-8 JSON `package.json` with:
   "version": "1.2.0",
   "type": "module",
   "openclaw": {
-    "claw": "CLAW.md"
+    "template": "CLAW.md"
   }
 }
 ```
@@ -94,12 +94,12 @@ The package root must contain a UTF-8 JSON `package.json` with:
 | --- | --- | --- |
 | `name` | Yes | Canonical package coordinate assigned by the registry. Display slugs and aliases are not identity. |
 | `version` | Yes | Exact canonical SemVer 2.0.0 version. Tags, ranges, and a leading `v` are forbidden. |
-| `openclaw.claw` | Yes | Package-relative path to the manifest. |
-| `type` | No | Ordinary package metadata; it does not affect Claw parsing. |
+| `openclaw.template` | Yes | Package-relative path to the manifest. |
+| `type` | No | Ordinary package metadata; it does not affect Template parsing. |
 
 Registry identity, version, and publisher ownership come from this package
 metadata and the authenticated publish operation. They must not be duplicated
-as authoritative fields inside the Claw manifest.
+as authoritative fields inside the Template manifest.
 
 At publication, the declared `name` and `version` must exactly match the
 authenticated publish coordinate. A mismatch must reject the publication.
@@ -146,7 +146,7 @@ registries must reject:
 Consumers must apply bounded file-size and aggregate extraction limits. Limits
 are implementation policy and should be documented by the registry or harness;
 exceeding them must fail closed rather than truncate content.
-Claws must not invent per-capability quotas such as a Claw-only scheduler count;
+Templates must not invent per-capability quotas such as a Template-only scheduler count;
 canonical owner limits apply uniformly. General package, manifest, extraction,
 and plan-size limits may protect parsing and resource use across all fields.
 
@@ -158,7 +158,7 @@ extraction.
 
 ## Manifest Selection
 
-`openclaw.claw` selects the one manifest for the package. The path must resolve
+`openclaw.template` selects the one manifest for the package. The path must resolve
 to a regular UTF-8 text file inside the package.
 
 If the selected basename is `CLAW.md`, compared case-insensitively, the consumer
@@ -166,7 +166,7 @@ uses the Markdown-envelope parser. Other selected filenames are parsed as JSON.
 Both forms pass through the same strict schema version 1 validator.
 
 A package must not select behavior from package scripts or another undeclared
-manifest. Installing or inspecting a Claw package must not execute package
+manifest. Installing or inspecting a Template package must not execute package
 lifecycle scripts merely to discover its manifest. The `CLAW.md` body remains
 documentation only.
 
@@ -177,7 +177,7 @@ A conforming registry must validate a publication in this order:
 1. Authenticate the publisher and resolve the requested package coordinate.
 2. Verify that `package.json` identity matches that coordinate exactly.
 3. Safely enumerate and extract the artifact under package size and path limits.
-4. Resolve `openclaw.claw` inside the package root.
+4. Resolve `openclaw.template` inside the package root.
 5. Parse the selected `CLAW.md` or JSON document.
 6. Validate the strict schema version 1 manifest.
 7. Verify that every workspace source exists and is a safe regular file, and
@@ -244,15 +244,15 @@ OpenClaw owns:
 - delegation to skill, plugin, MCP, agent, workspace, and scheduler owners;
 - local provenance, status, diagnostics, update, export, and removal.
 
-Registry approval of a Claw must not transitively approve a skill or plugin
+Registry approval of a Template must not transitively approve a skill or plugin
 dependency. The client must resolve and evaluate every dependency through its
 normal policy and installer path.
 
 During experimentation, a registry must not redefine an already published
-stable plugin/skill feed schema by adding a Claw entry variant under the same
-schema version. It may publish Claws through a separately identified, gated,
+stable plugin/skill feed schema by adding a Template entry variant under the same
+schema version. It may publish Templates through a separately identified, gated,
 and versioned experimental feed contract. A disabled deployment must fail
-closed before reading or serving stored Claw feed state, and an ungated edge
+closed before reading or serving stored Template feed state, and an ungated edge
 redirect must not expose the experimental route indirectly.
 
 Public search and release APIs should expose a bounded, derived summary for
@@ -323,20 +323,20 @@ After consent, the lifecycle delegates resources to their canonical owners and
 records enough shared provenance to explain and reconcile the resulting agent.
 At minimum, provenance must identify:
 
-- Claw package name, version, source, and integrity;
+- Template package name, version, source, and integrity;
 - final local agent id and workspace;
 - the consented plan identity and applied manifest schema version;
 - generated agent configuration digest and owned field paths;
 - managed workspace paths and content digests;
 - exact skill and plugin dependency edges, resource origin
-  (`claw-introduced` or `pre-existing`), and current non-Claw ownership;
+  (`template-introduced` or `pre-existing`), and current non-Template ownership;
 - MCP names, managed or referenced relationship, resource origin, current
-  non-Claw ownership, and redacted configuration digests;
+  non-Template ownership, and redacted configuration digests;
 - manifest cron ids and scheduler record ids;
 - per-owner pending, complete, partial, failed, and cleanup states;
 - timestamps and actor or caller identity when the host can establish one.
 
-Credentials and resolved environment values must never be persisted in Claw
+Credentials and resolved environment values must never be persisted in Template
 provenance.
 
 Provenance explains ownership and dependency relationships. It is not an
@@ -402,10 +402,10 @@ concurrent changes become conflicts rather than silent overwrites.
 
 An update plan must classify each resource as create, change, remove, retain,
 requires-local-configuration, or conflict. It must preserve unrelated owner
-state and must not replace a global plugin while another installed Claw or a
+state and must not replace a global plugin while another installed Template or a
 direct owner requires a different version.
 
-Removing a package declaration during update releases that Claw's reference.
+Removing a package declaration during update releases that Template's reference.
 It does not imply artifact uninstall during the update transaction. Irreversible
 or uncertain owner outcomes must be retained in current provenance and reported
 as `status: partial`, including in structured CLI output.
@@ -417,7 +417,7 @@ deleted.
 
 ## Resource Limits
 
-A consumer must reject a Claw manifest larger than 1 MiB and package metadata
+A consumer must reject a Template manifest larger than 1 MiB and package metadata
 larger than 256 KiB before parsing. Reads must remain bounded if a file grows
 after an initial metadata check. Existing canonical extraction, workspace-file,
 aggregate-workspace, and plan-output limits continue to apply.
@@ -428,26 +428,26 @@ Remove must first produce a plan and then require explicit consent. It must
 delegate agent, skill, plugin, MCP, workspace, and scheduler cleanup to their
 canonical owner lifecycles.
 
-Remove must disable Claw-owned recurring work before deleting the agent or its
+Remove must disable Template-owned recurring work before deleting the agent or its
 workspace content. If recurring work cannot be proven disabled, cleanup is
 partial and the failure remains visible; remove must not claim success merely
 because later local records were deleted.
 
 Managed resources are selected for cleanup by default. Referenced resources are
-retained by default while the removing Claw's dependency edges are released.
+retained by default while the removing Template's dependency edges are released.
 The plan must show the relationship, origin, expected integrity, every other
-known Claw dependency edge, known non-Claw ownership, and the canonical cleanup
+known Template dependency edge, known non-Template ownership, and the canonical cleanup
 owner for each resource.
 
 The operator must be offered these referenced-resource dispositions:
 
-- **retain**: release only this Claw's dependency edge. This is the default.
+- **retain**: release only this Template's dependency edge. This is the default.
 - **remove-if-unused**: invoke canonical removal only when the resource has no
-  other Claw dependency edge or known non-Claw owner, was introduced by Claw
+  other Template dependency edge or known non-Template owner, was introduced by Template
   add, is complete, unchanged, and unambiguous, and its canonical owner permits
   removal.
 - **remove-selected**: invoke canonical removal for specifically selected
-  resources after showing all known affected Claws and non-Claw owners. A
+  resources after showing all known affected Templates and non-Template owners. A
   remaining dependency or pre-existing origin requires stronger explicit
   confirmation but is not a hidden uninstall lock.
 
@@ -455,26 +455,26 @@ The chosen disposition and affected resource identities must be part of the
 integrity-bound remove plan. Non-interactive mutation must identify its cleanup
 mode explicitly; it must not broaden default `retain` behavior merely because a
 general `--yes` flag is present. Referenced cleanup runs after managed-resource
-cleanup so failure cannot damage a still-live Claw agent.
+cleanup so failure cannot damage a still-live Template agent.
 
-If an operator explicitly uninstalls an artifact despite a Claw-reference
-warning, canonical uninstall semantics win. The Claw becomes degraded and
-status must report the missing dependency. Claw status or remove must not
+If an operator explicitly uninstalls an artifact despite a Template-reference
+warning, canonical uninstall semantics win. The Template becomes degraded and
+status must report the missing dependency. Template status or remove must not
 silently reinstall it.
 
-Resource origin must remain current cleanup evidence while Claw dependency
+Resource origin must remain current cleanup evidence while Template dependency
 edges remain. `remove-if-unused` eligibility is evaluated from resource origin,
-current dependency edges, and canonical owner state, not from which Claw happens
+current dependency edges, and canonical owner state, not from which Template happens
 to be removed last. Removal order must not change the result.
 
 Conversely, a later direct install or explicit operator adoption must add
 independent ownership through the shared package lifecycle. Once independently
-owned, the artifact is retained when no Claw dependency edge remains. A
-Claw lifecycle must not infer that an idempotent direct install conveys no
+owned, the artifact is retained when no Template dependency edge remains. A
+Template lifecycle must not infer that an idempotent direct install conveys no
 ownership merely because the exact artifact was already present.
 
 The same dispositions apply to referenced MCP declarations. A newly created
-Claw-managed MCP declaration is removed by default when unchanged; an identical
+Template-managed MCP declaration is removed by default when unchanged; an identical
 pre-existing MCP declaration is referenced and retained by default. Remove must
 preserve locally modified files, unrelated MCP declarations, channel bindings,
 credentials, operator settings, and any resource whose ownership or expected
@@ -518,7 +518,7 @@ harness may inspect the portable data or implement that complete profile, and a
 future specification may define additional harness profiles. A consumer must
 not claim v1 application conformance if it drops, translates approximately, or
 cannot own a declared component. It may inspect such a package, but add must
-fail the complete plan rather than silently degrade the Claw.
+fail the complete plan rather than silently degrade the Template.
 
 ## Registry Conformance
 
@@ -533,7 +533,7 @@ A conforming registry must:
   requiring a second full-manifest copy in registry metadata;
 - allow authorized clients to retrieve the exact artifact for local manifest
   review;
-- never imply that Claw approval bypasses dependency policy.
+- never imply that Template approval bypasses dependency policy.
 
 ## Client Conformance
 

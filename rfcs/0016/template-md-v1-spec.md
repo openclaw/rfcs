@@ -1,30 +1,30 @@
 # CLAW.md v1 Specification
 
 This document is the implementer-facing manifest specification for RFC 0016,
-Claws. The RFC explains the product model, ownership boundaries, lifecycle, and
+Templates. The RFC explains the product model, ownership boundaries, lifecycle, and
 rollout plan. This file defines the schema version 1 data contract shared by
-OpenClaw and Claw registries and its human-readable `CLAW.md` envelope.
+OpenClaw and Template registries and its human-readable `CLAW.md` envelope.
 
 Status: experimental draft, tied to RFC 0016.
 
 ## Incubation Status
 
-The experimental implementation reads `CLAW.md` and equivalent grouped JSON,
-and exports `CLAW.md`. Both forms use the existing
-`OPENCLAW_EXPERIMENTAL_CLAWS=1` gate; there is no format-specific flag.
+The product is named Templates, while `CLAW.md` remains its manifest filename.
+Package metadata selects the manifest through `openclaw.template`. The feature
+is experimental and this is an intentional breaking rename, not a new format
+or a compatibility alias.
 
-`CLAW.md` is intentionally a thin serialization layer over the grouped schema.
-It does not define separate lifecycle, ownership, provenance, or capability
-semantics and introduces no new runtime dependency. Until the Claws gate is
-removed, maintainers may revise or remove this envelope without preserving it
-as a stable compatibility contract. Feedback remains welcome on the YAML
-frontmatter boundary, Markdown-body role, portability, and authoring ergonomics.
+OpenClaw reads `CLAW.md` and equivalent grouped JSON. Discovery and Add use
+`gateway.controlUi.experimental.templates` in Settings → Labs; local authoring
+and inspection do not require that setting. There is no format-specific flag.
+The RFC's original lifecycle proposal is historical; use the
+[current CLI guide](https://docs.openclaw.ai/cli/templates) for current commands.
 
 ## Scope
 
 This specification defines:
 
-- how a `CLAW.md` document carries a machine-readable Claw manifest;
+- how a `CLAW.md` document carries a machine-readable Template manifest;
 - the equivalent JSON representation;
 - the grouped schema version 1 fields;
 - strict parsing, defaults, and rejection behavior;
@@ -41,7 +41,7 @@ This specification does not define:
 - a generic harness-neutral runtime API.
 
 The enclosing package contract is defined by
-[`claw-package-v1-spec.md`](claw-package-v1-spec.md).
+[`template-package-v1-spec.md`](template-package-v1-spec.md).
 
 ## Design Goals
 
@@ -76,7 +76,7 @@ agent:
 
 # GitHub Triage
 
-This Claw creates an agent that triages GitHub issues.
+This Template creates an agent that triages GitHub issues.
 ```
 
 The following rules apply:
@@ -275,7 +275,7 @@ version; a floating tag or range blocks the plan.
 Environment keys must match `[A-Za-z_][A-Za-z0-9_]*`. Each value must match
 `${[A-Z_][A-Z0-9_]*}` exactly. Literal secret values are forbidden. The applying
 client must evaluate keys through its canonical spawned-process environment
-safety policy; a blocked key blocks the Claw plan rather than being silently
+safety policy; a blocked key blocks the Template plan rather than being silently
 dropped.
 
 A remote server requires a URL and `transport` equal to `sse` or
@@ -303,7 +303,7 @@ not embedded credentials. Dry-run must list their names and affected server
 without resolving or printing secret values. Add may complete after safely
 writing the declaration, but status must report the server as `requires-local-
 configuration` until every required environment value exists and OAuth login,
-when declared, is complete. An applied Claw is not necessarily ready to run.
+when declared, is complete. An applied Template is not necessarily ready to run.
 
 ## Cron Jobs
 
@@ -388,7 +388,7 @@ Adds one GitHub triage agent and the reviewed resources it needs.
 
 ## JSON Compatibility
 
-The package contract may point `openclaw.claw` at a JSON file containing the
+The package contract may point `openclaw.template` at a JSON file containing the
 grouped top-level object. JSON input passes through the same strict schema,
 defaults, diagnostics, and lifecycle. `CLAW.md` and JSON are two serializations
 of the same schema version, not different capability levels.
@@ -415,7 +415,7 @@ parsing or schema validation fails.
 
 Diagnostics are not an extension mechanism. A warning must not permit a
 consumer to ignore an unknown field, unsupported component, unsafe path, or
-missing required package source and still call the Claw valid.
+missing required package source and still call the Template valid.
 
 ## Consumer Conformance
 
