@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "live",
+  "completedAt": "2026-09-12T03:35:29.203Z",
+  "result": "pass",
+  "source": {
+    "repository": "consenlabs/sigil",
+    "commit": "bfe6ec0396bc73772b2aed85de35a0ac35278a3d",
+    "path": "docs/superpowers/evidence/2026-09-12-butter-grouped-standing-live-drill.json"
+  },
+  "observations": {
+    "negativeControl": {
+      "status": "timed-out",
+      "authorizationReceiptCreated": false,
+      "ledgerDecisionCreated": false,
+      "processStarted": false,
+      "result": "fail-closed"
+    },
+    "standingGrant": {
+      "runClasses": ["scheduled"],
+      "realOwnerWalletSignature": true,
+      "successfulOccurrenceCount": 4,
+      "distinctOccurrenceCount": 4,
+      "distinctExecutionDigestCount": 4,
+      "subsequentPromptlessReuseCount": 3
+    },
+    "allColdSignaturesVerified": true,
+    "allColdSignersMatchedCurrentBinding": true,
+    "allLedgerAndHostReceiptsCorrelated": true,
+    "allProofReferencesIndependentlyRecomputed": true,
+    "allExecutionDigestsMatchedReceipts": true,
+    "ledgerBeforeAuthorizationReceiptBeforeProcessFinish": true,
+    "hostReceiptsStoredRawProof": false,
+    "standingGrantDurablyRevoked": true,
+    "matchingGrantCountAfterRevoke": 0,
+    "freshProcessGrantCountAfterGatewayRestart": 0,
+    "gatewayHealthyAfterRestart": true
+  },
+  "redacted": [
+    "wallet address and signature",
+    "account and channel identifiers",
+    "local paths",
+    "request, job, run, occurrence, receipt, and decision identifiers",
+    "raw command and output",
+    "proof and proof-reference values",
+    "private endpoints"
+  ],
+  "coverageLimit": "Automation-specific broad-resolver prototype; not the RFC 0038 host-owned adapter."
+}

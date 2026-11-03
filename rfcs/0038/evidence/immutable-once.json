@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "live",
+  "completedAt": "2026-09-11T00:21:34.711Z",
+  "result": "pass",
+  "source": {
+    "repository": "consenlabs/sigil",
+    "commit": "09223a8542e644cdbb7dee75ccd2d776b226e0af",
+    "path": "docs/superpowers/evidence/2026-09-11-butter-immutable-automation-smoke.json"
+  },
+  "observations": {
+    "realOwnerWalletSignature": true,
+    "coldSignatureVerified": true,
+    "signerMatchedCurrentBinding": true,
+    "publishedSourceBytes": 112,
+    "publishedSourceSha256": "0d5272152e13897d80f600846309c5afda3d0dcbc0050ac81988a3a12c10e014",
+    "provenancePathMutatedAfterPublish": true,
+    "mutatedDiskSourceBytes": 141,
+    "mutatedDiskSourceSha256": "02b4f0728038951ef6fae6ca7ef7898a174c3226b41cfa067bf50b8b35877f18",
+    "mutatedSentinelObservedInOutput": false,
+    "publishedOutputObserved": true,
+    "ledgerAndHostReceiptCorrelated": true,
+    "proofReferenceIndependentlyRecomputed": true,
+    "hostReceiptStoredRawProof": false,
+    "ledgerBeforeAuthorizationReceipt": true,
+    "authorizationReceiptBeforeCommandCompletion": true
+  },
+  "redacted": [
+    "wallet address and signature",
+    "account and channel identifiers",
+    "local paths",
+    "request, job, run, receipt, and decision identifiers",
+    "raw command and output",
+    "proof and proof-reference values",
+    "private endpoints"
+  ],
+  "coverageLimit": "Automation-specific broad-resolver prototype; not the RFC 0038 host-owned adapter."
+}
