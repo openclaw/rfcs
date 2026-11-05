@@ -6,7 +6,7 @@ created: 2026-11-04
 last_updated: 2026-11-05
 status: draft
 issue:
-rfc_pr:
+rfc_pr: https://github.com/openclaw/rfcs/pull/82
 ---
 
 # Proposal: Scoped RBAC for multiplayer OpenClaw
@@ -16,7 +16,7 @@ certification of deployment security. No runtime or permission changes accompany
 this RFC. Source paths below refer to the `openclaw/openclaw` repository.
 
 **Submission metadata:** The implementation `issue` remains empty until acceptance;
-the RFC PR link is filled after publication. Design discussion:
+the RFC PR link identifies this draft PR. Design discussion:
 [openclaw/openclaw#192888](https://github.com/openclaw/openclaw/issues/192888).
 
 ## Summary
