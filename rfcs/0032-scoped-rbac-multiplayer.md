@@ -3,7 +3,7 @@ title: "Scoped RBAC for multiplayer OpenClaw"
 authors:
   - Erick Kinnee
 created: 2026-11-04
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/82
@@ -63,8 +63,14 @@ Example questions the design should answer:
 
 ### Existing foundation
 
-This inventory is based on source revision
-`785e8c67f0d8f3577abe95a488355478e83bf63c`, not an inspection of a live deployment.
+The original inventory was based on source revision
+`785e8c67f0d8f3577abe95a488355478e83bf63c`. The listed role resolver,
+role schema, assignment mutation, method checks, and session-sharing boundaries
+were rechecked in upstream commit `cbe182f49c4cac33f339c03a77b983f3d7a52ccc`
+(OpenClaw 2026.11.1), which the contributor reports as the team server's running
+commit. This is source inspection and a reported deployment version, **not** a
+read of that server's configuration or live authorization test.
+
 See [Operator scopes](https://docs.openclaw.ai/gateway/operator-scopes) and
 [Identity and roles](https://docs.openclaw.ai/start/why-openclaw/identity-and-roles) for current behavior.
 
@@ -78,6 +84,19 @@ See [Operator scopes](https://docs.openclaw.ai/gateway/operator-scopes) and
 | Session resource authority | `src/gateway/session-access-authority.ts`: current access, canonical targets, and retained-authority lifecycle |
 | Role-policy changes | `src/gateway/operator-role-policy.ts`: assignment/configuration notifications and current-role checks |
 | Required external access policy | Gateway access-policy integration, including plugin-held grant authority |
+
+At the rechecked revision, `resolveOperatorRoleSelection` still chooses a *single*
+effective role: explicit profile assignment, verified GitHub-login mapping, then
+default. `GatewayOperatorRoleDefinitionSchema` already has ceilings for other
+people's sessions, scopes, agents, models, workers, and optional required
+sandbox/access policy. `users.setRole` updates the canonical profile and
+invalidates role policy. Existing session sharing distinguishes creator/admin,
+membership, visibility, and incognito restrictions; membership is not an
+independently selectable read-only resource-role binding. The `read-only` and
+`suggest` session visibility modes do not themselves implement the proposed
+per-person read/write grant composition. Method-scope and retained session
+authority checks exist, but do not constitute a unified effective-access
+explanation or proof of the contributor contract below.
 
 Existing role definitions already constrain more than method names. Existing
 session authority and revocation are not missing primitives. This proposal must
@@ -375,7 +394,10 @@ gates, not decisions implicitly approved by this proposal.
 
 Use one repository-session review workflow: an authorized contributor creates a
 task through existing agent admission, grants another admitted person read-only
-access, and removes that grant. Add a write grant only after the same ownership
+access, and removes that grant. Existing membership and session-level read-only
+visibility are partial foundations, not proof of a selectable per-person read
+grant; establish the missing grant semantics through the canonical sharing owner
+before claiming this workflow. Add a write grant only after the same ownership
 and constraint semantics are proven. Provide an effective-access explanation
 from the enforcing evaluator. Validate the direct and agent-mediated paths.
 
