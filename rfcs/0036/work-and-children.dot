@@ -1,0 +1,57 @@
+digraph RootWork {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad=0.20,
+    nodesep=0.36,
+    ranksep=0.55,
+    splines=polyline,
+    outputorder=edgesfirst,
+    fontname="DejaVu Sans"
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    color="#9CAAB1",
+    fillcolor="#F4F7F8",
+    fontcolor="#21343C",
+    fontname="DejaVu Sans",
+    fontsize=17,
+    margin="0.18,0.13",
+    penwidth=1.2
+  ];
+  edge [
+    color="#516A76",
+    fontcolor="#405762",
+    fontname="DejaVu Sans",
+    fontsize=12,
+    arrowsize=0.7,
+    penwidth=1.3
+  ];
+
+  requester [label="Allowed requester"];
+  result [label="Review result"];
+
+  subgraph cluster_root {
+    label="Repository reads: one root Work\nShared scope, budget and cancellation";
+    labelloc="t";
+    fontsize=16;
+    fontcolor="#405762";
+    color="#6493B0";
+    fillcolor="#F8FBFD";
+    style="rounded,filled";
+    margin=18;
+
+    work [label="Service-owned\nrepository review", color="#6493B0", fillcolor="#EAF3F8"];
+    helper_a [label="Subordinate helper A", color="#669E96", fillcolor="#EAF6F2"];
+    helper_b [label="Subordinate helper B", color="#669E96", fillcolor="#EAF6F2"];
+
+    { rank=same; helper_a; helper_b; }
+    work -> helper_a [label="same Work context"];
+    work -> helper_b;
+  }
+
+  requester -> work [label="authorized invocation"];
+  helper_a -> result;
+  helper_b -> result;
+}
