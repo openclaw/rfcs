@@ -1,0 +1,12 @@
+digraph RuntimeAccessOverview {
+  graph [rankdir=LR, bgcolor="white", pad="0.18", nodesep="0.28", ranksep="0.38", splines=spline, fontname="Arial", fontsize=11];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=12, fontcolor="#24323B", color="#82949D", penwidth=1.1, margin="0.16,0.12"];
+  edge [fontname="Arial", fontsize=10, fontcolor="#425963", color="#6B818A", penwidth=1.2, arrowsize=0.7];
+
+  reads [label="A: Managed reads\nMetadata, clone, fetch\nMinimal internal Work + operations", fillcolor="#E9F3F1", color="#578D82"];
+  publish [label="B: Coding + publication\nHuman Approve and publish\nExact candidate + separate effects", fillcolor="#EAF1F8", color="#6489B0"];
+  lifecycle [label="C: Broader durable Work + children\nStop task / Stop Agent / Start Agent\nQualify broader lifecycle behavior", fillcolor="#F7EDEE", color="#B7858B"];
+
+  reads -> publish;
+  publish -> lifecycle;
+}
