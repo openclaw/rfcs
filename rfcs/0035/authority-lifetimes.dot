@@ -1,0 +1,19 @@
+digraph AuthorityLifetimes {
+  graph [rankdir=LR, bgcolor="white", pad="0.16", nodesep="0.32", ranksep="0.35", splines=polyline, outputorder=edgesfirst];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=18, color="#426875", fontcolor="#20323A", fillcolor="#ECF5F5", margin="0.15,0.11", penwidth=1.2];
+  edge [fontname="Arial", fontsize=15, color="#607982", fontcolor="#405962", arrowsize=0.7, penwidth=1.2];
+
+  work [label="Logical work\nScope / horizon", fillcolor="#E6F3EF", color="#418678"];
+  authority [label="Current authority", fillcolor="#EAF1FA", color="#5780A8"];
+  lease [label="Enforcement lease\nExecution / expiry", fillcolor="#E6F3EF", color="#418678"];
+  identity [label="Verified peer", fillcolor="#EAF1FA", color="#5780A8"];
+  accepting [label="Accepting service\nOperation checks", fillcolor="#F8EEEE", color="#AF7781"];
+
+  { rank=same; work; authority; }
+  { rank=same; lease; identity; }
+  work -> lease [label="bounds"];
+  authority -> lease [label="issue / renew"];
+  lease -> accepting [label="bounds use"];
+  identity -> accepting [label="authenticates"];
+  authority -> identity [style=invis];
+}
