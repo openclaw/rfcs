@@ -3,7 +3,7 @@ title: Claws
 authors:
   - Gio
 created: 2026-07-03
-last_updated: 2026-07-19
+last_updated: 2026-11-12
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/27
@@ -33,6 +33,10 @@ replace the underlying owner surfaces.
 The public lifecycle is `add`, `status`, `update`, `remove`, and `export`.
 `add --dry-run` is the non-mutating preview. Artifact-level `install` and
 `uninstall` remain the underlying operations for individual skills and plugins.
+
+The Control UI adds a Claw through a separate conversational path, described in
+[Control UI add path](#control-ui-add-path). The plan, consent, and
+completeness rules elsewhere in this RFC describe the CLI path.
 
 ## Motivation
 
@@ -73,8 +77,11 @@ adopting or merging into an existing agent or managed workspace.
   files.
 - Allow portable, job-specific agent settings while excluding operator-owned
   runtime and authentication choices.
-- Preview every config, file, package, MCP, and cron mutation before `add`.
-- Fail the complete add when any declared component cannot be applied.
+- Preview every config, file, package, MCP, and cron mutation before a CLI
+  `add`.
+- Fail the complete CLI add when any declared component cannot be applied. The
+  Control UI reports such a component instead; see
+  [Control UI add path](#control-ui-add-path).
 - Record enough provenance to inspect, diagnose, update, export, and remove the
   installed agent safely.
 - Reuse RFC 0009 feeds for discovery, curation, approval, blocking, and exact
@@ -117,7 +124,7 @@ principles.
 | Existing agents | `add` never merges into or updates an existing agent. Agent-id and workspace collisions fail closed. |
 | Lifecycle verb | The creation operation is `claws add`; `install` remains an artifact-level operation. |
 | Public schema | The manifest uses grouped `agent`, `workspace`, `packages`, `mcpServers`, and `cronJobs` fields rather than a generic flat entry list. |
-| Completeness | Every declared component is part of the Claw. Unsupported, blocked, or invalid components block `add`; there is no optional `required` flag. |
+| Completeness | Every declared component is part of the Claw. On the CLI path, unsupported, blocked, or invalid components block `add`; there is no optional `required` flag. The [Control UI add path](#control-ui-add-path) reports them instead. |
 | Package identity | Package name and version come from the enclosing package metadata and authenticated publish operation, following the ClawHub plugin precedent. |
 | Operator control | Models, providers, credentials, channel bindings, and local runtime defaults are not portable Claw settings. |
 | Agent configuration | Only explicitly supported portable job settings can be copied into the new `agents.list[]` entry. |
@@ -126,7 +133,7 @@ principles.
 | Discovery and composition | Hosted feeds discover and govern plugin and skill packages; a Claw composes exact resolved package versions and direct MCP declarations rather than defining another catalog. |
 | MCP | Portable stdio and remote MCP declarations map to top-level `mcp.servers`; credentials and completed OAuth state remain local and are not persisted in the manifest or Claw provenance. |
 | Scheduled work | Heartbeat is agent behavior; exact schedules are Gateway cron jobs pinned to the new agent id. |
-| Mutation | `add --dry-run` is read-only. Mutating add requires explicit consent. |
+| Mutation | `add --dry-run` is read-only. Mutating CLI add requires explicit consent. The [Control UI add path](#control-ui-add-path) does not request a plan. |
 | Provenance | OpenClaw records the installed Claw, local agent id, workspace, package refs, MCP refs, cron refs, and managed-file hashes in shared state. |
 | Removal | `remove` deletes only Claw-owned state after drift checks and preserves local edits and independently owned artifacts. |
 
@@ -453,7 +460,7 @@ and reports them as manual conflicts.
 
 `packages` contains only actual installable `skill` and `plugin` packages.
 Every package is required. A blocked source, failed safety check, unavailable
-exact version, or unsupported source blocks the complete add.
+exact version, or unsupported source blocks the complete CLI add.
 
 Skill packages install into the new agent workspace through existing skill
 installers. They are discovered from the workspace normally. Add must not set
@@ -533,7 +540,9 @@ unique within the Claw and must not overwrite existing scheduler records.
 Dry-run shows cadence, timezone, session mode, message/action, delivery, and the
 derived `agentId`. Mutating add creates cron jobs only after the agent and
 workspace are ready, and provenance stores stable scheduler ids for status,
-update, disable, and removal.
+update, disable, and removal. On the Control UI path the new agent creates the
+declared cron jobs itself, paused, during its setup conversation; see
+[Control UI add path](#control-ui-add-path).
 
 Channel delivery settings may name portable modes such as `last`, but a Claw
 does not embed account ids, group ids, credentials, or bindings. Operators bind
@@ -603,7 +612,7 @@ resources by default; `--remove-unused`, repeatable `--remove-referenced`, and
 `--force-referenced` select stronger cleanup in both preview and mutation so
 the choice is included in the plan digest. `--yes` alone never broadens a plan.
 
-Add ordering is transactional where owner APIs permit it and resumable where
+CLI add ordering is transactional where owner APIs permit it and resumable where
 external installers or the scheduler cannot share one transaction:
 
 1. Validate package metadata and manifest.
@@ -622,7 +631,142 @@ mutation and successful resources are recorded immediately. Safe local
 pre-commit work may be compensated, but a completed or uncertain owner mutation
 is retained for deterministic resume, doctor, or remove rather than hidden by a
 best-effort rollback. The result distinguishes complete, partial, and failed
-adds; it never reports a partial agent as successfully added.
+adds; it never reports a partial agent as successfully added. The Control UI
+uses a different order and a different failure rule, described next.
+
+### Control UI add path
+
+The Control UI adds a Claw through a different path from the CLI. What a Claw
+is does not change: one Claw adds one new agent, with its own agent entry and
+its own workspace, and never merges into, replaces, or updates an agent the
+operator already has. The Gateway chooses an unused agent id and a new
+workspace, so there is no adoption or merge case on this path either. Each
+resource still belongs to its existing OpenClaw owner.
+
+What differs is when the user is asked to consent, which steps Gateway code
+performs, which steps the new agent performs in conversation, and what happens
+when a step fails. The CLI path in [CLI and lifecycle](#cli-and-lifecycle) is
+unchanged: it stays plan-first, binds consent to the plan integrity digest, and
+fails the complete add when a declared component cannot be applied.
+
+The Control UI presents a Claw as a Template and its cron jobs as automations.
+This section keeps the RFC's terms.
+
+#### Why this path does not plan first
+
+The plan front-loads consent. It exists for a caller who is not present to
+answer questions while the add runs, such as a script or a non-interactive
+command. That caller has one opportunity to agree, so every effect has to be
+listed and accepted before the first mutation. A chat does not have that
+constraint. The user is present for the whole setup, so the agent can ask at
+the moment each effect would happen, and the user answers about one concrete
+thing instead of approving a list in advance.
+
+The plan is also slow to build. Producing it requires downloading and
+inspecting every declared dependency before anything is created, and in the
+Control UI that made Add take tens of seconds before the user saw a result.
+Without a plan, the chat opens immediately and setup happens in front of the
+user.
+
+#### Before Add
+
+The Control UI does not request a plan, and it shows no review step for plugin
+capability grants or skill warnings. Its trust signal is the ClawHub security
+audit shown in the sidebar for the Claw. The capability disclosure and
+plan-integrity rules under [Safety and security](#safety-and-security) apply
+where a plan is produced, which is the CLI.
+
+#### Creation by the Gateway
+
+Selecting Add opens the new agent's chat immediately. Gateway code then creates
+the agent. Creation is deterministic: it runs no model turn and asks the user
+nothing. It covers:
+
+- the agent entry and its chat;
+- the workspace files;
+- the Claw's skills, whether they come from ClawHub or are carried inside the
+  package, installed without asking;
+- any plugin carried inside the package;
+- the declared MCP servers, written to config;
+- the Claw's `CLAW.md`, copied unchanged into the workspace as an ordinary
+  file;
+- the agent's tool list, which is made to include `automations`, `plugins`,
+  and `message` even when the Claw's agent settings omit them.
+
+`CLAW.md` is copied so that the agent can read the Claw's declarations during
+the setup conversation described below. Lifecycle code still takes declarations
+only from the frontmatter, and the Markdown body remains documentation. The
+tools are added because the setup conversation relies on the agent's ordinary
+tools: for example, it creates cron jobs with `automations` and checks plugins
+with `plugins`.
+
+#### Which dependencies creation installs
+
+Creation installs what is inside the package, and it always installs skills. A
+plugin that the Claw points to on ClawHub is not installed by creation; the
+agent recommends it during the setup conversation.
+
+Two inputs named in this section are accepted by the current implementation but
+are not yet described by the schema text in this RFC, which lists only
+`clawhub` as a package source: a skill or plugin carried inside the Claw
+package as a package-relative folder, and an optional package-root
+`BOOTSTRAP.md` that holds the author's first-run instructions.
+
+#### Failures during creation
+
+Only two failures undo the add: the Claw cannot be fetched, or the workspace
+cannot be written. In either case the Gateway rolls back by removing the agent
+and its chat, since an agent without the Claw's files would not be the agent
+the user asked for.
+
+Every other failure keeps the agent. A skill, a plugin carried inside the
+package, or an MCP server that could not be applied is recorded and reported to
+the user in the setup conversation. No dependency condition blocks the add. A
+plugin that is disabled, missing, blocked by policy, or installed at a
+conflicting version is something to tell the user about, not a failure.
+
+This is the deliberate difference from the Completeness principle. On the CLI,
+a component that cannot be applied has to stop the add, because nobody is
+present to decide what to do about it. In the Control UI the user is in the
+chat with the new agent and can act on each report.
+
+#### Setup conversation
+
+After creation the Gateway starts the agent's first turn with a prompt that is
+not rendered in the chat. The agent has its tools available for this turn. The
+prompt carries only the failures from creation and the MCP servers that were
+added. Everything else the agent reads from `CLAW.md` in its workspace.
+
+The agent then runs the setup conversation in a fixed order:
+
+1. It greets the user.
+2. It creates each declared cron job with its ordinary `automations` tool.
+   Every job is created paused, and the agent tells the user to ask when they
+   want one turned on.
+3. It reports the MCP servers that were added and offers sign-in for any that
+   need it.
+4. It checks each plugin the Claw declares on ClawHub. It confirms the ones
+   that are installed. For one that is missing, it shows the built-in card for
+   that exact plugin. For one that is installed but disabled, it names the
+   plugin and offers to enable it if the user asks.
+5. It continues with the opening from the author's `BOOTSTRAP.md`.
+
+The agent never installs or enables a ClawHub plugin without the user's action.
+Cron jobs created on this path do not run until the user asks for them to be
+turned on, so the non-goal of silently enabling recurring work still holds.
+
+#### Running setup again
+
+This path adds no progress tracking. The prompt is written so that setup is
+safe to run twice, and the existing Retry setup control sends the same prompt
+again.
+
+#### Scope of this section
+
+An earlier direction for this work was that one shared installer would perform
+all setup for both the CLI and the Control UI. This section supersedes that
+direction for the Control UI only. It describes add, and it makes no change to
+the status, update, remove, export, or provenance sections of this RFC.
 
 ### Provenance and local state
 
@@ -733,8 +877,10 @@ must share the schema and fixtures rather than maintain divergent validators.
   hardlink-safe file APIs with size limits.
 - Secrets and resolved environment values never enter plans or provenance.
 - MCP config writes use validated, concurrent-write-safe config APIs.
-- Cron jobs require explicit consent, visible cadence/action previews, stable
-  ownership, live-definition revalidation, and disable/remove handles.
+- Cron jobs created by the CLI require explicit consent, visible cadence/action
+  previews, stable ownership, live-definition revalidation, and disable/remove
+  handles. On the Control UI path the agent creates them paused and the user
+  turns them on by asking.
 - Config mutation preserves `agents.defaults`, existing `agents.list[]` entries,
   channel bindings, and unrelated plugin/MCP settings.
 - Partial adds persist enough state for diagnosis and cleanup.
@@ -751,6 +897,10 @@ must share the schema and fixtures rather than maintain divergent validators.
   separately disclosed capability effect and plan integrity. The Claw CLI's
   exact plan confirmation may acknowledge that warning; an internal
   `acknowledge` parameter must not make the warning disappear from preview.
+- The two preceding items apply wherever a plan is produced, which is the CLI.
+  The Control UI produces no plan and discloses no capability set before
+  creation; its trust signal and its points of consent are described in
+  [Control UI add path](#control-ui-add-path).
 - Claws do not introduce capability-specific resource quotas. Existing
   canonical owner limits apply. Claw manifests are limited to 1 MiB and package
   metadata to 256 KiB; extraction, managed workspace, and plan limits remain
@@ -766,6 +916,11 @@ cleanup make composition safer than an opaque setup script or whole-instance
 export. The tradeoff is a broader lifecycle than an ordinary package manager,
 which is why the RFC uses `add`/`remove`, explicit partial outcomes, and an
 experimental gate rather than promising cross-owner atomicity.
+
+Plan-first mutation is the CLI's model. The Control UI departs from it for the
+reasons given in [Control UI add path](#control-ui-add-path): the user is
+present in a chat to consent at the moment of each effect, and building the
+plan made Add slow.
 
 ## Compatibility and migration
 
@@ -918,9 +1073,9 @@ The RFC implementation is acceptable when tests and real CLI proof demonstrate:
    config, store no secrets or completed OAuth state in provenance, and do not
    depend on a feed-backed connector identity.
 10. Cron jobs are scheduler records pinned to the final local agent id.
-11. Any declared unsupported or blocked component fails the complete add.
-12. Partial failures remain visible and cleanable; they are not reported as a
-    successfully added Claw.
+11. Any declared unsupported or blocked component fails the complete CLI add.
+12. Partial failures of a CLI add remain visible and cleanable; they are not
+    reported as a successfully added Claw.
 13. Status and doctor explain agent, workspace, package, MCP, cron, and managed
     file drift.
 14. Update changes only Claw-owned state, preserves local/operator edits,
