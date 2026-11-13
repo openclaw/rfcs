@@ -705,8 +705,11 @@ These tool additions do not bypass policy. Explicit operator or Claw tool
 denies still win; a denied tool remains unavailable during setup.
 
 `CLAW.md` is copied so that the agent can read the Claw's declarations during
-the setup conversation described below. Lifecycle code still takes declarations
-only from the frontmatter, and the Markdown body remains documentation. The
+the setup conversation described below. Its workspace-root path is reserved for
+that original manifest: a conflicting workspace-file declaration fails before
+Claw files are written, and the new agent and chat are removed. Lifecycle code
+still takes declarations only from the frontmatter, and the Markdown body
+remains documentation. The
 tools are added because the setup conversation relies on the agent's ordinary
 tools: for example, it reads the original `CLAW.md` with `read`, creates cron
 jobs with `automations`, and checks plugins with `plugins`.
@@ -775,6 +778,9 @@ The agent then runs the setup conversation in a fixed order:
 The agent never installs or enables a ClawHub plugin without the user's action.
 Cron jobs created on this path do not run until the user asks for them to be
 turned on, so the non-goal of silently enabling recurring work still holds.
+The current chat path does not convert legacy `agent.heartbeat` settings into
+a heartbeat automation; it creates only the declared cron jobs. This remains
+a gap from the heartbeat behavior described elsewhere in this RFC.
 
 #### Running setup again
 
