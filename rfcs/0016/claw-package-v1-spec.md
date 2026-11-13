@@ -23,6 +23,12 @@ The grouped manifest schema and `CLAW.md` envelope are defined by
 [`claw-md-v1-spec.md`](claw-md-v1-spec.md). Equivalent grouped JSON passes
 through the same validator and lifecycle.
 
+The planning, consent, add, and client conformance requirements below describe
+the plan-first path used by the OpenClaw CLI. The Control UI adds a Claw
+through the separate path described in RFC 0016,
+[Control UI add path](../0016-claws.md#control-ui-add-path), which produces no
+plan and does not fail the add for a dependency that cannot be applied.
+
 This specification does not define:
 
 - a new package transport or dependency solver;
