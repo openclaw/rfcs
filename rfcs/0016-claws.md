@@ -15,9 +15,10 @@ rfc_pr: https://github.com/openclaw/rfcs/pull/27
 
 Define a **Claw** as a distributable definition of one complete OpenClaw agent
 for one job. Adding a Claw creates a new local agent, creates that agent's
-workspace, installs its skills and plugin dependencies, configures declared MCP
-servers, creates agent-pinned scheduled work, and records provenance for the
-complete installed agent.
+workspace, and composes its declared resources. On the CLI path, add installs
+its skills and plugin dependencies, configures declared MCP servers, creates
+agent-pinned scheduled work, and records provenance for the complete installed
+agent.
 
 The central invariant is:
 
@@ -46,7 +47,7 @@ workspace, instructions, skills, tools, MCP dependency, heartbeat behavior, and
 scheduled triage job. It does not rewrite the default agent or borrow an
 unrelated workspace.
 
-Adding a Claw always plans the following owned resources:
+Adding a Claw through the CLI always plans the following owned resources:
 
 1. One new `agents.list[]` entry.
 2. One new workspace assigned to that agent.
@@ -513,12 +514,15 @@ related process settings) and remote servers (`url`, `sse` or
 carry arbitrary authorization headers, bearer tokens, client secrets, or
 completed OAuth state.
 
-Server-name collisions fail unless the existing canonical config is identical
-and a referenced dependency edge can be recorded without taking over unrelated
-state. A newly created, collision-free MCP declaration is managed by the Claw;
-an identical pre-existing declaration is referenced. Both cases use the same
-canonical MCP config path, plan preview, capability consent, drift checks, and
-operator-selected cleanup rules as other resources. Environment
+Server-name collisions block a CLI add unless the existing canonical config is
+identical and a referenced dependency edge can be recorded without taking over
+unrelated state. On the Control UI path an MCP collision is reported without
+discarding the new agent. A newly created, collision-free MCP declaration is
+managed by the Claw; an identical pre-existing declaration is referenced. Both
+cases use the same canonical MCP config path, drift checks, and
+operator-selected cleanup rules as other resources. The CLI also uses plan
+preview and capability consent; the
+Control UI follows [Control UI add path](#control-ui-add-path). Environment
 placeholders such as `${GITHUB_TOKEN}` remain references. Resolved secret values
 must never be stored in the manifest, plan, logs, or provenance. Provenance uses
 a canonical redacted digest sufficient for drift detection. Remote OAuth and
@@ -650,7 +654,10 @@ unchanged: it stays plan-first, binds consent to the plan integrity digest, and
 fails the complete add when a declared component cannot be applied.
 
 The Control UI presents a Claw as a Template and its cron jobs as automations.
-This section keeps the RFC's terms.
+This section keeps the RFC's terms. The codebase and its current documentation
+use `skills`, `plugins`, and `automations` where the legacy schema text above
+and in the sidecars uses `packages` and `cronJobs`. This amendment does not
+reconcile those schemas or rename the RFC's lifecycle commands.
 
 #### Why this path does not plan first
 
@@ -685,26 +692,35 @@ nothing. It covers:
 - the agent entry and its chat;
 - the workspace files;
 - the Claw's skills, whether they come from ClawHub or are carried inside the
-  package, installed without asking;
+  package, installed without asking, subject to the unresolved warning policy
+  noted below;
 - any plugin carried inside the package;
 - the declared MCP servers, written to config;
 - the Claw's `CLAW.md`, copied unchanged into the workspace as an ordinary
   file;
-- the agent's tool list, which is made to include `automations`, `plugins`,
-  and `message` even when the Claw's agent settings omit them.
+- the agent's tool list, which is made to include `read`, `automations`,
+  `plugins`, and `message` even when the Claw's agent settings omit them.
+
+These tool additions do not bypass policy. Explicit operator or Claw tool
+denies still win; a denied tool remains unavailable during setup.
 
 `CLAW.md` is copied so that the agent can read the Claw's declarations during
 the setup conversation described below. Lifecycle code still takes declarations
 only from the frontmatter, and the Markdown body remains documentation. The
 tools are added because the setup conversation relies on the agent's ordinary
-tools: for example, it creates cron jobs with `automations` and checks plugins
-with `plugins`.
+tools: for example, it reads the original `CLAW.md` with `read`, creates cron
+jobs with `automations`, and checks plugins with `plugins`.
 
 #### Which dependencies creation installs
 
-Creation installs what is inside the package, and it always installs skills. A
-plugin that the Claw points to on ClawHub is not installed by creation; the
-agent recommends it during the setup conversation.
+The intended rule is that creation installs what is inside the package and
+always installs skills. A plugin that the Claw points to on ClawHub is not
+installed by creation; the agent recommends it during the setup conversation.
+
+There is an unresolved exception in the implementation being integrated:
+warned dependencies are reported and left uninstalled. Whether warned skills
+may be installed without a separate acknowledgment is not settled. The
+intended always-install-skills rule does not authorize bypassing that check.
 
 Two inputs named in this section are accepted by the current implementation but
 are not yet described by the schema text in this RFC, which lists only
@@ -740,16 +756,21 @@ added. Everything else the agent reads from `CLAW.md` in its workspace.
 The agent then runs the setup conversation in a fixed order:
 
 1. It greets the user.
-2. It creates each declared cron job with its ordinary `automations` tool.
-   Every job is created paused, and the agent tells the user to ask when they
-   want one turned on.
-3. It reports the MCP servers that were added and offers sign-in for any that
-   need it.
+2. It creates any missing declared cron jobs with its ordinary `automations`
+   tool. Every new job is created paused, and the agent tells the user to ask
+   when they want one turned on. Existing matching jobs are left unchanged.
+3. It reports the MCP servers that were added and directs the user to
+   Settings → MCP → Sign in for any that need sign-in. There is currently no
+   agent-triggerable MCP sign-in card.
 4. It checks each plugin the Claw declares on ClawHub. It confirms the ones
    that are installed. For one that is missing, it shows the built-in card for
-   that exact plugin. For one that is installed but disabled, it names the
+   that exact plugin: an official plugin card offers Install, while a
+   community plugin card offers View details. An unknown plugin returns
+   not-found and no card; the agent reports that rather than substituting a
+   different plugin. For one that is installed but disabled, it names the
    plugin and offers to enable it if the user asks.
-5. It continues with the opening from the author's `BOOTSTRAP.md`.
+5. It reports the failures recorded during creation.
+6. It continues with the opening from the author's `BOOTSTRAP.md`, if present.
 
 The agent never installs or enables a ClawHub plugin without the user's action.
 Cron jobs created on this path do not run until the user asks for them to be
@@ -757,9 +778,11 @@ turned on, so the non-goal of silently enabling recurring work still holds.
 
 #### Running setup again
 
-This path adds no progress tracking. The prompt is written so that setup is
-safe to run twice, and the existing Retry setup control sends the same prompt
-again.
+This path adds no progress tracking. The existing Retry setup control reruns
+only the setup conversation for the existing agent, using the same prompt
+with a fresh run identity. It never recreates the agent, workspace files, or
+dependencies. The prompt makes this safe to run twice: matching cron jobs are
+not modified or paused again, so a job the user has enabled keeps its state.
 
 #### Scope of this section
 
@@ -870,9 +893,12 @@ must share the schema and fixtures rather than maintain divergent validators.
 
 - Agent-id and workspace collisions fail closed.
 - Add never mutates an existing agent.
-- Unknown fields or unsupported declared components fail closed.
+- Unknown schema fields fail closed. Unsupported declared components block
+  the CLI add; the Control UI reports components it cannot apply as described
+  in [Control UI add path](#control-ui-add-path).
 - All package dependencies pass existing source, integrity, compatibility, and
-  install safety checks.
+  install safety checks before installation. On the Control UI path a failed
+  check is reported without discarding the agent.
 - Workspace package reads and destination writes use rooted, symlink-safe,
   hardlink-safe file APIs with size limits.
 - Secrets and resolved environment values never enter plans or provenance.
