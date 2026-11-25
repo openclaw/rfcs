@@ -4,7 +4,7 @@ authors:
   - osolmaz
   - vincentkoc
 created: 2026-06-17
-last_updated: 2026-08-25
+last_updated: 2026-11-25
 status: draft
 issue:
 rfc_pr: https://github.com/openclaw/rfcs/pull/18
@@ -258,6 +258,18 @@ spec:
   openclaw.ai:
     toolProfile: lean
 ```
+
+When loading a pack, the registry accepts `kind: AgentProfile` and maps
+`apiVersion: agentprofiles.io/v1` to `schemaVersion: 1`. Join
+`metadata.namespace` and `metadata.name` with `/` to form the profile ID. Each component is one nonempty path
+segment. The example becomes `openclaw/acme-1-30b`. Preserve `spec` and, when present,
+the top-level `extends` field. Its value is a fully qualified profile ID from
+the same registry. Reject an unsupported kind or version, a missing namespace
+or name, or a duplicate ID before publishing the registry snapshot.
+
+In phase one, the built-in registry supplies the `bindings` array separately.
+Each binding names a materialized profile by its full `profileId`. Loading a
+pack alone adds no model, family, artifact or size binding.
 
 All behavior fields live under `spec`. The `common` section is the
 harness-agnostic part. Domain-named sections such as `openclaw.ai` are owned
@@ -679,7 +691,16 @@ shapes.
 | --- | --- | --- |
 | default `experimental.localModelLean: true` | default `agentProfileId: "openclaw/small"` | preserves explicit Lean intent |
 | agent `experimental.localModelLean: true` | agent `agentProfileId: "openclaw/small"` | preserves stronger scope |
-| legacy Lean `false` | remove legacy field | no explicit base profile needed |
+| default `experimental.localModelLean: false` | explicit non-Lean default profile | preserve the opt-out even when a Tiny/Small size binding would select Lean |
+| agent `experimental.localModelLean: false` | explicit non-Lean agent profile | preserve the opt-out over a Lean default |
+
+Use `openclaw/base` for a false value only when it preserves the other
+effective behavior at that scope. For example, defaults set to true and an
+agent set to false require `openclaw/small` at defaults and a non-Lean
+profile for that agent. If no single non-Lean profile preserves
+the applicable model-family settings across the configured models, Doctor
+must leave the configuration unchanged and report the conflicting scope and
+bindings. An absent legacy field needs no explicit opt-out.
 
 Doctor must validate rewritten config, be idempotent, remove legacy fields
 after success, and report same-precedence conflicts rather than guessing.
